@@ -1,0 +1,16 @@
+/* Локальные файлы: client/public/fonts/jost/ (OFL — OFL.txt). Веса 100–900 из variable font. */
+@font-face {
+  font-family: Jost;
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url("/fonts/jost/Jost-VariableFont_wght.ttf") format("truetype");
+}
+
+@font-face {
+  font-family: Jost;
+  font-style: italic;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url("/fonts/jost/Jost-Italic-VariableFont_wght.ttf") format("truetype");
+}

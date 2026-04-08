@@ -18,12 +18,23 @@ dotenv.config();
  * Дашборд результатов: `DASHBOARD_RESULTS_DEBOUNCE_MS` — пауза перед пересчётом после
  * всплеска `answer:submit` (меньше — живее UI, больше — меньше нагрузки на Postgres).
  */
+/**
+ * Разрешить CORS для http(s)://*:5173 с частных IP / localhost, если не production
+ * и не задано CLIENT_ORIGIN_ALLOW_LAN=0. Явно включить: CLIENT_ORIGIN_ALLOW_LAN=1.
+ */
+function allowLanViteOrigins(): boolean {
+  if (process.env.CLIENT_ORIGIN_ALLOW_LAN === "0") return false;
+  if (process.env.CLIENT_ORIGIN_ALLOW_LAN === "1") return true;
+  return process.env.NODE_ENV !== "production";
+}
+
 export const env = {
   port: Number(process.env.PORT ?? 4000),
   clientOrigins: (process.env.CLIENT_ORIGIN ?? "http://localhost:5173")
     .split(",")
     .map((origin) => origin.trim())
     .filter(Boolean),
+  allowLanViteOrigins: allowLanViteOrigins(),
   adminLogin: process.env.ADMIN_LOGIN ?? "admin",
   adminPassword: process.env.ADMIN_PASSWORD ?? "change-me",
   databaseUrl:

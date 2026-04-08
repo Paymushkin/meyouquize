@@ -15,6 +15,7 @@ import {
 import { isAdminTokenValid } from "./admin-session-cache.js";
 import { registerSocketHandlers } from "./socket/register-handlers.js";
 import { attachSocketIoRedisAdapter } from "./socket/redis-io-adapter.js";
+import { isPrivateNetworkViteDevPort } from "./cors-allow.js";
 import { prisma } from "./prisma.js";
 import { randomToken } from "./utils.js";
 import {
@@ -232,7 +233,21 @@ export async function buildServer() {
   const httpServer = createServer(app);
   const io = new Server(httpServer, {
     cors: {
-      origin: env.clientOrigins,
+      origin: (origin, callback) => {
+        if (!origin) {
+          callback(null, true);
+          return;
+        }
+        if (env.clientOrigins.includes(origin)) {
+          callback(null, true);
+          return;
+        }
+        if (env.allowLanViteOrigins && isPrivateNetworkViteDevPort(origin)) {
+          callback(null, true);
+          return;
+        }
+        callback(null, false);
+      },
       credentials: true,
     },
   });
