@@ -1,1 +1,0 @@
-{"root":["./src/main.tsx","./src/socket.ts","./src/storage.ts","./src/components/adminloginform.tsx","./src/pages/admineventpage.tsx","./src/pages/adminpage.tsx","./src/pages/adminroomspage.tsx","./src/pages/quizplaypage.tsx","./src/pages/resultspage.tsx"],"version":"5.9.3"}
