@@ -1,0 +1,29 @@
+/**
+ * Декоративные круги как у body в админке (main.tsx CssBaseline).
+ * Включается на /q/:slug/results вместе с projectorBackground #7c5acb.
+ */
+body.mq-admin-projector-bg::before {
+  content: "";
+  position: fixed;
+  left: -18vw;
+  top: 18vh;
+  width: 72vw;
+  height: 72vw;
+  border-radius: 50%;
+  background: #6749b5;
+  z-index: 0;
+  pointer-events: none;
+}
+
+body.mq-admin-projector-bg::after {
+  content: "";
+  position: fixed;
+  right: -16vw;
+  bottom: -20vw;
+  width: 52vw;
+  height: 52vw;
+  border-radius: 50%;
+  border: 56px solid rgba(180, 155, 245, 0.32);
+  z-index: 0;
+  pointer-events: none;
+}

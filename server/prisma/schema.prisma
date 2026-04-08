@@ -1,0 +1,129 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Quiz {
+  id          String        @id @default(cuid())
+  title       String
+  slug        String        @unique
+  accessToken String
+  status      QuizStatus    @default(DRAFT)
+  /** Снимок public view (режим экрана, брендирование, настройки облака) для комнаты */
+  publicView  Json?
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+  subQuizzes  SubQuiz[]
+  questions   Question[]
+  participants Participant[]
+  answers     Answer[]
+}
+
+model SubQuiz {
+  id                   String     @id @default(cuid())
+  quizId               String
+  quiz                 Quiz       @relation(fields: [quizId], references: [id], onDelete: Cascade)
+  title                String     @default("Квиз")
+  sortOrder            Int        @default(0)
+  currentQuestionIndex Int        @default(0)
+  questions            Question[]
+
+  @@index([quizId])
+}
+
+model Question {
+  id          String        @id @default(cuid())
+  quizId      String
+  quiz        Quiz          @relation(fields: [quizId], references: [id], onDelete: Cascade)
+  /** null — отдельное голосование комнаты */
+  subQuizId   String?
+  subQuiz     SubQuiz?      @relation(fields: [subQuizId], references: [id], onDelete: Cascade)
+  text        String
+  type        QuestionType
+  order       Int
+  points      Int           @default(1)
+  maxAnswers  Int           @default(1)
+  isActive    Boolean       @default(false)
+  isClosed    Boolean       @default(false)
+  /** POLL: баллы не начисляются */
+  scoringMode ScoringMode   @default(QUIZ)
+  /** Голосования комнаты: показывать на проекторе ники первых верно ответивших (если включено глобально). */
+  projectorShowFirstCorrect Boolean @default(true)
+  /** Сколько первых верно ответивших показывать на проекторе (1–20), если projectorShowFirstCorrect. */
+  projectorFirstCorrectWinnersCount Int @default(1)
+  options     Option[]
+  answers     Answer[]
+
+  @@index([quizId])
+  @@index([subQuizId])
+}
+
+model Option {
+  id         String   @id @default(cuid())
+  questionId String
+  question   Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  text       String
+  isCorrect  Boolean  @default(false)
+}
+
+model Participant {
+  id        String   @id @default(cuid())
+  quizId    String
+  quiz      Quiz     @relation(fields: [quizId], references: [id], onDelete: Cascade)
+  deviceId  String
+  nickname  String
+  createdAt DateTime @default(now())
+  answers   Answer[]
+
+  @@unique([quizId, deviceId])
+  @@index([quizId])
+}
+
+model Answer {
+  id                String      @id @default(cuid())
+  quizId            String
+  quiz              Quiz        @relation(fields: [quizId], references: [id], onDelete: Cascade)
+  questionId        String
+  question          Question    @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  participantId     String
+  participant       Participant @relation(fields: [participantId], references: [id], onDelete: Cascade)
+  selectedOptionIds String
+  isCorrect         Boolean
+  scoreAwarded      Int         @default(0)
+  submittedAt       DateTime    @default(now())
+
+  @@unique([questionId, participantId])
+  @@index([quizId])
+  @@index([questionId])
+  @@index([participantId])
+  /** Выборки лидербордов и getParticipantAnswersMap по комнате + участнику */
+  @@index([quizId, participantId])
+}
+
+model AdminSession {
+  id        String   @id @default(cuid())
+  token     String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+}
+
+enum ScoringMode {
+  POLL
+  QUIZ
+}
+
+enum QuestionType {
+  SINGLE
+  MULTI
+  TAG_CLOUD
+}
+
+enum QuizStatus {
+  DRAFT
+  LIVE
+  FINISHED
+}

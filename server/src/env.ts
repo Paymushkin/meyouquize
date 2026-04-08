@@ -1,0 +1,38 @@
+import dotenv from "dotenv";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+
+const currentFile = fileURLToPath(import.meta.url);
+const serverSrcDir = path.dirname(currentFile);
+const projectRootEnv = path.resolve(serverSrcDir, "../../.env");
+
+dotenv.config({ path: projectRootEnv });
+dotenv.config();
+
+/**
+ * Малая инфраструктура: один процесс Node + Postgres. В `DATABASE_URL` для продакшена
+ * задайте лимит пула, например `?connection_limit=5` (или через PgBouncer), чтобы не
+ * исчерпать соединения на малом инстансе. `REDIS_URL` нужен только для нескольких
+ * инстансов Socket.IO (см. attachSocketIoRedisAdapter).
+ *
+ * Дашборд результатов: `DASHBOARD_RESULTS_DEBOUNCE_MS` — пауза перед пересчётом после
+ * всплеска `answer:submit` (меньше — живее UI, больше — меньше нагрузки на Postgres).
+ */
+export const env = {
+  port: Number(process.env.PORT ?? 4000),
+  clientOrigins: (process.env.CLIENT_ORIGIN ?? "http://localhost:5173")
+    .split(",")
+    .map((origin) => origin.trim())
+    .filter(Boolean),
+  adminLogin: process.env.ADMIN_LOGIN ?? "admin",
+  adminPassword: process.env.ADMIN_PASSWORD ?? "change-me",
+  databaseUrl:
+    process.env.DATABASE_URL ?? "postgresql://postgres:postgres@localhost:5432/meyouquize",
+  adminSessionHours: Number(process.env.ADMIN_SESSION_HOURS ?? 8),
+  redisUrl: process.env.REDIS_URL?.trim() || undefined,
+  /** Склейка всплесков пересчёта дашборда (мс). */
+  dashboardResultsDebounceMs: Math.max(
+    0,
+    Number.parseInt(process.env.DASHBOARD_RESULTS_DEBOUNCE_MS ?? "220", 10) || 220,
+  ),
+};

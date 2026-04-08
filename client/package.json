@@ -1,0 +1,41 @@
+{
+  "name": "client",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 0.0.0.0 --port 5173",
+    "build": "tsc --noEmit && vite build",
+    "lint": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@emotion/react": "^11.14.0",
+    "@emotion/styled": "^11.14.1",
+    "@fontsource/jost": "^5.2.8",
+    "@fontsource/roboto": "^5.2.10",
+    "@meyouquize/shared": "*",
+    "@mui/icons-material": "^7.3.9",
+    "@mui/material": "^7.3.9",
+    "@react-spring/web": "^10.0.3",
+    "@visx/group": "^3.12.0",
+    "@visx/text": "^3.12.0",
+    "@visx/wordcloud": "^3.12.0",
+    "d3-cloud": "^1.2.9",
+    "echarts": "^5.6.0",
+    "echarts-wordcloud": "^2.1.0",
+    "qrcode": "^1.5.4",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0",
+    "react-router-dom": "^7.5.0",
+    "react-wordcloud": "^1.2.7",
+    "socket.io-client": "^4.8.1"
+  },
+  "devDependencies": {
+    "@types/qrcode": "^1.5.5",
+    "@types/react": "^19.1.2",
+    "@types/react-dom": "^19.1.2",
+    "@vitejs/plugin-react": "^4.3.4",
+    "typescript": "^5.8.3",
+    "vite": "^6.2.4"
+  }
+}
