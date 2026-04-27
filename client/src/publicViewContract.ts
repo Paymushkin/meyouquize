@@ -8,32 +8,32 @@ import {
   type PublicViewPayload as SharedPublicViewPayload,
 } from "@meyouquize/shared";
 
-export type BrandingState = {
-  projectorBackground: string;
-  cloudQuestionColor: string;
-  cloudTagColors: string[];
-  cloudTopTagColor: string;
-  cloudCorrectTagColor: string;
-  cloudDensity: number;
-  cloudTagPadding: number;
-  cloudSpiral: "archimedean" | "rectangular";
-  cloudAnimationStrength: number;
-  voteQuestionTextColor: string;
-  voteOptionTextColor: string;
-  voteProgressTrackColor: string;
-  voteProgressBarColor: string;
-  brandPrimaryColor: string;
-  brandAccentColor: string;
-  brandSurfaceColor: string;
-  brandTextColor: string;
-  brandFontFamily: string;
-  brandFontUrl: string;
-  brandLogoUrl: string;
-  brandPlayerBackgroundImageUrl: string;
-  brandProjectorBackgroundImageUrl: string;
-  brandBodyBackgroundColor: string;
-  brandBackgroundOverlayColor: string;
-};
+type BrandingKeys =
+  | "projectorBackground"
+  | "cloudQuestionColor"
+  | "cloudTagColors"
+  | "cloudTopTagColor"
+  | "cloudCorrectTagColor"
+  | "cloudDensity"
+  | "cloudTagPadding"
+  | "cloudSpiral"
+  | "cloudAnimationStrength"
+  | "voteQuestionTextColor"
+  | "voteOptionTextColor"
+  | "voteProgressTrackColor"
+  | "voteProgressBarColor"
+  | "brandPrimaryColor"
+  | "brandAccentColor"
+  | "brandSurfaceColor"
+  | "brandTextColor"
+  | "brandFontFamily"
+  | "brandFontUrl"
+  | "brandLogoUrl"
+  | "brandPlayerBackgroundImageUrl"
+  | "brandProjectorBackgroundImageUrl"
+  | "brandBodyBackgroundColor";
+
+export type BrandingState = Pick<SharedPublicViewPayload, BrandingKeys>;
 
 export type CloudManualStateByQuestion = Record<
   string,
@@ -55,6 +55,7 @@ export const PROGRAM_TILE_ID = "program_tile";
 export type PublicViewPayload = SharedPublicViewPayload & {
   reactionsWidgets?: PublicReactionWidget[];
   playerVisibleResultQuestionIds?: string[];
+  randomizerListMode?: "participants_only" | "free_list";
   speakerTileVisible?: boolean;
   programTileText?: string;
   programTileBackgroundColor?: string;
@@ -65,6 +66,7 @@ export type PublicViewPayload = SharedPublicViewPayload & {
 export type PublicViewSetPatch = SharedPublicViewPatch & {
   reactionsWidgets?: PublicReactionWidget[];
   playerVisibleResultQuestionIds?: string[];
+  randomizerListMode?: "participants_only" | "free_list";
   speakerTileVisible?: boolean;
   programTileText?: string;
   programTileBackgroundColor?: string;
@@ -101,7 +103,6 @@ export function toBrandingState(payload: Partial<PublicViewPayload>): BrandingSt
     brandPlayerBackgroundImageUrl: view.brandPlayerBackgroundImageUrl,
     brandProjectorBackgroundImageUrl: view.brandProjectorBackgroundImageUrl,
     brandBodyBackgroundColor: view.brandBodyBackgroundColor,
-    brandBackgroundOverlayColor: view.brandBackgroundOverlayColor,
   };
 }
 

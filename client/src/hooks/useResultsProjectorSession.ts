@@ -23,6 +23,7 @@ export type UseResultsProjectorSessionResult = ProjectorDerived & {
   resultsAnimationTick: number;
   speakerQuestions: SpeakerQuestionsPayload | null;
   reactionSession: ReactionSession | null;
+  hasInitialPublicView: boolean;
 };
 
 export function useResultsProjectorSession(
@@ -31,6 +32,7 @@ export function useResultsProjectorSession(
   const [state, dispatch] = useReducer(projectorSessionReducer, initialProjectorSessionState);
   const [speakerQuestions, setSpeakerQuestions] = useState<SpeakerQuestionsPayload | null>(null);
   const [reactionSession, setReactionSession] = useState<ReactionSession | null>(null);
+  const [hasInitialPublicView, setHasInitialPublicView] = useState(false);
 
   useEffect(() => {
     if (!slug) return;
@@ -47,6 +49,7 @@ export function useResultsProjectorSession(
     };
     const onPublicView = (payload: PublicViewPayload) => {
       dispatch({ type: "publicView", payload });
+      setHasInitialPublicView(true);
       if (import.meta.env.DEV) {
         const v = normalizePublicViewState(payload);
         console.info("[mq-winners] results:public:view", {
@@ -113,6 +116,7 @@ export function useResultsProjectorSession(
       resultsAnimationTick: state.resultsAnimationTick,
       speakerQuestions,
       reactionSession,
+      hasInitialPublicView,
     }),
     [
       derived,
@@ -121,6 +125,7 @@ export function useResultsProjectorSession(
       state.resultsAnimationTick,
       speakerQuestions,
       reactionSession,
+      hasInitialPublicView,
     ],
   );
 }

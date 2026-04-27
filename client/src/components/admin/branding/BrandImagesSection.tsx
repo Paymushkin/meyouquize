@@ -22,8 +22,6 @@ type Props = {
   setBrandSurfaceColor: (value: string) => void;
   brandTextColor: string;
   setBrandTextColor: (value: string) => void;
-  brandBackgroundOverlayColor: string;
-  setBrandBackgroundOverlayColor: (value: string) => void;
   brandLogoUrl: string;
   setBrandLogoUrl: (value: string) => void;
   brandPlayerBackgroundImageUrl: string;
@@ -46,8 +44,6 @@ export function BrandImagesSection(props: Props) {
     setBrandSurfaceColor,
     brandTextColor,
     setBrandTextColor,
-    brandBackgroundOverlayColor,
-    setBrandBackgroundOverlayColor,
     brandLogoUrl,
     setBrandLogoUrl,
     brandPlayerBackgroundImageUrl,
@@ -90,12 +86,6 @@ export function BrandImagesSection(props: Props) {
               value={brandTextColor}
               onChange={setBrandTextColor}
               onBlur={() => emitPatch({ brandTextColor })}
-            />
-            <CompactColorField
-              label="Overlay"
-              value={brandBackgroundOverlayColor}
-              onChange={setBrandBackgroundOverlayColor}
-              onBlur={() => emitPatch({ brandBackgroundOverlayColor })}
             />
           </Box>
           <Box

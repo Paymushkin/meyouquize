@@ -130,7 +130,6 @@ export function QuizPlayPage() {
   const [dismissedQuestionId, setDismissedQuestionId] = useState<string | null>(null);
   const [error, setError] = useState("");
   const [metaBrandPlayerBackgroundImageUrl, setMetaBrandPlayerBackgroundImageUrl] = useState("");
-  const [metaBrandBackgroundOverlayColor, setMetaBrandBackgroundOverlayColor] = useState("#000000");
   const [metaBrandBodyBackgroundColor, setMetaBrandBodyBackgroundColor] = useState("#000000");
   const [connectionStatus, setConnectionStatus] = useState<"online" | "reconnecting" | "offline">(
     "reconnecting",
@@ -313,7 +312,6 @@ export function QuizPlayPage() {
         const payload = (await response.json()) as {
           title?: string;
           brandPlayerBackgroundImageUrl?: string;
-          brandBackgroundOverlayColor?: string;
           brandBodyBackgroundColor?: string;
         };
         if (typeof payload.title === "string") {
@@ -321,12 +319,6 @@ export function QuizPlayPage() {
         }
         if (typeof payload.brandPlayerBackgroundImageUrl === "string") {
           setMetaBrandPlayerBackgroundImageUrl(payload.brandPlayerBackgroundImageUrl);
-        }
-        if (
-          typeof payload.brandBackgroundOverlayColor === "string" &&
-          payload.brandBackgroundOverlayColor.trim()
-        ) {
-          setMetaBrandBackgroundOverlayColor(payload.brandBackgroundOverlayColor);
         }
         if (
           typeof payload.brandBodyBackgroundColor === "string" &&
@@ -598,7 +590,6 @@ export function QuizPlayPage() {
     quiz?.brandBodyBackgroundColor?.trim() || metaBrandBodyBackgroundColor;
   const brandBackground = buildBrandBackground({
     backgroundImageUrl: brandPlayerBackgroundImageUrl,
-    overlayColor: quiz?.brandBackgroundOverlayColor ?? metaBrandBackgroundOverlayColor,
   });
   useBrandFont(brandFontFamily, quiz?.brandFontUrl);
   useEventFavicon(brandLogoUrl);
@@ -621,7 +612,10 @@ export function QuizPlayPage() {
     (Boolean(speakerQuestions?.settings.enabled) && speakerTileVisible) ||
     visiblePlayerBanners.length > 0 ||
     (programTileVisible && programTileLinkUrl.length > 0);
-  const visibleResultTiles = quiz?.playerVisibleResults ?? [];
+  const visibleResultTiles = useMemo(
+    () => quiz?.playerVisibleResults ?? [],
+    [quiz?.playerVisibleResults],
+  );
   const selectedResultTile = useMemo(
     () => visibleResultTiles.find((item) => item.questionId === resultsDialogQuestionId) ?? null,
     [resultsDialogQuestionId, visibleResultTiles],

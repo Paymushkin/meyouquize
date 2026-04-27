@@ -41,8 +41,11 @@ export type PublicViewMode =
   | "question"
   | "leaderboard"
   | "speaker_questions"
-  | "reactions";
+  | "reactions"
+  | "randomizer";
 export type QuestionRevealStage = "options" | "results";
+export type RandomizerMode = "names" | "numbers";
+export type RandomizerListMode = "participants_only" | "free_list";
 
 export type CloudWordCount = { text: string; count: number };
 export type PublicBanner = {
@@ -56,6 +59,11 @@ export type PublicReactionWidget = {
   id: string;
   title: string;
   reactions: string[];
+};
+export type RandomizerHistoryEntry = {
+  timestamp: string;
+  winners: string[];
+  mode: RandomizerMode;
 };
 
 export interface PublicViewState {
@@ -129,6 +137,30 @@ export interface PublicViewState {
   reactionsWidgets: PublicReactionWidget[];
   /** Список questionId, для которых у пользователя показываются плитки результатов */
   playerVisibleResultQuestionIds: string[];
+  /** Рандомайзер: режим выбора (имена/числа) */
+  randomizerMode: RandomizerMode;
+  /** Рандомайзер: источник списка имён */
+  randomizerListMode: RandomizerListMode;
+  /** Рандомайзер: заголовок блока на проекторе */
+  randomizerTitle: string;
+  /** Рандомайзер: исходный список имён (по одному в строке) */
+  randomizerNamesText: string;
+  /** Рандомайзер: нижняя граница диапазона чисел */
+  randomizerMinNumber: number;
+  /** Рандомайзер: верхняя граница диапазона чисел */
+  randomizerMaxNumber: number;
+  /** Рандомайзер: сколько победителей выбирать за запуск */
+  randomizerWinnersCount: number;
+  /** Рандомайзер: исключать ранее выбранных */
+  randomizerExcludeWinners: boolean;
+  /** Рандомайзер: список ранее выбранных победителей (для исключения) */
+  randomizerSelectedWinners: string[];
+  /** Рандомайзер: победители последнего запуска */
+  randomizerCurrentWinners: string[];
+  /** Рандомайзер: история запусков */
+  randomizerHistory: RandomizerHistoryEntry[];
+  /** Рандомайзер: счётчик запусков (триггер анимации на проекторе) */
+  randomizerRunId: number;
   /** Бренд: базовый акцентный цвет интерфейса */
   brandPrimaryColor: string;
   /** Бренд: дополнительный цвет интерфейса */
@@ -151,8 +183,6 @@ export interface PublicViewState {
   brandBodyBackgroundColor: string;
   /** @deprecated legacy поле, используйте раздельные player/projector */
   brandBackgroundImageUrl?: string;
-  /** Бренд: цвет оверлея поверх фонового изображения */
-  brandBackgroundOverlayColor: string;
 }
 
 export interface PublicViewPayload extends PublicViewState {
@@ -209,6 +239,18 @@ export const DEFAULT_PUBLIC_VIEW_STATE: PublicViewState = {
   reactionsOverlayText: "Реакции аудитории",
   reactionsWidgets: [],
   playerVisibleResultQuestionIds: [],
+  randomizerMode: "names",
+  randomizerListMode: "free_list",
+  randomizerTitle: "Рандомайзер",
+  randomizerNamesText: "",
+  randomizerMinNumber: 1,
+  randomizerMaxNumber: 100,
+  randomizerWinnersCount: 1,
+  randomizerExcludeWinners: true,
+  randomizerSelectedWinners: [],
+  randomizerCurrentWinners: [],
+  randomizerHistory: [],
+  randomizerRunId: 0,
   brandPrimaryColor: "#7c5acb",
   brandAccentColor: "#1976d2",
   brandSurfaceColor: "#ffffff",
@@ -219,7 +261,6 @@ export const DEFAULT_PUBLIC_VIEW_STATE: PublicViewState = {
   brandPlayerBackgroundImageUrl: "",
   brandProjectorBackgroundImageUrl: "",
   brandBodyBackgroundColor: "#000000",
-  brandBackgroundOverlayColor: "#000000",
 };
 
 function clampInt(value: number, min: number, max: number): number {
@@ -320,6 +361,25 @@ function sanitizeReactionWidgets(
   return result;
 }
 
+function sanitizeRandomizerHistory(
+  items: RandomizerHistoryEntry[] | undefined,
+): RandomizerHistoryEntry[] {
+  if (!Array.isArray(items)) return [];
+  return items
+    .filter((item) => item && typeof item.timestamp === "string" && Array.isArray(item.winners))
+    .map((item) => ({
+      timestamp: item.timestamp.trim().slice(0, 80),
+      winners: item.winners
+        .filter((winner): winner is string => typeof winner === "string")
+        .map((winner) => winner.trim())
+        .filter((winner) => winner.length > 0)
+        .slice(0, 50),
+      mode: (item.mode === "numbers" ? "numbers" : "names") as RandomizerMode,
+    }))
+    .filter((item) => item.timestamp.length > 0 && item.winners.length > 0)
+    .slice(0, 200);
+}
+
 export function normalizePublicViewState(
   value: Partial<PublicViewState> | undefined,
 ): PublicViewState {
@@ -329,7 +389,8 @@ export function normalizePublicViewState(
     value?.mode === "leaderboard" ||
     value?.mode === "title" ||
     value?.mode === "speaker_questions" ||
-    value?.mode === "reactions"
+    value?.mode === "reactions" ||
+    value?.mode === "randomizer"
       ? value.mode
       : base.mode;
   const rawQuestionId =
@@ -504,6 +565,54 @@ export function normalizePublicViewState(
           .filter((item) => item.length > 0)
           .slice(0, 200)
       : [...base.playerVisibleResultQuestionIds],
+    randomizerMode: value?.randomizerMode === "numbers" ? "numbers" : base.randomizerMode,
+    randomizerListMode:
+      value?.randomizerListMode === "participants_only"
+        ? "participants_only"
+        : base.randomizerListMode,
+    randomizerTitle:
+      typeof value?.randomizerTitle === "string"
+        ? value.randomizerTitle.trim().slice(0, 120)
+        : base.randomizerTitle,
+    randomizerNamesText:
+      typeof value?.randomizerNamesText === "string"
+        ? value.randomizerNamesText.slice(0, 15000)
+        : base.randomizerNamesText,
+    randomizerMinNumber: clampInt(
+      value?.randomizerMinNumber ?? base.randomizerMinNumber,
+      -1000000,
+      1000000,
+    ),
+    randomizerMaxNumber: clampInt(
+      value?.randomizerMaxNumber ?? base.randomizerMaxNumber,
+      -1000000,
+      1000000,
+    ),
+    randomizerWinnersCount: clampInt(
+      value?.randomizerWinnersCount ?? base.randomizerWinnersCount,
+      1,
+      500,
+    ),
+    randomizerExcludeWinners:
+      typeof value?.randomizerExcludeWinners === "boolean"
+        ? value.randomizerExcludeWinners
+        : base.randomizerExcludeWinners,
+    randomizerSelectedWinners: Array.isArray(value?.randomizerSelectedWinners)
+      ? value.randomizerSelectedWinners
+          .filter((winner): winner is string => typeof winner === "string")
+          .map((winner) => winner.trim())
+          .filter((winner) => winner.length > 0)
+          .slice(0, 10000)
+      : [...base.randomizerSelectedWinners],
+    randomizerCurrentWinners: Array.isArray(value?.randomizerCurrentWinners)
+      ? value.randomizerCurrentWinners
+          .filter((winner): winner is string => typeof winner === "string")
+          .map((winner) => winner.trim())
+          .filter((winner) => winner.length > 0)
+          .slice(0, 500)
+      : [...base.randomizerCurrentWinners],
+    randomizerHistory: sanitizeRandomizerHistory(value?.randomizerHistory),
+    randomizerRunId: clampInt(value?.randomizerRunId ?? base.randomizerRunId, 0, 1000000000),
     brandPrimaryColor: sanitizeHex6(value?.brandPrimaryColor, base.brandPrimaryColor),
     brandAccentColor: sanitizeHex6(value?.brandAccentColor, base.brandAccentColor),
     brandSurfaceColor: sanitizeHex6(value?.brandSurfaceColor, base.brandSurfaceColor),
@@ -520,10 +629,6 @@ export function normalizePublicViewState(
     brandBodyBackgroundColor: sanitizeHex6(
       value?.brandBodyBackgroundColor,
       base.brandBodyBackgroundColor,
-    ),
-    brandBackgroundOverlayColor: sanitizeHex6(
-      value?.brandBackgroundOverlayColor,
-      base.brandBackgroundOverlayColor,
     ),
   };
 }

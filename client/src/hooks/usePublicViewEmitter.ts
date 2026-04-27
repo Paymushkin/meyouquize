@@ -7,6 +7,11 @@ import type {
   PublicViewSetPatch,
 } from "../publicViewContract";
 import type { ReactionWidget } from "../components/admin/AdminReactionsSection";
+import type {
+  RandomizerHistoryEntry,
+  RandomizerListMode,
+  RandomizerMode,
+} from "../features/randomizer/randomizerLogic";
 
 type QuestionViewState = {
   id?: string;
@@ -53,6 +58,18 @@ type UsePublicViewEmitterParams = {
   reactionsOverlayText: string;
   reactionsWidgets: ReactionWidget[];
   playerVisibleResultQuestionIds: string[];
+  randomizerMode: RandomizerMode;
+  randomizerListMode: RandomizerListMode;
+  randomizerTitle: string;
+  randomizerNamesText: string;
+  randomizerMinNumber: number;
+  randomizerMaxNumber: number;
+  randomizerWinnersCount: number;
+  randomizerExcludeWinners: boolean;
+  randomizerSelectedWinners: string[];
+  randomizerCurrentWinners: string[];
+  randomizerHistory: RandomizerHistoryEntry[];
+  randomizerRunId: number;
   brandPrimaryColor: string;
   brandAccentColor: string;
   brandSurfaceColor: string;
@@ -63,7 +80,6 @@ type UsePublicViewEmitterParams = {
   brandPlayerBackgroundImageUrl: string;
   brandProjectorBackgroundImageUrl: string;
   brandBodyBackgroundColor: string;
-  brandBackgroundOverlayColor: string;
 };
 
 export function usePublicViewEmitter(params: UsePublicViewEmitterParams) {
@@ -102,6 +118,18 @@ export function usePublicViewEmitter(params: UsePublicViewEmitterParams) {
     reactionsOverlayText,
     reactionsWidgets,
     playerVisibleResultQuestionIds,
+    randomizerMode,
+    randomizerListMode,
+    randomizerTitle,
+    randomizerNamesText,
+    randomizerMinNumber,
+    randomizerMaxNumber,
+    randomizerWinnersCount,
+    randomizerExcludeWinners,
+    randomizerSelectedWinners,
+    randomizerCurrentWinners,
+    randomizerHistory,
+    randomizerRunId,
     brandPrimaryColor,
     brandAccentColor,
     brandSurfaceColor,
@@ -112,7 +140,6 @@ export function usePublicViewEmitter(params: UsePublicViewEmitterParams) {
     brandPlayerBackgroundImageUrl,
     brandProjectorBackgroundImageUrl,
     brandBodyBackgroundColor,
-    brandBackgroundOverlayColor,
   } = params;
 
   const getQuestionViewState = useCallback(
@@ -137,7 +164,7 @@ export function usePublicViewEmitter(params: UsePublicViewEmitterParams) {
       const nextQuestionId =
         nextMode === "question" ? (patch.questionId ?? publicViewQuestionId) : undefined;
       const questionState = getQuestionViewState(nextQuestionId);
-      socket.emit("admin:results:view:set", {
+      const nextPayload = {
         quizId,
         mode: nextMode,
         questionId: nextQuestionId,
@@ -178,6 +205,18 @@ export function usePublicViewEmitter(params: UsePublicViewEmitterParams) {
         reactionsWidgets: patch.reactionsWidgets ?? reactionsWidgets,
         playerVisibleResultQuestionIds:
           patch.playerVisibleResultQuestionIds ?? playerVisibleResultQuestionIds,
+        randomizerMode: patch.randomizerMode ?? randomizerMode,
+        randomizerListMode: patch.randomizerListMode ?? randomizerListMode,
+        randomizerTitle: patch.randomizerTitle ?? randomizerTitle,
+        randomizerNamesText: patch.randomizerNamesText ?? randomizerNamesText,
+        randomizerMinNumber: patch.randomizerMinNumber ?? randomizerMinNumber,
+        randomizerMaxNumber: patch.randomizerMaxNumber ?? randomizerMaxNumber,
+        randomizerWinnersCount: patch.randomizerWinnersCount ?? randomizerWinnersCount,
+        randomizerExcludeWinners: patch.randomizerExcludeWinners ?? randomizerExcludeWinners,
+        randomizerSelectedWinners: patch.randomizerSelectedWinners ?? randomizerSelectedWinners,
+        randomizerCurrentWinners: patch.randomizerCurrentWinners ?? randomizerCurrentWinners,
+        randomizerHistory: patch.randomizerHistory ?? randomizerHistory,
+        randomizerRunId: patch.randomizerRunId ?? randomizerRunId,
         brandPrimaryColor: patch.brandPrimaryColor ?? brandPrimaryColor,
         brandAccentColor: patch.brandAccentColor ?? brandAccentColor,
         brandSurfaceColor: patch.brandSurfaceColor ?? brandSurfaceColor,
@@ -190,9 +229,8 @@ export function usePublicViewEmitter(params: UsePublicViewEmitterParams) {
         brandProjectorBackgroundImageUrl:
           patch.brandProjectorBackgroundImageUrl ?? brandProjectorBackgroundImageUrl,
         brandBodyBackgroundColor: patch.brandBodyBackgroundColor ?? brandBodyBackgroundColor,
-        brandBackgroundOverlayColor:
-          patch.brandBackgroundOverlayColor ?? brandBackgroundOverlayColor,
-      });
+      };
+      socket.emit("admin:results:view:set", nextPayload);
     },
     [
       cloudAnimationStrength,
@@ -229,6 +267,18 @@ export function usePublicViewEmitter(params: UsePublicViewEmitterParams) {
       reactionsOverlayText,
       reactionsWidgets,
       playerVisibleResultQuestionIds,
+      randomizerMode,
+      randomizerListMode,
+      randomizerTitle,
+      randomizerNamesText,
+      randomizerMinNumber,
+      randomizerMaxNumber,
+      randomizerWinnersCount,
+      randomizerExcludeWinners,
+      randomizerSelectedWinners,
+      randomizerCurrentWinners,
+      randomizerHistory,
+      randomizerRunId,
       brandPrimaryColor,
       brandAccentColor,
       brandSurfaceColor,
@@ -239,7 +289,6 @@ export function usePublicViewEmitter(params: UsePublicViewEmitterParams) {
       brandPlayerBackgroundImageUrl,
       brandProjectorBackgroundImageUrl,
       brandBodyBackgroundColor,
-      brandBackgroundOverlayColor,
     ],
   );
 

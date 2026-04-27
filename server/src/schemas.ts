@@ -178,7 +178,14 @@ export const subscribeResultsSchema = z.object({
 
 export const setPublicViewSchema = z.object({
   quizId: z.string().min(1),
-  mode: z.enum(["title", "question", "leaderboard", "speaker_questions", "reactions"]),
+  mode: z.enum([
+    "title",
+    "question",
+    "leaderboard",
+    "speaker_questions",
+    "reactions",
+    "randomizer",
+  ]),
   questionId: z.string().min(1).optional(),
   questionRevealStage: z.enum(["options", "results"]).optional(),
   highlightedLeadersCount: z.number().int().min(0).max(100).optional(),
@@ -292,6 +299,27 @@ export const setPublicViewSchema = z.object({
     .max(100)
     .optional(),
   playerVisibleResultQuestionIds: z.array(z.string().trim().min(1).max(80)).max(200).optional(),
+  randomizerMode: z.enum(["names", "numbers"]).optional(),
+  randomizerListMode: z.enum(["participants_only", "free_list"]).optional(),
+  randomizerTitle: z.string().trim().max(120).optional(),
+  randomizerNamesText: z.string().max(15000).optional(),
+  randomizerMinNumber: z.number().int().min(-1000000).max(1000000).optional(),
+  randomizerMaxNumber: z.number().int().min(-1000000).max(1000000).optional(),
+  randomizerWinnersCount: z.number().int().min(1).max(500).optional(),
+  randomizerExcludeWinners: z.boolean().optional(),
+  randomizerSelectedWinners: z.array(z.string().trim().min(1).max(120)).max(10000).optional(),
+  randomizerCurrentWinners: z.array(z.string().trim().min(1).max(120)).max(500).optional(),
+  randomizerHistory: z
+    .array(
+      z.object({
+        timestamp: z.string().trim().min(1).max(80),
+        winners: z.array(z.string().trim().min(1).max(120)).min(1).max(50),
+        mode: z.enum(["names", "numbers"]),
+      }),
+    )
+    .max(200)
+    .optional(),
+  randomizerRunId: z.number().int().min(0).max(1000000000).optional(),
   brandPrimaryColor: z
     .string()
     .regex(/^#([0-9a-fA-F]{6})$/)
@@ -319,10 +347,6 @@ export const setPublicViewSchema = z.object({
     .optional(),
   /** @deprecated */
   brandBackgroundImageUrl: z.string().trim().max(1000).optional(),
-  brandBackgroundOverlayColor: z
-    .string()
-    .regex(/^#([0-9a-fA-F]{6})$/)
-    .optional(),
 });
 
 export const subscribeSpeakerQuestionsSchema = z.object({

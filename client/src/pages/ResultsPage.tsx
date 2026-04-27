@@ -1,13 +1,15 @@
 import { Box, Card, CardContent, Container, Stack, Typography } from "@mui/material";
 import { alpha } from "@mui/material/styles";
-import { Fragment, useEffect, useRef, useState } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
 import { ProjectorLeaderboardTable } from "../components/projector/ProjectorLeaderboardTable";
 import { ProjectorQuestionSection } from "../components/projector/ProjectorQuestionSection";
+import { ProjectorRandomizerSection } from "../components/projector/ProjectorRandomizerSection";
 import { useResultsProjectorSession } from "../hooks/useResultsProjectorSession";
 import { buildBrandBackground } from "../features/branding/brandVisual";
 import { useBrandFont } from "../hooks/useBrandFont";
 import { useEventFavicon } from "../hooks/useEventFavicon";
+import { resolveClientAssetUrl } from "../utils/resolveClientAssetUrl";
 import "../styles/adminProjectorBody.css";
 
 type ReactionBurst = {
@@ -25,6 +27,8 @@ type ReactionBurst = {
   phase: number;
 };
 
+const DEFAULT_REACTIONS = ["👍", "👏", "🔥", "🤔"] as const;
+
 function speakerTargetLabel(speakerName: string): string {
   return speakerName === "Все спикеры" ? "кому: всем спикерам" : `кому: ${speakerName}`;
 }
@@ -39,6 +43,7 @@ export function ResultsPage() {
   const initializedReactionSessionIdRef = useRef<string | null>(null);
 
   const {
+    hasInitialPublicView,
     quizTitle,
     view,
     resultsAnimationTick,
@@ -55,7 +60,10 @@ export function ResultsPage() {
     speakerQuestions,
     reactionSession,
   } = p;
-  const reactionList = reactionSession?.reactions ?? ["👍", "👏", "🔥", "🤔"];
+  const reactionList = useMemo(
+    () => (reactionSession?.reactions?.length ? reactionSession.reactions : [...DEFAULT_REACTIONS]),
+    [reactionSession?.reactions],
+  );
 
   useEffect(() => {
     if (!reactionSession?.isActive) {
@@ -134,16 +142,41 @@ export function ResultsPage() {
 
   const containerContentMaxPx = 1920;
   const isFullScreenWidgetMode =
-    view.mode === "leaderboard" || view.mode === "speaker_questions" || view.mode === "reactions";
+    view.mode === "leaderboard" ||
+    view.mode === "speaker_questions" ||
+    view.mode === "reactions" ||
+    view.mode === "randomizer";
+  const brandProjectorBackgroundImageUrl = view.brandProjectorBackgroundImageUrl?.trim()
+    ? resolveClientAssetUrl(view.brandProjectorBackgroundImageUrl)
+    : undefined;
+  const brandFontUrl = view.brandFontUrl?.trim()
+    ? resolveClientAssetUrl(view.brandFontUrl)
+    : undefined;
+  const brandLogoUrl = view.brandLogoUrl?.trim()
+    ? resolveClientAssetUrl(view.brandLogoUrl)
+    : undefined;
   const projectorBrandBg = buildBrandBackground({
-    backgroundImageUrl: view.brandProjectorBackgroundImageUrl,
-    overlayColor: view.brandBackgroundOverlayColor,
+    backgroundImageUrl: brandProjectorBackgroundImageUrl,
   });
-  useBrandFont(view.brandFontFamily, view.brandFontUrl);
-  useEventFavicon(view.brandLogoUrl);
+  useBrandFont(view.brandFontFamily, brandFontUrl);
+  useEventFavicon(brandLogoUrl);
   const screenSpeakerQuestions = (speakerQuestions?.items ?? [])
     .filter((item) => item.isOnScreen)
     .slice(0, 10);
+
+  if (!hasInitialPublicView) {
+    return (
+      <Container
+        maxWidth={false}
+        disableGutters
+        sx={{
+          minHeight: "100dvh",
+          width: "100%",
+          bgcolor: "#000",
+        }}
+      />
+    );
+  }
 
   return (
     <Container
@@ -508,6 +541,7 @@ export function ResultsPage() {
           </Box>
         </Stack>
       )}
+      {view.mode === "randomizer" && <ProjectorRandomizerSection view={view} />}
     </Container>
   );
 }

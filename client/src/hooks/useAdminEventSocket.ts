@@ -67,7 +67,6 @@ type Params = {
   setBrandPlayerBackgroundImageUrl: (value: string) => void;
   setBrandProjectorBackgroundImageUrl: (value: string) => void;
   setBrandBodyBackgroundColor: (value: string) => void;
-  setBrandBackgroundOverlayColor: (value: string) => void;
   setShowFirstCorrectAnswerer: (value: boolean) => void;
   setFirstCorrectWinnersCount: (value: number) => void;
   setSpeakerQuestionsPayload: (value: SpeakerQuestionsPayload | null) => void;
@@ -117,7 +116,6 @@ export function useAdminEventSocket<TQuestion extends QuestionFormPatchable>(
     setBrandPlayerBackgroundImageUrl,
     setBrandProjectorBackgroundImageUrl,
     setBrandBodyBackgroundColor,
-    setBrandBackgroundOverlayColor,
     setShowFirstCorrectAnswerer,
     setFirstCorrectWinnersCount,
     setSpeakerQuestionsPayload,
@@ -136,6 +134,60 @@ export function useAdminEventSocket<TQuestion extends QuestionFormPatchable>(
     socket.off("speaker:questions:update");
     socket.off("quiz:online:count");
   }, []);
+
+  const applyBrandingState = useCallback(
+    (payload: PublicViewPayload) => {
+      const nextBranding = toBrandingState(payload);
+      setProjectorBackground(nextBranding.projectorBackground);
+      setCloudQuestionColor(nextBranding.cloudQuestionColor);
+      setCloudTagColors(nextBranding.cloudTagColors);
+      setCloudTopTagColor(nextBranding.cloudTopTagColor);
+      setCloudCorrectTagColor(nextBranding.cloudCorrectTagColor);
+      setCloudDensity(nextBranding.cloudDensity);
+      setCloudTagPadding(nextBranding.cloudTagPadding);
+      setCloudSpiral(nextBranding.cloudSpiral);
+      setCloudAnimationStrength(nextBranding.cloudAnimationStrength);
+      setVoteQuestionTextColor(nextBranding.voteQuestionTextColor);
+      setVoteOptionTextColor(nextBranding.voteOptionTextColor);
+      setVoteProgressTrackColor(nextBranding.voteProgressTrackColor);
+      setVoteProgressBarColor(nextBranding.voteProgressBarColor);
+      setBrandPrimaryColor(nextBranding.brandPrimaryColor);
+      setBrandAccentColor(nextBranding.brandAccentColor);
+      setBrandSurfaceColor(nextBranding.brandSurfaceColor);
+      setBrandTextColor(nextBranding.brandTextColor);
+      setBrandFontFamily(nextBranding.brandFontFamily);
+      setBrandFontUrl(nextBranding.brandFontUrl);
+      setBrandLogoUrl(nextBranding.brandLogoUrl);
+      setBrandPlayerBackgroundImageUrl(nextBranding.brandPlayerBackgroundImageUrl);
+      setBrandProjectorBackgroundImageUrl(nextBranding.brandProjectorBackgroundImageUrl);
+      setBrandBodyBackgroundColor(nextBranding.brandBodyBackgroundColor);
+    },
+    [
+      setProjectorBackground,
+      setCloudQuestionColor,
+      setCloudTagColors,
+      setCloudTopTagColor,
+      setCloudCorrectTagColor,
+      setCloudDensity,
+      setCloudTagPadding,
+      setCloudSpiral,
+      setCloudAnimationStrength,
+      setVoteQuestionTextColor,
+      setVoteOptionTextColor,
+      setVoteProgressTrackColor,
+      setVoteProgressBarColor,
+      setBrandPrimaryColor,
+      setBrandAccentColor,
+      setBrandSurfaceColor,
+      setBrandTextColor,
+      setBrandFontFamily,
+      setBrandFontUrl,
+      setBrandLogoUrl,
+      setBrandPlayerBackgroundImageUrl,
+      setBrandProjectorBackgroundImageUrl,
+      setBrandBodyBackgroundColor,
+    ],
+  );
 
   const setupSocketListeners = useCallback(() => {
     if (socket.connected) socket.disconnect();
@@ -188,31 +240,7 @@ export function useAdminEventSocket<TQuestion extends QuestionFormPatchable>(
         setHighlightedLeadersCount(payload.highlightedLeadersCount);
       }
       setQuestionForms((prev) => patchQuestionsFromPublicView(prev, payload));
-      const nextBranding = toBrandingState(payload);
-      setProjectorBackground(nextBranding.projectorBackground);
-      setCloudQuestionColor(nextBranding.cloudQuestionColor);
-      setCloudTagColors(nextBranding.cloudTagColors);
-      setCloudTopTagColor(nextBranding.cloudTopTagColor);
-      setCloudCorrectTagColor(nextBranding.cloudCorrectTagColor);
-      setCloudDensity(nextBranding.cloudDensity);
-      setCloudTagPadding(nextBranding.cloudTagPadding);
-      setCloudSpiral(nextBranding.cloudSpiral);
-      setCloudAnimationStrength(nextBranding.cloudAnimationStrength);
-      setVoteQuestionTextColor(nextBranding.voteQuestionTextColor);
-      setVoteOptionTextColor(nextBranding.voteOptionTextColor);
-      setVoteProgressTrackColor(nextBranding.voteProgressTrackColor);
-      setVoteProgressBarColor(nextBranding.voteProgressBarColor);
-      setBrandPrimaryColor(nextBranding.brandPrimaryColor);
-      setBrandAccentColor(nextBranding.brandAccentColor);
-      setBrandSurfaceColor(nextBranding.brandSurfaceColor);
-      setBrandTextColor(nextBranding.brandTextColor);
-      setBrandFontFamily(nextBranding.brandFontFamily);
-      setBrandFontUrl(nextBranding.brandFontUrl);
-      setBrandLogoUrl(nextBranding.brandLogoUrl);
-      setBrandPlayerBackgroundImageUrl(nextBranding.brandPlayerBackgroundImageUrl);
-      setBrandProjectorBackgroundImageUrl(nextBranding.brandProjectorBackgroundImageUrl);
-      setBrandBodyBackgroundColor(nextBranding.brandBodyBackgroundColor);
-      setBrandBackgroundOverlayColor(nextBranding.brandBackgroundOverlayColor);
+      applyBrandingState(payload);
       if (typeof view.reactionsOverlayText === "string" && setReactionsOverlayText) {
         setReactionsOverlayText(view.reactionsOverlayText);
       }
@@ -239,42 +267,19 @@ export function useAdminEventSocket<TQuestion extends QuestionFormPatchable>(
       setOnlineUsersCount(Math.max(0, Math.trunc(count)));
     });
   }, [
+    applyBrandingState,
     clearSocketListeners,
     eventName,
-    setCloudAnimationStrength,
-    setCloudDensity,
-    setCloudQuestionColor,
-    setCloudSpiral,
-    setCloudTagColors,
-    setCloudTagPadding,
-    setCloudTopTagColor,
-    setCloudCorrectTagColor,
     setHighlightedLeadersCount,
     setLeaderboard,
     setLeaderboardsBySubQuiz,
     setMessage,
-    setProjectorBackground,
     setPublicViewMode,
     setPublicViewQuestionId,
     setQuestionRevealStage,
     setQuestionForms,
     setQuestionId,
     setQuestionResults,
-    setVoteQuestionTextColor,
-    setVoteOptionTextColor,
-    setVoteProgressTrackColor,
-    setVoteProgressBarColor,
-    setBrandPrimaryColor,
-    setBrandAccentColor,
-    setBrandSurfaceColor,
-    setBrandTextColor,
-    setBrandFontFamily,
-    setBrandFontUrl,
-    setBrandLogoUrl,
-    setBrandPlayerBackgroundImageUrl,
-    setBrandProjectorBackgroundImageUrl,
-    setBrandBodyBackgroundColor,
-    setBrandBackgroundOverlayColor,
     setShowFirstCorrectAnswerer,
     setFirstCorrectWinnersCount,
     setSpeakerQuestionsPayload,

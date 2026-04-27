@@ -60,6 +60,7 @@ import {
   AdminReactionsSection,
   type ReactionWidget,
 } from "../components/admin/AdminReactionsSection";
+import { AdminRandomizerSection } from "../components/admin/AdminRandomizerSection";
 import { AdminQuestionsSection } from "../components/admin/AdminQuestionsSection";
 import { AdminResultsSection } from "../components/admin/AdminResultsSection";
 import { AdminSpeakersSection } from "../components/admin/AdminSpeakersSection";
@@ -113,6 +114,14 @@ import type { SpeakerQuestionsPayload } from "../types/speakerQuestions";
 import type { ReactionSession } from "./quiz-play/types";
 import { parseApiErrorMessage } from "../utils/apiError";
 import { patchQuestionsFromPublicView } from "../features/publicView/patchQuestionFromPublicView";
+import {
+  getRandomizerPool,
+  makeRandomizerTimestamp,
+  pickRandomWinners,
+  type RandomizerHistoryEntry,
+  type RandomizerListMode,
+  type RandomizerMode,
+} from "../features/randomizer/randomizerLogic";
 
 type AdminSection =
   | "general"
@@ -160,6 +169,7 @@ function publicScreenModeLabel(mode: PublicViewMode): string {
   if (mode === "leaderboard") return "таблица лидеров";
   if (mode === "speaker_questions") return "вопросы спикерам";
   if (mode === "reactions") return "реакции";
+  if (mode === "randomizer") return "рандомайзер";
   if (mode === "question") return "вопрос";
   return "название";
 }
@@ -174,7 +184,8 @@ function isSupportedPublicMode(mode: unknown): mode is PublicViewMode {
     mode === "question" ||
     mode === "leaderboard" ||
     mode === "speaker_questions" ||
-    mode === "reactions"
+    mode === "reactions" ||
+    mode === "randomizer"
   );
 }
 
@@ -294,9 +305,9 @@ export function AdminEventPage() {
   const [quizId, setQuizId] = useState("");
   const [questionId, setQuestionId] = useState("");
   const [subQuizSheets, setSubQuizSheets] = useState<SubQuizSheet[]>([]);
-  const [roomQuestionsTab, setRoomQuestionsTab] = useState<"quizzes" | "votes" | "reactions">(
-    "quizzes",
-  );
+  const [roomQuestionsTab, setRoomQuestionsTab] = useState<
+    "quizzes" | "votes" | "reactions" | "randomizer"
+  >("quizzes");
   const [expandedSubQuizId, setExpandedSubQuizId] = useState<string | false>(false);
   const [questionForms, setQuestionForms] = useState<QuestionForm[]>([]);
   const [selectedQuestionIndex, setSelectedQuestionIndex] = useState(0);
@@ -343,6 +354,72 @@ export function AdminEventPage() {
   );
   const [activeReactionWidgetId, setActiveReactionWidgetId] = useState<string | null>(null);
   const [projectorReactionWidgetId, setProjectorReactionWidgetId] = useState<string | null>(null);
+  const [randomizerMode, setRandomizerMode] = useState<RandomizerMode>("names");
+  const [randomizerListMode, setRandomizerListMode] = useState<RandomizerListMode>("free_list");
+  const [randomizerTitle, setRandomizerTitle] = useState("Рандомайзер");
+  const [randomizerNamesText, setRandomizerNamesText] = useState("");
+  const [randomizerMinNumber, setRandomizerMinNumber] = useState(1);
+  const [randomizerMaxNumber, setRandomizerMaxNumber] = useState(100);
+  const [randomizerWinnersCount, setRandomizerWinnersCount] = useState(1);
+  const [randomizerExcludeWinners, setRandomizerExcludeWinners] = useState(true);
+  const [randomizerSelectedWinners, setRandomizerSelectedWinners] = useState<string[]>([]);
+  const [randomizerCurrentWinners, setRandomizerCurrentWinners] = useState<string[]>([]);
+  const [randomizerHistory, setRandomizerHistory] = useState<RandomizerHistoryEntry[]>([]);
+  const [randomizerRunId, setRandomizerRunId] = useState(0);
+  const [randomizerIsRunning, setRandomizerIsRunning] = useState(false);
+  const randomizerRunTimerRef = useRef<number | null>(null);
+  const [eventParticipantNicknames, setEventParticipantNicknames] = useState<string[]>([]);
+  const randomizerNamesEditedRef = useRef(false);
+  const applyRandomizerFromPublicView = useCallback((payload: PublicViewPayload) => {
+    setRandomizerMode(payload.randomizerMode === "numbers" ? "numbers" : "names");
+    setRandomizerListMode(
+      payload.randomizerListMode === "participants_only" ? "participants_only" : "free_list",
+    );
+    if (typeof payload.randomizerTitle === "string") {
+      setRandomizerTitle(payload.randomizerTitle);
+    }
+    setRandomizerNamesText(
+      typeof payload.randomizerNamesText === "string" ? payload.randomizerNamesText : "",
+    );
+    if (typeof payload.randomizerMinNumber === "number") {
+      setRandomizerMinNumber(Math.trunc(payload.randomizerMinNumber));
+    }
+    if (typeof payload.randomizerMaxNumber === "number") {
+      setRandomizerMaxNumber(Math.trunc(payload.randomizerMaxNumber));
+    }
+    if (typeof payload.randomizerWinnersCount === "number") {
+      setRandomizerWinnersCount(Math.max(1, Math.trunc(payload.randomizerWinnersCount)));
+    }
+    if (typeof payload.randomizerExcludeWinners === "boolean") {
+      setRandomizerExcludeWinners(payload.randomizerExcludeWinners);
+    }
+    if (Array.isArray(payload.randomizerSelectedWinners)) {
+      setRandomizerSelectedWinners(
+        payload.randomizerSelectedWinners.filter(
+          (item): item is string => typeof item === "string",
+        ),
+      );
+    }
+    if (Array.isArray(payload.randomizerCurrentWinners)) {
+      setRandomizerCurrentWinners(
+        payload.randomizerCurrentWinners.filter((item): item is string => typeof item === "string"),
+      );
+    }
+    if (Array.isArray(payload.randomizerHistory)) {
+      setRandomizerHistory(
+        payload.randomizerHistory
+          .filter((row) => row && typeof row.timestamp === "string" && Array.isArray(row.winners))
+          .map((row) => ({
+            timestamp: row.timestamp,
+            winners: row.winners.filter((item): item is string => typeof item === "string"),
+            mode: row.mode === "numbers" ? "numbers" : "names",
+          })),
+      );
+    }
+    if (typeof payload.randomizerRunId === "number") {
+      setRandomizerRunId(Math.max(0, Math.trunc(payload.randomizerRunId)));
+    }
+  }, []);
   const [speakerQuestionsEnabled, setSpeakerQuestionsEnabled] = useState(false);
   const [speakerQuestionsAllowLikes, setSpeakerQuestionsAllowLikes] = useState(true);
   const [speakerQuestionsShowLikesOnScreen, setSpeakerQuestionsShowLikesOnScreen] = useState(true);
@@ -372,7 +449,8 @@ export function AdminEventPage() {
       const parsed = JSON.parse(raw) as { publicViewMode?: PublicViewMode };
       return parsed.publicViewMode === "leaderboard" ||
         parsed.publicViewMode === "speaker_questions" ||
-        parsed.publicViewMode === "reactions"
+        parsed.publicViewMode === "reactions" ||
+        parsed.publicViewMode === "randomizer"
         ? parsed.publicViewMode
         : "title";
     } catch {
@@ -427,7 +505,6 @@ export function AdminEventPage() {
   const [brandPlayerBackgroundImageUrl, setBrandPlayerBackgroundImageUrl] = useState("");
   const [brandProjectorBackgroundImageUrl, setBrandProjectorBackgroundImageUrl] = useState("");
   const [brandBodyBackgroundColor, setBrandBodyBackgroundColor] = useState("#000000");
-  const [brandBackgroundOverlayColor, setBrandBackgroundOverlayColor] = useState("#000000");
   const [availableFonts, setAvailableFonts] = useState<
     Array<{ id: string; family: string; url: string; kind: "static" | "variable" }>
   >([]);
@@ -721,7 +798,6 @@ export function AdminEventPage() {
     setBrandPlayerBackgroundImageUrl,
     setBrandProjectorBackgroundImageUrl,
     setBrandBodyBackgroundColor,
-    setBrandBackgroundOverlayColor,
     setShowFirstCorrectAnswerer,
     setFirstCorrectWinnersCount,
     setSpeakerQuestionsPayload,
@@ -737,12 +813,13 @@ export function AdminEventPage() {
       if (typeof payload.reactionsOverlayText === "string") {
         setReactionsOverlayText(payload.reactionsOverlayText);
       }
+      applyRandomizerFromPublicView(payload);
     };
     socket.on("results:public:view", onPublicView);
     return () => {
       socket.off("results:public:view", onPublicView);
     };
-  }, []);
+  }, [applyRandomizerFromPublicView]);
 
   const { emitPublicViewSet, emitBrandingPatch } = usePublicViewEmitter({
     quizId,
@@ -779,6 +856,18 @@ export function AdminEventPage() {
     playerTilesOrder,
     reactionsOverlayText,
     reactionsWidgets: reactionWidgets,
+    randomizerMode,
+    randomizerListMode,
+    randomizerTitle,
+    randomizerNamesText,
+    randomizerMinNumber,
+    randomizerMaxNumber,
+    randomizerWinnersCount,
+    randomizerExcludeWinners,
+    randomizerSelectedWinners,
+    randomizerCurrentWinners,
+    randomizerHistory,
+    randomizerRunId,
     brandPrimaryColor,
     brandAccentColor,
     brandSurfaceColor,
@@ -789,7 +878,6 @@ export function AdminEventPage() {
     brandPlayerBackgroundImageUrl,
     brandProjectorBackgroundImageUrl,
     brandBodyBackgroundColor,
-    brandBackgroundOverlayColor,
   });
 
   useEffect(() => {
@@ -816,6 +904,32 @@ export function AdminEventPage() {
       clearSocketListeners();
     };
   }, [checkSession, clearSocketListeners, eventName, loadRoom, setupSocketListeners]);
+
+  useEffect(() => {
+    if (!isAuth) return;
+    let active = true;
+    const fetchParticipants = async () => {
+      try {
+        const response = await fetch(
+          `${API_BASE}/api/admin/rooms/${encodeURIComponent(eventName)}/participants`,
+          { credentials: "include" },
+        );
+        if (!response.ok) return;
+        const payload = (await response.json()) as { nicknames?: unknown };
+        const nicknames = Array.isArray(payload.nicknames)
+          ? payload.nicknames.filter((item): item is string => typeof item === "string")
+          : [];
+        if (!active) return;
+        setEventParticipantNicknames(nicknames);
+      } catch {
+        // ignore network errors and keep manual list input available
+      }
+    };
+    void fetchParticipants();
+    return () => {
+      active = false;
+    };
+  }, [eventName, isAuth]);
 
   useEffect(() => {
     const onConnect = () => setAdminSocketStatus("connected");
@@ -892,7 +1006,6 @@ export function AdminEventPage() {
     setBrandPlayerBackgroundImageUrl(b.brandPlayerBackgroundImageUrl);
     setBrandProjectorBackgroundImageUrl(b.brandProjectorBackgroundImageUrl);
     setBrandBodyBackgroundColor(b.brandBodyBackgroundColor);
-    setBrandBackgroundOverlayColor(b.brandBackgroundOverlayColor);
     if (typeof pv.showFirstCorrectAnswerer === "boolean") {
       setShowFirstCorrectAnswerer(pv.showFirstCorrectAnswerer);
     }
@@ -955,6 +1068,45 @@ export function AdminEventPage() {
     if (widgets) {
       setReactionWidgets(widgets);
     }
+    setRandomizerMode(pv.randomizerMode === "numbers" ? "numbers" : "names");
+    setRandomizerListMode(
+      pv.randomizerListMode === "participants_only" ? "participants_only" : "free_list",
+    );
+    if (typeof pv.randomizerTitle === "string") setRandomizerTitle(pv.randomizerTitle);
+    if (typeof pv.randomizerNamesText === "string") setRandomizerNamesText(pv.randomizerNamesText);
+    if (typeof pv.randomizerMinNumber === "number")
+      setRandomizerMinNumber(Math.trunc(pv.randomizerMinNumber));
+    if (typeof pv.randomizerMaxNumber === "number")
+      setRandomizerMaxNumber(Math.trunc(pv.randomizerMaxNumber));
+    if (typeof pv.randomizerWinnersCount === "number") {
+      setRandomizerWinnersCount(Math.max(1, Math.trunc(pv.randomizerWinnersCount)));
+    }
+    if (typeof pv.randomizerExcludeWinners === "boolean") {
+      setRandomizerExcludeWinners(pv.randomizerExcludeWinners);
+    }
+    if (Array.isArray(pv.randomizerSelectedWinners)) {
+      setRandomizerSelectedWinners(
+        pv.randomizerSelectedWinners.filter((item): item is string => typeof item === "string"),
+      );
+    }
+    if (Array.isArray(pv.randomizerCurrentWinners)) {
+      setRandomizerCurrentWinners(
+        pv.randomizerCurrentWinners.filter((item): item is string => typeof item === "string"),
+      );
+    }
+    if (Array.isArray(pv.randomizerHistory)) {
+      setRandomizerHistory(
+        pv.randomizerHistory
+          .filter((row) => row && typeof row.timestamp === "string" && Array.isArray(row.winners))
+          .map((row) => ({
+            timestamp: row.timestamp,
+            winners: row.winners.filter((item): item is string => typeof item === "string"),
+            mode: row.mode === "numbers" ? "numbers" : "names",
+          })),
+      );
+    }
+    if (typeof pv.randomizerRunId === "number")
+      setRandomizerRunId(Math.max(0, Math.trunc(pv.randomizerRunId)));
     const speakerList = getStringArrayOrNull(pv.speakerQuestionsSpeakers);
     if (speakerList) {
       setSpeakerListText(speakerList.join("\n"));
@@ -1002,6 +1154,16 @@ export function AdminEventPage() {
     quizId,
     emitPublicViewSet,
   ]);
+
+  useEffect(() => {
+    if (randomizerMode !== "names") return;
+    if (randomizerListMode !== "free_list") return;
+    if (randomizerNamesEditedRef.current) return;
+    if (randomizerNamesText.trim().length > 0) return;
+    if (eventParticipantNicknames.length === 0) return;
+    const next = eventParticipantNicknames.join("\n");
+    setRandomizerNamesText(next);
+  }, [eventParticipantNicknames, randomizerListMode, randomizerMode, randomizerNamesText]);
 
   useEffect(() => {
     document.title = "Админ";
@@ -1476,7 +1638,7 @@ export function AdminEventPage() {
 
   const setPublicResultsView = useCallback(
     (
-      mode: "title" | "question" | "leaderboard" | "speaker_questions" | "reactions",
+      mode: "title" | "question" | "leaderboard" | "speaker_questions" | "reactions" | "randomizer",
       questionIdForMode?: string,
       extraPatch?: PublicViewSetPatch,
     ) => {
@@ -1529,6 +1691,111 @@ export function AdminEventPage() {
       showFirstCorrectAnswerer: false,
     });
   }
+
+  const runRandomizer = useCallback(() => {
+    const effectiveNamesText =
+      randomizerListMode === "participants_only"
+        ? eventParticipantNicknames.join("\n")
+        : randomizerNamesText;
+    const pool = getRandomizerPool({
+      mode: randomizerMode,
+      namesText: effectiveNamesText,
+      minNumber: randomizerMinNumber,
+      maxNumber: randomizerMaxNumber,
+      winnersCount: randomizerWinnersCount,
+      excludeWinners: randomizerExcludeWinners,
+      selectedWinners: randomizerSelectedWinners,
+    });
+    if (pool.length === 0) {
+      setMessage("Для рандомайзера нет доступных значений");
+      return;
+    }
+    const winners = pickRandomWinners(pool, randomizerWinnersCount);
+    if (winners.length === 0) {
+      setMessage("Не удалось выбрать победителей");
+      return;
+    }
+    const nextSelected = randomizerExcludeWinners
+      ? [...randomizerSelectedWinners, ...winners]
+      : randomizerSelectedWinners;
+    const nextHistory: RandomizerHistoryEntry[] = [
+      { timestamp: makeRandomizerTimestamp(), winners, mode: randomizerMode },
+      ...randomizerHistory,
+    ].slice(0, 200);
+    const nextRunId = randomizerRunId + 1;
+    setRandomizerCurrentWinners(winners);
+    setRandomizerSelectedWinners(nextSelected);
+    setRandomizerHistory(nextHistory);
+    setRandomizerRunId(nextRunId);
+    setRandomizerIsRunning(true);
+    if (randomizerRunTimerRef.current != null) {
+      window.clearTimeout(randomizerRunTimerRef.current);
+      randomizerRunTimerRef.current = null;
+    }
+    const totalRunMs = winners.length * (3000 + 1000);
+    randomizerRunTimerRef.current = window.setTimeout(() => {
+      setRandomizerIsRunning(false);
+      randomizerRunTimerRef.current = null;
+    }, totalRunMs);
+    setPublicResultsView("randomizer", undefined, {
+      randomizerMode,
+      randomizerListMode,
+      randomizerTitle,
+      randomizerNamesText: effectiveNamesText,
+      randomizerMinNumber,
+      randomizerMaxNumber,
+      randomizerWinnersCount,
+      randomizerExcludeWinners,
+      randomizerSelectedWinners: nextSelected,
+      randomizerCurrentWinners: winners,
+      randomizerHistory: nextHistory,
+      randomizerRunId: nextRunId,
+    });
+  }, [
+    randomizerExcludeWinners,
+    randomizerListMode,
+    randomizerHistory,
+    randomizerMaxNumber,
+    randomizerMinNumber,
+    randomizerMode,
+    randomizerNamesText,
+    randomizerRunId,
+    randomizerSelectedWinners,
+    randomizerTitle,
+    randomizerWinnersCount,
+    setPublicResultsView,
+    eventParticipantNicknames,
+  ]);
+
+  const resetRandomizer = useCallback(() => {
+    if (randomizerRunTimerRef.current != null) {
+      window.clearTimeout(randomizerRunTimerRef.current);
+      randomizerRunTimerRef.current = null;
+    }
+    setRandomizerIsRunning(false);
+    setRandomizerSelectedWinners([]);
+    setRandomizerCurrentWinners([]);
+    setRandomizerHistory([]);
+    setRandomizerRunId(0);
+    emitPublicViewSet({
+      randomizerSelectedWinners: [],
+      randomizerCurrentWinners: [],
+      randomizerHistory: [],
+      randomizerRunId: 0,
+    });
+  }, [emitPublicViewSet]);
+
+  const clearRandomizerScreenData = useCallback(() => {
+    if (randomizerRunTimerRef.current != null) {
+      window.clearTimeout(randomizerRunTimerRef.current);
+      randomizerRunTimerRef.current = null;
+    }
+    setRandomizerIsRunning(false);
+    setRandomizerCurrentWinners([]);
+    emitPublicViewSet({
+      randomizerCurrentWinners: [],
+    });
+  }, [emitPublicViewSet]);
 
   function createPlayerBanner(
     linkUrl: string,
@@ -2512,12 +2779,15 @@ export function AdminEventPage() {
                   >
                     <Tabs
                       value={roomQuestionsTab}
-                      onChange={(_, v: "quizzes" | "votes" | "reactions") => setRoomQuestionsTab(v)}
+                      onChange={(_, v: "quizzes" | "votes" | "reactions" | "randomizer") =>
+                        setRoomQuestionsTab(v)
+                      }
                       sx={{ borderBottom: 1, borderColor: "divider", px: 0.5 }}
                     >
                       <Tab label="Квизы" value="quizzes" />
                       <Tab label="Голосования" value="votes" />
                       <Tab label="Реакции" value="reactions" />
+                      <Tab label="Рандомайзер" value="randomizer" />
                     </Tabs>
                     <Box sx={{ pt: 2, px: 0.25 }}>
                       {roomQuestionsTab === "quizzes" &&
@@ -2903,6 +3173,77 @@ export function AdminEventPage() {
                             />
                           </Stack>
                         ))}
+                      {roomQuestionsTab === "randomizer" && (
+                        <AdminRandomizerSection
+                          mode={randomizerMode}
+                          listMode={randomizerListMode}
+                          title={randomizerTitle}
+                          namesText={randomizerNamesText}
+                          participantsNamesText={eventParticipantNicknames.join("\n")}
+                          minNumber={randomizerMinNumber}
+                          maxNumber={randomizerMaxNumber}
+                          winnersCount={randomizerWinnersCount}
+                          excludeWinners={randomizerExcludeWinners}
+                          currentWinners={randomizerCurrentWinners}
+                          history={randomizerHistory}
+                          projectorMode={publicViewMode === "randomizer"}
+                          isRunning={randomizerIsRunning}
+                          onModeChange={(next) => {
+                            setRandomizerMode(next);
+                            emitPublicViewSet({ randomizerMode: next });
+                          }}
+                          onListModeChange={(next) => {
+                            setRandomizerListMode(next);
+                            emitPublicViewSet({
+                              randomizerListMode: next,
+                              randomizerNamesText:
+                                next === "participants_only"
+                                  ? eventParticipantNicknames.join("\n")
+                                  : randomizerNamesText,
+                            });
+                          }}
+                          onTitleChange={(next) => {
+                            setRandomizerTitle(next);
+                          }}
+                          onTitleCommit={() => {
+                            emitPublicViewSet({ randomizerTitle });
+                          }}
+                          onNamesTextChange={(next) => {
+                            randomizerNamesEditedRef.current = true;
+                            setRandomizerNamesText(next);
+                            if (randomizerListMode === "free_list") {
+                              emitPublicViewSet({ randomizerNamesText: next });
+                            }
+                          }}
+                          onMinNumberChange={(next) => {
+                            setRandomizerMinNumber(Math.trunc(next || 0));
+                            emitPublicViewSet({ randomizerMinNumber: Math.trunc(next || 0) });
+                          }}
+                          onMaxNumberChange={(next) => {
+                            setRandomizerMaxNumber(Math.trunc(next || 0));
+                            emitPublicViewSet({ randomizerMaxNumber: Math.trunc(next || 0) });
+                          }}
+                          onWinnersCountChange={(next) => {
+                            const clamped = Math.max(1, Math.trunc(next || 1));
+                            setRandomizerWinnersCount(clamped);
+                            emitPublicViewSet({ randomizerWinnersCount: clamped });
+                          }}
+                          onExcludeWinnersChange={(next) => {
+                            setRandomizerExcludeWinners(next);
+                            emitPublicViewSet({ randomizerExcludeWinners: next });
+                          }}
+                          onRun={runRandomizer}
+                          onReset={resetRandomizer}
+                          onClearScreen={clearRandomizerScreenData}
+                          onToggleProjector={() => {
+                            if (publicViewMode === "randomizer") {
+                              setPublicResultsView("title");
+                              return;
+                            }
+                            setPublicResultsView("randomizer");
+                          }}
+                        />
+                      )}
                       {roomQuestionsTab === "reactions" && (
                         <AdminReactionsSection
                           widgets={reactionWidgets}
@@ -3144,8 +3485,6 @@ export function AdminEventPage() {
                   brandProjectorBackgroundImageUrl={brandProjectorBackgroundImageUrl}
                   setBrandProjectorBackgroundImageUrl={setBrandProjectorBackgroundImageUrl}
                   onUploadMedia={uploadBannerMedia}
-                  brandBackgroundOverlayColor={brandBackgroundOverlayColor}
-                  setBrandBackgroundOverlayColor={setBrandBackgroundOverlayColor}
                   emitBrandingPatch={emitBrandingPatch}
                 />
               )}

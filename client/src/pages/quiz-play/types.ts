@@ -89,7 +89,6 @@ export type QuizState = {
   brandPlayerBackgroundImageUrl?: string;
   brandProjectorBackgroundImageUrl?: string;
   brandBodyBackgroundColor?: string;
-  brandBackgroundOverlayColor?: string;
   reactionSession?: ReactionSession | null;
   status: string;
   quizProgress: { subQuizId: string; index: number; total: number } | null;

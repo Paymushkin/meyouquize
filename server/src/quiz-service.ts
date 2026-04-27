@@ -368,6 +368,26 @@ export async function getRoomByEventName(eventName: string) {
   });
 }
 
+export async function listParticipantNicknamesByEventName(eventName: string): Promise<string[]> {
+  const room = await prisma.quiz.findUnique({
+    where: { slug: eventName },
+    select: { id: true },
+  });
+  if (!room) return [];
+  const participants = await prisma.participant.findMany({
+    where: { quizId: room.id },
+    select: { nickname: true },
+    orderBy: { createdAt: "asc" },
+  });
+  const deduped: string[] = [];
+  for (const row of participants) {
+    const nickname = row.nickname.trim();
+    if (!nickname) continue;
+    if (!deduped.includes(nickname)) deduped.push(nickname);
+  }
+  return deduped;
+}
+
 export async function updateRoomTitle(eventName: string, title: string) {
   const room = await prisma.quiz.findUnique({ where: { slug: eventName } });
   if (!room) throw new Error("Room not found");
@@ -672,7 +692,6 @@ export async function getQuizPublicState(quizId: string) {
     brandPlayerBackgroundImageUrl: view.brandPlayerBackgroundImageUrl,
     brandProjectorBackgroundImageUrl: view.brandProjectorBackgroundImageUrl,
     brandBodyBackgroundColor: view.brandBodyBackgroundColor,
-    brandBackgroundOverlayColor: view.brandBackgroundOverlayColor,
     reactionSession: getReactionSessionPublic(quiz.id),
     quizProgress,
     activeQuestions: activeQuestions.map((q) => ({
@@ -755,14 +774,18 @@ async function getPlayerVisibleResultsForQuiz(
   return questionIds
     .map((qid) => byId.get(qid))
     .filter((item): item is NonNullable<typeof item> => Boolean(item))
+    .filter(
+      (
+        item,
+      ): item is NonNullable<typeof item> & {
+        type: "single" | "multi" | "ranking";
+      } => item.type !== "tag_cloud",
+    )
     .map((item) => ({
       questionId: item.questionId,
       text: item.text,
-      type: prismaTypeToApi(item.type) as "single" | "multi" | "ranking",
-      rankingProjectorMetric:
-        item.type === QuestionType.RANKING
-          ? rankingMetricToApi(item.rankingProjectorMetric)
-          : undefined,
+      type: item.type === "ranking" ? "ranking" : item.type,
+      rankingProjectorMetric: item.type === "ranking" ? item.rankingProjectorMetric : undefined,
       optionStats: item.optionStats.map((row) => ({
         optionId: row.optionId,
         text: row.text,

@@ -60,8 +60,6 @@ type Props = {
   brandProjectorBackgroundImageUrl: string;
   setBrandProjectorBackgroundImageUrl: (value: string) => void;
   onUploadMedia: (file: File) => Promise<string>;
-  brandBackgroundOverlayColor: string;
-  setBrandBackgroundOverlayColor: (value: string) => void;
   emitBrandingPatch: (patch: PublicViewSetPatch) => void;
 };
 
@@ -116,8 +114,6 @@ export function AdminBrandingSection(props: Props) {
     brandProjectorBackgroundImageUrl,
     setBrandProjectorBackgroundImageUrl,
     onUploadMedia,
-    brandBackgroundOverlayColor,
-    setBrandBackgroundOverlayColor,
     emitBrandingPatch,
   } = props;
 
@@ -189,8 +185,6 @@ export function AdminBrandingSection(props: Props) {
             setBrandSurfaceColor={setBrandSurfaceColor}
             brandTextColor={brandTextColor}
             setBrandTextColor={setBrandTextColor}
-            brandBackgroundOverlayColor={brandBackgroundOverlayColor}
-            setBrandBackgroundOverlayColor={setBrandBackgroundOverlayColor}
             brandLogoUrl={brandLogoUrl}
             setBrandLogoUrl={setBrandLogoUrl}
             brandPlayerBackgroundImageUrl={brandPlayerBackgroundImageUrl}

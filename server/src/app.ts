@@ -29,6 +29,7 @@ import {
   getQuizPublicState,
   getResults,
   getRoomByEventName,
+  listParticipantNicknamesByEventName,
   listRooms,
   getStandaloneVoteAdminDetail,
   getSubQuizDetailedResults,
@@ -318,6 +319,16 @@ export function buildApp() {
     return res.json(room);
   });
 
+  app.get("/api/admin/rooms/:eventName/participants", adminAuthMiddleware, async (req, res) => {
+    const eventName = Array.isArray(req.params.eventName)
+      ? req.params.eventName[0]
+      : req.params.eventName;
+    const room = await getRoomByEventName(eventName);
+    if (!room) return res.status(404).json({ error: "Not found" });
+    const nicknames = await listParticipantNicknamesByEventName(eventName);
+    return res.json({ nicknames });
+  });
+
   app.patch("/api/admin/rooms/:eventName", adminAuthMiddleware, async (req, res) => {
     const eventName = Array.isArray(req.params.eventName)
       ? req.params.eventName[0]
@@ -441,7 +452,6 @@ export function buildApp() {
       title: quiz.title,
       status: quiz.status,
       brandPlayerBackgroundImageUrl: view.brandPlayerBackgroundImageUrl,
-      brandBackgroundOverlayColor: view.brandBackgroundOverlayColor,
       brandBodyBackgroundColor: view.brandBodyBackgroundColor,
     });
   });

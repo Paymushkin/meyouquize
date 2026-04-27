@@ -1,6 +1,5 @@
 type BrandVisualInput = {
   backgroundImageUrl?: string;
-  overlayColor?: string;
 };
 
 function hexToRgba(hex: string, alpha: number): string {
@@ -21,7 +20,7 @@ export function buildBrandBackground(input: BrandVisualInput): {
   if (!hasImage) {
     return { backgroundImage: "none" };
   }
-  const overlay = `linear-gradient(${hexToRgba(input.overlayColor ?? "#000000", 0.25)}, ${hexToRgba(input.overlayColor ?? "#000000", 0.25)})`;
+  const overlay = `linear-gradient(${hexToRgba("#000000", 0.25)}, ${hexToRgba("#000000", 0.25)})`;
   const layers: string[] = [overlay];
   if (input.backgroundImageUrl?.trim()) {
     layers.push(`url("${input.backgroundImageUrl.trim()}")`);
