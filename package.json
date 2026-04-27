@@ -10,10 +10,42 @@
   "scripts": {
     "dev": "concurrently -n server,client \"npm run dev -w server\" \"npm run dev -w client\"",
     "build": "npm run build -w shared && npm run build -w server && npm run build -w client",
-    "test": "npm run test -w server",
-    "lint": "npm run lint -w server && npm run lint -w client"
+    "test": "npm run test:unit",
+    "test:unit": "npm run test -w server && npm run test -w client",
+    "test:e2e": "playwright test",
+    "lint": "npm run lint:types && npm run lint:eslint",
+    "lint:types": "npm run lint -w server && npm run lint -w client",
+    "lint:eslint": "eslint .",
+    "format:check": "prettier --check .",
+    "format:write": "prettier --write .",
+    "prepare": "husky",
+    "prisma:generate": "npm run prisma:generate -w server",
+    "prisma:migrate": "npm run prisma:migrate -w server",
+    "prisma:migrate:deploy": "npm run prisma:migrate:deploy -w server"
   },
   "devDependencies": {
-    "concurrently": "^9.1.2"
+    "@eslint/js": "^9.39.1",
+    "@playwright/test": "^1.59.1",
+    "@types/node": "^24.10.1",
+    "@typescript-eslint/eslint-plugin": "^8.46.1",
+    "@typescript-eslint/parser": "^8.46.1",
+    "concurrently": "^9.1.2",
+    "eslint": "^9.39.1",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-react-hooks": "^7.0.1",
+    "eslint-plugin-react-refresh": "^0.4.24",
+    "globals": "^16.5.0",
+    "husky": "^9.1.7",
+    "lint-staged": "^16.2.6",
+    "prettier": "^3.6.2",
+    "typescript-eslint": "^8.46.1"
+  },
+  "lint-staged": {
+    "*.{ts,tsx,js,mjs,cjs,json,md,yml,yaml}": [
+      "prettier --write"
+    ],
+    "*.{ts,tsx,js,mjs,cjs}": [
+      "eslint --fix"
+    ]
   }
 }

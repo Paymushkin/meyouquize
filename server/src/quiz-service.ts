@@ -1,7 +1,18 @@
-import { Prisma, QuestionType, QuizStatus, ScoringMode } from "@prisma/client";
+import { normalizeTagComparable } from "@meyouquize/shared";
+import {
+  Prisma,
+  QuestionType,
+  QuizStatus,
+  RankingKind,
+  RankingProjectorMetric,
+  ScoringMode,
+} from "@prisma/client";
 import { prisma } from "./prisma.js";
+import { publicViewJsonToState } from "./socket/public-view-store.js";
 import { parseSelectedIds, randomSlug, randomToken } from "./utils.js";
-import { evaluateAnswer } from "./scoring.js";
+import { evaluateAnswer, evaluateRankingAnswer } from "./scoring.js";
+import { containsProfanity } from "./profanity.js";
+import { getReactionSessionPublic } from "./reactions-service.js";
 
 type QuestionWithOptions = Prisma.QuestionGetPayload<{ include: { options: true } }>;
 
@@ -13,6 +24,20 @@ function normalizeTag(value: string) {
     .replace(/\s+/g, " ");
 }
 
+/** Совпадение хотя бы с одним эталонным тегом (после normalizeTagComparable). */
+function evaluateTagCloudQuizAnswer(
+  question: QuestionWithOptions,
+  userTagsComparable: string[],
+): boolean {
+  const reference = question.options
+    .filter((o) => o.isCorrect)
+    .map((o) => normalizeTagComparable(o.text))
+    .filter(Boolean);
+  if (reference.length === 0) return false;
+  const userSet = new Set(userTagsComparable);
+  return reference.some((r) => userSet.has(r));
+}
+
 function parseTagAnswers(raw: string) {
   try {
     const parsed = JSON.parse(raw) as string[];
@@ -21,6 +46,23 @@ function parseTagAnswers(raw: string) {
   } catch {
     return [];
   }
+}
+
+function isStoredAnswerValidForQuestion(
+  question: { type: QuestionType; options: Array<{ id: string }> },
+  rawSelectedOptionIds: string,
+): boolean {
+  if (question.type === QuestionType.TAG_CLOUD) {
+    return parseTagAnswers(rawSelectedOptionIds).length > 0;
+  }
+  const selected = parseSelectedIds(rawSelectedOptionIds);
+  if (selected.length < 1) return false;
+  const allowed = new Set(question.options.map((o) => o.id));
+  if (question.type === QuestionType.RANKING) {
+    if (selected.length !== question.options.length) return false;
+    if (new Set(selected).size !== selected.length) return false;
+  }
+  return selected.every((id) => allowed.has(id));
 }
 
 /** Лимит тегов в ответе дашборда — снижает CPU/память при больших облаках. */
@@ -37,24 +79,106 @@ type QuestionDashboardRow = Prisma.QuestionGetPayload<{
     type: true;
     projectorShowFirstCorrect: true;
     projectorFirstCorrectWinnersCount: true;
-    options: { select: { id: true; text: true; isCorrect: true } };
+    rankingPointsByRank: true;
+    rankingProjectorMetric: true;
+    rankingKind: true;
+    options: { select: { id: true; text: true; isCorrect: true; sortOrder: true } };
     answers: { select: { selectedOptionIds: true } };
   };
 }>;
 
 export type QuestionReplaceInput = {
+  id?: string;
   text: string;
-  type: "single" | "multi" | "tag_cloud";
+  type: "single" | "multi" | "tag_cloud" | "ranking";
   points: number;
   maxAnswers?: number;
   scoringMode?: "poll" | "quiz";
   /** Показывать победителей на проекторе для этого вопроса (вместе с глобальной настройкой комнаты). */
   projectorShowFirstCorrect?: boolean;
   projectorFirstCorrectWinnersCount?: number;
+  /** Для ranking: баллы за совпадение на каждой позиции; null/undefined — только полный ответ даёт `points`. */
+  rankingPointsByRank?: number[] | null;
+  /** Для ranking: метрика на проекторе */
+  rankingProjectorMetric?: "avg_rank" | "avg_score" | "total_score";
+  /** RANKING: квиз (эталон) или жюри (без верного ответа) */
+  rankingKind?: "quiz" | "jury";
+  /** Для RANKING: кастомная подсказка игроку; null/undefined = текст по умолчанию. */
+  rankingPlayerHint?: string | null;
   options: Array<{ text: string; isCorrect: boolean }>;
 };
 
+function parseRankingTiersJson(value: unknown): number[] | null {
+  if (value == null) return null;
+  if (!Array.isArray(value)) return null;
+  const out: number[] = [];
+  for (const x of value) {
+    if (typeof x !== "number" || !Number.isFinite(x)) return null;
+    const t = Math.trunc(x);
+    if (t < 0 || t > 10_000) return null;
+    out.push(t);
+  }
+  return out.length > 0 ? out : null;
+}
+
+function rankingMetricToPrisma(
+  m: QuestionReplaceInput["rankingProjectorMetric"] | undefined,
+): RankingProjectorMetric {
+  switch (m) {
+    case "avg_score":
+      return RankingProjectorMetric.AVG_SCORE;
+    case "total_score":
+      return RankingProjectorMetric.TOTAL_SCORE;
+    case "avg_rank":
+    default:
+      return RankingProjectorMetric.AVG_RANK;
+  }
+}
+
+function rankingMetricToApi(m: RankingProjectorMetric): "avg_rank" | "avg_score" | "total_score" {
+  switch (m) {
+    case RankingProjectorMetric.AVG_SCORE:
+      return "avg_score";
+    case RankingProjectorMetric.TOTAL_SCORE:
+      return "total_score";
+    case RankingProjectorMetric.AVG_RANK:
+    default:
+      return "avg_rank";
+  }
+}
+
+function rankingKindToPrisma(k: QuestionReplaceInput["rankingKind"] | undefined): RankingKind {
+  return k === "jury" ? RankingKind.JURY : RankingKind.QUIZ;
+}
+
+function rankingKindToApi(k: RankingKind): "quiz" | "jury" {
+  return k === RankingKind.JURY ? "jury" : "quiz";
+}
+
+function rankingExpectedIdsFromQuestion(
+  options: Array<{ id: string }>,
+  rankingKind: RankingKind,
+  rankingPointsByRank: unknown,
+): string[] {
+  const fallback = options.map((o) => o.id);
+  if (rankingKind !== RankingKind.QUIZ) return fallback;
+  const n = options.length;
+  const places = parseRankingTiersJson(rankingPointsByRank);
+  if (places == null || places.length !== n) return fallback;
+  const out = new Array<string>(n);
+  const seen = new Set<number>();
+  for (let i = 0; i < n; i += 1) {
+    const p = places[i]!;
+    if (p < 1 || p > n || seen.has(p)) return fallback;
+    seen.add(p);
+    out[p - 1] = options[i]!.id;
+  }
+  if (out.some((x) => !x)) return fallback;
+  return out as string[];
+}
+
 export type SubQuizReplaceInput = {
+  id?: string;
   title: string;
   sortOrder?: number;
   questions: QuestionReplaceInput[];
@@ -65,16 +189,88 @@ export type RoomContentReplaceInput = {
   standaloneQuestions: QuestionReplaceInput[];
 };
 
+function inputTypeToPrisma(t: QuestionReplaceInput["type"]): QuestionType {
+  switch (t) {
+    case "single":
+      return QuestionType.SINGLE;
+    case "multi":
+      return QuestionType.MULTI;
+    case "tag_cloud":
+      return QuestionType.TAG_CLOUD;
+    case "ranking":
+      return QuestionType.RANKING;
+    default: {
+      const _exhaustive: never = t;
+      return _exhaustive;
+    }
+  }
+}
+
+function prismaTypeToApi(t: QuestionType): "single" | "multi" | "tag_cloud" | "ranking" {
+  switch (t) {
+    case QuestionType.SINGLE:
+      return "single";
+    case QuestionType.MULTI:
+      return "multi";
+    case QuestionType.TAG_CLOUD:
+      return "tag_cloud";
+    case QuestionType.RANKING:
+      return "ranking";
+    default: {
+      const _exhaustive: never = t;
+      return _exhaustive;
+    }
+  }
+}
+
+function pointsForReplaceQuestion(q: QuestionReplaceInput): number {
+  return q.type === "tag_cloud" ? 1 : q.points;
+}
+
+function maxAnswersForReplaceQuestion(q: QuestionReplaceInput): number {
+  if (q.type === "tag_cloud") return q.maxAnswers ?? 3;
+  if (q.type === "ranking") return q.options.length;
+  return 1;
+}
+
+function optionsCreateRows(questionId: string, options: QuestionReplaceInput["options"]) {
+  return options.map((o, idx) => ({
+    questionId,
+    text: o.text,
+    isCorrect: o.isCorrect,
+    sortOrder: idx,
+  }));
+}
+
 function toScoringMode(q: QuestionReplaceInput): ScoringMode {
-  if (q.type === "tag_cloud") return ScoringMode.POLL;
+  if (q.type === "tag_cloud") {
+    return q.scoringMode === "quiz" ? ScoringMode.QUIZ : ScoringMode.POLL;
+  }
   return q.scoringMode === "poll" ? ScoringMode.POLL : ScoringMode.QUIZ;
+}
+
+function rankingQuestionCreateData(q: QuestionReplaceInput) {
+  if (q.type !== "ranking") return {};
+  const tiers =
+    q.rankingPointsByRank != null && q.rankingPointsByRank.length === q.options.length
+      ? q.rankingPointsByRank
+      : null;
+  return {
+    rankingPointsByRank: tiers === null ? Prisma.DbNull : tiers,
+    rankingProjectorMetric: rankingMetricToPrisma(q.rankingProjectorMetric),
+    rankingKind: rankingKindToPrisma(q.rankingKind),
+    rankingPlayerHint:
+      q.rankingPlayerHint != null && q.rankingPlayerHint.trim() !== ""
+        ? q.rankingPlayerHint.trim()
+        : null,
+  };
 }
 
 export async function createQuiz(input: {
   title: string;
   questions: Array<{
     text: string;
-    type: "single" | "multi" | "tag_cloud";
+    type: "single" | "multi" | "tag_cloud" | "ranking";
     points: number;
     maxAnswers?: number;
     options: Array<{ text: string; isCorrect: boolean }>;
@@ -96,32 +292,23 @@ export async function createQuiz(input: {
     },
   });
   for (let index = 0; index < input.questions.length; index += 1) {
-    const q = input.questions[index];
+    const q = input.questions[index] as QuestionReplaceInput;
     const mode = q.type === "tag_cloud" ? ScoringMode.POLL : ScoringMode.QUIZ;
     const createdQ = await prisma.question.create({
       data: {
         quizId: quiz.id,
         subQuizId: sub.id,
         text: q.text,
-        type:
-          q.type === "single"
-            ? QuestionType.SINGLE
-            : q.type === "multi"
-              ? QuestionType.MULTI
-              : QuestionType.TAG_CLOUD,
+        type: inputTypeToPrisma(q.type),
         order: index,
-        points: q.type === "tag_cloud" ? 1 : q.points,
-        maxAnswers: q.type === "tag_cloud" ? (q.maxAnswers ?? 3) : 1,
+        points: pointsForReplaceQuestion(q),
+        maxAnswers: maxAnswersForReplaceQuestion(q),
         scoringMode: mode,
       },
     });
     if (q.type !== "tag_cloud") {
       await prisma.option.createMany({
-        data: q.options.map((o) => ({
-          questionId: createdQ.id,
-          text: o.text,
-          isCorrect: o.isCorrect,
-        })),
+        data: optionsCreateRows(createdQ.id, q.options),
       });
     }
   }
@@ -129,7 +316,10 @@ export async function createQuiz(input: {
     where: { id: quiz.id },
     include: {
       subQuizzes: true,
-      questions: { include: { options: true }, orderBy: { order: "asc" } },
+      questions: {
+        include: { options: { orderBy: { sortOrder: "asc" } } },
+        orderBy: { order: "asc" },
+      },
     },
   });
 }
@@ -165,7 +355,10 @@ export async function listRooms() {
 
 const roomInclude = {
   subQuizzes: { orderBy: { sortOrder: "asc" as const } },
-  questions: { include: { options: true }, orderBy: { order: "asc" as const } },
+  questions: {
+    include: { options: { orderBy: { sortOrder: "asc" as const } } },
+    orderBy: { order: "asc" as const },
+  },
 } satisfies Prisma.QuizInclude;
 
 export async function getRoomByEventName(eventName: string) {
@@ -194,92 +387,142 @@ export async function updateRoomTitle(eventName: string, title: string) {
 export async function replaceRoomContent(eventName: string, content: RoomContentReplaceInput) {
   const room = await prisma.quiz.findUnique({ where: { slug: eventName } });
   if (!room) throw new Error("Room not found");
+  const roomId = room.id;
   await prisma.$transaction(async (tx) => {
-    await tx.question.deleteMany({ where: { quizId: room.id } });
-    await tx.subQuiz.deleteMany({ where: { quizId: room.id } });
+    const existingSubQuizzes = await tx.subQuiz.findMany({
+      where: { quizId: roomId },
+      select: { id: true },
+    });
+    const existingSubQuizIds = new Set(existingSubQuizzes.map((sq) => sq.id));
+    const existingQuestions = await tx.question.findMany({
+      where: { quizId: roomId },
+      select: { id: true },
+    });
+    const existingQuestionIds = new Set(existingQuestions.map((q) => q.id));
+    const keptSubQuizIds = new Set<string>();
+    const keptQuestionIds = new Set<string>();
+
+    async function upsertQuestion(
+      q: QuestionReplaceInput,
+      subQuizId: string | null,
+      order: number,
+    ) {
+      async function syncOptionsForQuestion(
+        questionId: string,
+        options: QuestionReplaceInput["options"],
+      ) {
+        const existing = await tx.option.findMany({
+          where: { questionId },
+          orderBy: { sortOrder: "asc" },
+          select: { id: true },
+        });
+        const keepCount = Math.min(existing.length, options.length);
+        for (let idx = 0; idx < keepCount; idx += 1) {
+          const opt = options[idx]!;
+          const existingId = existing[idx]!.id;
+          await tx.option.update({
+            where: { id: existingId },
+            data: {
+              text: opt.text,
+              isCorrect: opt.isCorrect,
+              sortOrder: idx,
+            },
+          });
+        }
+        if (options.length > existing.length) {
+          await tx.option.createMany({
+            data: options.slice(existing.length).map((opt, relIdx) => ({
+              questionId,
+              text: opt.text,
+              isCorrect: opt.isCorrect,
+              sortOrder: existing.length + relIdx,
+            })),
+          });
+        } else if (existing.length > options.length) {
+          const deleteIds = existing.slice(options.length).map((o) => o.id);
+          await tx.option.deleteMany({ where: { id: { in: deleteIds } } });
+        }
+      }
+
+      const mode = toScoringMode(q);
+      const questionData = {
+        quizId: roomId,
+        subQuizId,
+        text: q.text,
+        type: inputTypeToPrisma(q.type),
+        order,
+        points: pointsForReplaceQuestion(q),
+        maxAnswers: maxAnswersForReplaceQuestion(q),
+        scoringMode: mode,
+        projectorShowFirstCorrect: q.projectorShowFirstCorrect ?? true,
+        projectorFirstCorrectWinnersCount: Math.max(
+          1,
+          Math.min(20, Math.trunc(q.projectorFirstCorrectWinnersCount ?? 1)),
+        ),
+        ...rankingQuestionCreateData(q),
+      };
+      let targetQuestionId: string;
+      if (q.id && existingQuestionIds.has(q.id)) {
+        await tx.question.update({
+          where: { id: q.id },
+          data: questionData,
+        });
+        targetQuestionId = q.id;
+      } else {
+        const createdQ = await tx.question.create({ data: questionData });
+        targetQuestionId = createdQ.id;
+      }
+      keptQuestionIds.add(targetQuestionId);
+      await syncOptionsForQuestion(targetQuestionId, q.options);
+    }
+
     const subRows: { id: string; sortOrder: number }[] = [];
     let sortBase = 0;
     for (const sq of content.subQuizzes) {
-      const createdSq = await tx.subQuiz.create({
-        data: {
-          quizId: room.id,
-          title: sq.title,
-          sortOrder: sq.sortOrder ?? sortBase,
-        },
-      });
-      subRows.push({ id: createdSq.id, sortOrder: createdSq.sortOrder });
-      sortBase += 1;
-      for (let i = 0; i < sq.questions.length; i += 1) {
-        const q = sq.questions[i];
-        const mode = toScoringMode(q);
-        const createdQ = await tx.question.create({
+      const nextSortOrder = sq.sortOrder ?? sortBase;
+      let subQuizId: string;
+      if (sq.id && existingSubQuizIds.has(sq.id)) {
+        const updatedSq = await tx.subQuiz.update({
+          where: { id: sq.id },
           data: {
-            quizId: room.id,
-            subQuizId: createdSq.id,
-            text: q.text,
-            type:
-              q.type === "single"
-                ? QuestionType.SINGLE
-                : q.type === "multi"
-                  ? QuestionType.MULTI
-                  : QuestionType.TAG_CLOUD,
-            order: i,
-            points: q.type === "tag_cloud" ? 1 : q.points,
-            maxAnswers: q.type === "tag_cloud" ? (q.maxAnswers ?? 3) : 1,
-            scoringMode: mode,
-            projectorShowFirstCorrect: q.projectorShowFirstCorrect ?? true,
-            projectorFirstCorrectWinnersCount: Math.max(
-              1,
-              Math.min(20, Math.trunc(q.projectorFirstCorrectWinnersCount ?? 1)),
-            ),
+            title: sq.title,
+            sortOrder: nextSortOrder,
           },
         });
-        if (q.type !== "tag_cloud") {
-          await tx.option.createMany({
-            data: q.options.map((o) => ({
-              questionId: createdQ.id,
-              text: o.text,
-              isCorrect: o.isCorrect,
-            })),
-          });
-        }
+        subQuizId = updatedSq.id;
+        subRows.push({ id: updatedSq.id, sortOrder: updatedSq.sortOrder });
+      } else {
+        const createdSq = await tx.subQuiz.create({
+          data: {
+            quizId: roomId,
+            title: sq.title,
+            sortOrder: nextSortOrder,
+          },
+        });
+        subQuizId = createdSq.id;
+        subRows.push({ id: createdSq.id, sortOrder: createdSq.sortOrder });
+      }
+      keptSubQuizIds.add(subQuizId);
+      sortBase += 1;
+      for (let i = 0; i < sq.questions.length; i += 1) {
+        await upsertQuestion(sq.questions[i]!, subQuizId, i);
       }
     }
     for (let i = 0; i < content.standaloneQuestions.length; i += 1) {
-      const q = content.standaloneQuestions[i];
-      const mode = toScoringMode(q);
-      const createdQ = await tx.question.create({
-        data: {
-          quizId: room.id,
-          subQuizId: null,
-          text: q.text,
-          type:
-            q.type === "single"
-              ? QuestionType.SINGLE
-              : q.type === "multi"
-                ? QuestionType.MULTI
-                : QuestionType.TAG_CLOUD,
-          order: i,
-          points: q.type === "tag_cloud" ? 1 : q.points,
-          maxAnswers: q.type === "tag_cloud" ? (q.maxAnswers ?? 3) : 1,
-          scoringMode: mode,
-          projectorShowFirstCorrect: q.projectorShowFirstCorrect ?? true,
-          projectorFirstCorrectWinnersCount: Math.max(
-            1,
-            Math.min(20, Math.trunc(q.projectorFirstCorrectWinnersCount ?? 1)),
-          ),
-        },
-      });
-      if (q.type !== "tag_cloud") {
-        await tx.option.createMany({
-          data: q.options.map((o) => ({
-            questionId: createdQ.id,
-            text: o.text,
-            isCorrect: o.isCorrect,
-          })),
-        });
-      }
+      await upsertQuestion(content.standaloneQuestions[i]!, null, i);
     }
+    await tx.question.deleteMany({
+      where: {
+        quizId: roomId,
+        id: { notIn: Array.from(keptQuestionIds) },
+      },
+    });
+    await tx.subQuiz.deleteMany({
+      where: {
+        quizId: roomId,
+        id: { notIn: Array.from(keptSubQuizIds) },
+      },
+    });
   });
   return getRoomByEventName(eventName);
 }
@@ -287,19 +530,24 @@ export async function replaceRoomContent(eventName: string, content: RoomContent
 export async function patchQuestionProjectorSettings(
   eventName: string,
   questionId: string,
-  patch: { projectorShowFirstCorrect?: boolean; projectorFirstCorrectWinnersCount?: number },
+  patch: {
+    projectorShowFirstCorrect?: boolean;
+    projectorFirstCorrectWinnersCount?: number;
+    rankingProjectorMetric?: "avg_rank" | "avg_score" | "total_score";
+  },
 ): Promise<void> {
   const room = await prisma.quiz.findUnique({ where: { slug: eventName }, select: { id: true } });
   if (!room) throw new Error("Room not found");
   const question = await prisma.question.findFirst({
     where: { id: questionId, quizId: room.id },
-    select: { id: true },
+    select: { id: true, type: true },
   });
   if (!question) throw new Error("Question not found");
 
   const data: {
     projectorShowFirstCorrect?: boolean;
     projectorFirstCorrectWinnersCount?: number;
+    rankingProjectorMetric?: RankingProjectorMetric;
   } = {};
   if (typeof patch.projectorShowFirstCorrect === "boolean") {
     data.projectorShowFirstCorrect = patch.projectorShowFirstCorrect;
@@ -309,6 +557,12 @@ export async function patchQuestionProjectorSettings(
       1,
       Math.min(20, Math.trunc(patch.projectorFirstCorrectWinnersCount)),
     );
+  }
+  if (patch.rankingProjectorMetric !== undefined) {
+    if (question.type !== QuestionType.RANKING) {
+      throw new Error("Метрика проектора задаётся только для вопроса с ранжированием");
+    }
+    data.rankingProjectorMetric = rankingMetricToPrisma(patch.rankingProjectorMetric);
   }
   if (Object.keys(data).length === 0) return;
 
@@ -323,7 +577,7 @@ export async function replaceQuizQuestions(
   eventName: string,
   questions: Array<{
     text: string;
-    type: "single" | "multi" | "tag_cloud";
+    type: "single" | "multi" | "tag_cloud" | "ranking";
     points: number;
     maxAnswers?: number;
     options: Array<{ text: string; isCorrect: boolean }>;
@@ -341,14 +595,41 @@ export type QuizProgressPayload = {
   total: number;
 };
 
+export type PlayerVisibleResultTile = {
+  questionId: string;
+  text: string;
+  type: "single" | "multi" | "ranking";
+  rankingProjectorMetric?: "avg_rank" | "avg_score" | "total_score";
+  optionStats: Array<{
+    optionId: string;
+    text: string;
+    count: number;
+    isCorrect: boolean;
+    avgRank?: number;
+    avgScore?: number;
+    totalScore?: number;
+  }>;
+};
+
 export async function getQuizPublicState(quizId: string) {
   const quiz = await prisma.quiz.findUnique({
     where: { id: quizId },
-    include: { questions: { include: { options: true }, orderBy: { order: "asc" } } },
+    include: {
+      questions: {
+        include: { options: { orderBy: { sortOrder: "asc" } } },
+        orderBy: { order: "asc" },
+      },
+    },
   });
   if (!quiz) return null;
-  const activeQuestion = quiz.questions.find((q) => q.isActive);
+  const activeQuestions = quiz.questions.filter((q) => q.isActive);
+  const activeQuestion = activeQuestions[0];
   let quizProgress: QuizProgressPayload | null = null;
+  const view = publicViewJsonToState(quiz.publicView as Prisma.JsonValue | null);
+  const playerVisibleResults = await getPlayerVisibleResultsForQuiz(
+    quiz.id,
+    view.playerVisibleResultQuestionIds ?? [],
+  );
   if (activeQuestion?.subQuizId) {
     const inSub = await prisma.question.findMany({
       where: { subQuizId: activeQuestion.subQuizId },
@@ -369,37 +650,134 @@ export async function getQuizPublicState(quizId: string) {
     title: quiz.title,
     slug: quiz.slug,
     status: quiz.status,
+    showEventTitleOnPlayer: view.showEventTitleOnPlayer,
+    playerBanners: view.playerBanners,
+    activePlayerBannerId: view.activePlayerBannerId,
+    speakerTileText: view.speakerTileText,
+    speakerTileBackgroundColor: view.speakerTileBackgroundColor,
+    speakerTileVisible: view.speakerTileVisible,
+    programTileText: view.programTileText,
+    programTileBackgroundColor: view.programTileBackgroundColor,
+    programTileLinkUrl: view.programTileLinkUrl,
+    programTileVisible: view.programTileVisible,
+    playerVisibleResults,
+    playerTilesOrder: view.playerTilesOrder,
+    brandPrimaryColor: view.brandPrimaryColor,
+    brandAccentColor: view.brandAccentColor,
+    brandSurfaceColor: view.brandSurfaceColor,
+    brandTextColor: view.brandTextColor,
+    brandFontFamily: view.brandFontFamily,
+    brandFontUrl: view.brandFontUrl,
+    brandLogoUrl: view.brandLogoUrl,
+    brandPlayerBackgroundImageUrl: view.brandPlayerBackgroundImageUrl,
+    brandProjectorBackgroundImageUrl: view.brandProjectorBackgroundImageUrl,
+    brandBodyBackgroundColor: view.brandBodyBackgroundColor,
+    brandBackgroundOverlayColor: view.brandBackgroundOverlayColor,
+    reactionSession: getReactionSessionPublic(quiz.id),
     quizProgress,
+    activeQuestions: activeQuestions.map((q) => ({
+      id: q.id,
+      text: q.text,
+      type: prismaTypeToApi(q.type),
+      maxAnswers: q.maxAnswers,
+      options: q.options.map((o) => ({ id: o.id, text: o.text })),
+      isClosed: q.isClosed,
+      rankingKind: q.type === QuestionType.RANKING ? rankingKindToApi(q.rankingKind) : undefined,
+      rankingPlayerHint:
+        q.type === QuestionType.RANKING ? (q.rankingPlayerHint ?? undefined) : undefined,
+      rankingPointsByRank:
+        q.type === QuestionType.RANKING
+          ? (() => {
+              if (q.rankingKind !== RankingKind.JURY) return undefined;
+              const n = q.options.length;
+              const tiers = parseRankingTiersJson(q.rankingPointsByRank);
+              return tiers != null && tiers.length === n ? tiers : undefined;
+            })()
+          : undefined,
+    })),
     activeQuestion: activeQuestion
       ? {
           id: activeQuestion.id,
           text: activeQuestion.text,
-          type:
-            activeQuestion.type === QuestionType.SINGLE
-              ? "single"
-              : activeQuestion.type === QuestionType.MULTI
-                ? "multi"
-                : "tag_cloud",
+          type: prismaTypeToApi(activeQuestion.type),
           maxAnswers: activeQuestion.maxAnswers,
           options: activeQuestion.options.map((o) => ({ id: o.id, text: o.text })),
           isClosed: activeQuestion.isClosed,
+          rankingKind:
+            activeQuestion.type === QuestionType.RANKING
+              ? rankingKindToApi(activeQuestion.rankingKind)
+              : undefined,
+          rankingPlayerHint:
+            activeQuestion.type === QuestionType.RANKING
+              ? (activeQuestion.rankingPlayerHint ?? undefined)
+              : undefined,
+          rankingPointsByRank:
+            activeQuestion.type === QuestionType.RANKING
+              ? (() => {
+                  if (activeQuestion.rankingKind !== RankingKind.JURY) return undefined;
+                  const n = activeQuestion.options.length;
+                  const tiers = parseRankingTiersJson(activeQuestion.rankingPointsByRank);
+                  return tiers != null && tiers.length === n ? tiers : undefined;
+                })()
+              : undefined,
         }
       : null,
   };
 }
 
+async function getPlayerVisibleResultsForQuiz(
+  quizId: string,
+  questionIds: string[],
+): Promise<PlayerVisibleResultTile[]> {
+  if (questionIds.length === 0) return [];
+  const rows = (await prisma.question.findMany({
+    where: {
+      quizId,
+      id: { in: questionIds },
+      type: { in: [QuestionType.SINGLE, QuestionType.MULTI, QuestionType.RANKING] },
+    },
+    select: {
+      id: true,
+      text: true,
+      subQuizId: true,
+      type: true,
+      projectorShowFirstCorrect: true,
+      projectorFirstCorrectWinnersCount: true,
+      rankingPointsByRank: true,
+      rankingProjectorMetric: true,
+      rankingKind: true,
+      options: { select: { id: true, text: true, isCorrect: true, sortOrder: true } },
+      answers: { select: { selectedOptionIds: true } },
+    },
+    orderBy: { order: "asc" },
+  })) as QuestionDashboardRow[];
+  const byId = new Map(mapPerQuestion(rows).map((item) => [item.questionId, item]));
+  return questionIds
+    .map((qid) => byId.get(qid))
+    .filter((item): item is NonNullable<typeof item> => Boolean(item))
+    .map((item) => ({
+      questionId: item.questionId,
+      text: item.text,
+      type: prismaTypeToApi(item.type) as "single" | "multi" | "ranking",
+      rankingProjectorMetric:
+        item.type === QuestionType.RANKING
+          ? rankingMetricToApi(item.rankingProjectorMetric)
+          : undefined,
+      optionStats: item.optionStats.map((row) => ({
+        optionId: row.optionId,
+        text: row.text,
+        count: row.count,
+        isCorrect: row.isCorrect,
+        avgRank: row.avgRank,
+        avgScore: row.avgScore,
+        totalScore: row.totalScore,
+      })),
+    }));
+}
+
 function mapPerQuestion(questions: QuestionDashboardRow[]) {
   return questions.map((q) => {
-    const optionCounts: Record<string, number> = {};
-    q.options.forEach((o) => {
-      optionCounts[o.id] = 0;
-    });
-    q.answers.forEach((a) => {
-      const selected = parseSelectedIds(a.selectedOptionIds);
-      selected.forEach((id) => {
-        if (id in optionCounts) optionCounts[id] += 1;
-      });
-    });
+    const sortedOpts = [...q.options].sort((a, b) => a.sortOrder - b.sortOrder);
     let tagCloud: Array<{ text: string; count: number }> = [];
     if (q.type === QuestionType.TAG_CLOUD) {
       tagCloud = Object.entries(
@@ -415,24 +793,93 @@ function mapPerQuestion(questions: QuestionDashboardRow[]) {
         .sort((a, b) => b.count - a.count || a.text.localeCompare(b.text, "ru"))
         .slice(0, TAG_CLOUD_TAGS_DASHBOARD_CAP);
     }
+
+    let optionStats: Array<{
+      optionId: string;
+      text: string;
+      count: number;
+      isCorrect: boolean;
+      avgRank?: number;
+      avgScore?: number;
+      totalScore?: number;
+    }>;
+
+    if (q.type === QuestionType.RANKING) {
+      const n = sortedOpts.length;
+      const expectedIds = sortedOpts.map((o) => o.id);
+      const isJury = q.rankingKind === RankingKind.JURY;
+      const tiers = parseRankingTiersJson(q.rankingPointsByRank);
+      const useTiers = isJury && tiers != null && tiers.length === n;
+
+      const sumsRank: Record<string, number> = {};
+      const sumsAvgScore: Record<string, number> = {};
+      const sumsTotalScore: Record<string, number> = {};
+      sortedOpts.forEach((o) => {
+        sumsRank[o.id] = 0;
+        sumsAvgScore[o.id] = 0;
+        sumsTotalScore[o.id] = 0;
+      });
+      let answerCount = 0;
+      for (const a of q.answers) {
+        const ranked = parseSelectedIds(a.selectedOptionIds);
+        if (ranked.length !== n) continue;
+        answerCount += 1;
+        ranked.forEach((id, idx) => {
+          if (id in sumsRank) sumsRank[id] += idx + 1;
+        });
+        if (useTiers) {
+          for (let i = 0; i < n; i++) {
+            const id = ranked[i]!;
+            const counts = isJury ? true : ranked[i] === expectedIds[i];
+            if (counts && id in sumsAvgScore) {
+              const pts = tiers![i] ?? 0;
+              sumsAvgScore[id] += pts;
+              sumsTotalScore[id] += pts;
+            }
+          }
+        }
+      }
+      optionStats = sortedOpts.map((o) => ({
+        optionId: o.id,
+        text: o.text,
+        count: answerCount,
+        isCorrect: o.isCorrect,
+        avgRank: answerCount > 0 ? sumsRank[o.id]! / answerCount : 0,
+        avgScore: useTiers && answerCount > 0 ? sumsAvgScore[o.id]! / answerCount : undefined,
+        totalScore: useTiers ? sumsTotalScore[o.id]! : undefined,
+      }));
+    } else {
+      const optionCounts: Record<string, number> = {};
+      sortedOpts.forEach((o) => {
+        optionCounts[o.id] = 0;
+      });
+      if (q.type !== QuestionType.TAG_CLOUD) {
+        q.answers.forEach((a) => {
+          const selected = parseSelectedIds(a.selectedOptionIds);
+          selected.forEach((id) => {
+            if (id in optionCounts) optionCounts[id] += 1;
+          });
+        });
+      }
+      optionStats = sortedOpts.map((o) => ({
+        optionId: o.id,
+        text: o.text,
+        count: optionCounts[o.id] ?? 0,
+        isCorrect: o.isCorrect,
+      }));
+    }
+
     return {
       questionId: q.id,
       text: q.text,
       subQuizId: q.subQuizId,
       projectorShowFirstCorrect: q.projectorShowFirstCorrect,
       projectorFirstCorrectWinnersCount: q.projectorFirstCorrectWinnersCount,
-      type:
-        q.type === QuestionType.SINGLE
-          ? "single"
-          : q.type === QuestionType.MULTI
-            ? "multi"
-            : "tag_cloud",
-      optionStats: q.options.map((o) => ({
-        optionId: o.id,
-        text: o.text,
-        count: optionCounts[o.id] ?? 0,
-        isCorrect: o.isCorrect,
-      })),
+      type: prismaTypeToApi(q.type),
+      rankingProjectorMetric:
+        q.type === QuestionType.RANKING ? rankingMetricToApi(q.rankingProjectorMetric) : undefined,
+      rankingKind: q.type === QuestionType.RANKING ? rankingKindToApi(q.rankingKind) : undefined,
+      optionStats,
       tagCloud,
       firstCorrectNicknames: [] as string[],
     };
@@ -448,7 +895,14 @@ async function firstCorrectNicknamesForStandaloneQuestions(
       isCorrect: true,
       question: {
         subQuizId: null,
-        type: { in: [QuestionType.SINGLE, QuestionType.MULTI] },
+        type: {
+          in: [
+            QuestionType.SINGLE,
+            QuestionType.MULTI,
+            QuestionType.TAG_CLOUD,
+            QuestionType.RANKING,
+          ],
+        },
       },
     },
     select: {
@@ -476,7 +930,12 @@ async function aggregateLeaderboardsBySubQuizForQuiz(
   Array<{
     subQuizId: string;
     title: string;
-    rows: Array<{ participantId: string; nickname: string; score: number }>;
+    rows: Array<{
+      participantId: string;
+      nickname: string;
+      score: number;
+      totalResponseMs: number;
+    }>;
   }>
 > {
   if (subQuizzes.length === 0) return [];
@@ -486,12 +945,14 @@ async function aggregateLeaderboardsBySubQuizForQuiz(
       participantId: string;
       nickname: string;
       score: bigint;
+      totalResponseMs: bigint;
     }>
   >(Prisma.sql`
     SELECT q."subQuizId" AS "subQuizId",
            a."participantId" AS "participantId",
            p.nickname AS nickname,
-           SUM(a."scoreAwarded")::bigint AS score
+           SUM(a."scoreAwarded")::bigint AS score,
+           SUM(a."responseMs")::bigint AS "totalResponseMs"
     FROM "Answer" a
     INNER JOIN "Question" q ON q.id = a."questionId"
     INNER JOIN "Participant" p ON p.id = a."participantId"
@@ -500,20 +961,29 @@ async function aggregateLeaderboardsBySubQuizForQuiz(
     GROUP BY q."subQuizId", a."participantId", p.nickname
   `);
 
-  const bySub = new Map<string, Array<{ participantId: string; nickname: string; score: number }>>();
+  const bySub = new Map<
+    string,
+    Array<{ participantId: string; nickname: string; score: number; totalResponseMs: number }>
+  >();
   for (const r of rows) {
     const list = bySub.get(r.subQuizId);
     const row = {
       participantId: r.participantId,
       nickname: r.nickname,
       score: Number(r.score),
+      totalResponseMs: Number(r.totalResponseMs),
     };
     if (list) list.push(row);
     else bySub.set(r.subQuizId, [row]);
   }
   return subQuizzes.map((sq) => {
     const subRows = bySub.get(sq.id) ?? [];
-    subRows.sort((a, b) => b.score - a.score);
+    subRows.sort(
+      (a, b) =>
+        b.score - a.score ||
+        a.totalResponseMs - b.totalResponseMs ||
+        a.nickname.localeCompare(b.nickname, "ru"),
+    );
     return { subQuizId: sq.id, title: sq.title, rows: subRows };
   });
 }
@@ -528,7 +998,7 @@ export type SubQuizDetailedResults = {
     order: number;
     points: number;
     scoringMode: "poll" | "quiz";
-    type: "single" | "multi" | "tag_cloud";
+    type: "single" | "multi" | "tag_cloud" | "ranking";
     isActive: boolean;
   }>;
   rows: Array<{
@@ -536,6 +1006,7 @@ export type SubQuizDetailedResults = {
     nickname: string;
     scoresByQuestionId: Record<string, number | null>;
     totalScore: number;
+    totalResponseMs: number;
   }>;
 };
 
@@ -578,7 +1049,7 @@ export async function getSubQuizDetailedResults(
     include: {
       answers: {
         where: { question: { subQuizId } },
-        select: { questionId: true, scoreAwarded: true },
+        select: { questionId: true, scoreAwarded: true, responseMs: true },
       },
     },
   });
@@ -592,16 +1063,20 @@ export async function getSubQuizDetailedResults(
         scoresByQuestionId[qid] = ans !== undefined ? ans.scoreAwarded : null;
       }
       const totalScore = p.answers.reduce((sum, a) => sum + a.scoreAwarded, 0);
+      const totalResponseMs = p.answers.reduce((sum, a) => sum + a.responseMs, 0);
       return {
         participantId: p.id,
         nickname: p.nickname,
         scoresByQuestionId,
         totalScore,
+        totalResponseMs,
       };
     })
     .sort(
       (a, b) =>
-        b.totalScore - a.totalScore || a.nickname.localeCompare(b.nickname, "ru"),
+        b.totalScore - a.totalScore ||
+        a.totalResponseMs - b.totalResponseMs ||
+        a.nickname.localeCompare(b.nickname, "ru"),
     );
 
   return {
@@ -614,12 +1089,7 @@ export async function getSubQuizDetailedResults(
       order: q.order,
       points: q.points,
       scoringMode: q.scoringMode === ScoringMode.POLL ? "poll" : "quiz",
-      type:
-        q.type === QuestionType.SINGLE
-          ? "single"
-          : q.type === QuestionType.MULTI
-            ? "multi"
-            : "tag_cloud",
+      type: prismaTypeToApi(q.type),
       isActive: q.isActive,
     })),
     rows,
@@ -628,11 +1098,21 @@ export async function getSubQuizDetailedResults(
 
 export type DashboardResults = {
   perQuestion: ReturnType<typeof mapPerQuestion>;
-  leaderboard: Array<{ participantId: string; nickname: string; score: number }>;
+  leaderboard: Array<{
+    participantId: string;
+    nickname: string;
+    score: number;
+    totalResponseMs: number;
+  }>;
   leaderboardsBySubQuiz: Array<{
     subQuizId: string;
     title: string;
-    rows: Array<{ participantId: string; nickname: string; score: number }>;
+    rows: Array<{
+      participantId: string;
+      nickname: string;
+      score: number;
+      totalResponseMs: number;
+    }>;
   }>;
 };
 
@@ -647,7 +1127,10 @@ export async function getDashboardResults(quizId: string): Promise<DashboardResu
         type: true,
         projectorShowFirstCorrect: true,
         projectorFirstCorrectWinnersCount: true,
-        options: { select: { id: true, text: true, isCorrect: true } },
+        rankingPointsByRank: true,
+        rankingProjectorMetric: true,
+        rankingKind: true,
+        options: { select: { id: true, text: true, isCorrect: true, sortOrder: true } },
         answers: { select: { selectedOptionIds: true } },
       },
       orderBy: { order: "asc" },
@@ -662,10 +1145,7 @@ export async function getDashboardResults(quizId: string): Promise<DashboardResu
   const leaderboard = leaderboardsBySubQuiz[0]?.rows ?? [];
   const firstCorrectMap = await firstCorrectNicknamesForStandaloneQuestions(quizId);
   const perQuestion = mapPerQuestion(questions).map((row) => {
-    const nicks =
-      row.subQuizId == null && row.type !== "tag_cloud"
-        ? (firstCorrectMap.get(row.questionId) ?? [])
-        : [];
+    const nicks = row.subQuizId == null ? (firstCorrectMap.get(row.questionId) ?? []) : [];
     return { ...row, firstCorrectNicknames: nicks };
   });
   return {
@@ -687,9 +1167,18 @@ export async function getParticipantAnswersMap(quizId: string, participantId: st
     select: {
       questionId: true,
       selectedOptionIds: true,
+      question: {
+        select: {
+          type: true,
+          options: { select: { id: true } },
+        },
+      },
     },
   });
   return answers.reduce<Record<string, string[]>>((acc, answer) => {
+    if (!isStoredAnswerValidForQuestion(answer.question, answer.selectedOptionIds)) {
+      return acc;
+    }
     acc[answer.questionId] = parseSelectedIds(answer.selectedOptionIds);
     return acc;
   }, {});
@@ -726,7 +1215,7 @@ export async function activateNextQuestion(quizId: string, subQuizId?: string) {
     }),
     prisma.question.update({
       where: { id: nextQuestion.id },
-      data: { isActive: true, isClosed: false },
+      data: { isActive: true, isClosed: false, activatedAt: new Date() },
     }),
     prisma.quiz.update({
       where: { id: quizId },
@@ -761,13 +1250,9 @@ export async function setQuestionEnabled(quizId: string, questionId: string, ena
 
   if (enabled) {
     await prisma.$transaction([
-      prisma.question.updateMany({
-        where: { quizId },
-        data: { isActive: false, isClosed: true },
-      }),
       prisma.question.update({
         where: { id: questionId },
-        data: { isActive: true, isClosed: false },
+        data: { isActive: true, isClosed: false, activatedAt: new Date() },
       }),
       prisma.quiz.update({
         where: { id: quizId },
@@ -823,15 +1308,35 @@ export async function closeSubQuiz(quizId: string, subQuizId: string) {
   return getQuizPublicState(quizId);
 }
 
-export async function joinQuiz(payload: {
-  slug: string;
-  nickname: string;
-  deviceId: string;
-}) {
+export async function joinQuiz(payload: { slug: string; nickname: string; deviceId: string }) {
+  let nickname = payload.nickname.trim();
+  if (containsProfanity(nickname)) {
+    nickname = "Участник";
+  }
   const quiz = await prisma.quiz.findUnique({
     where: { slug: payload.slug },
   });
   if (!quiz) throw new Error("Quiz not found");
+  const currentParticipant = await prisma.participant.findUnique({
+    where: {
+      quizId_deviceId: { quizId: quiz.id, deviceId: payload.deviceId },
+    },
+    select: { id: true },
+  });
+  const duplicateNickname = await prisma.participant.findFirst({
+    where: {
+      quizId: quiz.id,
+      nickname: {
+        equals: nickname,
+        mode: "insensitive",
+      },
+      ...(currentParticipant ? { NOT: { id: currentParticipant.id } } : {}),
+    },
+    select: { id: true },
+  });
+  if (duplicateNickname) {
+    throw new Error("Ник уже используется в этой комнате");
+  }
   const participant = await prisma.participant.upsert({
     where: {
       quizId_deviceId: { quizId: quiz.id, deviceId: payload.deviceId },
@@ -839,45 +1344,64 @@ export async function joinQuiz(payload: {
     create: {
       quizId: quiz.id,
       deviceId: payload.deviceId,
-      nickname: payload.nickname,
+      nickname,
     },
     update: {
-      nickname: payload.nickname,
+      nickname,
     },
   });
   return { quizId: quiz.id, participantId: participant.id };
+}
+
+export async function updateParticipantNickname(payload: {
+  quizId: string;
+  participantId: string;
+  nickname: string;
+}) {
+  let nickname = payload.nickname.trim();
+  if (containsProfanity(nickname)) {
+    nickname = "Участник";
+  }
+  const currentParticipant = await prisma.participant.findFirst({
+    where: { id: payload.participantId, quizId: payload.quizId },
+    select: { id: true },
+  });
+  if (!currentParticipant) throw new Error("Participant not found");
+  const duplicateNickname = await prisma.participant.findFirst({
+    where: {
+      quizId: payload.quizId,
+      nickname: {
+        equals: nickname,
+        mode: "insensitive",
+      },
+      NOT: { id: payload.participantId },
+    },
+    select: { id: true },
+  });
+  if (duplicateNickname) {
+    throw new Error("Ник уже используется в этой комнате");
+  }
+  await prisma.participant.update({
+    where: { id: payload.participantId },
+    data: { nickname },
+  });
+  return { nickname };
 }
 
 export async function submitAnswer(payload: {
   quizId: string;
   questionId: string;
   optionIds?: string[];
+  rankedOptionIds?: string[];
   tagAnswers?: string[];
   participantId: string;
 }) {
   const question = await prisma.question.findFirst({
     where: { id: payload.questionId, quizId: payload.quizId },
-    include: { options: true },
+    include: { options: { orderBy: { sortOrder: "asc" } } },
   });
   if (!question) throw new Error("Question not found");
   if (!question.isActive || question.isClosed) throw new Error("Question is not open");
-
-  const selected = [...new Set(payload.optionIds ?? [])].sort();
-  const normalizedTags = (payload.tagAnswers ?? []).map(normalizeTag).filter(Boolean);
-  if (question.type === QuestionType.TAG_CLOUD) {
-    if (normalizedTags.length < 1) throw new Error("At least one tag is required");
-    if (normalizedTags.length > Math.max(1, question.maxAnswers)) {
-      throw new Error(`Too many tags: max ${question.maxAnswers}`);
-    }
-  } else if (selected.length < 1) {
-    throw new Error("At least one option is required");
-  }
-  const isCorrect =
-    question.type === QuestionType.TAG_CLOUD
-      ? false
-      : evaluateAnswer(question as QuestionWithOptions, selected);
-  const quizScoring = question.scoringMode === ScoringMode.QUIZ && question.type !== QuestionType.TAG_CLOUD;
-  const scoreAwarded = quizScoring && isCorrect ? question.points : 0;
 
   const existing = await prisma.answer.findUnique({
     where: {
@@ -888,8 +1412,113 @@ export async function submitAnswer(payload: {
     },
   });
   if (existing) {
-    throw new Error("Already answered this question");
+    if (isStoredAnswerValidForQuestion(question, existing.selectedOptionIds)) {
+      throw new Error("Already answered this question");
+    }
+    await prisma.answer.delete({
+      where: {
+        questionId_participantId: {
+          questionId: payload.questionId,
+          participantId: payload.participantId,
+        },
+      },
+    });
   }
+
+  const nowMs = Date.now();
+  const activatedAtMs = question.activatedAt?.getTime() ?? nowMs;
+  const responseMs = Math.max(0, nowMs - activatedAtMs);
+
+  if (question.type === QuestionType.RANKING) {
+    const ranked = payload.rankedOptionIds ?? [];
+    const expectedIds = rankingExpectedIdsFromQuestion(
+      question.options,
+      question.rankingKind,
+      question.rankingPointsByRank,
+    );
+    const expectedSet = new Set(expectedIds);
+    if (ranked.length !== expectedIds.length) {
+      throw new Error("Ranking must list each option exactly once");
+    }
+    if (new Set(ranked).size !== ranked.length) {
+      throw new Error("Duplicate options in ranking");
+    }
+    for (const id of ranked) {
+      if (!expectedSet.has(id)) throw new Error("Invalid option id in ranking");
+    }
+    const tiers = parseRankingTiersJson(question.rankingPointsByRank);
+    const useTiers = tiers != null && tiers.length === expectedIds.length;
+
+    if (question.rankingKind === RankingKind.JURY) {
+      if (!useTiers) {
+        throw new Error("Jury ranking requires points for each rank");
+      }
+      await prisma.answer.create({
+        data: {
+          quizId: payload.quizId,
+          questionId: payload.questionId,
+          participantId: payload.participantId,
+          selectedOptionIds: JSON.stringify(ranked),
+          isCorrect: false,
+          scoreAwarded: 0,
+          responseMs,
+        },
+      });
+      return;
+    }
+
+    const isCorrect =
+      question.scoringMode === ScoringMode.QUIZ && evaluateRankingAnswer(expectedIds, ranked);
+    const scoreAwarded =
+      question.scoringMode === ScoringMode.QUIZ && isCorrect ? question.points : 0;
+    await prisma.answer.create({
+      data: {
+        quizId: payload.quizId,
+        questionId: payload.questionId,
+        participantId: payload.participantId,
+        selectedOptionIds: JSON.stringify(ranked),
+        isCorrect,
+        scoreAwarded,
+        responseMs,
+      },
+    });
+    return;
+  }
+
+  const rawTagAnswers = payload.tagAnswers ?? [];
+  const tagAnswersForScore = rawTagAnswers.filter((t) => !containsProfanity(t));
+
+  const selected = [...new Set(payload.optionIds ?? [])].sort();
+  const tagCloudQuiz =
+    question.type === QuestionType.TAG_CLOUD && question.scoringMode === ScoringMode.QUIZ;
+  const tagCloudPollWithReference =
+    question.type === QuestionType.TAG_CLOUD &&
+    question.scoringMode === ScoringMode.POLL &&
+    question.options.some((o) => o.isCorrect);
+  const useComparableTagCloud = tagCloudQuiz || tagCloudPollWithReference;
+  const normalizedTags = tagAnswersForScore
+    .map(useComparableTagCloud ? normalizeTagComparable : normalizeTag)
+    .filter(Boolean);
+  if (question.type === QuestionType.TAG_CLOUD) {
+    if (normalizedTags.length < 1) {
+      if (rawTagAnswers.length < 1) {
+        throw new Error("At least one tag is required");
+      }
+    }
+    if (normalizedTags.length > Math.max(1, question.maxAnswers)) {
+      throw new Error(`Too many tags: max ${question.maxAnswers}`);
+    }
+  } else if (selected.length < 1) {
+    throw new Error("At least one option is required");
+  }
+  const isCorrect =
+    question.type === QuestionType.TAG_CLOUD
+      ? tagCloudQuiz || tagCloudPollWithReference
+        ? evaluateTagCloudQuizAnswer(question as QuestionWithOptions, normalizedTags)
+        : false
+      : evaluateAnswer(question as QuestionWithOptions, selected);
+  const quizScoring = question.scoringMode === ScoringMode.QUIZ;
+  const scoreAwarded = quizScoring && isCorrect ? question.points : 0;
 
   await prisma.answer.create({
     data: {
@@ -901,6 +1530,7 @@ export async function submitAnswer(payload: {
       ),
       isCorrect,
       scoreAwarded,
+      responseMs,
     },
   });
 }
@@ -930,10 +1560,20 @@ export type StandaloneVoteAdminDetail = {
   question: {
     id: string;
     text: string;
-    type: "single" | "multi" | "tag_cloud";
+    type: "single" | "multi" | "tag_cloud" | "ranking";
+    rankingProjectorMetric?: "avg_rank" | "avg_score" | "total_score";
+    rankingKind?: "quiz" | "jury";
   };
   firstCorrect: null | { participantId: string; nickname: string; submittedAt: string };
-  optionStats: Array<{ optionId: string; text: string; count: number; isCorrect: boolean }>;
+  optionStats: Array<{
+    optionId: string;
+    text: string;
+    count: number;
+    isCorrect: boolean;
+    avgRank?: number;
+    avgScore?: number;
+    totalScore?: number;
+  }>;
   tagCloud: Array<{ text: string; count: number }>;
   answerRows: Array<{
     participantId: string;
@@ -952,7 +1592,7 @@ export async function getStandaloneVoteAdminDetail(
   if (!room) return null;
   const q = await prisma.question.findFirst({
     where: { id: questionId, quizId: room.id, subQuizId: null },
-    include: { options: true },
+    include: { options: { orderBy: { sortOrder: "asc" } } },
   });
   if (!q) return null;
 
@@ -966,7 +1606,10 @@ export async function getStandaloneVoteAdminDetail(
   const correctOptionCount = q.options.filter((o) => o.isCorrect).length;
 
   let firstCorrect: StandaloneVoteAdminDetail["firstCorrect"] = null;
-  if (q.type === QuestionType.SINGLE && correctOptionCount === 1) {
+  if (
+    (q.type === QuestionType.SINGLE && correctOptionCount === 1) ||
+    (q.type === QuestionType.RANKING && q.rankingKind === RankingKind.QUIZ)
+  ) {
     const hit = answers.find((a) => a.isCorrect);
     if (hit) {
       firstCorrect = {
@@ -977,15 +1620,68 @@ export async function getStandaloneVoteAdminDetail(
     }
   }
 
-  const optionCounts: Record<string, number> = {};
-  q.options.forEach((o) => {
-    optionCounts[o.id] = 0;
-  });
-  answers.forEach((a) => {
-    parseSelectedIds(a.selectedOptionIds).forEach((id) => {
-      if (id in optionCounts) optionCounts[id] += 1;
+  const sortedOpts = [...q.options].sort((a, b) => a.sortOrder - b.sortOrder);
+  let optionStats: StandaloneVoteAdminDetail["optionStats"];
+  if (q.type === QuestionType.RANKING) {
+    const n = sortedOpts.length;
+    const expectedIds = sortedOpts.map((o) => o.id);
+    const isJury = q.rankingKind === RankingKind.JURY;
+    const tiers = parseRankingTiersJson(q.rankingPointsByRank);
+    const useTiers = isJury && tiers != null && tiers.length === n;
+    const sumsRank: Record<string, number> = {};
+    const sumsAvgScore: Record<string, number> = {};
+    const sumsTotalScore: Record<string, number> = {};
+    sortedOpts.forEach((o) => {
+      sumsRank[o.id] = 0;
+      sumsAvgScore[o.id] = 0;
+      sumsTotalScore[o.id] = 0;
     });
-  });
+    let answerCount = 0;
+    for (const a of answers) {
+      const ranked = parseSelectedIds(a.selectedOptionIds);
+      if (ranked.length !== n) continue;
+      answerCount += 1;
+      ranked.forEach((id, idx) => {
+        if (id in sumsRank) sumsRank[id] += idx + 1;
+      });
+      if (useTiers) {
+        for (let i = 0; i < n; i++) {
+          const id = ranked[i]!;
+          const ok = isJury || ranked[i] === expectedIds[i];
+          if (ok && id in sumsAvgScore) {
+            const pts = tiers![i] ?? 0;
+            sumsAvgScore[id] += pts;
+            sumsTotalScore[id] += pts;
+          }
+        }
+      }
+    }
+    optionStats = sortedOpts.map((o) => ({
+      optionId: o.id,
+      text: o.text,
+      count: answerCount,
+      isCorrect: o.isCorrect,
+      avgRank: answerCount > 0 ? sumsRank[o.id]! / answerCount : 0,
+      avgScore: useTiers && answerCount > 0 ? sumsAvgScore[o.id]! / answerCount : undefined,
+      totalScore: useTiers ? sumsTotalScore[o.id]! : undefined,
+    }));
+  } else {
+    const optionCounts: Record<string, number> = {};
+    sortedOpts.forEach((o) => {
+      optionCounts[o.id] = 0;
+    });
+    answers.forEach((a) => {
+      parseSelectedIds(a.selectedOptionIds).forEach((id) => {
+        if (id in optionCounts) optionCounts[id] += 1;
+      });
+    });
+    optionStats = sortedOpts.map((o) => ({
+      optionId: o.id,
+      text: o.text,
+      count: optionCounts[o.id] ?? 0,
+      isCorrect: o.isCorrect,
+    }));
+  }
 
   const tagCloud =
     q.type === QuestionType.TAG_CLOUD
@@ -1020,20 +1716,13 @@ export async function getStandaloneVoteAdminDetail(
     question: {
       id: q.id,
       text: q.text,
-      type:
-        q.type === QuestionType.SINGLE
-          ? "single"
-          : q.type === QuestionType.MULTI
-            ? "multi"
-            : "tag_cloud",
+      type: prismaTypeToApi(q.type),
+      rankingProjectorMetric:
+        q.type === QuestionType.RANKING ? rankingMetricToApi(q.rankingProjectorMetric) : undefined,
+      rankingKind: q.type === QuestionType.RANKING ? rankingKindToApi(q.rankingKind) : undefined,
     },
     firstCorrect,
-    optionStats: q.options.map((o) => ({
-      optionId: o.id,
-      text: o.text,
-      count: optionCounts[o.id] ?? 0,
-      isCorrect: o.isCorrect,
-    })),
+    optionStats,
     tagCloud,
     answerRows,
   };

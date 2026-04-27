@@ -1,9 +1,11 @@
 import {
   normalizePublicViewState,
+  SPEAKER_TILE_ID,
   type CloudWordCount,
+  type PublicBanner,
   type PublicViewMode,
-  type PublicViewPatch,
-  type PublicViewPayload,
+  type PublicViewPatch as SharedPublicViewPatch,
+  type PublicViewPayload as SharedPublicViewPayload,
 } from "@meyouquize/shared";
 
 export type BrandingState = {
@@ -11,6 +13,7 @@ export type BrandingState = {
   cloudQuestionColor: string;
   cloudTagColors: string[];
   cloudTopTagColor: string;
+  cloudCorrectTagColor: string;
   cloudDensity: number;
   cloudTagPadding: number;
   cloudSpiral: "archimedean" | "rectangular";
@@ -19,17 +22,58 @@ export type BrandingState = {
   voteOptionTextColor: string;
   voteProgressTrackColor: string;
   voteProgressBarColor: string;
+  brandPrimaryColor: string;
+  brandAccentColor: string;
+  brandSurfaceColor: string;
+  brandTextColor: string;
+  brandFontFamily: string;
+  brandFontUrl: string;
+  brandLogoUrl: string;
+  brandPlayerBackgroundImageUrl: string;
+  brandProjectorBackgroundImageUrl: string;
+  brandBodyBackgroundColor: string;
+  brandBackgroundOverlayColor: string;
 };
 
-export type CloudManualStateByQuestion = Record<string, {
-  hiddenTagTexts: string[];
-  injectedTagWords: CloudWordCount[];
-  tagCountOverrides: CloudWordCount[];
-}>;
+export type CloudManualStateByQuestion = Record<
+  string,
+  {
+    hiddenTagTexts: string[];
+    injectedTagWords: CloudWordCount[];
+    tagCountOverrides: CloudWordCount[];
+  }
+>;
 
-export type PublicViewSetPatch = PublicViewPatch;
-export type { CloudWordCount, PublicViewMode, PublicViewPayload };
-export { normalizePublicViewState };
+type PublicReactionWidget = {
+  id: string;
+  title: string;
+  reactions: string[];
+};
+
+export const PROGRAM_TILE_ID = "program_tile";
+
+export type PublicViewPayload = SharedPublicViewPayload & {
+  reactionsWidgets?: PublicReactionWidget[];
+  playerVisibleResultQuestionIds?: string[];
+  speakerTileVisible?: boolean;
+  programTileText?: string;
+  programTileBackgroundColor?: string;
+  programTileLinkUrl?: string;
+  programTileVisible?: boolean;
+};
+
+export type PublicViewSetPatch = SharedPublicViewPatch & {
+  reactionsWidgets?: PublicReactionWidget[];
+  playerVisibleResultQuestionIds?: string[];
+  speakerTileVisible?: boolean;
+  programTileText?: string;
+  programTileBackgroundColor?: string;
+  programTileLinkUrl?: string;
+  programTileVisible?: boolean;
+};
+
+export type { CloudWordCount, PublicBanner, PublicViewMode };
+export { normalizePublicViewState, SPEAKER_TILE_ID };
 
 export function toBrandingState(payload: Partial<PublicViewPayload>): BrandingState {
   const view = normalizePublicViewState(payload);
@@ -38,6 +82,7 @@ export function toBrandingState(payload: Partial<PublicViewPayload>): BrandingSt
     cloudQuestionColor: view.cloudQuestionColor,
     cloudTagColors: view.cloudTagColors,
     cloudTopTagColor: view.cloudTopTagColor,
+    cloudCorrectTagColor: view.cloudCorrectTagColor,
     cloudDensity: view.cloudDensity,
     cloudTagPadding: view.cloudTagPadding,
     cloudSpiral: view.cloudSpiral,
@@ -46,6 +91,17 @@ export function toBrandingState(payload: Partial<PublicViewPayload>): BrandingSt
     voteOptionTextColor: view.voteOptionTextColor,
     voteProgressTrackColor: view.voteProgressTrackColor,
     voteProgressBarColor: view.voteProgressBarColor,
+    brandPrimaryColor: view.brandPrimaryColor,
+    brandAccentColor: view.brandAccentColor,
+    brandSurfaceColor: view.brandSurfaceColor,
+    brandTextColor: view.brandTextColor,
+    brandFontFamily: view.brandFontFamily,
+    brandFontUrl: view.brandFontUrl,
+    brandLogoUrl: view.brandLogoUrl,
+    brandPlayerBackgroundImageUrl: view.brandPlayerBackgroundImageUrl,
+    brandProjectorBackgroundImageUrl: view.brandProjectorBackgroundImageUrl,
+    brandBodyBackgroundColor: view.brandBodyBackgroundColor,
+    brandBackgroundOverlayColor: view.brandBackgroundOverlayColor,
   };
 }
 

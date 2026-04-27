@@ -5,12 +5,17 @@ export type QuestionResult = {
   /** Для проектора: показывать блок «первые верно ответившие» (если включено глобально в комнате). */
   projectorShowFirstCorrect?: boolean;
   projectorFirstCorrectWinnersCount?: number;
-  type?: "single" | "multi" | "tag_cloud";
+  type?: "single" | "multi" | "tag_cloud" | "ranking";
+  rankingProjectorMetric?: "avg_rank" | "avg_score" | "total_score";
+  rankingKind?: "quiz" | "jury";
   optionStats: Array<{
     optionId: string;
     text: string;
     count: number;
     isCorrect: boolean;
+    avgRank?: number;
+    avgScore?: number;
+    totalScore?: number;
   }>;
   tagCloud?: Array<{
     text: string;

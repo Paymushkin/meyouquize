@@ -1,6 +1,7 @@
 import { FormEvent, useState } from "react";
 import { Alert, Box, Button, Card, CardContent, Stack, TextField, Typography } from "@mui/material";
 import { API_BASE } from "../config";
+import { parseApiErrorMessage } from "../utils/apiError";
 
 type Props = {
   onSuccess: () => void;
@@ -28,7 +29,7 @@ export function AdminLoginForm({ onSuccess }: Props) {
         let details = "";
         try {
           const payload = await response.json();
-          if (payload?.error) details = payload.error;
+          details = parseApiErrorMessage(payload, "");
         } catch {
           details = "";
         }
@@ -51,13 +52,18 @@ export function AdminLoginForm({ onSuccess }: Props) {
   }
 
   return (
-    <Card variant="outlined" sx={{ maxWidth: 420 }}>
+    <Card variant="outlined" sx={{ width: "100%", maxWidth: 520 }}>
       <CardContent>
         <Stack spacing={2}>
           <Typography variant="h6">Вход в админку</Typography>
           <Box component="form" onSubmit={submit}>
             <Stack spacing={2}>
-              <TextField label="Логин" value={login} onChange={(e) => setLogin(e.target.value)} fullWidth />
+              <TextField
+                label="Логин"
+                value={login}
+                onChange={(e) => setLogin(e.target.value)}
+                fullWidth
+              />
               <TextField
                 type="password"
                 label="Пароль"

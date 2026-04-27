@@ -1,8 +1,12 @@
-import type { CloudManualStateByQuestion, CloudWordCount, PublicViewPayload } from "../publicViewContract";
+import type {
+  CloudManualStateByQuestion,
+  CloudWordCount,
+  PublicViewPayload,
+} from "../publicViewContract";
 
 /** Голосования комнаты: вопросы с subQuizId === null не привязаны к квизу. */
 
-export type QuestionType = "single" | "multi" | "tag_cloud";
+export type QuestionType = "single" | "multi" | "tag_cloud" | "ranking";
 
 export type OptionForm = {
   text: string;
@@ -15,12 +19,13 @@ export type QuestionForm = {
   subQuizId?: string | null;
   text: string;
   type: QuestionType;
-  /** Режим квиза в редакторе: правильные ответы и баллы (для голосований комнаты — по желанию, переключатель в диалоге). */
+  /** В подквизе: переключатель опрос/квиз (баллы). У голосований комнаты не используется для single/multi — правильные ответы задаются всегда (без баллов). */
   editorQuizMode: boolean;
   points: number;
   maxAnswers: number;
   isActive?: boolean;
   showVoteCount?: boolean;
+  showCorrectOption?: boolean;
   showQuestionTitle?: boolean;
   /** Голосование комнаты: показывать победителей на проекторе (вместе с переключателем в «Результаты»). */
   projectorShowFirstCorrect?: boolean;
@@ -30,13 +35,21 @@ export type QuestionForm = {
   injectedTagWords?: CloudWordCount[];
   tagCountOverrides?: CloudWordCount[];
   injectedTagsInput?: string;
+  /** Для ranking: баллы за совпадение на каждой позиции (индекс 0 = лучшее место). null — только полный ответ даёт поле `points`. */
+  rankingPointsByRank?: number[] | null;
+  /** Для ranking: что показывать на проекторе */
+  rankingProjectorMetric?: "avg_rank" | "avg_score" | "total_score";
+  /** Для ranking: квиз с эталоном или жюри (без верного ответа, без зачёта в лидерборд) */
+  rankingKind?: "quiz" | "jury";
+  /** Для ranking: кастомная подсказка игроку; пусто = текст по умолчанию на экране ответа. */
+  rankingPlayerHint?: string;
   options: OptionForm[];
 };
 
 export type AdminEventRoomQuestion = {
   id: string;
   text: string;
-  type: "SINGLE" | "MULTI" | "TAG_CLOUD";
+  type: "SINGLE" | "MULTI" | "TAG_CLOUD" | "RANKING";
   points: number;
   maxAnswers: number;
   isActive: boolean;
@@ -45,7 +58,11 @@ export type AdminEventRoomQuestion = {
   scoringMode?: "POLL" | "QUIZ";
   projectorShowFirstCorrect?: boolean;
   projectorFirstCorrectWinnersCount?: number;
-  options: Array<{ id: string; text: string; isCorrect: boolean }>;
+  rankingPointsByRank?: unknown;
+  rankingProjectorMetric?: string;
+  rankingKind?: string;
+  rankingPlayerHint?: string | null;
+  options: Array<{ id: string; text: string; isCorrect: boolean; sortOrder?: number }>;
 };
 
 export type AdminEventSubQuiz = {
@@ -60,6 +77,7 @@ function normalizeSingleCorrectFlags<T extends { isCorrect: boolean }>(
   questionType: AdminEventRoomQuestion["type"],
   options: T[],
 ): T[] {
+  if (questionType === "RANKING") return options;
   if (questionType !== "SINGLE") return options;
   const first = options.findIndex((o) => o.isCorrect);
   if (first === -1) return options;
@@ -78,8 +96,37 @@ export type AdminEventRoom = {
 
 export type SubQuizSheet = { id: string; title: string };
 
+function parseRankingPointsFromApi(raw: unknown): number[] | null {
+  if (raw == null) return null;
+  if (!Array.isArray(raw)) return null;
+  const nums: number[] = [];
+  for (const x of raw) {
+    const n = typeof x === "number" ? x : Number(x);
+    if (!Number.isFinite(n)) return null;
+    nums.push(Math.trunc(n));
+  }
+  return nums.length > 0 ? nums : null;
+}
+
+function projectMetricFromApi(raw: unknown): "avg_rank" | "avg_score" | "total_score" {
+  if (raw === "AVG_SCORE") return "avg_score";
+  if (raw === "TOTAL_SCORE") return "total_score";
+  return "avg_score";
+}
+
+function rankingKindFromApi(raw: unknown): "quiz" | "jury" {
+  return raw === "JURY" ? "jury" : "quiz";
+}
+
+function defaultRankingPlayerHint(kind: "quiz" | "jury"): string {
+  return kind === "quiz"
+    ? "Расставьте варианты от лучшего к худшему (первый в списке — лучший)."
+    : "Расставьте варианты от лучшего к худшему. Баллы по позициям задаёт ведущий; зачёт в общей таблице не меняется.";
+}
+
 export type RoomContentPayload = {
   subQuizzes: Array<{
+    id?: string;
     title: string;
     sortOrder: number;
     questions: ReturnType<typeof toQuestionReplaceInput>[];
@@ -95,14 +142,16 @@ export function createEmptyQuestion(subQuizId: string | null = null): QuestionFo
     editorQuizMode: true,
     points: 1,
     maxAnswers: 3,
-    showVoteCount: true,
+    showVoteCount: false,
+    showCorrectOption: false,
     showQuestionTitle: true,
     hiddenTagTexts: [],
     injectedTagWords: [],
     tagCountOverrides: [],
     injectedTagsInput: "",
     options: [
-      { text: "", isCorrect: false },
+      /** Первый вариант по умолчанию правильный (подквиз и голосования комнаты — для подсказки/первых верных без баллов в опросе). */
+      { text: "", isCorrect: true },
       { text: "", isCorrect: false },
     ],
   };
@@ -110,14 +159,28 @@ export function createEmptyQuestion(subQuizId: string | null = null): QuestionFo
 
 export function toQuestionReplaceInput(q: QuestionForm) {
   const scoringMode: "poll" | "quiz" =
-    q.type === "tag_cloud"
+    q.type === "ranking" && q.rankingKind === "jury"
       ? "poll"
-      : q.subQuizId == null || q.subQuizId === undefined
-        ? "poll"
-        : isEditorQuizMode(q)
-          ? "quiz"
-          : "poll";
+      : q.type === "ranking" && q.rankingKind === "quiz"
+        ? "quiz"
+        : q.subQuizId == null || q.subQuizId === undefined
+          ? "poll"
+          : isEditorQuizMode(q)
+            ? "quiz"
+            : "poll";
+  const options =
+    q.type === "tag_cloud" && !isEditorQuizMode(q)
+      ? []
+      : q.type === "tag_cloud" && isEditorQuizMode(q)
+        ? q.options
+            .map((o) => o.text.trim())
+            .filter(Boolean)
+            .map((text) => ({ text, isCorrect: true }))
+        : q.type === "ranking"
+          ? q.options.map((o) => ({ text: o.text.trim(), isCorrect: false }))
+          : q.options.map((o) => ({ text: o.text, isCorrect: o.isCorrect }));
   return {
+    id: q.id,
     text: q.text,
     type: q.type,
     points: q.points,
@@ -128,17 +191,34 @@ export function toQuestionReplaceInput(q: QuestionForm) {
       1,
       Math.min(20, Math.trunc(q.projectorFirstCorrectWinnersCount ?? 1)),
     ),
-    options: q.type === "tag_cloud" ? [] : q.options.map((o) => ({ text: o.text, isCorrect: o.isCorrect })),
+    ...(q.type === "ranking"
+      ? {
+          rankingPointsByRank:
+            q.rankingPointsByRank != null && q.rankingPointsByRank.length === q.options.length
+              ? q.rankingPointsByRank
+              : null,
+          rankingProjectorMetric: q.rankingProjectorMetric ?? "avg_score",
+          rankingKind: q.rankingKind ?? "jury",
+          rankingPlayerHint: q.rankingPlayerHint?.trim() || null,
+        }
+      : {}),
+    options,
   };
 }
 
-export function buildRoomContentPayload(sheets: SubQuizSheet[], questionForms: QuestionForm[]): RoomContentPayload {
+export function buildRoomContentPayload(
+  sheets: SubQuizSheet[],
+  questionForms: QuestionForm[],
+): RoomContentPayload {
   const subQuizzes = sheets.map((sq, sortOrder) => ({
+    id: sq.id,
     title: sq.title.trim() || "Квиз",
     sortOrder,
     questions: questionForms.filter((q) => q.subQuizId === sq.id).map(toQuestionReplaceInput),
   }));
-  const standaloneQuestions = questionForms.filter((q) => q.subQuizId === null).map(toQuestionReplaceInput);
+  const standaloneQuestions = questionForms
+    .filter((q) => q.subQuizId === null)
+    .map(toQuestionReplaceInput);
   return { subQuizzes, standaloneQuestions };
 }
 
@@ -159,16 +239,18 @@ export function flattenQuestionsFromRoom(
       .sort((a, b) => a.order - b.order);
     out.push(...mapLoadedRoomQuestions(qs, cloudManual, sq.id));
   }
-  const stand = data.questions
-    .filter((q) => !q.subQuizId)
-    .sort((a, b) => a.order - b.order);
+  const stand = data.questions.filter((q) => !q.subQuizId).sort((a, b) => a.order - b.order);
   out.push(...mapLoadedRoomQuestions(stand, cloudManual, null));
   return out;
 }
 
 /** Показывать блок правильности / баллы для квиза (не выводить из факта «все варианты неверные»). */
 export function isEditorQuizMode(question: QuestionForm): boolean {
-  return question.type !== "tag_cloud" && question.editorQuizMode;
+  if (!question.editorQuizMode) return false;
+  if (question.type === "tag_cloud") {
+    return question.subQuizId != null;
+  }
+  return true;
 }
 
 function questionLabelForValidation(q: QuestionForm, index: number): string {
@@ -196,6 +278,24 @@ export function validateQuestionFormEntry(q: QuestionForm, index: number): strin
     return null;
   }
 
+  if (q.type === "ranking") {
+    if (q.options.length < 3) {
+      return `Вопрос ${label}: для ранжирования нужно не меньше трёх вариантов.`;
+    }
+    if (q.options.some((o) => !o.text.trim())) {
+      return `Вопрос ${label}: у каждого варианта должен быть непустой текст.`;
+    }
+    if (q.rankingPointsByRank != null && q.rankingPointsByRank.length !== q.options.length) {
+      return `Вопрос ${label}: задайте балл для каждой позиции или очистите поля «только полный ответ».`;
+    }
+    if (q.rankingKind === "jury") {
+      if (q.rankingPointsByRank == null || q.rankingPointsByRank.length !== q.options.length) {
+        return `Вопрос ${label}: в режиме жюри нужна полная таблица баллов по позициям.`;
+      }
+    }
+    return null;
+  }
+
   if (q.options.length < 2) {
     return `Вопрос ${label}: нужно минимум 2 варианта ответа.`;
   }
@@ -210,7 +310,7 @@ export function validateQuestionFormEntry(q: QuestionForm, index: number): strin
   const correctCount = q.options.reduce((n, o) => n + (o.isCorrect ? 1 : 0), 0);
 
   if (correctCount < 1) {
-    return `Вопрос ${label}: в режиме квиза отметьте хотя бы один правильный вариант.`;
+    return `Вопрос ${label}: отметьте хотя бы один правильный вариант (для подсказки на экране и списка первых верно ответивших).`;
   }
   if (q.type === "single" && correctCount !== 1) {
     return `Вопрос ${label}: при типе «один правильный» отметьте ровно один вариант (сейчас отмечено: ${correctCount}).`;
@@ -227,7 +327,10 @@ export function validateQuestionsForm(questions: QuestionForm[]): string | null 
   return null;
 }
 
-export function validateSheetsHaveSubQuizId(sheets: SubQuizSheet[], questions: QuestionForm[]): string | null {
+export function validateSheetsHaveSubQuizId(
+  sheets: SubQuizSheet[],
+  questions: QuestionForm[],
+): string | null {
   for (const q of questions) {
     if (q.subQuizId === null) continue;
     if (!sheets.some((s) => s.id === q.subQuizId)) {
@@ -276,34 +379,46 @@ export function mapLoadedRoomQuestions(
   cloudManual: CloudManualStateByQuestion,
   subQuizId: string | null,
 ): QuestionForm[] {
-  return questions.map((q) => ({
-    id: q.id,
-    subQuizId,
-    text: q.text,
-    type: q.type === "SINGLE" ? "single" : q.type === "MULTI" ? "multi" : "tag_cloud",
-    editorQuizMode:
-      q.type !== "TAG_CLOUD" &&
-      ((subQuizId != null && (q.scoringMode === undefined || q.scoringMode === "QUIZ")) ||
-        (subQuizId == null && q.options.some((o) => o.isCorrect))),
-    points: q.points,
-    maxAnswers: q.maxAnswers ?? 3,
-    isActive: q.isActive,
-    showVoteCount: true,
-    showQuestionTitle: true,
-    projectorShowFirstCorrect: q.projectorShowFirstCorrect ?? true,
-    projectorFirstCorrectWinnersCount: Math.max(
-      1,
-      Math.min(20, Math.trunc(q.projectorFirstCorrectWinnersCount ?? 1)),
-    ),
-    hiddenTagTexts: cloudManual[q.id]?.hiddenTagTexts ?? [],
-    injectedTagWords: cloudManual[q.id]?.injectedTagWords ?? [],
-    tagCountOverrides: cloudManual[q.id]?.tagCountOverrides ?? [],
-    injectedTagsInput: "",
-    options: normalizeSingleCorrectFlags(
-      q.type,
-      q.options.map((o) => ({ text: o.text, isCorrect: Boolean(o.isCorrect) })),
-    ),
-  }));
+  return questions.map((q) => {
+    const kind = rankingKindFromApi(q.rankingKind);
+    return {
+      id: q.id,
+      subQuizId,
+      text: q.text,
+      type:
+        q.type === "SINGLE"
+          ? "single"
+          : q.type === "MULTI"
+            ? "multi"
+            : q.type === "RANKING"
+              ? "ranking"
+              : "tag_cloud",
+      editorQuizMode: q.scoringMode === undefined || q.scoringMode === "QUIZ",
+      points: q.points,
+      maxAnswers: q.maxAnswers ?? 3,
+      isActive: q.isActive,
+      showVoteCount: false,
+      showQuestionTitle: true,
+      projectorShowFirstCorrect: q.projectorShowFirstCorrect ?? true,
+      projectorFirstCorrectWinnersCount: Math.max(
+        1,
+        Math.min(20, Math.trunc(q.projectorFirstCorrectWinnersCount ?? 1)),
+      ),
+      hiddenTagTexts: cloudManual[q.id]?.hiddenTagTexts ?? [],
+      injectedTagWords: cloudManual[q.id]?.injectedTagWords ?? [],
+      tagCountOverrides: cloudManual[q.id]?.tagCountOverrides ?? [],
+      injectedTagsInput: "",
+      rankingPointsByRank: parseRankingPointsFromApi(q.rankingPointsByRank),
+      rankingProjectorMetric: projectMetricFromApi(q.rankingProjectorMetric),
+      rankingKind: kind,
+      rankingPlayerHint:
+        q.type === "RANKING" ? q.rankingPlayerHint?.trim() || defaultRankingPlayerHint(kind) : "",
+      options: normalizeSingleCorrectFlags(
+        q.type,
+        q.options.map((o) => ({ text: o.text, isCorrect: Boolean(o.isCorrect) })),
+      ),
+    };
+  });
 }
 
 export function mergeServerQuestionsIntoForms(
@@ -311,34 +426,46 @@ export function mergeServerQuestionsIntoForms(
   mergeFrom: QuestionForm[],
   subQuizId: string | null,
 ): QuestionForm[] {
-  return serverQuestions.map((q) => ({
-    id: q.id,
-    subQuizId,
-    text: q.text,
-    type: q.type === "SINGLE" ? "single" : q.type === "MULTI" ? "multi" : "tag_cloud",
-    editorQuizMode:
-      q.type !== "TAG_CLOUD" &&
-      ((subQuizId != null && (q.scoringMode === undefined || q.scoringMode === "QUIZ")) ||
-        (subQuizId == null && q.options.some((o) => o.isCorrect))),
-    points: q.points,
-    maxAnswers: q.maxAnswers ?? 3,
-    isActive: q.isActive,
-    showVoteCount: mergeFrom.find((item) => item.id === q.id)?.showVoteCount ?? true,
-    showQuestionTitle: mergeFrom.find((item) => item.id === q.id)?.showQuestionTitle ?? true,
-    projectorShowFirstCorrect: q.projectorShowFirstCorrect ?? true,
-    projectorFirstCorrectWinnersCount: Math.max(
-      1,
-      Math.min(20, Math.trunc(q.projectorFirstCorrectWinnersCount ?? 1)),
-    ),
-    hiddenTagTexts: mergeFrom.find((item) => item.id === q.id)?.hiddenTagTexts ?? [],
-    injectedTagWords: mergeFrom.find((item) => item.id === q.id)?.injectedTagWords ?? [],
-    tagCountOverrides: mergeFrom.find((item) => item.id === q.id)?.tagCountOverrides ?? [],
-    injectedTagsInput: "",
-    options: normalizeSingleCorrectFlags(
-      q.type,
-      q.options.map((o) => ({ text: o.text, isCorrect: Boolean(o.isCorrect) })),
-    ),
-  }));
+  return serverQuestions.map((q) => {
+    const kind = rankingKindFromApi(q.rankingKind);
+    return {
+      id: q.id,
+      subQuizId,
+      text: q.text,
+      type:
+        q.type === "SINGLE"
+          ? "single"
+          : q.type === "MULTI"
+            ? "multi"
+            : q.type === "RANKING"
+              ? "ranking"
+              : "tag_cloud",
+      editorQuizMode: q.scoringMode === undefined || q.scoringMode === "QUIZ",
+      points: q.points,
+      maxAnswers: q.maxAnswers ?? 3,
+      isActive: q.isActive,
+      showVoteCount: mergeFrom.find((item) => item.id === q.id)?.showVoteCount ?? false,
+      showQuestionTitle: mergeFrom.find((item) => item.id === q.id)?.showQuestionTitle ?? true,
+      projectorShowFirstCorrect: q.projectorShowFirstCorrect ?? true,
+      projectorFirstCorrectWinnersCount: Math.max(
+        1,
+        Math.min(20, Math.trunc(q.projectorFirstCorrectWinnersCount ?? 1)),
+      ),
+      hiddenTagTexts: mergeFrom.find((item) => item.id === q.id)?.hiddenTagTexts ?? [],
+      injectedTagWords: mergeFrom.find((item) => item.id === q.id)?.injectedTagWords ?? [],
+      tagCountOverrides: mergeFrom.find((item) => item.id === q.id)?.tagCountOverrides ?? [],
+      injectedTagsInput: "",
+      rankingPointsByRank: parseRankingPointsFromApi(q.rankingPointsByRank),
+      rankingProjectorMetric: projectMetricFromApi(q.rankingProjectorMetric),
+      rankingKind: kind,
+      rankingPlayerHint:
+        q.type === "RANKING" ? q.rankingPlayerHint?.trim() || defaultRankingPlayerHint(kind) : "",
+      options: normalizeSingleCorrectFlags(
+        q.type,
+        q.options.map((o) => ({ text: o.text, isCorrect: Boolean(o.isCorrect) })),
+      ),
+    };
+  });
 }
 
 /** После PUT: восстановить порядок и локальные поля из предыдущего снимка */
@@ -357,7 +484,7 @@ export function mergeRoomReloadIntoState(
     if (!prev) return q;
     return {
       ...q,
-      showVoteCount: prev.showVoteCount ?? true,
+      showVoteCount: prev.showVoteCount ?? false,
       showQuestionTitle: prev.showQuestionTitle ?? true,
       hiddenTagTexts: prev.hiddenTagTexts ?? [],
       injectedTagWords: prev.injectedTagWords ?? [],

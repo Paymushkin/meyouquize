@@ -1,58 +1,16 @@
-import type { Dispatch, SetStateAction } from "react";
-import {
-  Box,
-  Card,
-  CardContent,
-  MenuItem,
-  Stack,
-  TextField,
-  Typography,
-} from "@mui/material";
+import { type Dispatch, type SetStateAction } from "react";
+import { Card, CardContent, Stack, Typography } from "@mui/material";
 import type { PublicViewSetPatch } from "../../publicViewContract";
-
-function CompactColorField(props: {
-  label: string;
-  value: string;
-  onChange: (value: string) => void;
-  onBlur: () => void;
-}) {
-  const { label, value, onChange, onBlur } = props;
-  return (
-    <Box
-      sx={{
-        display: "flex",
-        alignItems: "center",
-        gap: 0.75,
-        minWidth: 0,
-      }}
-    >
-      <Typography variant="caption" color="text.secondary" noWrap title={label} sx={{ flex: "0 1 auto", minWidth: 0 }}>
-        {label}
-      </Typography>
-      <input
-        type="color"
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        onBlur={onBlur}
-        aria-label={label}
-        style={{
-          width: 32,
-          height: 26,
-          padding: 0,
-          border: "1px solid rgba(0,0,0,0.23)",
-          borderRadius: 4,
-          cursor: "pointer",
-          flexShrink: 0,
-          background: "transparent",
-        }}
-      />
-    </Box>
-  );
-}
+import { BrandFontsSection } from "./branding/BrandFontsSection";
+import { BrandImagesSection } from "./branding/BrandImagesSection";
+import { BrandScreenColorsSection } from "./branding/BrandScreenColorsSection";
+import { BrandTagCloudSection } from "./branding/BrandTagCloudSection";
 
 type Props = {
   projectorBackground: string;
   setProjectorBackground: (value: string) => void;
+  brandBodyBackgroundColor: string;
+  setBrandBodyBackgroundColor: (value: string) => void;
   voteQuestionTextColor: string;
   setVoteQuestionTextColor: (value: string) => void;
   voteOptionTextColor: string;
@@ -65,6 +23,8 @@ type Props = {
   setCloudQuestionColor: (value: string) => void;
   cloudTopTagColor: string;
   setCloudTopTagColor: (value: string) => void;
+  cloudCorrectTagColor: string;
+  setCloudCorrectTagColor: (value: string) => void;
   cloudTagColors: string[];
   setCloudTagColors: Dispatch<SetStateAction<string[]>>;
   cloudDensity: number;
@@ -75,6 +35,33 @@ type Props = {
   setCloudSpiral: (value: "archimedean" | "rectangular") => void;
   cloudAnimationStrength: number;
   setCloudAnimationStrength: (value: number) => void;
+  brandPrimaryColor: string;
+  setBrandPrimaryColor: (value: string) => void;
+  brandAccentColor: string;
+  setBrandAccentColor: (value: string) => void;
+  brandSurfaceColor: string;
+  setBrandSurfaceColor: (value: string) => void;
+  brandTextColor: string;
+  setBrandTextColor: (value: string) => void;
+  brandFontFamily: string;
+  setBrandFontFamily: (value: string) => void;
+  setBrandFontUrl: (value: string) => void;
+  availableFonts: Array<{ id: string; family: string; url: string; kind: "static" | "variable" }>;
+  onUploadFont: (
+    files: File[],
+    family: string,
+    kind: "static" | "variable",
+  ) => Promise<{ family: string; url: string }>;
+  onUploadFontError: (message: string) => void;
+  brandLogoUrl: string;
+  setBrandLogoUrl: (value: string) => void;
+  brandPlayerBackgroundImageUrl: string;
+  setBrandPlayerBackgroundImageUrl: (value: string) => void;
+  brandProjectorBackgroundImageUrl: string;
+  setBrandProjectorBackgroundImageUrl: (value: string) => void;
+  onUploadMedia: (file: File) => Promise<string>;
+  brandBackgroundOverlayColor: string;
+  setBrandBackgroundOverlayColor: (value: string) => void;
   emitBrandingPatch: (patch: PublicViewSetPatch) => void;
 };
 
@@ -82,6 +69,8 @@ export function AdminBrandingSection(props: Props) {
   const {
     projectorBackground,
     setProjectorBackground,
+    brandBodyBackgroundColor,
+    setBrandBodyBackgroundColor,
     voteQuestionTextColor,
     setVoteQuestionTextColor,
     voteOptionTextColor,
@@ -94,6 +83,8 @@ export function AdminBrandingSection(props: Props) {
     setCloudQuestionColor,
     cloudTopTagColor,
     setCloudTopTagColor,
+    cloudCorrectTagColor,
+    setCloudCorrectTagColor,
     cloudTagColors,
     setCloudTagColors,
     cloudDensity,
@@ -104,6 +95,29 @@ export function AdminBrandingSection(props: Props) {
     setCloudSpiral,
     cloudAnimationStrength,
     setCloudAnimationStrength,
+    brandPrimaryColor,
+    setBrandPrimaryColor,
+    brandAccentColor,
+    setBrandAccentColor,
+    brandSurfaceColor,
+    setBrandSurfaceColor,
+    brandTextColor,
+    setBrandTextColor,
+    brandFontFamily,
+    setBrandFontFamily,
+    setBrandFontUrl,
+    availableFonts,
+    onUploadFont,
+    onUploadFontError,
+    brandLogoUrl,
+    setBrandLogoUrl,
+    brandPlayerBackgroundImageUrl,
+    setBrandPlayerBackgroundImageUrl,
+    brandProjectorBackgroundImageUrl,
+    setBrandProjectorBackgroundImageUrl,
+    onUploadMedia,
+    brandBackgroundOverlayColor,
+    setBrandBackgroundOverlayColor,
     emitBrandingPatch,
   } = props;
 
@@ -113,128 +127,79 @@ export function AdminBrandingSection(props: Props) {
     gap: 1,
     alignItems: "center",
   } as const;
-
   return (
     <Card variant="outlined">
       <CardContent>
         <Typography variant="h6" gutterBottom>
           Брендирование
         </Typography>
-
-        <Typography variant="subtitle2" color="text.secondary" sx={{ mt: 1, mb: 0.75 }}>
-          Экран и голосование
-        </Typography>
-        <Box sx={colorGridSx}>
-          <CompactColorField
-            label="Фон проектора"
-            value={projectorBackground}
-            onChange={setProjectorBackground}
-            onBlur={() => emitBrandingPatch({ projectorBackground })}
+        <Stack spacing={1}>
+          <BrandScreenColorsSection
+            colorGridSx={colorGridSx}
+            projectorBackground={projectorBackground}
+            setProjectorBackground={setProjectorBackground}
+            brandBodyBackgroundColor={brandBodyBackgroundColor}
+            setBrandBodyBackgroundColor={setBrandBodyBackgroundColor}
+            voteQuestionTextColor={voteQuestionTextColor}
+            setVoteQuestionTextColor={setVoteQuestionTextColor}
+            voteOptionTextColor={voteOptionTextColor}
+            setVoteOptionTextColor={setVoteOptionTextColor}
+            voteProgressTrackColor={voteProgressTrackColor}
+            setVoteProgressTrackColor={setVoteProgressTrackColor}
+            voteProgressBarColor={voteProgressBarColor}
+            setVoteProgressBarColor={setVoteProgressBarColor}
+            emitPatch={emitBrandingPatch}
           />
-          <CompactColorField
-            label="Текст вопроса (голосование)"
-            value={voteQuestionTextColor}
-            onChange={setVoteQuestionTextColor}
-            onBlur={() => emitBrandingPatch({ voteQuestionTextColor })}
+          <BrandTagCloudSection
+            colorGridSx={colorGridSx}
+            cloudQuestionColor={cloudQuestionColor}
+            setCloudQuestionColor={setCloudQuestionColor}
+            cloudTopTagColor={cloudTopTagColor}
+            setCloudTopTagColor={setCloudTopTagColor}
+            cloudCorrectTagColor={cloudCorrectTagColor}
+            setCloudCorrectTagColor={setCloudCorrectTagColor}
+            cloudTagColors={cloudTagColors}
+            setCloudTagColors={setCloudTagColors}
+            cloudDensity={cloudDensity}
+            setCloudDensity={setCloudDensity}
+            cloudTagPadding={cloudTagPadding}
+            setCloudTagPadding={setCloudTagPadding}
+            cloudSpiral={cloudSpiral}
+            setCloudSpiral={setCloudSpiral}
+            cloudAnimationStrength={cloudAnimationStrength}
+            setCloudAnimationStrength={setCloudAnimationStrength}
+            emitPatch={emitBrandingPatch}
           />
-          <CompactColorField
-            label="Текст ответов и %"
-            value={voteOptionTextColor}
-            onChange={setVoteOptionTextColor}
-            onBlur={() => emitBrandingPatch({ voteOptionTextColor })}
+          <BrandFontsSection
+            brandFontFamily={brandFontFamily}
+            setBrandFontFamily={setBrandFontFamily}
+            setBrandFontUrl={setBrandFontUrl}
+            availableFonts={availableFonts}
+            onUploadFont={onUploadFont}
+            onUploadFontError={onUploadFontError}
+            emitPatch={emitBrandingPatch}
           />
-          <CompactColorField
-            label="Трек столбика"
-            value={voteProgressTrackColor}
-            onChange={setVoteProgressTrackColor}
-            onBlur={() => emitBrandingPatch({ voteProgressTrackColor })}
-          />
-          <CompactColorField
-            label="Заполнение столбика"
-            value={voteProgressBarColor}
-            onChange={setVoteProgressBarColor}
-            onBlur={() => emitBrandingPatch({ voteProgressBarColor })}
-          />
-        </Box>
-
-        <Typography variant="subtitle2" color="text.secondary" sx={{ mt: 2, mb: 0.75 }}>
-          Облако тегов
-        </Typography>
-        <Box sx={colorGridSx}>
-          <CompactColorField
-            label="Текст вопроса"
-            value={cloudQuestionColor}
-            onChange={setCloudQuestionColor}
-            onBlur={() => emitBrandingPatch({ cloudQuestionColor })}
-          />
-          <CompactColorField
-            label="Лидирующий тег"
-            value={cloudTopTagColor}
-            onChange={setCloudTopTagColor}
-            onBlur={() => emitBrandingPatch({ cloudTopTagColor })}
-          />
-          {cloudTagColors.map((color, idx) => (
-            <CompactColorField
-              key={`tag-color-${idx}`}
-              label={`Тег ${idx + 1}`}
-              value={color}
-              onChange={(v) => {
-                const next = [...cloudTagColors];
-                next[idx] = v;
-                setCloudTagColors(next);
-              }}
-              onBlur={() => emitBrandingPatch({ cloudTagColors })}
-            />
-          ))}
-        </Box>
-
-        <Stack direction={{ xs: "column", md: "row" }} spacing={1.5} sx={{ mt: 2, mb: 1 }} flexWrap="wrap" useFlexGap>
-          <TextField
-            type="number"
-            label="Плотность облака"
-            value={cloudDensity}
-            onChange={(e) => setCloudDensity(Math.max(0, Math.min(100, Number(e.target.value) || 0)))}
-            onBlur={() => emitBrandingPatch({ cloudDensity })}
-            size="small"
-            inputProps={{ min: 0, max: 100 }}
-            sx={{ width: 160 }}
-          />
-          <TextField
-            type="number"
-            label="Отступ между тегами"
-            value={cloudTagPadding}
-            onChange={(e) => setCloudTagPadding(Math.max(0, Math.min(40, Number(e.target.value) || 0)))}
-            onBlur={() => emitBrandingPatch({ cloudTagPadding })}
-            size="small"
-            inputProps={{ min: 0, max: 40 }}
-            sx={{ width: 180 }}
-          />
-        </Stack>
-        <Stack direction={{ xs: "column", md: "row" }} spacing={1.5} flexWrap="wrap" useFlexGap>
-          <TextField
-            select
-            label="Тип спирали"
-            value={cloudSpiral}
-            onChange={(e) => {
-              const next = e.target.value as "archimedean" | "rectangular";
-              setCloudSpiral(next);
-              emitBrandingPatch({ cloudSpiral: next });
-            }}
-            size="small"
-            sx={{ width: 200 }}
-          >
-            <MenuItem value="archimedean">archimedean</MenuItem>
-            <MenuItem value="rectangular">rectangular</MenuItem>
-          </TextField>
-          <TextField
-            type="number"
-            label="Сила анимации"
-            value={cloudAnimationStrength}
-            onChange={(e) => setCloudAnimationStrength(Math.max(0, Math.min(100, Number(e.target.value) || 0)))}
-            onBlur={() => emitBrandingPatch({ cloudAnimationStrength })}
-            size="small"
-            inputProps={{ min: 0, max: 100 }}
-            sx={{ width: 160 }}
+          <BrandImagesSection
+            colorGridSx={colorGridSx}
+            brandPrimaryColor={brandPrimaryColor}
+            setBrandPrimaryColor={setBrandPrimaryColor}
+            brandAccentColor={brandAccentColor}
+            setBrandAccentColor={setBrandAccentColor}
+            brandSurfaceColor={brandSurfaceColor}
+            setBrandSurfaceColor={setBrandSurfaceColor}
+            brandTextColor={brandTextColor}
+            setBrandTextColor={setBrandTextColor}
+            brandBackgroundOverlayColor={brandBackgroundOverlayColor}
+            setBrandBackgroundOverlayColor={setBrandBackgroundOverlayColor}
+            brandLogoUrl={brandLogoUrl}
+            setBrandLogoUrl={setBrandLogoUrl}
+            brandPlayerBackgroundImageUrl={brandPlayerBackgroundImageUrl}
+            setBrandPlayerBackgroundImageUrl={setBrandPlayerBackgroundImageUrl}
+            brandProjectorBackgroundImageUrl={brandProjectorBackgroundImageUrl}
+            setBrandProjectorBackgroundImageUrl={setBrandProjectorBackgroundImageUrl}
+            onUploadMedia={onUploadMedia}
+            onUploadFontError={onUploadFontError}
+            emitPatch={emitBrandingPatch}
           />
         </Stack>
       </CardContent>

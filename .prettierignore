@@ -1,0 +1,6 @@
+node_modules
+dist
+coverage
+media
+.cursor
+package-lock.json

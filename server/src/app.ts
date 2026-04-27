@@ -2,8 +2,11 @@ import cookieParser from "cookie-parser";
 import cors from "cors";
 import express from "express";
 import rateLimit from "express-rate-limit";
+import fs from "node:fs";
 import { createServer } from "node:http";
+import path from "node:path";
 import { Server } from "socket.io";
+import multer from "multer";
 import { env } from "./env.js";
 import {
   adminAuthSchema,
@@ -18,6 +21,8 @@ import { attachSocketIoRedisAdapter } from "./socket/redis-io-adapter.js";
 import { isPrivateNetworkViteDevPort } from "./cors-allow.js";
 import { prisma } from "./prisma.js";
 import { randomToken } from "./utils.js";
+import { readFontLibrary, registerFont } from "./font-library.js";
+import { publicViewJsonToState } from "./socket/public-view-store.js";
 import {
   createRoom,
   getQuizBySlug,
@@ -34,30 +39,101 @@ import {
 
 const ADMIN_COOKIE = "mq_admin";
 
-async function adminAuthMiddleware(req: express.Request, res: express.Response, next: express.NextFunction) {
+type ApiErrorBody = {
+  error: string;
+  code: string;
+  details?: unknown;
+};
+
+function apiError(code: string, message: string, details?: unknown): ApiErrorBody {
+  return { error: message, code, details };
+}
+
+async function adminAuthMiddleware(
+  req: express.Request,
+  res: express.Response,
+  next: express.NextFunction,
+) {
   const token = req.cookies[ADMIN_COOKIE];
-  if (!token) return res.status(401).json({ error: "Unauthorized" });
+  if (!token) return res.status(401).json(apiError("UNAUTHORIZED", "Unauthorized"));
   const session = await prisma.adminSession.findUnique({ where: { token } });
   if (!session || session.expiresAt <= new Date()) {
-    return res.status(401).json({ error: "Unauthorized" });
+    return res.status(401).json(apiError("UNAUTHORIZED", "Unauthorized"));
   }
   return next();
 }
 
 export function buildApp() {
   const app = express();
-  app.use(cors({
-    origin: (origin, callback) => {
-      if (!origin) {
-        callback(null, true);
-        return;
-      }
-      callback(null, env.clientOrigins.includes(origin));
+  fs.mkdirSync(env.mediaDir, { recursive: true });
+  const mediaUpload = multer({
+    storage: multer.diskStorage({
+      destination: (_req, _file, cb) => cb(null, env.mediaDir),
+      filename: (_req, file, cb) => {
+        const ext = path.extname(file.originalname || "").toLowerCase();
+        const safeExt = ext && ext.length <= 8 ? ext : ".bin";
+        cb(null, `${Date.now()}-${Math.random().toString(36).slice(2, 10)}${safeExt}`);
+      },
+    }),
+    limits: { fileSize: 10 * 1024 * 1024 },
+    fileFilter: (_req, file, cb) => {
+      if (file.mimetype.startsWith("image/")) cb(null, true);
+      else cb(new Error("Only image files are allowed"));
     },
-    credentials: true,
-  }));
+  });
+  const fontUpload = multer({
+    storage: multer.diskStorage({
+      destination: (_req, _file, cb) => cb(null, env.mediaDir),
+      filename: (_req, file, cb) => {
+        const ext = path.extname(file.originalname || "").toLowerCase();
+        const safeExt = ext && ext.length <= 8 ? ext : ".bin";
+        cb(null, `${Date.now()}-${Math.random().toString(36).slice(2, 10)}${safeExt}`);
+      },
+    }),
+    limits: { fileSize: 10 * 1024 * 1024 },
+    fileFilter: (_req, file, cb) => {
+      const allowedExt = new Set([".woff2"]);
+      const ext = path.extname(file.originalname || "").toLowerCase();
+      const mime = (file.mimetype || "").toLowerCase();
+      const looksLikeFont = mime.includes("woff2");
+      if (allowedExt.has(ext) || looksLikeFont) cb(null, true);
+      else cb(new Error("Only .woff2 font files are allowed"));
+    },
+  });
+  app.use(
+    cors({
+      origin: (origin, callback) => {
+        if (env.allowLanViteOrigins) {
+          callback(null, true);
+          return;
+        }
+        if (!origin) {
+          callback(null, true);
+          return;
+        }
+        if (origin === "null" && env.allowLanViteOrigins) {
+          callback(null, true);
+          return;
+        }
+        if (env.clientOrigins.includes(origin)) {
+          callback(null, true);
+          return;
+        }
+        if (env.allowLanViteOrigins && isPrivateNetworkViteDevPort(origin)) {
+          callback(null, true);
+          return;
+        }
+        if (env.allowLanViteOrigins) {
+          console.warn("[cors] reject origin", { origin });
+        }
+        callback(null, false);
+      },
+      credentials: true,
+    }),
+  );
   app.use(express.json());
   app.use(cookieParser());
+  app.use("/media", express.static(env.mediaDir));
 
   app.get("/", (_req, res) => {
     return res.json({ service: "meyouquize-backend", status: "ok" });
@@ -73,9 +149,10 @@ export function buildApp() {
 
   app.post("/api/admin/auth", authLimiter, async (req, res) => {
     const parsed = adminAuthSchema.safeParse(req.body);
-    if (!parsed.success) return res.status(400).json({ error: "Invalid payload" });
+    if (!parsed.success)
+      return res.status(400).json(apiError("INVALID_PAYLOAD", "Invalid payload"));
     if (parsed.data.login !== env.adminLogin || parsed.data.password !== env.adminPassword) {
-      return res.status(401).json({ error: "Wrong credentials" });
+      return res.status(401).json(apiError("WRONG_CREDENTIALS", "Wrong credentials"));
     }
     const token = randomToken();
     const expiresAt = new Date(Date.now() + env.adminSessionHours * 60 * 60 * 1000);
@@ -95,6 +172,125 @@ export function buildApp() {
     return res.json({ ok: true });
   });
 
+  app.post("/api/admin/media/upload", adminAuthMiddleware, (req, res) => {
+    mediaUpload.single("file")(req, res, (err: unknown) => {
+      if (err) {
+        const message = err instanceof Error ? err.message : "Upload failed";
+        return res.status(400).json(apiError("UPLOAD_FAILED", message));
+      }
+      const file = (req as express.Request & { file?: Express.Multer.File }).file;
+      if (!file) return res.status(400).json(apiError("FILE_REQUIRED", "File is required"));
+      const origin = `${req.protocol}://${req.get("host") ?? "localhost"}`;
+      return res.status(201).json({
+        url: `${origin}/media/${file.filename}`,
+        filename: file.filename,
+        mimeType: file.mimetype,
+        size: file.size,
+      });
+    });
+  });
+
+  app.get("/api/admin/fonts", adminAuthMiddleware, (_req, res) => {
+    return res.json({ fonts: readFontLibrary(env.mediaDir) });
+  });
+
+  app.post("/api/admin/fonts/upload", adminAuthMiddleware, (req, res) => {
+    fontUpload.array("files", 30)(req, res, (err: unknown) => {
+      if (err) {
+        const message = err instanceof Error ? err.message : "Upload failed";
+        return res.status(400).json(apiError("UPLOAD_FAILED", message));
+      }
+      const files = (req as express.Request & { files?: Express.Multer.File[] }).files ?? [];
+      if (!files.length)
+        return res.status(400).json(apiError("FILES_REQUIRED", "At least one file is required"));
+      const familyRaw = typeof req.body?.family === "string" ? req.body.family.trim() : "";
+      if (!familyRaw)
+        return res.status(400).json(apiError("FAMILY_REQUIRED", "Family is required"));
+      const kindRaw = req.body?.kind;
+      const kind = kindRaw === "variable" ? "variable" : "static";
+      const origin = `${req.protocol}://${req.get("host") ?? "localhost"}`;
+      const created: Array<{
+        id: string;
+        family: string;
+        url: string;
+        kind: "static" | "variable";
+        fileName: string;
+        sha256: string;
+        createdAt: string;
+      }> = [];
+      let replacedFamily = false;
+      let duplicateCount = 0;
+      const details: Array<{
+        fileName: string;
+        status: "created" | "duplicate";
+        family: string;
+        kind: "static" | "variable";
+      }> = [];
+      console.info("[fonts] upload batch started", {
+        family: familyRaw,
+        kind,
+        files: files.length,
+      });
+      for (const file of files) {
+        const fileUrl = `${origin}/media/${file.filename}`;
+        const result = registerFont({
+          mediaDir: env.mediaDir,
+          fileName: file.originalname || file.filename,
+          filePath: file.path,
+          fileUrl,
+          family: familyRaw,
+          kind,
+        });
+        if (result.duplicate) {
+          duplicateCount += 1;
+          fs.unlink(file.path, () => {});
+          details.push({
+            fileName: file.originalname || file.filename,
+            status: "duplicate",
+            family: result.font.family,
+            kind: result.font.kind,
+          });
+          console.warn("[fonts] duplicate skipped", {
+            fileName: file.originalname || file.filename,
+            family: result.font.family,
+            kind: result.font.kind,
+          });
+          continue;
+        }
+        if (result.replacedFamily) replacedFamily = true;
+        created.push(result.font);
+        details.push({
+          fileName: file.originalname || file.filename,
+          status: "created",
+          family: result.font.family,
+          kind: result.font.kind,
+        });
+        console.info("[fonts] file registered", {
+          fileName: file.originalname || file.filename,
+          family: result.font.family,
+          kind: result.font.kind,
+          replacedFamily: result.replacedFamily,
+        });
+      }
+      if (!created.length) {
+        console.warn("[fonts] batch finished with no new fonts", {
+          family: familyRaw,
+          kind,
+          duplicateCount,
+        });
+        return res.status(409).json({ error: "Все выбранные шрифты уже загружены" });
+      }
+      console.info("[fonts] upload batch completed", {
+        family: familyRaw,
+        kind,
+        created: created.length,
+        duplicateCount,
+        replacedFamily,
+      });
+      return res.status(201).json({ fonts: created, replacedFamily, duplicateCount, details });
+    });
+  });
+
   app.get("/api/admin/rooms", adminAuthMiddleware, async (_req, res) => {
     const rooms = await listRooms();
     return res.json(rooms);
@@ -107,19 +303,25 @@ export function buildApp() {
       const room = await createRoom(parsed.data);
       return res.status(201).json(room);
     } catch (error) {
-      return res.status(409).json({ error: error instanceof Error ? error.message : "Room already exists" });
+      return res
+        .status(409)
+        .json({ error: error instanceof Error ? error.message : "Room already exists" });
     }
   });
 
   app.get("/api/admin/rooms/:eventName", adminAuthMiddleware, async (req, res) => {
-    const eventName = Array.isArray(req.params.eventName) ? req.params.eventName[0] : req.params.eventName;
+    const eventName = Array.isArray(req.params.eventName)
+      ? req.params.eventName[0]
+      : req.params.eventName;
     const room = await getRoomByEventName(eventName);
     if (!room) return res.status(404).json({ error: "Not found" });
     return res.json(room);
   });
 
   app.patch("/api/admin/rooms/:eventName", adminAuthMiddleware, async (req, res) => {
-    const eventName = Array.isArray(req.params.eventName) ? req.params.eventName[0] : req.params.eventName;
+    const eventName = Array.isArray(req.params.eventName)
+      ? req.params.eventName[0]
+      : req.params.eventName;
     const parsed = updateRoomSchema.safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ error: "Invalid payload" });
     try {
@@ -127,14 +329,23 @@ export function buildApp() {
       return res.json(room);
     } catch (error) {
       const message = error instanceof Error ? error.message : "Not found";
-      return res.status(message === "Room title already exists" ? 409 : 404).json({ error: message });
+      return res
+        .status(message === "Room title already exists" ? 409 : 404)
+        .json({ error: message });
     }
   });
 
   app.put("/api/admin/rooms/:eventName/questions", adminAuthMiddleware, async (req, res) => {
-    const eventName = Array.isArray(req.params.eventName) ? req.params.eventName[0] : req.params.eventName;
+    const eventName = Array.isArray(req.params.eventName)
+      ? req.params.eventName[0]
+      : req.params.eventName;
     const parsed = replaceRoomContentSchema.safeParse(req.body);
-    if (!parsed.success) return res.status(400).json({ error: "Invalid payload" });
+    if (!parsed.success) {
+      const first = parsed.error.issues[0];
+      const where = first?.path?.length ? first.path.join(".") : "payload";
+      const message = first?.message ?? "Invalid payload";
+      return res.status(400).json({ error: `${where}: ${message}` });
+    }
     try {
       const room = await replaceRoomContent(eventName, parsed.data);
       return res.json(room);
@@ -147,8 +358,12 @@ export function buildApp() {
     "/api/admin/rooms/:eventName/questions/:questionId/projector-settings",
     adminAuthMiddleware,
     async (req, res) => {
-      const eventName = Array.isArray(req.params.eventName) ? req.params.eventName[0] : req.params.eventName;
-      const questionId = Array.isArray(req.params.questionId) ? req.params.questionId[0] : req.params.questionId;
+      const eventName = Array.isArray(req.params.eventName)
+        ? req.params.eventName[0]
+        : req.params.eventName;
+      const questionId = Array.isArray(req.params.questionId)
+        ? req.params.questionId[0]
+        : req.params.questionId;
       const parsed = patchQuestionProjectorSchema.safeParse(req.body);
       if (!parsed.success) return res.status(400).json({ error: "Invalid payload" });
       try {
@@ -166,8 +381,12 @@ export function buildApp() {
     "/api/admin/rooms/:eventName/votes/:questionId/detail",
     adminAuthMiddleware,
     async (req, res) => {
-      const eventName = Array.isArray(req.params.eventName) ? req.params.eventName[0] : req.params.eventName;
-      const questionId = Array.isArray(req.params.questionId) ? req.params.questionId[0] : req.params.questionId;
+      const eventName = Array.isArray(req.params.eventName)
+        ? req.params.eventName[0]
+        : req.params.eventName;
+      const questionId = Array.isArray(req.params.questionId)
+        ? req.params.questionId[0]
+        : req.params.questionId;
       const detail = await getStandaloneVoteAdminDetail(eventName, questionId);
       if (!detail) return res.status(404).json({ error: "Not found" });
       return res.json(detail);
@@ -178,8 +397,12 @@ export function buildApp() {
     "/api/admin/rooms/:eventName/sub-quizzes/:subQuizId/results",
     adminAuthMiddleware,
     async (req, res) => {
-      const eventName = Array.isArray(req.params.eventName) ? req.params.eventName[0] : req.params.eventName;
-      const subQuizId = Array.isArray(req.params.subQuizId) ? req.params.subQuizId[0] : req.params.subQuizId;
+      const eventName = Array.isArray(req.params.eventName)
+        ? req.params.eventName[0]
+        : req.params.eventName;
+      const subQuizId = Array.isArray(req.params.subQuizId)
+        ? req.params.subQuizId[0]
+        : req.params.subQuizId;
       const payload = await getSubQuizDetailedResults(eventName, subQuizId);
       if (!payload) return res.status(404).json({ error: "Not found" });
       return res.json(payload);
@@ -211,11 +434,15 @@ export function buildApp() {
     const slug = Array.isArray(req.params.slug) ? req.params.slug[0] : req.params.slug;
     const quiz = await getQuizBySlug(slug);
     if (!quiz) return res.status(404).json({ error: "Not found" });
+    const view = publicViewJsonToState(quiz.publicView);
     return res.json({
       id: quiz.id,
       slug: quiz.slug,
       title: quiz.title,
       status: quiz.status,
+      brandPlayerBackgroundImageUrl: view.brandPlayerBackgroundImageUrl,
+      brandBackgroundOverlayColor: view.brandBackgroundOverlayColor,
+      brandBodyBackgroundColor: view.brandBodyBackgroundColor,
     });
   });
 
@@ -234,7 +461,15 @@ export async function buildServer() {
   const io = new Server(httpServer, {
     cors: {
       origin: (origin, callback) => {
+        if (env.allowLanViteOrigins) {
+          callback(null, true);
+          return;
+        }
         if (!origin) {
+          callback(null, true);
+          return;
+        }
+        if (origin === "null" && env.allowLanViteOrigins) {
           callback(null, true);
           return;
         }
@@ -245,6 +480,9 @@ export async function buildServer() {
         if (env.allowLanViteOrigins && isPrivateNetworkViteDevPort(origin)) {
           callback(null, true);
           return;
+        }
+        if (env.allowLanViteOrigins) {
+          console.warn("[socket.cors] reject origin", { origin });
         }
         callback(null, false);
       },

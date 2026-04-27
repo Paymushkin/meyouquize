@@ -13,6 +13,8 @@ import {
 } from "../admin/adminEventForm";
 import { API_BASE } from "../config";
 import { readCloudManualFromStorage } from "../publicViewContract";
+import { socket } from "../socket";
+import { parseApiErrorMessage } from "../utils/apiError";
 
 type Params = {
   eventName: string;
@@ -85,7 +87,7 @@ export function useAdminEventApi(params: Params) {
       questions: QuestionForm[],
       sheets: SubQuizSheet[],
       options?: { suppressToast?: boolean; validateOnlyIndex?: number },
-    ) => {
+    ): Promise<false | { sheets: SubQuizSheet[]; questions: QuestionForm[] }> => {
       const suppressToast = options?.suppressToast ?? false;
       const onlyIdx = options?.validateOnlyIndex;
       const sheetErr = validateSheetsHaveSubQuizId(sheets, questions);
@@ -102,7 +104,9 @@ export function useAdminEventApi(params: Params) {
         return false;
       }
       const snapshot = serializeRoomContent(sheets, questions);
-      if (snapshot === lastSavedSnapshotRef.current) return true;
+      if (snapshot === lastSavedSnapshotRef.current) {
+        return { sheets, questions };
+      }
       const payload = buildRoomContentPayload(sheets, questions);
       const response = await fetch(`${API_BASE}/api/admin/rooms/${eventName}/questions`, {
         method: "PUT",
@@ -111,33 +115,52 @@ export function useAdminEventApi(params: Params) {
         body: JSON.stringify(payload),
       });
       if (!response.ok) {
-        if (!suppressToast) setMessage("Не удалось сохранить вопросы");
+        let errorMessage = "Не удалось сохранить вопросы";
+        try {
+          const payload = await response.json();
+          errorMessage = parseApiErrorMessage(payload, errorMessage);
+        } catch {
+          // ignore json parse issues and keep fallback message
+        }
+        if (!suppressToast) setMessage(errorMessage);
         return false;
       }
       const updatedRoom = (await response.json()) as AdminEventRoom;
       const cloudManual = readCloudManualFromStorage(cloudManualStorageKey);
-      const merged = mergeRoomReloadIntoState(
-        updatedRoom,
-        { sheets, questions },
-        cloudManual,
-      );
+      const merged = mergeRoomReloadIntoState(updatedRoom, { sheets, questions }, cloudManual);
       setSubQuizSheets(merged.sheets);
       setQuestionForms(merged.questions);
       setRoom(updatedRoom);
       lastSavedSnapshotRef.current = serializeRoomContent(merged.sheets, merged.questions);
+      if (updatedRoom.id) {
+        socket.emit("quiz:state:refresh", { quizId: updatedRoom.id });
+      }
       if (!suppressToast) setMessage("");
-      return true;
+      return merged;
     },
-    [cloudManualStorageKey, eventName, lastSavedSnapshotRef, setMessage, setQuestionForms, setRoom, setSubQuizSheets],
+    [
+      cloudManualStorageKey,
+      eventName,
+      lastSavedSnapshotRef,
+      setMessage,
+      setQuestionForms,
+      setRoom,
+      setSubQuizSheets,
+    ],
   );
 
-  /** Только projectorShowFirstCorrect / projectorFirstCorrectWinnersCount — без PUT replace (ответы не удаляются). */
+  /** Частичный PATCH настроек проектора (в т.ч. метрика ранжирования) — без PUT replace (ответы не удаляются). */
   const patchQuestionProjectorSettings = useCallback(
     async (
       questionId: string,
-      body: { projectorShowFirstCorrect?: boolean; projectorFirstCorrectWinnersCount?: number },
+      body: {
+        projectorShowFirstCorrect?: boolean;
+        projectorFirstCorrectWinnersCount?: number;
+        rankingProjectorMetric?: "avg_rank" | "avg_score" | "total_score";
+      },
       sheets: SubQuizSheet[],
       questions: QuestionForm[],
+      quizIdForRefresh?: string | null,
     ) => {
       const response = await fetch(
         `${API_BASE}/api/admin/rooms/${encodeURIComponent(eventName)}/questions/${encodeURIComponent(questionId)}/projector-settings`,
@@ -154,6 +177,9 @@ export function useAdminEventApi(params: Params) {
       }
       lastSavedSnapshotRef.current = serializeRoomContent(sheets, questions);
       setMessage("");
+      if (quizIdForRefresh) {
+        socket.emit("quiz:state:refresh", { quizId: quizIdForRefresh });
+      }
       return true;
     },
     [eventName, lastSavedSnapshotRef, setMessage],
@@ -183,5 +209,11 @@ export function useAdminEventApi(params: Params) {
     [eventName, setMessage, setRoom],
   );
 
-  return { checkSession, loadRoom, persistQuestions, patchQuestionProjectorSettings, saveQuizTitle };
+  return {
+    checkSession,
+    loadRoom,
+    persistQuestions,
+    patchQuestionProjectorSettings,
+    saveQuizTitle,
+  };
 }

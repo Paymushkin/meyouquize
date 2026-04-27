@@ -7,6 +7,8 @@ import {
   CardContent,
   Container,
   IconButton,
+  Divider,
+  TextField,
   Stack,
   Table,
   TableBody,
@@ -24,9 +26,14 @@ import ChevronRightIcon from "@mui/icons-material/ChevronRight";
 import DoneAllIcon from "@mui/icons-material/DoneAll";
 import DownloadIcon from "@mui/icons-material/Download";
 import LeaderboardIcon from "@mui/icons-material/Leaderboard";
+import AccessTimeIcon from "@mui/icons-material/AccessTime";
 import { AdminLoginForm } from "../components/AdminLoginForm";
 import { API_BASE } from "../config";
-import { normalizePublicViewState, type PublicViewMode, type PublicViewPayload } from "@meyouquize/shared";
+import {
+  normalizePublicViewState,
+  type PublicViewMode,
+  type PublicViewPayload,
+} from "@meyouquize/shared";
 import { leaderboardPlaceByScore, type LeaderboardItem } from "../admin/adminEventTypes";
 import { socket } from "../socket";
 
@@ -40,7 +47,7 @@ type SubQuizResultsPayload = {
     order: number;
     points: number;
     scoringMode: "poll" | "quiz";
-    type: "single" | "multi" | "tag_cloud";
+    type: "single" | "multi" | "tag_cloud" | "ranking";
     isActive: boolean;
   }>;
   rows: Array<{
@@ -48,6 +55,7 @@ type SubQuizResultsPayload = {
     nickname: string;
     scoresByQuestionId: Record<string, number | null>;
     totalScore: number;
+    totalResponseMs: number;
   }>;
 };
 
@@ -61,12 +69,19 @@ function scoreCellLabel(value: number | null, scoringMode: "poll" | "quiz"): str
   return String(value);
 }
 
+function formatSecondsFromMs(valueMs: number): string {
+  const sec = valueMs / 1000;
+  return `${sec.toFixed(1)} c`;
+}
+
 export function AdminSubQuizResultsPage() {
   const { eventName = "", subQuizId = "" } = useParams();
   const [isAuth, setIsAuth] = useState(false);
   const [payload, setPayload] = useState<SubQuizResultsPayload | null>(null);
   const [error, setError] = useState("");
   const [publicViewMode, setPublicViewMode] = useState<PublicViewMode>("title");
+  const [highlightedLeadersCount, setHighlightedLeadersCount] = useState(3);
+  const [firstCorrectWinnersCount, setFirstCorrectWinnersCount] = useState(1);
 
   async function checkSession() {
     const response = await fetch(`${API_BASE}/api/admin/me`, { credentials: "include" });
@@ -120,7 +135,10 @@ export function AdminSubQuizResultsPage() {
   useEffect(() => {
     if (!isAuth || !eventName) return;
     const onPublicView = (p: PublicViewPayload) => {
-      setPublicViewMode(normalizePublicViewState(p).mode);
+      const view = normalizePublicViewState(p);
+      setPublicViewMode(view.mode);
+      setHighlightedLeadersCount(view.highlightedLeadersCount);
+      setFirstCorrectWinnersCount(view.firstCorrectWinnersCount);
     };
     socket.on("results:public:view", onPublicView);
     socket.emit("results:subscribe", { slug: eventName });
@@ -193,6 +211,34 @@ export function AdminSubQuizResultsPage() {
     scheduleReloadPayload();
   }, [payload?.quizId, payload?.subQuizId, scheduleReloadPayload]);
 
+  const updateHighlightedLeaders = useCallback(
+    (raw: number) => {
+      const safe = Number.isFinite(raw) ? Math.max(0, Math.min(100, Math.trunc(raw))) : 0;
+      setHighlightedLeadersCount(safe);
+      if (!payload?.quizId) return;
+      socket.emit("admin:results:view:set", {
+        quizId: payload.quizId,
+        mode: publicViewMode,
+        highlightedLeadersCount: safe,
+      });
+    },
+    [payload?.quizId, publicViewMode],
+  );
+
+  const updateFirstCorrectWinners = useCallback(
+    (raw: number) => {
+      const safe = Number.isFinite(raw) ? Math.max(1, Math.min(20, Math.trunc(raw))) : 1;
+      setFirstCorrectWinnersCount(safe);
+      if (!payload?.quizId) return;
+      socket.emit("admin:results:view:set", {
+        quizId: payload.quizId,
+        mode: publicViewMode,
+        firstCorrectWinnersCount: safe,
+      });
+    },
+    [payload?.quizId, publicViewMode],
+  );
+
   const placeMap = useMemo(() => {
     if (!payload?.rows.length) return new Map<string, number>();
     const asLeaderboard: LeaderboardItem[] = payload.rows.map((r) => ({
@@ -205,18 +251,20 @@ export function AdminSubQuizResultsPage() {
 
   const exportCsv = useCallback(() => {
     if (!payload) return;
-    const escapeCsv = (value: string | number) => `"${String(value).replaceAll("\"", "\"\"")}"`;
+    const escapeCsv = (value: string | number) => `"${String(value).replaceAll('"', '""')}"`;
     const qHeaders = payload.questions.map((q, i) => {
       const short = `В${i + 1}: ${q.text.replace(/\s+/g, " ").slice(0, 80)}${q.text.length > 80 ? "…" : ""} (${q.points} б., ${q.scoringMode === "poll" ? "опрос" : "квиз"})`;
       return short;
     });
-    const header = ["Место", "Участник", ...qHeaders, "Итого"];
+    const header = ["Место", "Участник", ...qHeaders, "Итого", "Общее время, мс"];
     const lines = payload.rows.map((row) => {
       const place = placeMap.get(row.participantId) ?? "";
       const cells = payload.questions.map((q) =>
         scoreCellLabel(row.scoresByQuestionId[q.questionId] ?? null, q.scoringMode),
       );
-      return [place, row.nickname, ...cells, row.totalScore].map(escapeCsv).join(",");
+      return [place, row.nickname, ...cells, row.totalScore, row.totalResponseMs]
+        .map(escapeCsv)
+        .join(",");
     });
     const csvContent = [header.map(escapeCsv).join(","), ...lines].join("\n");
     const blob = new Blob(["\uFEFF" + csvContent], { type: "text/csv;charset=utf-8;" });
@@ -249,7 +297,13 @@ export function AdminSubQuizResultsPage() {
   return (
     <Container maxWidth={false} sx={{ py: 4, px: { xs: 2, sm: 3 } }}>
       <Stack spacing={2}>
-        <Stack direction="row" alignItems="center" justifyContent="space-between" spacing={2} flexWrap="wrap">
+        <Stack
+          direction="row"
+          alignItems="center"
+          justifyContent="space-between"
+          spacing={2}
+          flexWrap="wrap"
+        >
           <Button
             component={RouterLink}
             to={`/admin/${eventName}`}
@@ -283,75 +337,23 @@ export function AdminSubQuizResultsPage() {
                 <Typography color="text.secondary">В этом квизе пока нет вопросов.</Typography>
               ) : (
                 <>
-                  <Stack spacing={1.5} sx={{ mt: 1, mb: 2 }}>
+                  <Stack spacing={1.25} sx={{ mt: 1, mb: 2 }}>
                     <Typography variant="subtitle2" color="text.secondary">
                       {activeQuestionIndex >= 0 ? (
                         <>
                           Сейчас открыт для ответов: <strong>В{activeQuestionIndex + 1}</strong>
                           {" — "}
-                          {(payload.questions[activeQuestionIndex]?.text ?? "").trim().slice(0, 120)}
-                          {(payload.questions[activeQuestionIndex]?.text.length ?? 0) > 120 ? "…" : ""}
+                          {(payload.questions[activeQuestionIndex]?.text ?? "")
+                            .trim()
+                            .slice(0, 120)}
+                          {(payload.questions[activeQuestionIndex]?.text.length ?? 0) > 120
+                            ? "…"
+                            : ""}
                         </>
                       ) : (
                         "В этом квизе сейчас нет открытого вопроса (или на экране активен другой блок комнаты)."
                       )}
                     </Typography>
-                    <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5} alignItems={{ sm: "center" }}>
-                      <Button
-                        variant="outlined"
-                        startIcon={<ChevronLeftIcon />}
-                        onClick={() => handleQuestionStep(-1)}
-                        disabled={!payload.quizId || activeQuestionIndex <= 0}
-                        sx={{ textTransform: "none" }}
-                      >
-                        Назад
-                      </Button>
-                      <Button
-                        variant="outlined"
-                        endIcon={<ChevronRightIcon />}
-                        onClick={() => handleQuestionStep(1)}
-                        disabled={
-                          !payload.quizId ||
-                          payload.questions.length === 0 ||
-                          (activeQuestionIndex >= 0 && activeQuestionIndex >= payload.questions.length - 1)
-                        }
-                        sx={{ textTransform: "none" }}
-                      >
-                        Вперёд
-                      </Button>
-                      <Tooltip title="Снять все вопросы этого квиза с экрана и показать участникам экран «Квиз завершён»">
-                        <span>
-                          <Button
-                            variant="contained"
-                            color="success"
-                            startIcon={<DoneAllIcon />}
-                            onClick={completeSubQuizForPlayers}
-                            disabled={!payload.quizId || !payload.subQuizId || payload.questions.length === 0}
-                            sx={{ textTransform: "none" }}
-                          >
-                            Завершить
-                          </Button>
-                        </span>
-                      </Tooltip>
-                      <Tooltip
-                        title={
-                          publicViewMode === "leaderboard"
-                            ? "Скрыть таблицу лидеров на проекторе"
-                            : "Показать таблицу лидеров на проекторе"
-                        }
-                      >
-                        <Button
-                          variant={publicViewMode === "leaderboard" ? "contained" : "outlined"}
-                          color={publicViewMode === "leaderboard" ? "secondary" : "primary"}
-                          startIcon={<LeaderboardIcon />}
-                          onClick={toggleResultsOnProjector}
-                          disabled={!payload.quizId}
-                          sx={{ textTransform: "none" }}
-                        >
-                          {publicViewMode === "leaderboard" ? "Скрыть таблицу" : "Результаты"}
-                        </Button>
-                      </Tooltip>
-                    </Stack>
                   </Stack>
                   {payload.rows.length === 0 ? (
                     <Typography color="text.secondary">
@@ -386,7 +388,7 @@ export function AdminSubQuizResultsPage() {
                                 position: "sticky",
                                 left: STICKY_NAME_LEFT,
                                 zIndex: 4,
-                                minWidth: 160,
+                                minWidth: 100,
                                 bgcolor: "background.paper",
                                 boxShadow: (t) =>
                                   `4px 0 8px ${t.palette.mode === "dark" ? "rgba(0,0,0,0.35)" : "rgba(0,0,0,0.12)"}`,
@@ -415,7 +417,8 @@ export function AdminSubQuizResultsPage() {
                                     <span>
                                       {q.text}
                                       <br />
-                                      Макс. {q.points} б. · {q.scoringMode === "poll" ? "опрос" : "квиз"} ·{" "}
+                                      Макс. {q.points} б. ·{" "}
+                                      {q.scoringMode === "poll" ? "опрос" : "квиз"} ·{" "}
                                       {q.type === "tag_cloud"
                                         ? "облако"
                                         : q.type === "multi"
@@ -424,9 +427,17 @@ export function AdminSubQuizResultsPage() {
                                     </span>
                                   }
                                 >
-                                  <Typography variant="caption" component="span" sx={{ cursor: "help", fontWeight: 600 }}>
+                                  <Typography
+                                    variant="caption"
+                                    component="span"
+                                    sx={{ cursor: "help", fontWeight: 600 }}
+                                  >
                                     В{i + 1}{" "}
-                                    <Typography component="span" variant="caption" color="text.secondary">
+                                    <Typography
+                                      component="span"
+                                      variant="caption"
+                                      color="text.secondary"
+                                    >
                                       ({q.points})
                                     </Typography>
                                   </Typography>
@@ -435,6 +446,14 @@ export function AdminSubQuizResultsPage() {
                             ))}
                             <TableCell align="right" sx={{ fontWeight: 700 }}>
                               Σ
+                            </TableCell>
+                            <TableCell
+                              align="right"
+                              sx={{ fontWeight: 700, width: 44, minWidth: 44, px: 1 }}
+                            >
+                              <Tooltip title="Общее время ответа, секунды">
+                                <AccessTimeIcon fontSize="small" />
+                              </Tooltip>
                             </TableCell>
                           </TableRow>
                         </TableHead>
@@ -494,8 +513,23 @@ export function AdminSubQuizResultsPage() {
                                     </TableCell>
                                   );
                                 })}
-                                <TableCell align="right" sx={{ fontWeight: 600, fontVariantNumeric: "tabular-nums" }}>
+                                <TableCell
+                                  align="right"
+                                  sx={{ fontWeight: 600, fontVariantNumeric: "tabular-nums" }}
+                                >
                                   {row.totalScore}
+                                </TableCell>
+                                <TableCell
+                                  align="right"
+                                  sx={{
+                                    fontVariantNumeric: "tabular-nums",
+                                    whiteSpace: "nowrap",
+                                    width: 44,
+                                    minWidth: 44,
+                                    px: 1,
+                                  }}
+                                >
+                                  {formatSecondsFromMs(row.totalResponseMs)}
                                 </TableCell>
                               </TableRow>
                             );

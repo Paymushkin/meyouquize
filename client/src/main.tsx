@@ -1,3 +1,4 @@
+/* eslint-disable react-refresh/only-export-components */
 import React from "react";
 import { createRoot } from "react-dom/client";
 import { BrowserRouter, Navigate, Outlet, Route, Routes } from "react-router-dom";
@@ -55,7 +56,7 @@ const theme = createTheme({
           backgroundAttachment: "fixed",
           overflowX: "hidden",
           "&::before": {
-            content: "\"\"",
+            content: '""',
             position: "fixed",
             left: "-18vw",
             top: "18vh",
@@ -66,7 +67,7 @@ const theme = createTheme({
             zIndex: 0,
           },
           "&::after": {
-            content: "\"\"",
+            content: '""',
             position: "fixed",
             right: "-16vw",
             bottom: "-20vw",
@@ -76,6 +77,11 @@ const theme = createTheme({
             border: "56px solid rgba(180, 155, 245, 0.32)",
             zIndex: 0,
           },
+          "&.mq-player-brand-bg::before, &.mq-player-brand-bg::after, &.mq-admin-brand-bg::before, &.mq-admin-brand-bg::after":
+            {
+              content: "none",
+              display: "none",
+            },
         },
         "#root": {
           position: "relative",
@@ -98,10 +104,14 @@ function App() {
         <Routes>
           <Route path="/q/:slug" element={<QuizPlayPage />} />
           <Route path="/q/:slug/results" element={<ResultsPage />} />
+          <Route path="/p/:slug" element={<ResultsPage />} />
           <Route path="/admin" element={<AdminSectionLayout />}>
             <Route index element={<AdminRoomsPage />} />
             <Route path=":eventName/votes/:questionId" element={<AdminVoteDetailPage />} />
-            <Route path=":eventName/sub-quizzes/:subQuizId/results" element={<AdminSubQuizResultsPage />} />
+            <Route
+              path=":eventName/sub-quizzes/:subQuizId/results"
+              element={<AdminSubQuizResultsPage />}
+            />
             <Route path=":eventName" element={<AdminEventPage />} />
           </Route>
           <Route path="/" element={<Navigate to="/q/demo" replace />} />

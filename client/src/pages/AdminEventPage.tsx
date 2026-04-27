@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { flushSync } from "react-dom";
 import { useParams } from "react-router-dom";
-import QRCode from "qrcode";
 import {
   Alert,
   Box,
@@ -12,6 +12,7 @@ import {
   DialogContent,
   DialogTitle,
   Container,
+  Divider,
   List,
   ListItemButton,
   ListItemIcon,
@@ -26,7 +27,6 @@ import {
   TableHead,
   TableRow,
   Snackbar,
-  Switch,
   Stack,
   Tab,
   Tabs,
@@ -34,7 +34,6 @@ import {
   Accordion,
   AccordionDetails,
   AccordionSummary,
-  FormControlLabel,
   Tooltip,
   Typography,
 } from "@mui/material";
@@ -51,15 +50,30 @@ import LeaderboardIcon from "@mui/icons-material/Leaderboard";
 import WarningAmberIcon from "@mui/icons-material/WarningAmber";
 import RemoveIcon from "@mui/icons-material/Remove";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
+import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
+import PhotoSizeSelectActualIcon from "@mui/icons-material/PhotoSizeSelectActual";
+import EmojiEmotionsIcon from "@mui/icons-material/EmojiEmotions";
 import { AdminLoginForm } from "../components/AdminLoginForm";
 import { AdminBrandingSection } from "../components/admin/AdminBrandingSection";
 import { AdminGeneralSection } from "../components/admin/AdminGeneralSection";
+import {
+  AdminReactionsSection,
+  type ReactionWidget,
+} from "../components/admin/AdminReactionsSection";
 import { AdminQuestionsSection } from "../components/admin/AdminQuestionsSection";
 import { AdminResultsSection } from "../components/admin/AdminResultsSection";
-import { APP_ORIGIN } from "../config";
+import { AdminSpeakersSection } from "../components/admin/AdminSpeakersSection";
+import { AdminBannersSection } from "../components/admin/AdminBannersSection";
+import { SubQuizControlsCard } from "../components/admin/SubQuizControlsCard";
+import { API_BASE, APP_ORIGIN } from "../config";
 import {
+  PROGRAM_TILE_ID,
+  SPEAKER_TILE_ID,
   toBrandingState,
   type CloudManualStateByQuestion,
+  type PublicBanner,
+  type PublicViewPayload,
+  type PublicViewSetPatch,
   type PublicViewMode,
 } from "../publicViewContract";
 import {
@@ -72,6 +86,7 @@ import {
 import { useAdminEventSocket } from "../hooks/useAdminEventSocket";
 import { useAdminEventApi } from "../hooks/useAdminEventApi";
 import { usePublicViewEmitter } from "../hooks/usePublicViewEmitter";
+import { useSpeakerQuestionsAdminActions } from "../hooks/useSpeakerQuestionsAdminActions";
 import { socket } from "../socket";
 import {
   buildQuestionIndexMapForSubQuiz,
@@ -94,11 +109,38 @@ import {
   type QuestionResult,
   type SubQuizLeaderboardPayload,
 } from "../admin/adminEventTypes";
+import type { SpeakerQuestionsPayload } from "../types/speakerQuestions";
+import type { ReactionSession } from "./quiz-play/types";
+import { parseApiErrorMessage } from "../utils/apiError";
+import { patchQuestionsFromPublicView } from "../features/publicView/patchQuestionFromPublicView";
 
-type AdminSection = "general" | "questions" | "branding" | "results" | "danger";
+type AdminSection =
+  | "general"
+  | "questions"
+  | "speakers"
+  | "banners"
+  | "branding"
+  | "results"
+  | "danger";
 
-const ADMIN_BANNER_AUTO_HIDE_MS = 5000;
+const ADMIN_BANNER_AUTO_HIDE_MS = 2000;
 const RESULTS_UI_STORAGE_PREFIX = "mq_admin_results_ui_";
+const EXPANDED_SUBQUIZ_STORAGE_PREFIX = "mq_admin_expanded_subquiz_";
+const ADMIN_BODY_BG_FALLBACK = "#22313c";
+
+function buildEffectiveTilesOrder(order: string[], banners: PublicBanner[]): string[] {
+  const deduped: string[] = [];
+  for (const id of order) {
+    if (typeof id !== "string" || !id.trim()) continue;
+    if (!deduped.includes(id)) deduped.push(id);
+  }
+  for (const banner of banners) {
+    if (!deduped.includes(banner.id)) deduped.push(banner.id);
+  }
+  if (!deduped.includes(SPEAKER_TILE_ID)) deduped.push(SPEAKER_TILE_ID);
+  if (!deduped.includes(PROGRAM_TILE_ID)) deduped.push(PROGRAM_TILE_ID);
+  return deduped;
+}
 
 const ADMIN_NAV: {
   id: AdminSection;
@@ -107,32 +149,174 @@ const ADMIN_NAV: {
 }[] = [
   { id: "general", label: "Общее", icon: <DashboardIcon fontSize="small" /> },
   { id: "questions", label: "Вопросы", icon: <QuizIcon fontSize="small" /> },
+  { id: "speakers", label: "Спикеры", icon: <HowToVoteIcon fontSize="small" /> },
+  { id: "banners", label: "Баннеры", icon: <PhotoSizeSelectActualIcon fontSize="small" /> },
   { id: "results", label: "Результаты", icon: <LeaderboardIcon fontSize="small" /> },
   { id: "branding", label: "Брендирование", icon: <PaletteIcon fontSize="small" /> },
   { id: "danger", label: "Опасные", icon: <WarningAmberIcon fontSize="small" /> },
 ];
 
+function publicScreenModeLabel(mode: PublicViewMode): string {
+  if (mode === "leaderboard") return "таблица лидеров";
+  if (mode === "speaker_questions") return "вопросы спикерам";
+  if (mode === "reactions") return "реакции";
+  if (mode === "question") return "вопрос";
+  return "название";
+}
+
+function clampInt(value: number, min: number, max: number): number {
+  return Math.max(min, Math.min(max, Math.trunc(value)));
+}
+
+function isSupportedPublicMode(mode: unknown): mode is PublicViewMode {
+  return (
+    mode === "title" ||
+    mode === "question" ||
+    mode === "leaderboard" ||
+    mode === "speaker_questions" ||
+    mode === "reactions"
+  );
+}
+
+function getPublicBanners(value: unknown): PublicBanner[] {
+  if (!Array.isArray(value)) return [];
+  return value.flatMap((item) => {
+    if (!item || typeof item !== "object") return [];
+    const row = item as Record<string, unknown>;
+    if (
+      typeof row.id !== "string" ||
+      typeof row.linkUrl !== "string" ||
+      typeof row.backgroundUrl !== "string"
+    )
+      return [];
+    const size: PublicBanner["size"] =
+      row.size === "1x1" ? "1x1" : row.size === "full" ? "full" : "2x1";
+    return [
+      {
+        id: row.id,
+        linkUrl: row.linkUrl,
+        backgroundUrl: row.backgroundUrl,
+        size,
+        isVisible: Boolean(row.isVisible),
+      } satisfies PublicBanner,
+    ];
+  });
+}
+
+function getStringArrayOrNull(value: unknown): string[] | null {
+  return Array.isArray(value)
+    ? value.filter((item): item is string => typeof item === "string")
+    : null;
+}
+
+function parseReactionLines(text: string): string[] {
+  const deduped: string[] = [];
+  for (const line of text.split("\n")) {
+    const value = line.trim();
+    if (!value) continue;
+    if (!deduped.includes(value)) deduped.push(value);
+  }
+  return deduped;
+}
+
+function getQuestionTypeSelectValue(
+  question: QuestionForm,
+): "single" | "multi" | "ranking" | "tag_cloud" | "poll" {
+  if (
+    (question.subQuizId == null || question.subQuizId === undefined) &&
+    (question.type === "single" || question.type === "multi") &&
+    !isEditorQuizMode(question)
+  ) {
+    return "poll";
+  }
+  return question.type;
+}
+
+function getReactionWidgetsOrNull(value: unknown): ReactionWidget[] | null {
+  if (!Array.isArray(value)) return null;
+  const widgets: ReactionWidget[] = [];
+  for (const item of value) {
+    if (!item || typeof item !== "object") continue;
+    const row = item as { id?: unknown; title?: unknown; reactions?: unknown };
+    if (typeof row.id !== "string" || !row.id.trim()) continue;
+    const reactions = Array.isArray(row.reactions)
+      ? row.reactions
+          .filter((reaction): reaction is string => typeof reaction === "string")
+          .map((reaction) => reaction.trim())
+          .filter((reaction) => reaction.length > 0)
+      : [];
+    if (reactions.length === 0) continue;
+    widgets.push({
+      id: row.id.trim(),
+      title: typeof row.title === "string" ? row.title : "",
+      reactions,
+    });
+  }
+  return widgets;
+}
+
+function readReactionWidgetsFromStorage(storageKey: string): ReactionWidget[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = window.localStorage.getItem(storageKey);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw) as unknown;
+    return getReactionWidgetsOrNull(parsed) ?? [];
+  } catch {
+    return [];
+  }
+}
+
+function readOverlayTextFromStorage(storageKey: string): string | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = window.localStorage.getItem(storageKey);
+    if (!raw) return null;
+    const value = raw.trim();
+    return value.length > 0 ? value : null;
+  } catch {
+    return null;
+  }
+}
+
 export function AdminEventPage() {
+  const defaultRankingQuizHint =
+    "Расставьте варианты от лучшего к худшему (первый в списке — лучший).";
+  const defaultRankingJuryHint =
+    "Расставьте варианты от лучшего к худшему. Баллы по позициям задаёт ведущий; зачёт в общей таблице не меняется.";
   const { eventName = "" } = useParams();
   const resultsUiStorageKey = `${RESULTS_UI_STORAGE_PREFIX}${eventName}`;
+  const expandedSubQuizStorageKey = `${EXPANDED_SUBQUIZ_STORAGE_PREFIX}${eventName}`;
+  const reactionWidgetsStorageKey = `mq_reaction_widgets_${eventName}`;
+  const reactionsOverlayTextStorageKey = `mq_reaction_overlay_text_${eventName}`;
   const [isAuth, setIsAuth] = useState(false);
   const [room, setRoom] = useState<AdminEventRoom | null>(null);
   const [quizId, setQuizId] = useState("");
   const [questionId, setQuestionId] = useState("");
   const [subQuizSheets, setSubQuizSheets] = useState<SubQuizSheet[]>([]);
-  const [roomQuestionsTab, setRoomQuestionsTab] = useState<"quizzes" | "votes">("quizzes");
+  const [roomQuestionsTab, setRoomQuestionsTab] = useState<"quizzes" | "votes" | "reactions">(
+    "quizzes",
+  );
   const [expandedSubQuizId, setExpandedSubQuizId] = useState<string | false>(false);
   const [questionForms, setQuestionForms] = useState<QuestionForm[]>([]);
   const [selectedQuestionIndex, setSelectedQuestionIndex] = useState(0);
-  const [leaderboardsBySubQuiz, setLeaderboardsBySubQuiz] = useState<SubQuizLeaderboardPayload[]>([]);
+  const [leaderboardsBySubQuiz, setLeaderboardsBySubQuiz] = useState<SubQuizLeaderboardPayload[]>(
+    [],
+  );
   const [resultsSubQuizId, setResultsSubQuizId] = useState<string>("");
   const [isQuestionDialogOpen, setIsQuestionDialogOpen] = useState(false);
   const [confirmResetQuestionIndex, setConfirmResetQuestionIndex] = useState<number | null>(null);
-  const [tagInputDialogQuestionIndex, setTagInputDialogQuestionIndex] = useState<number | null>(null);
-  const [tagResultsDialogQuestionIndex, setTagResultsDialogQuestionIndex] = useState<number | null>(null);
+  const [tagInputDialogQuestionIndex, setTagInputDialogQuestionIndex] = useState<number | null>(
+    null,
+  );
+  const [tagResultsDialogQuestionIndex, setTagResultsDialogQuestionIndex] = useState<number | null>(
+    null,
+  );
   const [tagResultsOrder, setTagResultsOrder] = useState<string[]>([]);
   const [newOptionText, setNewOptionText] = useState("");
-  const [expandedQuestionSettingsIndex, setExpandedQuestionSettingsIndex] = useState<number | null>(null);
+  const [expandedQuestionSettingsIndex, setExpandedQuestionSettingsIndex] = useState<number | null>(
+    null,
+  );
   const [questionResults, setQuestionResults] = useState<QuestionResult[]>([]);
   const [leaderboard, setLeaderboard] = useState<LeaderboardItem[]>([]);
   const [leaderboardSort, setLeaderboardSort] = useState<LeaderboardSort>(() => {
@@ -147,18 +331,59 @@ export function AdminEventPage() {
     }
   });
   const [activeSection, setActiveSection] = useState<AdminSection>("questions");
+  const [speakerQuestionsPayload, setSpeakerQuestionsPayload] =
+    useState<SpeakerQuestionsPayload | null>(null);
+  const [reactionSession, setReactionSession] = useState<ReactionSession | null>(null);
+  const [reactionsDurationSec, setReactionsDurationSec] = useState(30);
+  const [reactionsOverlayText, setReactionsOverlayText] = useState(
+    () => readOverlayTextFromStorage(reactionsOverlayTextStorageKey) ?? "Реакции аудитории",
+  );
+  const [reactionWidgets, setReactionWidgets] = useState<ReactionWidget[]>(() =>
+    readReactionWidgetsFromStorage(reactionWidgetsStorageKey),
+  );
+  const [activeReactionWidgetId, setActiveReactionWidgetId] = useState<string | null>(null);
+  const [projectorReactionWidgetId, setProjectorReactionWidgetId] = useState<string | null>(null);
+  const [speakerQuestionsEnabled, setSpeakerQuestionsEnabled] = useState(false);
+  const [speakerQuestionsAllowLikes, setSpeakerQuestionsAllowLikes] = useState(true);
+  const [speakerQuestionsShowLikesOnScreen, setSpeakerQuestionsShowLikesOnScreen] = useState(true);
+  const [speakerQuestionsReactionsText, setSpeakerQuestionsReactionsText] =
+    useState("👍\n🔥\n👏\n❤️");
+  const [speakerQuestionsShowAuthorOnScreen, setSpeakerQuestionsShowAuthorOnScreen] =
+    useState(false);
+  const [showEventTitleOnPlayer, setShowEventTitleOnPlayer] = useState(true);
+  const [playerBanners, setPlayerBanners] = useState<PublicBanner[]>([]);
+  const [speakerTileText, setSpeakerTileText] = useState("Вопросы спикерам");
+  const [speakerTileBackgroundColor, setSpeakerTileBackgroundColor] = useState("#1976d2");
+  const [speakerTileVisible, setSpeakerTileVisible] = useState(true);
+  const [programTileText, setProgramTileText] = useState("Программа");
+  const [programTileBackgroundColor, setProgramTileBackgroundColor] = useState("#6a1b9a");
+  const [programTileLinkUrl, setProgramTileLinkUrl] = useState("");
+  const [programTileVisible, setProgramTileVisible] = useState(false);
+  const [playerTilesOrder, setPlayerTilesOrder] = useState<string[]>([
+    SPEAKER_TILE_ID,
+    PROGRAM_TILE_ID,
+  ]);
+  const [speakerListText, setSpeakerListText] = useState("");
   const [publicViewMode, setPublicViewMode] = useState<PublicViewMode>(() => {
     if (typeof window === "undefined") return "title";
     try {
       const raw = window.localStorage.getItem(resultsUiStorageKey);
       if (!raw) return "title";
       const parsed = JSON.parse(raw) as { publicViewMode?: PublicViewMode };
-      return parsed.publicViewMode === "leaderboard" ? "leaderboard" : "title";
+      return parsed.publicViewMode === "leaderboard" ||
+        parsed.publicViewMode === "speaker_questions" ||
+        parsed.publicViewMode === "reactions"
+        ? parsed.publicViewMode
+        : "title";
     } catch {
       return "title";
     }
   });
   const [publicViewQuestionId, setPublicViewQuestionId] = useState<string | undefined>(undefined);
+  const [playerVisibleResultQuestionIds, setPlayerVisibleResultQuestionIds] = useState<string[]>(
+    [],
+  );
+  const [questionRevealStage, setQuestionRevealStage] = useState<"options" | "results">("options");
   const [highlightedLeadersCount, setHighlightedLeadersCount] = useState(() => {
     if (typeof window === "undefined") return 3;
     try {
@@ -175,8 +400,15 @@ export function AdminEventPage() {
   const [firstCorrectWinnersCount, setFirstCorrectWinnersCount] = useState(1);
   const [projectorBackground, setProjectorBackground] = useState("#7c5acb");
   const [cloudQuestionColor, setCloudQuestionColor] = useState("#1f1f1f");
-  const [cloudTagColors, setCloudTagColors] = useState<string[]>(["#1f1f1f", "#1976d2", "#2e7d32", "#ef6c00", "#6a1b9a"]);
+  const [cloudTagColors, setCloudTagColors] = useState<string[]>([
+    "#1f1f1f",
+    "#1976d2",
+    "#2e7d32",
+    "#ef6c00",
+    "#6a1b9a",
+  ]);
   const [cloudTopTagColor, setCloudTopTagColor] = useState("#d32f2f");
+  const [cloudCorrectTagColor, setCloudCorrectTagColor] = useState("#2e7d32");
   const [cloudDensity, setCloudDensity] = useState(60);
   const [cloudTagPadding, setCloudTagPadding] = useState(5);
   const [cloudSpiral, setCloudSpiral] = useState<"archimedean" | "rectangular">("archimedean");
@@ -185,17 +417,71 @@ export function AdminEventPage() {
   const [voteOptionTextColor, setVoteOptionTextColor] = useState("#1f1f1f");
   const [voteProgressTrackColor, setVoteProgressTrackColor] = useState("#e3e3e3");
   const [voteProgressBarColor, setVoteProgressBarColor] = useState("#1976d2");
+  const [brandPrimaryColor, setBrandPrimaryColor] = useState("#7c5acb");
+  const [brandAccentColor, setBrandAccentColor] = useState("#1976d2");
+  const [brandSurfaceColor, setBrandSurfaceColor] = useState("#ffffff");
+  const [brandTextColor, setBrandTextColor] = useState("#1f1f1f");
+  const [brandFontFamily, setBrandFontFamily] = useState("Jost, Arial, sans-serif");
+  const [brandFontUrl, setBrandFontUrl] = useState("");
+  const [brandLogoUrl, setBrandLogoUrl] = useState("");
+  const [brandPlayerBackgroundImageUrl, setBrandPlayerBackgroundImageUrl] = useState("");
+  const [brandProjectorBackgroundImageUrl, setBrandProjectorBackgroundImageUrl] = useState("");
+  const [brandBodyBackgroundColor, setBrandBodyBackgroundColor] = useState("#000000");
+  const [brandBackgroundOverlayColor, setBrandBackgroundOverlayColor] = useState("#000000");
+  const [availableFonts, setAvailableFonts] = useState<
+    Array<{ id: string; family: string; url: string; kind: "static" | "variable" }>
+  >([]);
   const [editableTitle, setEditableTitle] = useState("");
   const [message, setMessage] = useState("");
+  const [onlineUsersCount, setOnlineUsersCount] = useState(0);
+  const [adminSocketStatus, setAdminSocketStatus] = useState<
+    "connected" | "connecting" | "disconnected"
+  >(() => (socket.connected ? "connected" : "disconnected"));
   /** Ошибка валидации/сети при сохранении из попапа редактора вопроса */
   const [questionDialogError, setQuestionDialogError] = useState("");
-  const [qrData, setQrData] = useState("");
   const lastSavedSnapshotRef = useRef("");
   /** Снимок вопросов на момент открытия редактора (отмена восстанавливает) */
   const questionDialogSnapshotRef = useRef<QuestionForm[] | null>(null);
+  /** В каком подквизе открыт редактор вопроса — задаётся при открытии, после сохранения по нему раскрываем аккордеон. */
+  const questionDialogTargetSubQuizIdRef = useRef<string | null>(null);
   const cloudManualSyncRef = useRef("");
   const cloudManualStorageKey = `mq_cloud_manual_${eventName}`;
   const syncedSubQuizIdsKeyRef = useRef("");
+  const questionFormsRef = useRef<QuestionForm[]>([]);
+  questionFormsRef.current = questionForms;
+  /** Чтобы не вызывать removeItem(localStorage) на первом кадре, пока эффект не восстановил раскрытие из LS. */
+  const isFirstExpandedPersistEffect = useRef(true);
+
+  useEffect(() => {
+    const root = document.getElementById("root");
+    const prevBodyBg = document.body.style.backgroundColor;
+    const prevBodyImg = document.body.style.backgroundImage;
+    const prevBodyAtt = document.body.style.backgroundAttachment;
+    const prevOverflowX = document.body.style.overflowX;
+    const prevRootBg = root?.style.backgroundColor ?? "";
+    const hadPlayerBrandClass = document.body.classList.contains("mq-player-brand-bg");
+    const hadAdminBrandClass = document.body.classList.contains("mq-admin-brand-bg");
+    const nextBodyBg = brandBodyBackgroundColor?.trim() || ADMIN_BODY_BG_FALLBACK;
+
+    document.body.style.backgroundColor = nextBodyBg;
+    document.body.style.backgroundImage = "none";
+    document.body.style.backgroundAttachment = "";
+    document.body.style.overflowX = "";
+    document.body.classList.add("mq-admin-brand-bg");
+    document.body.classList.remove("mq-player-brand-bg");
+    if (root) root.style.backgroundColor = "transparent";
+
+    return () => {
+      document.body.style.backgroundColor = prevBodyBg;
+      document.body.style.backgroundImage = prevBodyImg;
+      document.body.style.backgroundAttachment = prevBodyAtt;
+      document.body.style.overflowX = prevOverflowX;
+      if (root) root.style.backgroundColor = prevRootBg;
+      if (hadAdminBrandClass) document.body.classList.add("mq-admin-brand-bg");
+      else document.body.classList.remove("mq-admin-brand-bg");
+      if (hadPlayerBrandClass) document.body.classList.add("mq-player-brand-bg");
+    };
+  }, [brandBodyBackgroundColor]);
 
   const {
     checkSession,
@@ -221,6 +507,21 @@ export function AdminEventPage() {
     await persistQuestions(questionForms, subQuizSheets);
   }, [persistQuestions, questionForms, subQuizSheets]);
 
+  /** Синхронно до размонтирования диалога: иначе эффект персиста при `false` стирает LS, а отложенный setTimeout не успевает. */
+  const pinExpandedSubQuiz = useCallback(
+    (subQuizId: string) => {
+      flushSync(() => {
+        setExpandedSubQuizId(subQuizId);
+      });
+      try {
+        window.localStorage.setItem(expandedSubQuizStorageKey, subQuizId);
+      } catch {
+        /* ignore */
+      }
+    },
+    [expandedSubQuizStorageKey],
+  );
+
   function saveQuizTitle() {
     void saveQuizTitleApi(editableTitle, room?.title);
   }
@@ -228,6 +529,11 @@ export function AdminEventPage() {
   const joinUrl = useMemo(() => {
     if (!room) return "";
     return `${APP_ORIGIN}/q/${room.slug}`;
+  }, [room]);
+
+  const screenUrl = useMemo(() => {
+    if (!room) return "";
+    return `${APP_ORIGIN}/p/${room.slug}`;
   }, [room]);
 
   const votesIndexMap = useMemo(
@@ -240,10 +546,20 @@ export function AdminEventPage() {
     return si < 0 ? 0 : si;
   }, [votesIndexMap, selectedQuestionIndex]);
 
-  const subQuizIdsKey = useMemo(() => subQuizSheets.map((s) => s.id).join(","), [subQuizSheets]);
+  /** Только набор id подквизов (без порядка): после PUT порядок с сервера может отличаться — не сбрасываем раскрытие. */
+  const subQuizIdsKey = useMemo(
+    () =>
+      [...subQuizSheets]
+        .map((s) => s.id)
+        .sort()
+        .join(","),
+    [subQuizSheets],
+  );
 
   useEffect(() => {
     syncedSubQuizIdsKeyRef.current = "";
+    isFirstExpandedPersistEffect.current = true;
+    questionDialogTargetSubQuizIdRef.current = null;
   }, [eventName]);
 
   useEffect(() => {
@@ -253,12 +569,66 @@ export function AdminEventPage() {
     }
     if (subQuizIdsKey === syncedSubQuizIdsKeyRef.current) return;
     syncedSubQuizIdsKeyRef.current = subQuizIdsKey;
-    setExpandedSubQuizId(computeFirstIncompleteSubQuizId(subQuizSheets, questionForms));
-  }, [subQuizIdsKey, subQuizSheets, questionForms]);
+
+    const sheetIds = new Set(subQuizSheets.map((s) => s.id));
+    let fromStorage: string | null = null;
+    try {
+      fromStorage =
+        typeof window !== "undefined"
+          ? window.localStorage.getItem(expandedSubQuizStorageKey)
+          : null;
+    } catch {
+      fromStorage = null;
+    }
+    if (fromStorage && sheetIds.has(fromStorage)) {
+      setExpandedSubQuizId(fromStorage);
+      return;
+    }
+
+    setExpandedSubQuizId((prev) => {
+      if (typeof prev === "string" && sheetIds.has(prev)) return prev;
+      return computeFirstIncompleteSubQuizId(subQuizSheets, questionFormsRef.current);
+    });
+  }, [subQuizIdsKey, subQuizSheets, expandedSubQuizStorageKey]);
+
+  useEffect(() => {
+    if (typeof window === "undefined" || !eventName) return;
+    if (isFirstExpandedPersistEffect.current) {
+      isFirstExpandedPersistEffect.current = false;
+      return;
+    }
+    try {
+      if (expandedSubQuizId === false) {
+        window.localStorage.removeItem(expandedSubQuizStorageKey);
+      } else {
+        window.localStorage.setItem(expandedSubQuizStorageKey, expandedSubQuizId);
+      }
+    } catch {
+      /* ignore quota / private mode */
+    }
+  }, [eventName, expandedSubQuizId, expandedSubQuizStorageKey]);
 
   useEffect(() => {
     setExpandedQuestionSettingsIndex(null);
   }, [roomQuestionsTab]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      window.localStorage.setItem(reactionWidgetsStorageKey, JSON.stringify(reactionWidgets));
+    } catch {
+      /* ignore */
+    }
+  }, [reactionWidgets, reactionWidgetsStorageKey]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      window.localStorage.setItem(reactionsOverlayTextStorageKey, reactionsOverlayText);
+    } catch {
+      /* ignore */
+    }
+  }, [reactionsOverlayText, reactionsOverlayTextStorageKey]);
 
   useEffect(() => {
     if (roomQuestionsTab === "quizzes") {
@@ -306,7 +676,12 @@ export function AdminEventPage() {
     const payload = {
       leaderboardSort,
       highlightedLeadersCount,
-      publicViewMode: publicViewMode === "leaderboard" ? "leaderboard" : "title",
+      publicViewMode:
+        publicViewMode === "leaderboard" ||
+        publicViewMode === "speaker_questions" ||
+        publicViewMode === "reactions"
+          ? publicViewMode
+          : "title",
     };
     window.localStorage.setItem(resultsUiStorageKey, JSON.stringify(payload));
   }, [resultsUiStorageKey, leaderboardSort, highlightedLeadersCount, publicViewMode]);
@@ -320,12 +695,14 @@ export function AdminEventPage() {
     setLeaderboardsBySubQuiz,
     setPublicViewMode,
     setPublicViewQuestionId,
+    setQuestionRevealStage,
     setHighlightedLeadersCount,
     setQuestionForms,
     setProjectorBackground,
     setCloudQuestionColor,
     setCloudTagColors,
     setCloudTopTagColor,
+    setCloudCorrectTagColor,
     setCloudDensity,
     setCloudTagPadding,
     setCloudSpiral,
@@ -334,20 +711,51 @@ export function AdminEventPage() {
     setVoteOptionTextColor,
     setVoteProgressTrackColor,
     setVoteProgressBarColor,
+    setBrandPrimaryColor,
+    setBrandAccentColor,
+    setBrandSurfaceColor,
+    setBrandTextColor,
+    setBrandFontFamily,
+    setBrandFontUrl,
+    setBrandLogoUrl,
+    setBrandPlayerBackgroundImageUrl,
+    setBrandProjectorBackgroundImageUrl,
+    setBrandBodyBackgroundColor,
+    setBrandBackgroundOverlayColor,
     setShowFirstCorrectAnswerer,
     setFirstCorrectWinnersCount,
+    setSpeakerQuestionsPayload,
+    setReactionSession,
+    setReactionsOverlayText,
+    setOnlineUsersCount,
   });
+
+  useEffect(() => {
+    const onPublicView = (payload: PublicViewPayload) => {
+      const widgets = getReactionWidgetsOrNull(payload.reactionsWidgets);
+      if (widgets) setReactionWidgets(widgets);
+      if (typeof payload.reactionsOverlayText === "string") {
+        setReactionsOverlayText(payload.reactionsOverlayText);
+      }
+    };
+    socket.on("results:public:view", onPublicView);
+    return () => {
+      socket.off("results:public:view", onPublicView);
+    };
+  }, []);
 
   const { emitPublicViewSet, emitBrandingPatch } = usePublicViewEmitter({
     quizId,
     publicViewMode,
     publicViewQuestionId,
+    questionRevealStage,
     highlightedLeadersCount,
     questionForms,
     projectorBackground,
     cloudQuestionColor,
     cloudTagColors,
     cloudTopTagColor,
+    cloudCorrectTagColor,
     cloudDensity,
     cloudTagPadding,
     cloudSpiral,
@@ -358,6 +766,30 @@ export function AdminEventPage() {
     voteProgressBarColor,
     showFirstCorrectAnswerer,
     firstCorrectWinnersCount,
+    showEventTitleOnPlayer,
+    playerBanners,
+    speakerTileText,
+    speakerTileBackgroundColor,
+    speakerTileVisible,
+    programTileText,
+    programTileBackgroundColor,
+    programTileLinkUrl,
+    programTileVisible,
+    playerVisibleResultQuestionIds,
+    playerTilesOrder,
+    reactionsOverlayText,
+    reactionsWidgets: reactionWidgets,
+    brandPrimaryColor,
+    brandAccentColor,
+    brandSurfaceColor,
+    brandTextColor,
+    brandFontFamily,
+    brandFontUrl,
+    brandLogoUrl,
+    brandPlayerBackgroundImageUrl,
+    brandProjectorBackgroundImageUrl,
+    brandBodyBackgroundColor,
+    brandBackgroundOverlayColor,
   });
 
   useEffect(() => {
@@ -377,6 +809,7 @@ export function AdminEventPage() {
     checkSession().then((ok) => {
       if (!ok) return;
       loadRoom();
+      void loadFontLibrary();
       setupSocketListeners();
     });
     return () => {
@@ -384,50 +817,147 @@ export function AdminEventPage() {
     };
   }, [checkSession, clearSocketListeners, eventName, loadRoom, setupSocketListeners]);
 
+  useEffect(() => {
+    const onConnect = () => setAdminSocketStatus("connected");
+    const onDisconnect = () => setAdminSocketStatus("disconnected");
+    const onConnectError = () => setAdminSocketStatus("disconnected");
+    const onReconnectAttempt = () => setAdminSocketStatus("connecting");
+    const onReconnect = () => setAdminSocketStatus("connected");
+
+    if (socket.connected) setAdminSocketStatus("connected");
+    else setAdminSocketStatus("connecting");
+
+    socket.on("connect", onConnect);
+    socket.on("disconnect", onDisconnect);
+    socket.on("connect_error", onConnectError);
+    socket.io.on("reconnect_attempt", onReconnectAttempt);
+    socket.io.on("reconnect", onReconnect);
+
+    return () => {
+      socket.off("connect", onConnect);
+      socket.off("disconnect", onDisconnect);
+      socket.off("connect_error", onConnectError);
+      socket.io.off("reconnect_attempt", onReconnectAttempt);
+      socket.io.off("reconnect", onReconnect);
+    };
+  }, []);
+
+  useEffect(() => {
+    const syncStatusFromSocket = () => {
+      setAdminSocketStatus((prev) => {
+        if (socket.connected) return "connected";
+        return prev === "connected" ? "disconnected" : prev;
+      });
+    };
+    syncStatusFromSocket();
+    const timerId = window.setInterval(syncStatusFromSocket, 1000);
+    return () => window.clearInterval(timerId);
+  }, []);
+
   /** Подтянуть сохранённое на сервере состояние экрана (включая цвета) после loadRoom */
   useEffect(() => {
     if (!room?.publicView || typeof room.publicView !== "object") return;
     const pv = room.publicView;
-    if (pv.mode === "title" || pv.mode === "question" || pv.mode === "leaderboard") {
+    if (isSupportedPublicMode(pv.mode)) {
       setPublicViewMode(pv.mode);
     }
     setPublicViewQuestionId(typeof pv.questionId === "string" ? pv.questionId : undefined);
+    setQuestionRevealStage(pv.questionRevealStage === "results" ? "results" : "options");
     if (typeof pv.highlightedLeadersCount === "number") {
       setHighlightedLeadersCount(pv.highlightedLeadersCount);
     }
     const qid = typeof pv.questionId === "string" ? pv.questionId : undefined;
-    if (qid) {
-      setQuestionForms((prev) =>
-        prev.map((q) => (q.id === qid
-          ? {
-            ...q,
-            showVoteCount: pv.showVoteCount ?? q.showVoteCount ?? true,
-            showQuestionTitle: pv.showQuestionTitle ?? q.showQuestionTitle ?? true,
-            hiddenTagTexts: Array.isArray(pv.hiddenTagTexts) ? pv.hiddenTagTexts : (q.hiddenTagTexts ?? []),
-            injectedTagWords: Array.isArray(pv.injectedTagWords) ? pv.injectedTagWords : (q.injectedTagWords ?? []),
-            tagCountOverrides: Array.isArray(pv.tagCountOverrides) ? pv.tagCountOverrides : (q.tagCountOverrides ?? []),
-          }
-          : q)),
-      );
-    }
+    if (qid) setQuestionForms((prev) => patchQuestionsFromPublicView(prev, pv));
     const b = toBrandingState(pv);
     setProjectorBackground(b.projectorBackground);
     setCloudQuestionColor(b.cloudQuestionColor);
     setCloudTagColors(b.cloudTagColors);
     setCloudTopTagColor(b.cloudTopTagColor);
-    setCloudDensity(Math.max(0, Math.min(100, Math.trunc(b.cloudDensity))));
-    setCloudTagPadding(Math.max(0, Math.min(40, Math.trunc(b.cloudTagPadding))));
+    setCloudCorrectTagColor(b.cloudCorrectTagColor);
+    setCloudDensity(clampInt(b.cloudDensity, 0, 100));
+    setCloudTagPadding(clampInt(b.cloudTagPadding, 0, 40));
     setCloudSpiral(b.cloudSpiral);
-    setCloudAnimationStrength(Math.max(0, Math.min(100, Math.trunc(b.cloudAnimationStrength))));
+    setCloudAnimationStrength(clampInt(b.cloudAnimationStrength, 0, 100));
     setVoteQuestionTextColor(b.voteQuestionTextColor);
     setVoteOptionTextColor(b.voteOptionTextColor);
     setVoteProgressTrackColor(b.voteProgressTrackColor);
     setVoteProgressBarColor(b.voteProgressBarColor);
+    setBrandPrimaryColor(b.brandPrimaryColor);
+    setBrandAccentColor(b.brandAccentColor);
+    setBrandSurfaceColor(b.brandSurfaceColor);
+    setBrandTextColor(b.brandTextColor);
+    setBrandFontFamily(b.brandFontFamily);
+    setBrandFontUrl(b.brandFontUrl);
+    setBrandLogoUrl(b.brandLogoUrl);
+    setBrandPlayerBackgroundImageUrl(b.brandPlayerBackgroundImageUrl);
+    setBrandProjectorBackgroundImageUrl(b.brandProjectorBackgroundImageUrl);
+    setBrandBodyBackgroundColor(b.brandBodyBackgroundColor);
+    setBrandBackgroundOverlayColor(b.brandBackgroundOverlayColor);
     if (typeof pv.showFirstCorrectAnswerer === "boolean") {
       setShowFirstCorrectAnswerer(pv.showFirstCorrectAnswerer);
     }
     if (typeof pv.firstCorrectWinnersCount === "number") {
-      setFirstCorrectWinnersCount(Math.max(1, Math.min(20, Math.trunc(pv.firstCorrectWinnersCount))));
+      setFirstCorrectWinnersCount(clampInt(pv.firstCorrectWinnersCount, 1, 20));
+    }
+    if (typeof pv.speakerQuestionsEnabled === "boolean") {
+      setSpeakerQuestionsEnabled(pv.speakerQuestionsEnabled);
+    }
+    if (typeof pv.speakerQuestionsAllowLikes === "boolean") {
+      setSpeakerQuestionsAllowLikes(pv.speakerQuestionsAllowLikes);
+    }
+    if (typeof pv.speakerQuestionsShowLikesOnScreen === "boolean") {
+      setSpeakerQuestionsShowLikesOnScreen(pv.speakerQuestionsShowLikesOnScreen);
+    }
+    const speakerReactions = getStringArrayOrNull(pv.speakerQuestionsReactions);
+    if (speakerReactions) {
+      setSpeakerQuestionsReactionsText(speakerReactions.join("\n"));
+    }
+    if (typeof pv.speakerQuestionsShowAuthorOnScreen === "boolean") {
+      setSpeakerQuestionsShowAuthorOnScreen(pv.speakerQuestionsShowAuthorOnScreen);
+    }
+    if (typeof pv.showEventTitleOnPlayer === "boolean") {
+      setShowEventTitleOnPlayer(pv.showEventTitleOnPlayer);
+    }
+    const nextBanners = getPublicBanners(pv.playerBanners);
+    setPlayerBanners(nextBanners);
+    if (typeof pv.speakerTileText === "string") {
+      setSpeakerTileText(pv.speakerTileText);
+    }
+    if (typeof pv.speakerTileBackgroundColor === "string") {
+      setSpeakerTileBackgroundColor(pv.speakerTileBackgroundColor);
+    }
+    if (typeof pv.speakerTileVisible === "boolean") {
+      setSpeakerTileVisible(pv.speakerTileVisible);
+    }
+    if (typeof pv.programTileText === "string") {
+      setProgramTileText(pv.programTileText);
+    }
+    if (typeof pv.programTileBackgroundColor === "string") {
+      setProgramTileBackgroundColor(pv.programTileBackgroundColor);
+    }
+    if (typeof pv.programTileLinkUrl === "string") {
+      setProgramTileLinkUrl(pv.programTileLinkUrl);
+    }
+    if (typeof pv.programTileVisible === "boolean") {
+      setProgramTileVisible(pv.programTileVisible);
+    }
+    if (Array.isArray(pv.playerVisibleResultQuestionIds)) {
+      setPlayerVisibleResultQuestionIds(
+        pv.playerVisibleResultQuestionIds.filter((x): x is string => typeof x === "string"),
+      );
+    }
+    const nextTilesOrder = getStringArrayOrNull(pv.playerTilesOrder) ?? [];
+    setPlayerTilesOrder(buildEffectiveTilesOrder(nextTilesOrder, nextBanners));
+    if (typeof pv.reactionsOverlayText === "string") {
+      setReactionsOverlayText(pv.reactionsOverlayText);
+    }
+    const widgets = getReactionWidgetsOrNull(pv.reactionsWidgets);
+    if (widgets) {
+      setReactionWidgets(widgets);
+    }
+    const speakerList = getStringArrayOrNull(pv.speakerQuestionsSpeakers);
+    if (speakerList) {
+      setSpeakerListText(speakerList.join("\n"));
     }
   }, [room?.id, room?.publicView]);
 
@@ -446,7 +976,7 @@ export function AdminEventPage() {
     emitPublicViewSet({
       mode: "question",
       questionId: publicViewQuestionId,
-      showVoteCount: question.showVoteCount ?? true,
+      showVoteCount: question.showVoteCount ?? false,
       showQuestionTitle: question.showQuestionTitle ?? true,
       hiddenTagTexts: question.hiddenTagTexts ?? [],
       injectedTagWords: question.injectedTagWords ?? [],
@@ -470,16 +1000,12 @@ export function AdminEventPage() {
     publicViewQuestionId,
     questionForms,
     quizId,
+    emitPublicViewSet,
   ]);
 
   useEffect(() => {
     document.title = "Админ";
   }, []);
-
-  useEffect(() => {
-    if (!joinUrl) return;
-    QRCode.toDataURL(joinUrl).then(setQrData).catch(() => setQrData(""));
-  }, [joinUrl]);
 
   useEffect(() => {
     setEditableTitle(room?.title ?? "");
@@ -499,8 +1025,50 @@ export function AdminEventPage() {
     if (!isQuestionDialogOpen) return;
     setQuestionForms((prev) => {
       const q = prev[selectedQuestionIndex];
-      if (!q || q.type === "tag_cloud") return prev;
+      if (!q) return prev;
+      if (q.subQuizId == null && q.type === "tag_cloud") {
+        if (q.editorQuizMode && q.options.length >= 2) return prev;
+        const hasCorrect = q.options.some((o) => o.isCorrect);
+        return prev.map((qq, i) =>
+          i !== selectedQuestionIndex
+            ? qq
+            : {
+                ...qq,
+                editorQuizMode: true,
+                options:
+                  qq.options.length >= 2
+                    ? hasCorrect
+                      ? qq.options
+                      : qq.options.map((o, oi) => ({ ...o, isCorrect: oi === 0 }))
+                    : [
+                        { text: "", isCorrect: true },
+                        { text: "", isCorrect: false },
+                      ],
+              },
+        );
+      }
       if (q.subQuizId == null) return prev;
+      if (q.type === "tag_cloud") {
+        if (q.editorQuizMode && q.options.length >= 2) return prev;
+        const hasCorrect = q.options.some((o) => o.isCorrect);
+        return prev.map((qq, i) =>
+          i !== selectedQuestionIndex
+            ? qq
+            : {
+                ...qq,
+                editorQuizMode: true,
+                options:
+                  qq.options.length >= 2
+                    ? hasCorrect
+                      ? qq.options
+                      : qq.options.map((o, oi) => ({ ...o, isCorrect: oi === 0 }))
+                    : [
+                        { text: "", isCorrect: true },
+                        { text: "", isCorrect: false },
+                      ],
+              },
+        );
+      }
       if (q.editorQuizMode) return prev;
       const hasCorrect = q.options.some((o) => o.isCorrect);
       return prev.map((qq, i) =>
@@ -519,19 +1087,14 @@ export function AdminEventPage() {
 
   const adminBannerSeverity = useMemo((): "success" | "warning" | "info" => {
     if (!message) return "info";
-    if (/сохранен|сохранена|добавлен|обнулен|завершен|удалён|удален/i.test(message)) return "success";
+    if (/сохранен|сохранена|добавлен|обнулен|завершен|удалён|удален/i.test(message))
+      return "success";
     if (/сначала|не найден|пустой|неверн|ошибк/i.test(message.toLowerCase())) return "warning";
     return "info";
   }, [message]);
 
   const currentPublicScreenText = useMemo(() => {
-    if (publicViewMode === "leaderboard") {
-      return "таблица лидеров";
-    }
-    if (publicViewMode === "question") {
-      return "вопрос";
-    }
-    return "название";
+    return publicScreenModeLabel(publicViewMode);
   }, [publicViewMode]);
 
   function cloneQuestionForms(forms: QuestionForm[]): QuestionForm[] {
@@ -542,7 +1105,10 @@ export function AdminEventPage() {
     const id = `new-${crypto.randomUUID()}`;
     setSubQuizSheets((prev) => {
       const next = [...prev, { id, title: "Новый квиз" }];
-      syncedSubQuizIdsKeyRef.current = next.map((s) => s.id).join(",");
+      syncedSubQuizIdsKeyRef.current = [...next]
+        .map((s) => s.id)
+        .sort()
+        .join(",");
       return next;
     });
     setExpandedSubQuizId(id);
@@ -566,6 +1132,7 @@ export function AdminEventPage() {
     const prevSelectedId = questionForms[selectedQuestionIndex]?.id;
     if (isQuestionDialogOpen && questionForms[selectedQuestionIndex]?.subQuizId === sqId) {
       questionDialogSnapshotRef.current = null;
+      questionDialogTargetSubQuizIdRef.current = null;
       closeQuestionDialog();
     }
     setSubQuizSheets(nextSheets);
@@ -579,7 +1146,7 @@ export function AdminEventPage() {
       return 0;
     });
     const persisted = await persistQuestions(nextForms, nextSheets);
-    if (persisted) {
+    if (persisted !== false) {
       setMessage("Квиз удалён");
       if (nextForms.length === 0) setQuestionId("");
     }
@@ -587,8 +1154,16 @@ export function AdminEventPage() {
 
   function addQuestionToSubQuiz(sqId: string | null) {
     setQuestionDialogError("");
+    questionDialogTargetSubQuizIdRef.current = sqId;
+    if (sqId) {
+      pinExpandedSubQuiz(sqId);
+    }
     questionDialogSnapshotRef.current = cloneQuestionForms(questionForms);
     const newQ = createEmptyQuestion(sqId);
+    if (sqId == null) {
+      newQ.editorQuizMode = false;
+      newQ.options = newQ.options.map((opt) => ({ ...opt, isCorrect: false }));
+    }
     setQuestionForms((prev) => {
       let insertAt = prev.length;
       if (sqId !== null) {
@@ -613,6 +1188,9 @@ export function AdminEventPage() {
   }
 
   async function removeQuestion(index: number) {
+    const removed = questionForms[index];
+    const subQuizIdForAccordion =
+      removed?.subQuizId != null && removed.subQuizId !== "" ? removed.subQuizId : null;
     const next = questionForms.filter((_, i) => i !== index);
     const err = validateQuestionsForm(next);
     if (err) {
@@ -627,11 +1205,15 @@ export function AdminEventPage() {
       return current;
     });
     questionDialogSnapshotRef.current = null;
+    questionDialogTargetSubQuizIdRef.current = null;
     closeQuestionDialog();
     const persisted = await persistQuestions(next, subQuizSheets);
-    if (persisted) {
+    if (persisted !== false) {
       setMessage("Вопросы сохранены");
       if (next.length === 0) setQuestionId("");
+      if (subQuizIdForAccordion) {
+        pinExpandedSubQuiz(subQuizIdForAccordion);
+      }
     }
   }
 
@@ -641,7 +1223,39 @@ export function AdminEventPage() {
         if (i !== index) return q;
         const next = { ...q, ...patch };
         if (patch.type === "tag_cloud") {
-          next.editorQuizMode = false;
+          next.editorQuizMode = true;
+          if (next.options.length < 2) {
+            next.options = [
+              { text: "", isCorrect: true },
+              { text: "", isCorrect: false },
+            ];
+          } else if (!next.options.some((o) => o.isCorrect)) {
+            next.options = next.options.map((o, idx) => ({ ...o, isCorrect: idx === 0 }));
+          }
+        } else if (patch.type === "ranking") {
+          next.editorQuizMode = true;
+          next.rankingKind = next.rankingKind ?? "jury";
+          if (!next.rankingPlayerHint?.trim()) {
+            next.rankingPlayerHint =
+              next.rankingKind === "quiz" ? defaultRankingQuizHint : defaultRankingJuryHint;
+          }
+          if (next.rankingProjectorMetric == null) {
+            next.rankingProjectorMetric = "avg_score";
+          }
+          if (next.options.length < 3) {
+            const pad = 3 - next.options.length;
+            next.options = [
+              ...next.options,
+              ...Array.from({ length: pad }, () => ({ text: "", isCorrect: false })),
+            ];
+          }
+          {
+            const n = next.options.length;
+            next.rankingPointsByRank =
+              next.rankingKind === "jury"
+                ? Array.from({ length: n }, (_, j) => Math.max(1, n - j))
+                : Array.from({ length: n }, (_, j) => j + 1);
+          }
         } else if (patch.type === "single" || patch.type === "multi") {
           if (q.type === "tag_cloud") {
             next.editorQuizMode = true;
@@ -650,44 +1264,37 @@ export function AdminEventPage() {
             }
           }
         }
-        if (patch.type === "single") {
+        if (patch.type === "single" && isEditorQuizMode(next)) {
           let firstCorrect = next.options.findIndex((o) => o.isCorrect);
           if (firstCorrect === -1 && next.options.length > 0) {
             firstCorrect = 0;
           }
-          next.options = next.options.map((o, optIdx) => ({ ...o, isCorrect: optIdx === firstCorrect && firstCorrect !== -1 }));
+          next.options = next.options.map((o, optIdx) => ({
+            ...o,
+            isCorrect: optIdx === firstCorrect && firstCorrect !== -1,
+          }));
         }
         return next;
       }),
     );
   }
 
-  /** Для голосований комнаты: выкл. — только опрос; вкл. — правильные ответы и баллы. */
-  function toggleNoCorrectMode(questionIndex: number, voteOnlyWithoutCorrect: boolean) {
-    if (voteOnlyWithoutCorrect) {
-      setQuestionForms((prev) =>
-        prev.map((q, i) => (i === questionIndex
-          ? { ...q, editorQuizMode: false, options: q.options.map((o) => ({ ...o, isCorrect: false })) }
-          : q)),
-      );
-      return;
-    }
+  function addOption(questionIndex: number) {
     setQuestionForms((prev) =>
       prev.map((q, i) => {
         if (i !== questionIndex) return q;
-        if (q.type === "tag_cloud") return q;
+        const nextOpts = [...q.options, { text: "", isCorrect: false }];
+        if (q.type !== "ranking") return { ...q, options: nextOpts };
+        const n = nextOpts.length;
         return {
           ...q,
-          editorQuizMode: true,
-          options: q.options.map((o, idx) => ({ ...o, isCorrect: idx === 0 })),
+          options: nextOpts,
+          rankingPointsByRank:
+            q.rankingKind === "jury"
+              ? Array.from({ length: n }, (_, j) => Math.max(1, n - j))
+              : Array.from({ length: n }, (_, j) => j + 1),
         };
       }),
-    );
-  }
-
-  function addOption(questionIndex: number) {
-    setQuestionForms((prev) =>
-      prev.map((q, i) => (i === questionIndex ? { ...q, options: [...q.options, { text: "", isCorrect: false }] } : q)),
     );
   }
 
@@ -695,8 +1302,61 @@ export function AdminEventPage() {
     setQuestionForms((prev) =>
       prev.map((q, i) => {
         if (i !== questionIndex) return q;
-        if (q.options.length <= 2) return q;
-        return { ...q, options: q.options.filter((_, oi) => oi !== optionIndex) };
+        const minOpts =
+          q.type === "tag_cloud" && isEditorQuizMode(q) ? 1 : q.type === "ranking" ? 3 : 2;
+        if (q.options.length <= minOpts) return q;
+        const nextOpts = q.options.filter((_, oi) => oi !== optionIndex);
+        if (q.type !== "ranking") return { ...q, options: nextOpts };
+        const n = nextOpts.length;
+        return {
+          ...q,
+          options: nextOpts,
+          rankingPointsByRank:
+            q.rankingKind === "jury"
+              ? Array.from({ length: n }, (_, j) => Math.max(1, n - j))
+              : Array.from({ length: n }, (_, j) => j + 1),
+        };
+      }),
+    );
+  }
+
+  function fillRankingTiersDescending(questionIndex: number) {
+    setQuestionForms((prev) =>
+      prev.map((q, i) => {
+        if (i !== questionIndex || q.type !== "ranking") return q;
+        const n = q.options.length;
+        return {
+          ...q,
+          rankingPointsByRank: Array.from({ length: n }, (_, j) => Math.max(1, n - j)),
+        };
+      }),
+    );
+  }
+
+  function setRankingTierAt(questionIndex: number, rankIdx: number, raw: string) {
+    setQuestionForms((prev) =>
+      prev.map((q, i) => {
+        if (i !== questionIndex || q.type !== "ranking") return q;
+        const n = q.options.length;
+        const base = [
+          ...(q.rankingPointsByRank ??
+            Array.from({ length: n }, () => (q.rankingKind === "jury" ? 0 : 1))),
+        ];
+        while (base.length < n) base.push(0);
+        const v =
+          raw.trim() === ""
+            ? q.rankingKind === "jury"
+              ? 0
+              : 1
+            : q.rankingKind === "jury"
+              ? Math.min(10_000, Math.max(0, Math.trunc(Number(raw)) || 0))
+              : Math.min(n, Math.max(1, Math.trunc(Number(raw)) || 1));
+        base[rankIdx] = v;
+        if (q.rankingKind === "jury") {
+          const allZero = base.every((x) => x === 0);
+          return { ...q, rankingPointsByRank: allZero ? null : base };
+        }
+        return { ...q, rankingPointsByRank: base };
       }),
     );
   }
@@ -718,12 +1378,6 @@ export function AdminEventPage() {
         return { ...q, options: nextOptions };
       }),
     );
-  }
-
-  function finishQuiz() {
-    if (!quizId) return;
-    socket.emit("quiz:finish", { quizId });
-    setMessage("Квиз завершен");
   }
 
   function resetQuestionAnswersByIndex(index: number) {
@@ -763,7 +1417,7 @@ export function AdminEventPage() {
       nickname: item.nickname,
       score: item.score,
     }));
-    const escapeCsv = (value: string | number) => `"${String(value).replaceAll("\"", "\"\"")}"`;
+    const escapeCsv = (value: string | number) => `"${String(value).replaceAll('"', '""')}"`;
     const header = ["Место", "Участник", "Баллы"];
     const csvContent = [
       header.map(escapeCsv).join(","),
@@ -785,6 +1439,17 @@ export function AdminEventPage() {
     if (!quizId || !question?.id) {
       setMessage("Сначала сохраните вопросы, чтобы управлять их запуском");
       return;
+    }
+    if (enabled) {
+      for (const q of questionForms) {
+        if (q.id && q.id !== question.id && q.isActive) {
+          socket.emit("question:toggle", {
+            quizId,
+            questionId: q.id,
+            enabled: false,
+          });
+        }
+      }
     }
     socket.emit("question:toggle", {
       quizId,
@@ -809,25 +1474,372 @@ export function AdminEventPage() {
     }
   }
 
-  function setPublicResultsView(mode: "title" | "question" | "leaderboard", questionIdForMode?: string) {
+  const setPublicResultsView = useCallback(
+    (
+      mode: "title" | "question" | "leaderboard" | "speaker_questions" | "reactions",
+      questionIdForMode?: string,
+      extraPatch?: PublicViewSetPatch,
+    ) => {
+      if (!quizId) {
+        setMessage("Quiz ID не найден");
+        return;
+      }
+      const nextQuestionId = mode === "question" ? questionIdForMode : undefined;
+      if (mode === "question" && !nextQuestionId) {
+        setMessage("Не выбран вопрос для экрана");
+        return;
+      }
+      const targetQuestion =
+        mode === "question" && nextQuestionId
+          ? questionForms.find((q) => q.id === nextQuestionId)
+          : undefined;
+      const nextQuestionRevealStage =
+        mode === "question" && targetQuestion?.type !== "tag_cloud" ? "options" : "results";
+      setShowFirstCorrectAnswerer(false);
+      setPublicViewMode(mode);
+      setPublicViewQuestionId(nextQuestionId);
+      setQuestionRevealStage(nextQuestionRevealStage);
+      emitPublicViewSet({
+        mode,
+        questionId: nextQuestionId,
+        questionRevealStage: nextQuestionRevealStage,
+        showCorrectOption: targetQuestion?.showCorrectOption ?? false,
+        showFirstCorrectAnswerer: false,
+        ...extraPatch,
+      });
+    },
+    [emitPublicViewSet, questionForms, quizId],
+  );
+
+  function setQuestionRevealStageForQuestion(
+    questionIdForProjector: string,
+    stage: "options" | "results",
+  ) {
     if (!quizId) {
       setMessage("Quiz ID не найден");
       return;
     }
-    const nextQuestionId = mode === "question" ? questionIdForMode : undefined;
-    if (mode === "question" && !nextQuestionId) {
-      setMessage("Не выбран вопрос для экрана");
-      return;
-    }
-    setShowFirstCorrectAnswerer(false);
-    setPublicViewMode(mode);
-    setPublicViewQuestionId(nextQuestionId);
+    setPublicViewMode("question");
+    setPublicViewQuestionId(questionIdForProjector);
+    setQuestionRevealStage(stage);
     emitPublicViewSet({
-      mode,
-      questionId: nextQuestionId,
+      mode: "question",
+      questionId: questionIdForProjector,
+      questionRevealStage: stage,
       showFirstCorrectAnswerer: false,
     });
   }
+
+  function createPlayerBanner(
+    linkUrl: string,
+    backgroundUrl: string,
+    size: "2x1" | "1x1" | "full",
+  ) {
+    if (!quizId) return;
+    const next: PublicBanner[] = [
+      ...playerBanners,
+      {
+        id: globalThis.crypto?.randomUUID?.() ?? `banner_${Date.now()}`,
+        linkUrl,
+        backgroundUrl,
+        size,
+        isVisible: false,
+      },
+    ];
+    const baseOrder = buildEffectiveTilesOrder(playerTilesOrder, playerBanners);
+    const nextOrder = [
+      ...baseOrder.filter((x) => x !== SPEAKER_TILE_ID),
+      next[next.length - 1]!.id,
+      SPEAKER_TILE_ID,
+    ];
+    setPlayerBanners(next);
+    setPlayerTilesOrder(nextOrder);
+    emitPublicViewSet({ playerBanners: next, playerTilesOrder: nextOrder });
+    socket.emit("quiz:state:refresh", { quizId });
+    setMessage("Баннер создан");
+  }
+
+  async function uploadBannerMedia(file: File): Promise<string> {
+    const form = new FormData();
+    form.append("file", file);
+    const response = await fetch(`${API_BASE}/api/admin/media/upload`, {
+      method: "POST",
+      credentials: "include",
+      body: form,
+    });
+    if (!response.ok) {
+      const payload = await response.json().catch(() => ({}));
+      throw new Error(parseApiErrorMessage(payload, "Не удалось загрузить файл"));
+    }
+    const payload = (await response.json()) as { url: string };
+    if (!payload?.url) throw new Error("Сервер не вернул URL файла");
+    setMessage("Картинка загружена");
+    return payload.url;
+  }
+
+  async function loadFontLibrary() {
+    const response = await fetch(`${API_BASE}/api/admin/fonts`, {
+      method: "GET",
+      credentials: "include",
+    });
+    if (!response.ok) return;
+    const payload = (await response.json()) as {
+      fonts?: Array<{ id: string; family: string; url: string; kind?: "static" | "variable" }>;
+    };
+    setAvailableFonts(
+      Array.isArray(payload.fonts)
+        ? payload.fonts.map((font) => ({
+            ...font,
+            kind: font.kind === "variable" ? "variable" : "static",
+          }))
+        : [],
+    );
+  }
+
+  async function uploadCustomFont(
+    files: File[],
+    family: string,
+    kind: "static" | "variable",
+  ): Promise<{ family: string; url: string }> {
+    const form = new FormData();
+    files.forEach((file) => form.append("files", file));
+    form.append("family", family);
+    form.append("kind", kind);
+    const response = await fetch(`${API_BASE}/api/admin/fonts/upload`, {
+      method: "POST",
+      credentials: "include",
+      body: form,
+    });
+    const payload = (await response.json().catch(() => ({}))) as {
+      error?: string;
+      fonts?: Array<{ id: string; family: string; url: string; kind?: "static" | "variable" }>;
+      replacedFamily?: boolean;
+      duplicateCount?: number;
+      details?: Array<{
+        fileName: string;
+        status: "created" | "duplicate";
+        family: string;
+        kind: "static" | "variable";
+      }>;
+    };
+    if (!response.ok) {
+      console.error("[fonts] upload failed", {
+        status: response.status,
+        error: payload.error,
+      });
+      throw new Error(payload.error || "Не удалось загрузить шрифт");
+    }
+    if (
+      !Array.isArray(payload.fonts) ||
+      payload.fonts.length === 0 ||
+      !payload.fonts[0]?.family ||
+      !payload.fonts[0]?.url
+    ) {
+      throw new Error("Сервер не вернул данные шрифта");
+    }
+    const normalizedFonts: Array<{
+      id: string;
+      family: string;
+      url: string;
+      kind: "static" | "variable";
+    }> = payload.fonts.map((font) => ({
+      ...font,
+      kind: font.kind === "variable" ? "variable" : "static",
+    }));
+    setAvailableFonts((prev) => {
+      const next = [
+        ...normalizedFonts,
+        ...prev.filter(
+          (x) =>
+            !normalizedFonts.some((n) => n.id === x.id) &&
+            !normalizedFonts.some((n) => n.kind === "variable" && n.family === x.family),
+        ),
+      ];
+      return next;
+    });
+    console.info("[fonts] upload result", {
+      created: normalizedFonts.length,
+      duplicateCount: payload.duplicateCount ?? 0,
+      replacedFamily: !!payload.replacedFamily,
+      details: payload.details ?? [],
+    });
+    const duplicateText = payload.duplicateCount
+      ? `, пропущено дублей: ${payload.duplicateCount}`
+      : "";
+    setMessage(
+      payload.replacedFamily
+        ? `Семейство заменено на вариативный шрифт${duplicateText}`
+        : `Шрифты загружены${duplicateText}`,
+    );
+    const selected = normalizedFonts[0]!;
+    return { family: selected.family, url: selected.url };
+  }
+
+  function togglePlayerBannerVisible(bannerId: string, next: boolean) {
+    if (!quizId) return;
+    const updated = playerBanners.map((item) =>
+      item.id === bannerId ? { ...item, isVisible: next } : item,
+    );
+    setPlayerBanners(updated);
+    emitPublicViewSet({ playerBanners: updated });
+    socket.emit("quiz:state:refresh", { quizId });
+    setMessage(next ? "Баннер выведен на экран пользователя" : "Баннер скрыт у пользователя");
+  }
+
+  function deletePlayerBanner(bannerId: string) {
+    if (!quizId) return;
+    const next = playerBanners.filter((item) => item.id !== bannerId);
+    const nextOrder = buildEffectiveTilesOrder(playerTilesOrder, playerBanners).filter(
+      (id) => id !== bannerId,
+    );
+    setPlayerBanners(next);
+    setPlayerTilesOrder(nextOrder);
+    emitPublicViewSet({ playerBanners: next, playerTilesOrder: nextOrder });
+    socket.emit("quiz:state:refresh", { quizId });
+    setMessage("Баннер удален");
+  }
+
+  function updatePlayerBanner(
+    id: string,
+    linkUrl: string,
+    backgroundUrl: string,
+    size: "2x1" | "1x1" | "full",
+  ) {
+    if (!quizId) return;
+    const next = playerBanners.map((item) =>
+      item.id === id ? { ...item, linkUrl, backgroundUrl, size } : item,
+    );
+    setPlayerBanners(next);
+    emitPublicViewSet({ playerBanners: next });
+    socket.emit("quiz:state:refresh", { quizId });
+    setMessage("Баннер обновлен");
+  }
+
+  function saveSpeakerTile(text: string, backgroundColor: string) {
+    if (!quizId) return;
+    setSpeakerTileText(text || "Вопросы спикерам");
+    setSpeakerTileBackgroundColor(backgroundColor || "#1976d2");
+    emitPublicViewSet({
+      speakerTileText: text || "Вопросы спикерам",
+      speakerTileBackgroundColor: backgroundColor || "#1976d2",
+      speakerTileVisible: speakerTileVisible,
+    });
+    setMessage("Плитка «Вопросы спикерам» обновлена");
+  }
+
+  function toggleSpeakerTileVisible(
+    next: boolean,
+    payload: { text: string; backgroundColor: string },
+  ) {
+    if (!quizId) return;
+    const nextText = payload.text.trim() || "Вопросы спикерам";
+    const nextBg = payload.backgroundColor.trim() || "#1976d2";
+    setSpeakerTileText(nextText);
+    setSpeakerTileBackgroundColor(nextBg);
+    setSpeakerTileVisible(next);
+    emitPublicViewSet({
+      speakerTileText: nextText,
+      speakerTileBackgroundColor: nextBg,
+      speakerTileVisible: next,
+    });
+    socket.emit("quiz:state:refresh", { quizId });
+    setMessage(
+      next
+        ? "Плитка «Вопросы спикерам» выведена пользователю"
+        : "Плитка «Вопросы спикерам» скрыта у пользователя",
+    );
+  }
+
+  function saveProgramTile(text: string, backgroundColor: string, linkUrl: string) {
+    if (!quizId) return;
+    setProgramTileText(text || "Программа");
+    setProgramTileBackgroundColor(backgroundColor || "#6a1b9a");
+    setProgramTileLinkUrl(linkUrl || "");
+    emitPublicViewSet({
+      programTileText: text || "Программа",
+      programTileBackgroundColor: backgroundColor || "#6a1b9a",
+      programTileLinkUrl: linkUrl || "",
+      programTileVisible: programTileVisible,
+    });
+    socket.emit("quiz:state:refresh", { quizId });
+    setMessage("Кнопка «Программа» обновлена");
+  }
+
+  function toggleProgramTileVisible(
+    next: boolean,
+    payload: { text: string; backgroundColor: string; linkUrl: string },
+  ) {
+    if (!quizId) return;
+    const nextText = payload.text.trim() || "Программа";
+    const nextBg = payload.backgroundColor.trim() || "#6a1b9a";
+    const nextLink = payload.linkUrl.trim();
+    setProgramTileText(nextText);
+    setProgramTileBackgroundColor(nextBg);
+    setProgramTileLinkUrl(nextLink);
+    setProgramTileVisible(next);
+    emitPublicViewSet({
+      programTileText: nextText,
+      programTileBackgroundColor: nextBg,
+      programTileLinkUrl: nextLink,
+      programTileVisible: next,
+    });
+    socket.emit("quiz:state:refresh", { quizId });
+    setMessage(
+      next
+        ? "Кнопка «Программа» выведена пользователю"
+        : "Кнопка «Программа» скрыта у пользователя",
+    );
+  }
+
+  function moveTile(id: string, direction: -1 | 1) {
+    if (!quizId) return;
+    const current = buildEffectiveTilesOrder(playerTilesOrder, playerBanners);
+    const index = current.indexOf(id);
+    if (index < 0) return;
+    const nextIndex = index + direction;
+    if (nextIndex < 0 || nextIndex >= current.length) return;
+    const next = [...current];
+    [next[index], next[nextIndex]] = [next[nextIndex]!, next[index]!];
+    setPlayerTilesOrder(next);
+    emitPublicViewSet({ playerTilesOrder: next });
+    socket.emit("quiz:state:refresh", { quizId });
+  }
+
+  const {
+    saveSpeakerSettings,
+    setSpeakerQuestionOnScreen,
+    hideSpeakerQuestion,
+    restoreSpeakerQuestion,
+    setSpeakerQuestionUserVisible,
+    updateSpeakerQuestionText,
+    deleteSpeakerQuestion,
+  } = useSpeakerQuestionsAdminActions({
+    quizId,
+    speakerQuestionsEnabled,
+    speakerQuestionsAllowLikes,
+    speakerQuestionsShowLikesOnScreen,
+    speakerQuestionsReactionsText,
+    speakerQuestionsShowAuthorOnScreen,
+    speakerListText,
+    setMessage,
+  });
+
+  const saveSpeakerSettingsAndOpenProjector = useCallback(() => {
+    saveSpeakerSettings();
+    if (speakerQuestionsEnabled) {
+      setPublicResultsView("speaker_questions");
+    }
+  }, [saveSpeakerSettings, speakerQuestionsEnabled, setPublicResultsView]);
+
+  const setSpeakerQuestionOnScreenAndOpenProjector = useCallback(
+    (id: string, next: boolean) => {
+      setSpeakerQuestionOnScreen(id, next);
+      if (next) {
+        setPublicResultsView("speaker_questions");
+      }
+    },
+    [setPublicResultsView, setSpeakerQuestionOnScreen],
+  );
 
   function updateHighlightedLeaders(nextValue: number) {
     const safe = Number.isFinite(nextValue) ? Math.max(0, Math.min(100, Math.trunc(nextValue))) : 0;
@@ -848,8 +1860,10 @@ export function AdminEventPage() {
     if (quizId) {
       setPublicViewMode("title");
       setPublicViewQuestionId(undefined);
+      setQuestionRevealStage("options");
       emitPublicViewSet({
         mode: "title",
+        questionRevealStage: "options",
         highlightedLeadersCount: 3,
         showFirstCorrectAnswerer: false,
         firstCorrectWinnersCount: 1,
@@ -859,6 +1873,7 @@ export function AdminEventPage() {
     }
     setPublicViewMode("title");
     setPublicViewQuestionId(undefined);
+    setQuestionRevealStage("options");
   }
 
   function updateShowFirstCorrectAnswerer(next: boolean, questionIdForProjector?: string) {
@@ -866,12 +1881,14 @@ export function AdminEventPage() {
     if (next && questionIdForProjector) {
       setPublicViewMode("question");
       setPublicViewQuestionId(questionIdForProjector);
+      setQuestionRevealStage("results");
     }
     if (!quizId) return;
     if (next && questionIdForProjector) {
       emitPublicViewSet({
         mode: "question",
         questionId: questionIdForProjector,
+        questionRevealStage: "results",
         showFirstCorrectAnswerer: true,
       });
     } else {
@@ -886,16 +1903,57 @@ export function AdminEventPage() {
     emitPublicViewSet({ firstCorrectWinnersCount: safe });
   }
 
+  function togglePlayerVisibleResultQuestionId(questionIdForTile: string) {
+    setPlayerVisibleResultQuestionIds((prev) => {
+      const next = prev.includes(questionIdForTile)
+        ? prev.filter((x) => x !== questionIdForTile)
+        : [...prev, questionIdForTile];
+      emitPublicViewSet({ playerVisibleResultQuestionIds: next });
+      return next;
+    });
+  }
+
   function updateQuestionShowVoteCount(questionIndex: number, next: boolean) {
     setQuestionForms((prev) =>
       prev.map((q, idx) => (idx === questionIndex ? { ...q, showVoteCount: next } : q)),
     );
     const question = questionForms[questionIndex];
-    if (!quizId || publicViewMode !== "question" || !question?.id || publicViewQuestionId !== question.id) return;
+    if (
+      !quizId ||
+      publicViewMode !== "question" ||
+      !question?.id ||
+      publicViewQuestionId !== question.id
+    )
+      return;
     emitPublicViewSet({
       mode: "question",
       questionId: question.id,
       showVoteCount: next,
+      showCorrectOption: question.showCorrectOption ?? false,
+      showQuestionTitle: question.showQuestionTitle ?? true,
+      hiddenTagTexts: question.hiddenTagTexts ?? [],
+      injectedTagWords: question.injectedTagWords ?? [],
+      tagCountOverrides: question.tagCountOverrides ?? [],
+    });
+  }
+
+  function updateQuestionShowCorrectOption(questionIndex: number, next: boolean) {
+    setQuestionForms((prev) =>
+      prev.map((q, idx) => (idx === questionIndex ? { ...q, showCorrectOption: next } : q)),
+    );
+    const question = questionForms[questionIndex];
+    if (
+      !quizId ||
+      publicViewMode !== "question" ||
+      !question?.id ||
+      publicViewQuestionId !== question.id
+    )
+      return;
+    emitPublicViewSet({
+      mode: "question",
+      questionId: question.id,
+      showVoteCount: question.showVoteCount ?? false,
+      showCorrectOption: next,
       showQuestionTitle: question.showQuestionTitle ?? true,
       hiddenTagTexts: question.hiddenTagTexts ?? [],
       injectedTagWords: question.injectedTagWords ?? [],
@@ -908,11 +1966,18 @@ export function AdminEventPage() {
       prev.map((q, idx) => (idx === questionIndex ? { ...q, showQuestionTitle: next } : q)),
     );
     const question = questionForms[questionIndex];
-    if (!quizId || publicViewMode !== "question" || !question?.id || publicViewQuestionId !== question.id) return;
+    if (
+      !quizId ||
+      publicViewMode !== "question" ||
+      !question?.id ||
+      publicViewQuestionId !== question.id
+    )
+      return;
     emitPublicViewSet({
       mode: "question",
       questionId: question.id,
-      showVoteCount: question.showVoteCount ?? true,
+      showVoteCount: question.showVoteCount ?? false,
+      showCorrectOption: question.showCorrectOption ?? false,
       showQuestionTitle: next,
       hiddenTagTexts: question.hiddenTagTexts ?? [],
       injectedTagWords: question.injectedTagWords ?? [],
@@ -931,7 +1996,13 @@ export function AdminEventPage() {
       idx === questionIndex ? { ...q, projectorShowFirstCorrect: next } : q,
     );
     setQuestionForms(nextForms);
-    const ok = await patchQuestionProjectorSettings(prev.id, { projectorShowFirstCorrect: next }, subQuizSheets, nextForms);
+    const ok = await patchQuestionProjectorSettings(
+      prev.id,
+      { projectorShowFirstCorrect: next },
+      subQuizSheets,
+      nextForms,
+      quizId,
+    );
     if (!ok) {
       setQuestionForms((forms) =>
         forms.map((q, idx) =>
@@ -941,10 +2012,43 @@ export function AdminEventPage() {
     }
   }
 
+  async function updateQuestionRankingProjectorMetric(
+    questionIndex: number,
+    value: "avg_rank" | "avg_score" | "total_score",
+  ) {
+    const prev = questionForms[questionIndex];
+    if (!prev?.id) {
+      setMessage("Сначала сохраните вопрос");
+      return;
+    }
+    if (prev.type !== "ranking") return;
+    const previousMetric = prev.rankingProjectorMetric ?? "avg_score";
+    const nextForms = questionForms.map((q, idx) =>
+      idx === questionIndex ? { ...q, rankingProjectorMetric: value } : q,
+    );
+    setQuestionForms(nextForms);
+    const ok = await patchQuestionProjectorSettings(
+      prev.id,
+      { rankingProjectorMetric: value },
+      subQuizSheets,
+      nextForms,
+      quizId,
+    );
+    if (!ok) {
+      setQuestionForms((forms) =>
+        forms.map((q, idx) =>
+          idx === questionIndex ? { ...q, rankingProjectorMetric: previousMetric } : q,
+        ),
+      );
+    }
+  }
+
   function patchQuestionProjectorFirstCorrectWinnersCount(questionIndex: number, next: number) {
     const safe = Math.max(1, Math.min(20, Math.trunc(Number.isFinite(next) ? next : 1)));
     setQuestionForms((prev) =>
-      prev.map((q, idx) => (idx === questionIndex ? { ...q, projectorFirstCorrectWinnersCount: safe } : q)),
+      prev.map((q, idx) =>
+        idx === questionIndex ? { ...q, projectorFirstCorrectWinnersCount: safe } : q,
+      ),
     );
   }
 
@@ -974,6 +2078,7 @@ export function AdminEventPage() {
             { projectorFirstCorrectWinnersCount: safe },
             subQuizSheets,
             nextForms,
+            quizId,
           );
           if (!ok) {
             setQuestionForms((p) =>
@@ -996,11 +2101,17 @@ export function AdminEventPage() {
     setQuestionForms((prev) =>
       prev.map((q, idx) => (idx === questionIndex ? { ...q, hiddenTagTexts: nextHidden } : q)),
     );
-    if (!quizId || publicViewMode !== "question" || !question?.id || publicViewQuestionId !== question.id) return;
+    if (
+      !quizId ||
+      publicViewMode !== "question" ||
+      !question?.id ||
+      publicViewQuestionId !== question.id
+    )
+      return;
     emitPublicViewSet({
       mode: "question",
       questionId: question.id,
-      showVoteCount: question.showVoteCount ?? true,
+      showVoteCount: question.showVoteCount ?? false,
       showQuestionTitle: question.showQuestionTitle ?? true,
       hiddenTagTexts: nextHidden,
       injectedTagWords: question.injectedTagWords ?? [],
@@ -1017,15 +2128,21 @@ export function AdminEventPage() {
     }
     const nextWords = mergeInjectedTagWords(question.injectedTagWords ?? [], parsed);
     setQuestionForms((prev) =>
-      prev.map((q, idx) => (idx === questionIndex
-        ? { ...q, injectedTagWords: nextWords, injectedTagsInput: "" }
-        : q)),
+      prev.map((q, idx) =>
+        idx === questionIndex ? { ...q, injectedTagWords: nextWords, injectedTagsInput: "" } : q,
+      ),
     );
-    if (!quizId || publicViewMode !== "question" || !question?.id || publicViewQuestionId !== question.id) return;
+    if (
+      !quizId ||
+      publicViewMode !== "question" ||
+      !question?.id ||
+      publicViewQuestionId !== question.id
+    )
+      return;
     emitPublicViewSet({
       mode: "question",
       questionId: question.id,
-      showVoteCount: question.showVoteCount ?? true,
+      showVoteCount: question.showVoteCount ?? false,
       showQuestionTitle: question.showQuestionTitle ?? true,
       hiddenTagTexts: question.hiddenTagTexts ?? [],
       injectedTagWords: nextWords,
@@ -1036,15 +2153,27 @@ export function AdminEventPage() {
 
   function updateTagCountOverride(questionIndex: number, tagText: string, nextCount: number) {
     const question = questionForms[questionIndex];
-    const nextOverrides = setTagCountOverrideRow(question.tagCountOverrides ?? [], tagText, nextCount);
-    setQuestionForms((prev) =>
-      prev.map((q, idx) => (idx === questionIndex ? { ...q, tagCountOverrides: nextOverrides } : q)),
+    const nextOverrides = setTagCountOverrideRow(
+      question.tagCountOverrides ?? [],
+      tagText,
+      nextCount,
     );
-    if (!quizId || publicViewMode !== "question" || !question?.id || publicViewQuestionId !== question.id) return;
+    setQuestionForms((prev) =>
+      prev.map((q, idx) =>
+        idx === questionIndex ? { ...q, tagCountOverrides: nextOverrides } : q,
+      ),
+    );
+    if (
+      !quizId ||
+      publicViewMode !== "question" ||
+      !question?.id ||
+      publicViewQuestionId !== question.id
+    )
+      return;
     emitPublicViewSet({
       mode: "question",
       questionId: question.id,
-      showVoteCount: question.showVoteCount ?? true,
+      showVoteCount: question.showVoteCount ?? false,
       showQuestionTitle: question.showQuestionTitle ?? true,
       hiddenTagTexts: question.hiddenTagTexts ?? [],
       injectedTagWords: question.injectedTagWords ?? [],
@@ -1086,6 +2215,10 @@ export function AdminEventPage() {
   function openQuestionDialog(index: number) {
     setQuestionDialogError("");
     questionDialogSnapshotRef.current = cloneQuestionForms(questionForms);
+    const q = questionForms[index];
+    const sid = q?.subQuizId;
+    questionDialogTargetSubQuizIdRef.current =
+      sid != null && String(sid).trim() !== "" ? String(sid) : null;
     setSelectedQuestionIndex(index);
     setIsQuestionDialogOpen(true);
   }
@@ -1096,6 +2229,7 @@ export function AdminEventPage() {
 
   function cancelQuestionDialog() {
     setQuestionDialogError("");
+    questionDialogTargetSubQuizIdRef.current = null;
     if (questionDialogSnapshotRef.current) {
       setQuestionForms(questionDialogSnapshotRef.current);
       questionDialogSnapshotRef.current = null;
@@ -1112,16 +2246,38 @@ export function AdminEventPage() {
       return;
     }
     questionDialogSnapshotRef.current = null;
-    const ok = await persistQuestions(questionForms, subQuizSheets, {
+    const merged = await persistQuestions(questionForms, subQuizSheets, {
       suppressToast: true,
       validateOnlyIndex: idx,
     });
-    if (!ok) {
-      setQuestionDialogError("Не удалось сохранить вопросы. Проверьте соединение и попробуйте ещё раз.");
+    if (merged === false) {
+      setQuestionDialogError(
+        "Не удалось сохранить вопросы. Проверьте соединение и попробуйте ещё раз.",
+      );
       return;
     }
     setQuestionDialogError("");
     setMessage("Вопросы сохранены");
+    questionDialogTargetSubQuizIdRef.current = null;
+
+    /** subQuizId из ответа сервера после merge — id подквиза мог смениться (new-* → cuid), до сохранения нельзя полагаться на ref. */
+    const mq = merged.questions;
+    let targetSubQuizId: string | null = null;
+    if (current?.id) {
+      const hit = mq.find((q) => q.id === current.id);
+      if (hit?.subQuizId != null && String(hit.subQuizId).trim() !== "") {
+        targetSubQuizId = String(hit.subQuizId);
+      }
+    }
+    if (targetSubQuizId == null && idx >= 0 && idx < mq.length) {
+      const at = mq[idx];
+      if (at?.subQuizId != null && String(at.subQuizId).trim() !== "") {
+        targetSubQuizId = String(at.subQuizId);
+      }
+    }
+    if (targetSubQuizId) {
+      pinExpandedSubQuiz(targetSubQuizId);
+    }
     closeQuestionDialog();
   }
 
@@ -1129,17 +2285,26 @@ export function AdminEventPage() {
     const value = newOptionText.trim();
     if (!value) return;
     setQuestionForms((prev) =>
-      prev.map((question, index) =>
-        index === selectedQuestionIndex
-          ? { ...question, options: [...question.options, { text: value, isCorrect: false }] }
-          : question,
-      ),
+      prev.map((question, index) => {
+        if (index !== selectedQuestionIndex) return question;
+        const nextOpts = [...question.options, { text: value, isCorrect: false }];
+        if (question.type !== "ranking") return { ...question, options: nextOpts };
+        const n = nextOpts.length;
+        return {
+          ...question,
+          options: nextOpts,
+          rankingPointsByRank:
+            question.rankingKind === "jury"
+              ? Array.from({ length: n }, (_, j) => Math.max(1, n - j))
+              : Array.from({ length: n }, (_, j) => j + 1),
+        };
+      }),
     );
     setNewOptionText("");
   }
 
   return (
-    <Container maxWidth="lg" sx={{ py: 4 }}>
+    <Container maxWidth={false} disableGutters sx={{ p: 0, m: 0, maxWidth: "none" }}>
       <Snackbar
         key={message || "_closed"}
         open={!!message}
@@ -1168,9 +2333,69 @@ export function AdminEventPage() {
           {message}
         </Alert>
       </Snackbar>
-      {!isAuth && <AdminLoginForm onSuccess={() => checkSession().then(() => { loadRoom(); setupSocketListeners(); })} />}
+      {isAuth && room ? (
+        <Box sx={{ width: "100%", mb: 0 }}>
+          <Paper
+            elevation={0}
+            sx={{
+              width: "100%",
+              borderRadius: 0,
+              borderBottom: "1px solid",
+              borderColor: "divider",
+              bgcolor: "#111",
+              color: "#fff",
+              px: { xs: 1, sm: 2 },
+              py: 0.75,
+            }}
+          >
+            <Stack direction="row" spacing={2} alignItems="center" justifyContent="space-between">
+              <Typography variant="caption">Экран: {currentPublicScreenText}</Typography>
+              <Typography
+                variant="caption"
+                sx={{
+                  color:
+                    adminSocketStatus === "connected"
+                      ? "success.light"
+                      : adminSocketStatus === "connecting"
+                        ? "warning.light"
+                        : "error.light",
+                }}
+              >
+                Статус:{" "}
+                {adminSocketStatus === "connected"
+                  ? "подключено"
+                  : adminSocketStatus === "connecting"
+                    ? "подключение..."
+                    : "отключено"}
+              </Typography>
+              <Typography variant="caption">Онлайн: {onlineUsersCount}</Typography>
+            </Stack>
+          </Paper>
+        </Box>
+      ) : null}
+      {!isAuth && (
+        <Box
+          sx={{
+            minHeight: "100dvh",
+            width: "100%",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            px: 2,
+          }}
+        >
+          <AdminLoginForm
+            onSuccess={() =>
+              checkSession().then(() => {
+                loadRoom();
+                setupSocketListeners();
+              })
+            }
+          />
+        </Box>
+      )}
       {isAuth && room && (
-        <Stack direction="row" spacing={2} alignItems="stretch">
+        <Stack direction="row" spacing={0} alignItems="stretch">
           <Card
             variant="outlined"
             component="nav"
@@ -1178,10 +2403,24 @@ export function AdminEventPage() {
             sx={{
               width: { xs: 72, md: 256 },
               flexShrink: 0,
-              alignSelf: "stretch",
+              alignSelf: "flex-start",
+              position: "sticky",
+              top: 0,
+              maxHeight: "calc(100vh - 32px)",
+              overflowY: "auto",
+              borderTopLeftRadius: 0,
+              borderBottomLeftRadius: 0,
+              borderTopRightRadius: 0,
+              borderBottomRightRadius: 0,
             }}
           >
-            <CardContent sx={{ px: { xs: 0.5, md: 2 }, py: { xs: 1, md: 2 }, "&:last-child": { pb: { xs: 1, md: 2 } } }}>
+            <CardContent
+              sx={{
+                px: { xs: 0.25, md: 1.5 },
+                py: { xs: 1, md: 2 },
+                "&:last-child": { pb: { xs: 1, md: 2 } },
+              }}
+            >
               <List
                 dense
                 sx={{
@@ -1192,55 +2431,63 @@ export function AdminEventPage() {
                 {ADMIN_NAV.map(({ id, label, icon }) => (
                   <ListItemButton
                     key={id}
-                      selected={activeSection === id}
-                      onClick={() => setActiveSection(id)}
-                      aria-label={label}
+                    selected={activeSection === id}
+                    onClick={() => setActiveSection(id)}
+                    aria-label={label}
+                    sx={{
+                      minWidth: 0,
+                      justifyContent: { xs: "center", md: "flex-start" },
+                      borderRadius: 1,
+                      py: { xs: 1.25, md: 1 },
+                      px: { xs: 0.5, md: 1.25 },
+                    }}
+                  >
+                    <ListItemIcon
                       sx={{
-                        minWidth: 0,
-                        justifyContent: { xs: "center", md: "flex-start" },
-                        borderRadius: 1,
-                        py: { xs: 1.25, md: 1 },
-                        px: { xs: 1, md: 1.5 },
+                        minWidth: { xs: 0, md: 40 },
+                        mr: { xs: 0, md: 0 },
+                        justifyContent: "center",
                       }}
                     >
-                      <ListItemIcon
-                        sx={{
-                          minWidth: { xs: 0, md: 40 },
-                          mr: { xs: 0, md: 0 },
-                          justifyContent: "center",
-                        }}
-                      >
-                        {icon}
-                      </ListItemIcon>
-                      <ListItemText
-                        primary={label}
-                        primaryTypographyProps={{ variant: "body2", fontWeight: activeSection === id ? 600 : 400 }}
-                        sx={{
-                          display: { xs: "none", md: "block" },
-                          m: 0,
-                        }}
-                      />
+                      {icon}
+                    </ListItemIcon>
+                    <ListItemText
+                      primary={label}
+                      primaryTypographyProps={{
+                        variant: "body2",
+                        fontWeight: activeSection === id ? 600 : 400,
+                      }}
+                      sx={{
+                        display: { xs: "none", md: "block" },
+                        m: 0,
+                      }}
+                    />
                   </ListItemButton>
                 ))}
               </List>
             </CardContent>
           </Card>
 
-          <Box sx={{ flex: 1, minWidth: 0 }}>
+          <Box sx={{ flex: 1, minWidth: 0, mt: 0 }}>
             <Stack spacing={3}>
               {activeSection === "general" && (
-                <AdminGeneralSection
-                  editableTitle={editableTitle}
-                  setEditableTitle={setEditableTitle}
-                  saveQuizTitle={saveQuizTitle}
-                  joinUrl={joinUrl}
-                  qrData={qrData}
-                  quizId={quizId}
-                  setQuizId={setQuizId}
-                  questionId={questionId}
-                  setQuestionId={setQuestionId}
-                  finishQuiz={finishQuiz}
-                />
+                <Stack spacing={2}>
+                  <AdminGeneralSection
+                    editableTitle={editableTitle}
+                    setEditableTitle={setEditableTitle}
+                    saveQuizTitle={saveQuizTitle}
+                    joinUrl={joinUrl}
+                    screenUrl={screenUrl}
+                    showEventTitleOnPlayer={showEventTitleOnPlayer}
+                    onToggleShowEventTitleOnPlayer={(next) => {
+                      setShowEventTitleOnPlayer(next);
+                      emitPublicViewSet({ showEventTitleOnPlayer: next });
+                      if (quizId) {
+                        socket.emit("quiz:state:refresh", { quizId });
+                      }
+                    }}
+                  />
+                </Stack>
               )}
 
               {activeSection === "questions" && (
@@ -1257,15 +2504,20 @@ export function AdminEventPage() {
                       maxWidth: "100%",
                       minWidth: 0,
                       boxSizing: "border-box",
+                      borderTopLeftRadius: 0,
+                      borderBottomLeftRadius: 0,
+                      borderTopRightRadius: 0,
+                      borderBottomRightRadius: 0,
                     }}
                   >
                     <Tabs
                       value={roomQuestionsTab}
-                      onChange={(_, v: "quizzes" | "votes") => setRoomQuestionsTab(v)}
+                      onChange={(_, v: "quizzes" | "votes" | "reactions") => setRoomQuestionsTab(v)}
                       sx={{ borderBottom: 1, borderColor: "divider", px: 0.5 }}
                     >
                       <Tab label="Квизы" value="quizzes" />
                       <Tab label="Голосования" value="votes" />
+                      <Tab label="Реакции" value="reactions" />
                     </Tabs>
                     <Box sx={{ pt: 2, px: 0.25 }}>
                       {roomQuestionsTab === "quizzes" &&
@@ -1298,150 +2550,260 @@ export function AdminEventPage() {
                           </Box>
                         ) : (
                           <Stack sx={{ alignItems: "stretch" }}>
-                            <Box sx={{ alignSelf: "flex-start", flexShrink: 0, pb: 3, width: "100%" }}>
+                            <Box
+                              sx={{
+                                display: "flex",
+                                justifyContent: "flex-end",
+                                alignItems: "center",
+                                flexShrink: 0,
+                                width: "100%",
+                              }}
+                            >
                               <Button
                                 startIcon={<AddIcon />}
                                 variant="outlined"
                                 size="small"
                                 onClick={addSubQuizSheet}
                               >
-                                Создать квиз
+                                квиз
                               </Button>
                             </Box>
                             <Stack spacing={3} sx={{ width: "100%", mt: 1.5 }}>
-                            {subQuizSheets.map((sq) => {
-                            const quizIndexMap = buildQuestionIndexMapForSubQuiz(questionForms, sq.id);
-                            const qSel = quizIndexMap.indexOf(selectedQuestionIndex);
-                            const quizHasQuestions = quizIndexMap.length > 0;
-                            return (
-                              <Accordion
-                                key={sq.id}
-                                disableGutters
-                                expanded={expandedSubQuizId === sq.id}
-                                onChange={(_, expanded) => setExpandedSubQuizId(expanded ? sq.id : false)}
-                              >
-                                <AccordionSummary
-                                  component="div"
-                                  expandIcon={<ExpandMoreIcon />}
-                                  sx={{
-                                    pt: 2.5,
-                                    pb: 2,
-                                    "& .MuiAccordionSummary-content": {
-                                      alignItems: "center",
-                                      gap: 1,
-                                      flexGrow: 1,
-                                      marginTop: 0,
-                                      marginBottom: 0,
-                                      minWidth: 0,
-                                    },
-                                  }}
-                                >
-                                  <Stack
-                                    direction="row"
-                                    spacing={1}
-                                    alignItems="center"
-                                    sx={{ flex: 1, minWidth: 0 }}
+                              {subQuizSheets.map((sq) => {
+                                const quizIndexMap = buildQuestionIndexMapForSubQuiz(
+                                  questionForms,
+                                  sq.id,
+                                );
+                                const quizQuestions = quizIndexMap
+                                  .map((i) => questionForms[i])
+                                  .filter(Boolean);
+                                const qSel = quizIndexMap.indexOf(selectedQuestionIndex);
+                                const quizHasQuestions = quizIndexMap.length > 0;
+                                const activeLocalIndex = quizQuestions.findIndex((q) =>
+                                  Boolean(q?.isActive),
+                                );
+                                return (
+                                  <Accordion
+                                    key={sq.id}
+                                    disableGutters
+                                    expanded={expandedSubQuizId === sq.id}
+                                    onChange={(_, expanded) =>
+                                      setExpandedSubQuizId(expanded ? sq.id : false)
+                                    }
                                   >
-                                    <TextField
-                                      size="small"
-                                      label="Название квиза"
-                                      value={sq.title}
-                                      onChange={(e) => {
-                                        const title = e.target.value;
-                                        setSubQuizSheets((prev) =>
-                                          prev.map((s) => (s.id === sq.id ? { ...s, title } : s)),
-                                        );
-                                      }}
-                                      onClick={(e) => e.stopPropagation()}
-                                      onFocus={(e) => e.stopPropagation()}
-                                      sx={{ flex: 1, maxWidth: 480, minWidth: 0 }}
-                                    />
-                                    <Tooltip title="Удалить квиз" enterTouchDelay={400}>
-                                      <IconButton
-                                        size="small"
-                                        color="error"
-                                        aria-label="Удалить квиз"
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          void removeSubQuizSheet(sq.id);
-                                        }}
-                                      >
-                                        <DeleteOutlineIcon fontSize="small" />
-                                      </IconButton>
-                                    </Tooltip>
-                                  </Stack>
-                                </AccordionSummary>
-                                <AccordionDetails sx={{ pt: 0, px: 0, pb: 2 }}>
-                                  {quizHasQuestions ? (
-                                      <AdminQuestionsSection
-                                        listTitle="Вопросы квиза"
-                                        listHeaderPrimaryAction={{
-                                          label: "Результаты",
-                                          to: `/admin/${eventName}/sub-quizzes/${sq.id}/results`,
-                                        }}
-                                        addButtonLabel="Вопрос"
-                                        questionForms={quizIndexMap.map((i) => questionForms[i])}
-                                        selectedListIndex={qSel < 0 ? 0 : qSel}
-                                        remapQuestionIndex={(local) => quizIndexMap[local] ?? 0}
-                                        eventName={eventName}
-                                        expandedQuestionSettingsIndex={expandedQuestionSettingsIndex}
-                                        setExpandedQuestionSettingsIndex={setExpandedQuestionSettingsIndex}
-                                        questionResults={questionResults}
-                                        publicViewMode={publicViewMode}
-                                        publicViewQuestionId={publicViewQuestionId}
-                                        setMessage={setMessage}
-                                        openQuestionDialog={openQuestionDialog}
-                                        addQuestion={() => addQuestionToSubQuiz(sq.id)}
-                                        setPublicResultsView={setPublicResultsView}
-                                        updateQuestionShowVoteCount={updateQuestionShowVoteCount}
-                                        updateQuestionShowTitle={updateQuestionShowTitle}
-                                        openTagInputDialog={openTagInputDialog}
-                                        openTagResultsDialog={openTagResultsDialog}
-                                        confirmResetQuestionAnswersByIndex={confirmResetQuestionAnswersByIndex}
-                                        toggleQuestion={toggleQuestion}
-                                        updateQuestionProjectorShowFirstCorrect={updateQuestionProjectorShowFirstCorrect}
-                                        patchQuestionProjectorFirstCorrectWinnersCount={
-                                          patchQuestionProjectorFirstCorrectWinnersCount
-                                        }
-                                        commitQuestionProjectorFirstCorrectWinnersCount={
-                                          commitQuestionProjectorFirstCorrectWinnersCount
-                                        }
-                                        showFirstCorrectAnswerer={showFirstCorrectAnswerer}
-                                        updateShowFirstCorrectAnswerer={updateShowFirstCorrectAnswerer}
-                                      />
-                                  ) : (
-                                    <Box
+                                    <AccordionSummary
+                                      component="div"
+                                      expandIcon={<ExpandMoreIcon />}
                                       sx={{
-                                        display: "flex",
-                                        alignItems: "center",
-                                        justifyContent: "center",
-                                        minHeight: 200,
-                                        py: 4,
-                                        px: 2,
+                                        pt: 2.5,
+                                        pb: 2,
+                                        "& .MuiAccordionSummary-content": {
+                                          alignItems: "center",
+                                          gap: 1,
+                                          flexGrow: 1,
+                                          marginTop: 0,
+                                          marginBottom: 0,
+                                          minWidth: 0,
+                                        },
                                       }}
                                     >
-                                      <Button
-                                        variant="contained"
-                                        size="large"
-                                        startIcon={<QuizIcon sx={{ fontSize: 28 }} />}
-                                        onClick={() => addQuestionToSubQuiz(sq.id)}
-                                        sx={{
-                                          py: 2,
-                                          px: 4,
-                                          fontSize: "1.1rem",
-                                          borderRadius: 2,
-                                          boxShadow: 2,
-                                          textTransform: "none",
-                                        }}
+                                      <Stack
+                                        direction="row"
+                                        spacing={1}
+                                        alignItems="center"
+                                        sx={{ flex: 1, minWidth: 0 }}
                                       >
-                                        Вопрос
-                                      </Button>
-                                    </Box>
-                                  )}
-                                </AccordionDetails>
-                              </Accordion>
-                            );
-                          })}
+                                        <TextField
+                                          size="small"
+                                          label="Название квиза"
+                                          value={sq.title}
+                                          onChange={(e) => {
+                                            const title = e.target.value;
+                                            setSubQuizSheets((prev) =>
+                                              prev.map((s) =>
+                                                s.id === sq.id ? { ...s, title } : s,
+                                              ),
+                                            );
+                                          }}
+                                          onClick={(e) => e.stopPropagation()}
+                                          onFocus={(e) => e.stopPropagation()}
+                                          sx={{ flex: 1, maxWidth: 480, minWidth: 0 }}
+                                        />
+                                        <Tooltip title="Удалить квиз" enterTouchDelay={400}>
+                                          <IconButton
+                                            size="small"
+                                            color="error"
+                                            aria-label="Удалить квиз"
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              void removeSubQuizSheet(sq.id);
+                                            }}
+                                          >
+                                            <DeleteOutlineIcon fontSize="small" />
+                                          </IconButton>
+                                        </Tooltip>
+                                      </Stack>
+                                    </AccordionSummary>
+                                    <AccordionDetails sx={{ pt: 0, px: 0, pb: 2 }}>
+                                      {quizHasQuestions ? (
+                                        <Stack spacing={1.25}>
+                                          <AdminQuestionsSection
+                                            listTitle="Вопросы квиза"
+                                            listHeaderPrimaryAction={{
+                                              label: "Статистика",
+                                              to: `/admin/${eventName}/sub-quizzes/${sq.id}/results`,
+                                            }}
+                                            addButtonLabel="Вопрос"
+                                            questionForms={quizIndexMap.map(
+                                              (i) => questionForms[i],
+                                            )}
+                                            selectedListIndex={qSel < 0 ? 0 : qSel}
+                                            remapQuestionIndex={(local) => quizIndexMap[local] ?? 0}
+                                            eventName={eventName}
+                                            expandedQuestionSettingsIndex={
+                                              expandedQuestionSettingsIndex
+                                            }
+                                            setExpandedQuestionSettingsIndex={
+                                              setExpandedQuestionSettingsIndex
+                                            }
+                                            questionResults={questionResults}
+                                            publicViewMode={publicViewMode}
+                                            publicViewQuestionId={publicViewQuestionId}
+                                            setMessage={setMessage}
+                                            openQuestionDialog={openQuestionDialog}
+                                            addQuestion={() => addQuestionToSubQuiz(sq.id)}
+                                            setPublicResultsView={setPublicResultsView}
+                                            updateQuestionShowVoteCount={
+                                              updateQuestionShowVoteCount
+                                            }
+                                            updateQuestionShowCorrectOption={
+                                              updateQuestionShowCorrectOption
+                                            }
+                                            openTagInputDialog={openTagInputDialog}
+                                            openTagResultsDialog={openTagResultsDialog}
+                                            confirmResetQuestionAnswersByIndex={
+                                              confirmResetQuestionAnswersByIndex
+                                            }
+                                            toggleQuestion={toggleQuestion}
+                                            updateQuestionProjectorShowFirstCorrect={
+                                              updateQuestionProjectorShowFirstCorrect
+                                            }
+                                            patchQuestionProjectorFirstCorrectWinnersCount={
+                                              patchQuestionProjectorFirstCorrectWinnersCount
+                                            }
+                                            commitQuestionProjectorFirstCorrectWinnersCount={
+                                              commitQuestionProjectorFirstCorrectWinnersCount
+                                            }
+                                            updateQuestionRankingProjectorMetric={
+                                              updateQuestionRankingProjectorMetric
+                                            }
+                                            showFirstCorrectAnswerer={showFirstCorrectAnswerer}
+                                            updateShowFirstCorrectAnswerer={
+                                              updateShowFirstCorrectAnswerer
+                                            }
+                                            questionRevealStage={questionRevealStage}
+                                            setQuestionRevealStageForQuestion={
+                                              setQuestionRevealStageForQuestion
+                                            }
+                                            playerVisibleResultQuestionIds={
+                                              playerVisibleResultQuestionIds
+                                            }
+                                            togglePlayerVisibleResultQuestionId={
+                                              togglePlayerVisibleResultQuestionId
+                                            }
+                                          />
+                                          <SubQuizControlsCard
+                                            activeLocalIndex={activeLocalIndex}
+                                            quizIndexMap={quizIndexMap}
+                                            quizId={quizId}
+                                            isLeaderboardShown={publicViewMode === "leaderboard"}
+                                            firstCorrectWinnersCount={firstCorrectWinnersCount}
+                                            highlightedLeadersCount={highlightedLeadersCount}
+                                            onPrev={() => {
+                                              if (activeLocalIndex <= 0) return;
+                                              const prevGlobalIndex =
+                                                quizIndexMap[activeLocalIndex - 1];
+                                              if (prevGlobalIndex == null) return;
+                                              toggleQuestion(prevGlobalIndex, true);
+                                            }}
+                                            onNext={() => {
+                                              if (activeLocalIndex < 0) {
+                                                const firstGlobalIndex = quizIndexMap[0];
+                                                if (firstGlobalIndex == null) return;
+                                                toggleQuestion(firstGlobalIndex, true);
+                                                return;
+                                              }
+                                              const nextGlobalIndex =
+                                                quizIndexMap[activeLocalIndex + 1];
+                                              if (nextGlobalIndex == null) {
+                                                if (!quizId) return;
+                                                socket.emit("sub-quiz:close", {
+                                                  quizId,
+                                                  subQuizId: sq.id,
+                                                });
+                                                return;
+                                              }
+                                              toggleQuestion(nextGlobalIndex, true);
+                                            }}
+                                            onFinish={() => {
+                                              if (!quizId) return;
+                                              socket.emit("sub-quiz:close", {
+                                                quizId,
+                                                subQuizId: sq.id,
+                                              });
+                                            }}
+                                            onToggleResults={() =>
+                                              setPublicResultsView(
+                                                publicViewMode === "leaderboard"
+                                                  ? "title"
+                                                  : "leaderboard",
+                                              )
+                                            }
+                                            onChangeLeadersTop={(next) =>
+                                              setFirstCorrectWinnersCount(
+                                                Math.max(1, Math.min(20, next)),
+                                              )
+                                            }
+                                            onCommitLeadersTop={updateFirstCorrectWinnersCount}
+                                            onChangeResultsUsers={(next) =>
+                                              setHighlightedLeadersCount(next)
+                                            }
+                                            onCommitResultsUsers={updateHighlightedLeaders}
+                                          />
+                                        </Stack>
+                                      ) : (
+                                        <Box
+                                          sx={{
+                                            display: "flex",
+                                            alignItems: "center",
+                                            justifyContent: "center",
+                                            minHeight: 200,
+                                            py: 4,
+                                            px: 2,
+                                          }}
+                                        >
+                                          <Button
+                                            variant="contained"
+                                            size="large"
+                                            startIcon={<QuizIcon sx={{ fontSize: 28 }} />}
+                                            onClick={() => addQuestionToSubQuiz(sq.id)}
+                                            sx={{
+                                              py: 2,
+                                              px: 4,
+                                              fontSize: "1.1rem",
+                                              borderRadius: 2,
+                                              boxShadow: 2,
+                                              textTransform: "none",
+                                            }}
+                                          >
+                                            Вопрос
+                                          </Button>
+                                        </Box>
+                                      )}
+                                    </AccordionDetails>
+                                  </Accordion>
+                                );
+                              })}
                             </Stack>
                           </Stack>
                         ))}
@@ -1475,16 +2837,26 @@ export function AdminEventPage() {
                           </Box>
                         ) : (
                           <Stack spacing={1.5}>
-                            <Button
-                              startIcon={<AddIcon />}
-                              variant="outlined"
-                              size="small"
-                              onClick={() => addQuestionToSubQuiz(null)}
+                            <Box
+                              sx={{
+                                display: "flex",
+                                justifyContent: "flex-end",
+                                alignItems: "center",
+                                flexShrink: 0,
+                                width: "100%",
+                              }}
                             >
-                              Добавить голосование
-                            </Button>
+                              <Button
+                                startIcon={<AddIcon />}
+                                variant="outlined"
+                                size="small"
+                                onClick={() => addQuestionToSubQuiz(null)}
+                              >
+                                Голосование
+                              </Button>
+                            </Box>
                             <AdminQuestionsSection
-                              listTitle="Голосования комнаты"
+                              listTitle=""
                               addButtonLabel="Добавить голосование"
                               listHeaderShowAddButton={false}
                               questionForms={votesIndexMap.map((i) => questionForms[i])}
@@ -1501,32 +2873,232 @@ export function AdminEventPage() {
                               addQuestion={() => addQuestionToSubQuiz(null)}
                               setPublicResultsView={setPublicResultsView}
                               updateQuestionShowVoteCount={updateQuestionShowVoteCount}
-                              updateQuestionShowTitle={updateQuestionShowTitle}
+                              updateQuestionShowCorrectOption={updateQuestionShowCorrectOption}
                               openTagInputDialog={openTagInputDialog}
                               openTagResultsDialog={openTagResultsDialog}
-                              confirmResetQuestionAnswersByIndex={confirmResetQuestionAnswersByIndex}
+                              confirmResetQuestionAnswersByIndex={
+                                confirmResetQuestionAnswersByIndex
+                              }
                               toggleQuestion={toggleQuestion}
-                              updateQuestionProjectorShowFirstCorrect={updateQuestionProjectorShowFirstCorrect}
+                              updateQuestionProjectorShowFirstCorrect={
+                                updateQuestionProjectorShowFirstCorrect
+                              }
                               patchQuestionProjectorFirstCorrectWinnersCount={
                                 patchQuestionProjectorFirstCorrectWinnersCount
                               }
                               commitQuestionProjectorFirstCorrectWinnersCount={
                                 commitQuestionProjectorFirstCorrectWinnersCount
                               }
+                              updateQuestionRankingProjectorMetric={
+                                updateQuestionRankingProjectorMetric
+                              }
                               showFirstCorrectAnswerer={showFirstCorrectAnswerer}
                               updateShowFirstCorrectAnswerer={updateShowFirstCorrectAnswerer}
+                              questionRevealStage={questionRevealStage}
+                              setQuestionRevealStageForQuestion={setQuestionRevealStageForQuestion}
+                              playerVisibleResultQuestionIds={playerVisibleResultQuestionIds}
+                              togglePlayerVisibleResultQuestionId={
+                                togglePlayerVisibleResultQuestionId
+                              }
                             />
                           </Stack>
                         ))}
+                      {roomQuestionsTab === "reactions" && (
+                        <AdminReactionsSection
+                          widgets={reactionWidgets}
+                          session={reactionSession}
+                          activeWidgetId={activeReactionWidgetId}
+                          projectorWidgetId={projectorReactionWidgetId}
+                          projectorMode={publicViewMode === "reactions"}
+                          overlayText={reactionsOverlayText}
+                          setOverlayText={(next) => {
+                            setReactionsOverlayText(next);
+                            emitPublicViewSet({ reactionsOverlayText: next });
+                          }}
+                          onCreateWidget={(title, reactionsText) => {
+                            const reactions = parseReactionLines(reactionsText);
+                            if (reactions.length === 0) {
+                              setMessage("Добавьте хотя бы одну реакцию для виджета");
+                              return;
+                            }
+                            setReactionWidgets((prev) => {
+                              const nextWidgets = [
+                                ...prev,
+                                {
+                                  id: `reaction_widget_${crypto.randomUUID()}`,
+                                  title: title.trim() || `Виджет ${prev.length + 1}`,
+                                  reactions,
+                                },
+                              ];
+                              emitPublicViewSet({ reactionsWidgets: nextWidgets });
+                              return nextWidgets;
+                            });
+                            setMessage("Виджет реакций создан");
+                          }}
+                          onUpdateWidget={(widgetId, title, reactionsText) => {
+                            const reactions = parseReactionLines(reactionsText);
+                            if (reactions.length === 0) {
+                              setMessage("Добавьте хотя бы одну реакцию для виджета");
+                              return;
+                            }
+                            setReactionWidgets((prev) => {
+                              const target = prev.find((item) => item.id === widgetId);
+                              if (!target) return prev;
+                              const nextWidgets = prev.map((item) =>
+                                item.id === widgetId
+                                  ? {
+                                      ...item,
+                                      title: title.trim() || target.title,
+                                      reactions,
+                                    }
+                                  : item,
+                              );
+                              if (
+                                activeReactionWidgetId === widgetId &&
+                                reactionSession?.isActive
+                              ) {
+                                const updated = nextWidgets.find((item) => item.id === widgetId);
+                                if (updated && quizId) {
+                                  socket.emit("reactions:start", {
+                                    quizId,
+                                    durationSec: 3600,
+                                    reactions: updated.reactions,
+                                  });
+                                }
+                              }
+                              emitPublicViewSet({ reactionsWidgets: nextWidgets });
+                              return nextWidgets;
+                            });
+                            setMessage("Виджет реакций обновлен");
+                          }}
+                          onDeleteWidget={(widgetId) => {
+                            setReactionWidgets((prev) => {
+                              const nextWidgets = prev.filter((item) => item.id !== widgetId);
+                              emitPublicViewSet({ reactionsWidgets: nextWidgets });
+                              return nextWidgets;
+                            });
+                            if (activeReactionWidgetId === widgetId) {
+                              setActiveReactionWidgetId(null);
+                            }
+                            if (projectorReactionWidgetId === widgetId) {
+                              setProjectorReactionWidgetId(null);
+                              if (publicViewMode === "reactions") {
+                                setPublicResultsView("title");
+                              }
+                            }
+                            setMessage("Виджет реакций удален");
+                          }}
+                          onStartWidget={(widget) => {
+                            if (!quizId) return;
+                            socket.emit("reactions:start", {
+                              quizId,
+                              durationSec: 3600,
+                              reactions: widget.reactions,
+                            });
+                            const nextOverlayText = widget.title.trim() || "Реакции аудитории";
+                            setReactionsOverlayText(nextOverlayText);
+                            emitPublicViewSet({ reactionsOverlayText: nextOverlayText });
+                            setActiveReactionWidgetId(widget.id);
+                            setMessage("Реакции запущены");
+                          }}
+                          onStop={() => {
+                            if (!quizId) return;
+                            socket.emit("reactions:stop", { quizId });
+                            setActiveReactionWidgetId(null);
+                            setMessage("Реакции остановлены");
+                          }}
+                          onToggleProjector={(widget) => {
+                            const isSameWidgetOnProjector =
+                              publicViewMode === "reactions" &&
+                              projectorReactionWidgetId === widget.id;
+                            if (isSameWidgetOnProjector) {
+                              setProjectorReactionWidgetId(null);
+                              setPublicResultsView("title");
+                              return;
+                            }
+                            setProjectorReactionWidgetId(widget.id);
+                            const nextOverlayText = widget.title.trim() || "Реакции аудитории";
+                            setReactionsOverlayText(nextOverlayText);
+                            if (quizId) {
+                              setPublicResultsView("reactions", undefined, {
+                                reactionsOverlayText: nextOverlayText,
+                              });
+                              return;
+                            }
+                            setPublicResultsView("reactions");
+                          }}
+                        />
+                      )}
                     </Box>
                   </Paper>
                 </Stack>
+              )}
+
+              {activeSection === "speakers" && (
+                <AdminSpeakersSection
+                  enabled={speakerQuestionsEnabled}
+                  allowLikes={speakerQuestionsAllowLikes}
+                  showLikesOnScreen={speakerQuestionsShowLikesOnScreen}
+                  reactionsText={speakerQuestionsReactionsText}
+                  showAuthorOnScreen={speakerQuestionsShowAuthorOnScreen}
+                  speakersText={speakerListText}
+                  questions={speakerQuestionsPayload?.items ?? []}
+                  onToggleEnabled={setSpeakerQuestionsEnabled}
+                  onToggleAllowLikes={setSpeakerQuestionsAllowLikes}
+                  onToggleShowLikesOnScreen={setSpeakerQuestionsShowLikesOnScreen}
+                  onReactionsTextChange={setSpeakerQuestionsReactionsText}
+                  onToggleShowAuthorOnScreen={setSpeakerQuestionsShowAuthorOnScreen}
+                  onSpeakersTextChange={setSpeakerListText}
+                  onSaveSettings={saveSpeakerSettingsAndOpenProjector}
+                  onHide={hideSpeakerQuestion}
+                  onRestore={restoreSpeakerQuestion}
+                  onSetUserVisible={setSpeakerQuestionUserVisible}
+                  onSetOnScreen={setSpeakerQuestionOnScreenAndOpenProjector}
+                  onUpdateQuestionText={updateSpeakerQuestionText}
+                  onDeleteQuestion={deleteSpeakerQuestion}
+                />
+              )}
+
+              {activeSection === "banners" && (
+                <AdminBannersSection
+                  banners={playerBanners}
+                  onCreate={createPlayerBanner}
+                  onUpdate={updatePlayerBanner}
+                  speakerTileText={speakerTileText}
+                  speakerTileBackgroundColor={speakerTileBackgroundColor}
+                  speakerTileVisible={speakerTileVisible}
+                  onSaveSpeakerTile={saveSpeakerTile}
+                  onToggleSpeakerTileVisible={toggleSpeakerTileVisible}
+                  programTileText={programTileText}
+                  programTileBackgroundColor={programTileBackgroundColor}
+                  programTileLinkUrl={programTileLinkUrl}
+                  programTileVisible={programTileVisible}
+                  onSaveProgramTile={saveProgramTile}
+                  onToggleProgramTileVisible={toggleProgramTileVisible}
+                  tilesOrder={playerTilesOrder}
+                  onMoveTileUp={(id) => moveTile(id, -1)}
+                  onMoveTileDown={(id) => moveTile(id, 1)}
+                  onUploadMedia={async (file) => {
+                    try {
+                      return await uploadBannerMedia(file);
+                    } catch (error) {
+                      setMessage(
+                        error instanceof Error ? error.message : "Не удалось загрузить файл",
+                      );
+                      throw error;
+                    }
+                  }}
+                  onToggleVisible={togglePlayerBannerVisible}
+                  onDelete={deletePlayerBanner}
+                />
               )}
 
               {activeSection === "branding" && (
                 <AdminBrandingSection
                   projectorBackground={projectorBackground}
                   setProjectorBackground={setProjectorBackground}
+                  brandBodyBackgroundColor={brandBodyBackgroundColor}
+                  setBrandBodyBackgroundColor={setBrandBodyBackgroundColor}
                   voteQuestionTextColor={voteQuestionTextColor}
                   setVoteQuestionTextColor={setVoteQuestionTextColor}
                   voteOptionTextColor={voteOptionTextColor}
@@ -1539,6 +3111,8 @@ export function AdminEventPage() {
                   setCloudQuestionColor={setCloudQuestionColor}
                   cloudTopTagColor={cloudTopTagColor}
                   setCloudTopTagColor={setCloudTopTagColor}
+                  cloudCorrectTagColor={cloudCorrectTagColor}
+                  setCloudCorrectTagColor={setCloudCorrectTagColor}
                   cloudTagColors={cloudTagColors}
                   setCloudTagColors={setCloudTagColors}
                   cloudDensity={cloudDensity}
@@ -1549,6 +3123,29 @@ export function AdminEventPage() {
                   setCloudSpiral={setCloudSpiral}
                   cloudAnimationStrength={cloudAnimationStrength}
                   setCloudAnimationStrength={setCloudAnimationStrength}
+                  brandPrimaryColor={brandPrimaryColor}
+                  setBrandPrimaryColor={setBrandPrimaryColor}
+                  brandAccentColor={brandAccentColor}
+                  setBrandAccentColor={setBrandAccentColor}
+                  brandSurfaceColor={brandSurfaceColor}
+                  setBrandSurfaceColor={setBrandSurfaceColor}
+                  brandTextColor={brandTextColor}
+                  setBrandTextColor={setBrandTextColor}
+                  brandFontFamily={brandFontFamily}
+                  setBrandFontFamily={setBrandFontFamily}
+                  setBrandFontUrl={setBrandFontUrl}
+                  availableFonts={availableFonts}
+                  onUploadFont={uploadCustomFont}
+                  onUploadFontError={setMessage}
+                  brandLogoUrl={brandLogoUrl}
+                  setBrandLogoUrl={setBrandLogoUrl}
+                  brandPlayerBackgroundImageUrl={brandPlayerBackgroundImageUrl}
+                  setBrandPlayerBackgroundImageUrl={setBrandPlayerBackgroundImageUrl}
+                  brandProjectorBackgroundImageUrl={brandProjectorBackgroundImageUrl}
+                  setBrandProjectorBackgroundImageUrl={setBrandProjectorBackgroundImageUrl}
+                  onUploadMedia={uploadBannerMedia}
+                  brandBackgroundOverlayColor={brandBackgroundOverlayColor}
+                  setBrandBackgroundOverlayColor={setBrandBackgroundOverlayColor}
                   emitBrandingPatch={emitBrandingPatch}
                 />
               )}
@@ -1559,17 +3156,6 @@ export function AdminEventPage() {
                   setLeaderboardSort={setLeaderboardSort}
                   displayedLeaderboard={displayedLeaderboard}
                   exportLeaderboardCsv={exportLeaderboardCsv}
-                  publicViewMode={publicViewMode}
-                  setPublicResultsView={setPublicResultsView}
-                  highlightedLeadersCount={highlightedLeadersCount}
-                  setHighlightedLeadersCount={setHighlightedLeadersCount}
-                  updateHighlightedLeaders={updateHighlightedLeaders}
-                  resetResultsUiSettings={resetResultsUiSettings}
-                  showFirstCorrectAnswerer={showFirstCorrectAnswerer}
-                  onShowFirstCorrectAnswererChange={updateShowFirstCorrectAnswerer}
-                  firstCorrectWinnersCount={firstCorrectWinnersCount}
-                  setFirstCorrectWinnersCount={setFirstCorrectWinnersCount}
-                  updateFirstCorrectWinnersCount={updateFirstCorrectWinnersCount}
                   subQuizLeaderboardOptions={leaderboardsBySubQuiz.map((x) => ({
                     subQuizId: x.subQuizId,
                     title: x.title,
@@ -1597,63 +3183,77 @@ export function AdminEventPage() {
         </Stack>
       )}
       {isAuth && !room && <Alert severity="warning">Комната не найдена.</Alert>}
-      <Snackbar
-        open
-        onClose={() => {}}
-        anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
-        sx={{
-          position: "fixed",
-          bottom: 0,
-          left: 0,
-          right: 0,
-          zIndex: (theme) => theme.zIndex.snackbar + 100,
-        }}
-      >
-        <Alert
-          severity="info"
-          sx={{ width: "100%", borderRadius: 0 }}
-        >
-          {currentPublicScreenText}
-        </Alert>
-      </Snackbar>
-
       <Dialog
         open={isQuestionDialogOpen}
         onClose={() => cancelQuestionDialog()}
-        maxWidth="md"
+        maxWidth="sm"
         fullWidth
         aria-label="Редактор вопроса"
       >
-        <DialogTitle sx={{ display: "flex", justifyContent: "flex-end", alignItems: "center", py: 1, px: 1 }}>
-          <IconButton onClick={cancelQuestionDialog} size="small" aria-label="Закрыть без сохранения">
+        <DialogTitle
+          sx={{ display: "flex", justifyContent: "flex-end", alignItems: "center", py: 1, px: 1 }}
+        >
+          <IconButton
+            onClick={cancelQuestionDialog}
+            size="small"
+            aria-label="Закрыть без сохранения"
+          >
             <CloseIcon fontSize="small" />
           </IconButton>
         </DialogTitle>
         <DialogContent>
           {questionForms[selectedQuestionIndex] && (
-            <Stack spacing={3} sx={{ pt: 1 }}>
+            <Stack spacing={2} sx={{ pt: 1 }}>
               {!!questionDialogError && (
                 <Alert severity="error" onClose={() => setQuestionDialogError("")}>
                   {questionDialogError}
                 </Alert>
               )}
-              <TextField
-                label="Текст вопроса"
-                value={questionForms[selectedQuestionIndex].text}
-                onChange={(e) => updateQuestion(selectedQuestionIndex, { text: e.target.value })}
-                fullWidth
-                size="small"
-                multiline
-                minRows={1}
-                maxRows={12}
-              />
+              <Stack spacing={2}>
+                <TextField
+                  label="Текст вопроса"
+                  value={questionForms[selectedQuestionIndex].text}
+                  onChange={(e) => updateQuestion(selectedQuestionIndex, { text: e.target.value })}
+                  fullWidth
+                  size="small"
+                  multiline
+                  minRows={1}
+                  maxRows={12}
+                />
+                {questionForms[selectedQuestionIndex].type === "ranking" && (
+                  <TextField
+                    size="small"
+                    label="Подсказка игроку (ранжирование)"
+                    value={questionForms[selectedQuestionIndex].rankingPlayerHint ?? ""}
+                    onChange={(e) =>
+                      updateQuestion(selectedQuestionIndex, {
+                        rankingPlayerHint: e.target.value,
+                      })
+                    }
+                    helperText="Необязательно. Если пусто — показывается стандартная подсказка."
+                    placeholder="Например: Расставьте варианты по стоимости от большей к меньшей."
+                    multiline
+                    minRows={1}
+                    maxRows={3}
+                    fullWidth
+                  />
+                )}
+              </Stack>
+              <Divider />
 
-              {questionForms[selectedQuestionIndex].type !== "tag_cloud" && (
+              {(questionForms[selectedQuestionIndex].type !== "tag_cloud" ||
+                isEditorQuizMode(questionForms[selectedQuestionIndex])) && (
                 <>
                   <Typography variant="subtitle2" sx={{ mt: 0.5 }}>
-                    Варианты ответов
+                    {questionForms[selectedQuestionIndex].type === "tag_cloud"
+                      ? "Эталонные теги"
+                      : questionForms[selectedQuestionIndex].type === "ranking"
+                        ? questionForms[selectedQuestionIndex].rankingKind === "quiz"
+                          ? "Варианты (для квиза эталон задаётся в колонке «Эталон (место)»)"
+                          : "Варианты (для жюри эталон не используется)"
+                        : "Варианты ответов"}
                   </Typography>
-                  <Stack spacing={2}>
+                  <Stack spacing={1.25}>
                     {questionForms[selectedQuestionIndex].options.map((option, oIndex) => (
                       <Stack
                         key={`q-${selectedQuestionIndex}-o-${oIndex}`}
@@ -1663,48 +3263,103 @@ export function AdminEventPage() {
                         sx={{ width: "100%", minWidth: 0 }}
                       >
                         <TextField
-                          label={`Вариант ${oIndex + 1}`}
+                          label={
+                            questionForms[selectedQuestionIndex].type === "tag_cloud"
+                              ? `Тег ${oIndex + 1}`
+                              : `Вариант ${oIndex + 1}`
+                          }
                           value={option.text}
-                          onChange={(e) => updateOption(selectedQuestionIndex, oIndex, { text: e.target.value })}
+                          onChange={(e) =>
+                            updateOption(selectedQuestionIndex, oIndex, { text: e.target.value })
+                          }
                           size="small"
                           multiline
                           minRows={1}
                           maxRows={8}
                           sx={{ flex: 1, minWidth: 0 }}
                         />
-                        {isEditorQuizMode(questionForms[selectedQuestionIndex]) && (
-                          <Stack direction="row" spacing={0} sx={{ flexShrink: 0, pt: 0.5 }} aria-label="Правильность ответа">
-                            <Tooltip title="Правильный">
-                              <IconButton
-                                size="small"
-                                color={option.isCorrect ? "success" : "default"}
-                                onClick={() => {
-                                  updateOption(selectedQuestionIndex, oIndex, { isCorrect: true });
-                                }}
-                                aria-pressed={option.isCorrect}
-                                aria-label="Отметить как правильный"
-                              >
-                                <CheckCircleOutlineIcon fontSize="small" />
-                              </IconButton>
-                            </Tooltip>
-                            <Tooltip title="Неверный">
-                              <IconButton
-                                size="small"
-                                color={!option.isCorrect ? "error" : "default"}
-                                onClick={() => {
-                                  updateOption(selectedQuestionIndex, oIndex, { isCorrect: false });
-                                }}
-                                aria-pressed={!option.isCorrect}
-                                aria-label="Отметить как неверный"
-                              >
-                                <HighlightOffOutlinedIcon fontSize="small" />
-                              </IconButton>
-                            </Tooltip>
-                          </Stack>
+                        {questionForms[selectedQuestionIndex].type === "ranking" && (
+                          <TextField
+                            type="number"
+                            size="small"
+                            label={
+                              questionForms[selectedQuestionIndex].rankingKind === "jury"
+                                ? `${oIndex + 1}-е место`
+                                : "Эталон (место)"
+                            }
+                            inputProps={{
+                              min:
+                                questionForms[selectedQuestionIndex].rankingKind === "jury" ? 0 : 1,
+                              max:
+                                questionForms[selectedQuestionIndex].rankingKind === "jury"
+                                  ? 10000
+                                  : questionForms[selectedQuestionIndex].options.length,
+                              "aria-label":
+                                questionForms[selectedQuestionIndex].rankingKind === "jury"
+                                  ? `Балл за ${oIndex + 1}-е место`
+                                  : `Место варианта ${oIndex + 1} в скрытом эталоне`,
+                            }}
+                            value={
+                              questionForms[selectedQuestionIndex].rankingPointsByRank?.[oIndex] ??
+                              ""
+                            }
+                            onChange={(e) =>
+                              setRankingTierAt(selectedQuestionIndex, oIndex, e.target.value)
+                            }
+                            sx={{ width: 118, flexShrink: 0 }}
+                          />
                         )}
+                        {isEditorQuizMode(questionForms[selectedQuestionIndex]) &&
+                          questionForms[selectedQuestionIndex].type !== "tag_cloud" &&
+                          questionForms[selectedQuestionIndex].type !== "ranking" && (
+                            <Stack
+                              direction="row"
+                              spacing={0}
+                              sx={{ flexShrink: 0, pt: 0.5 }}
+                              aria-label="Правильность ответа"
+                            >
+                              <Tooltip title="Правильный">
+                                <IconButton
+                                  size="small"
+                                  color={option.isCorrect ? "success" : "default"}
+                                  onClick={() => {
+                                    updateOption(selectedQuestionIndex, oIndex, {
+                                      isCorrect: true,
+                                    });
+                                  }}
+                                  aria-pressed={option.isCorrect}
+                                  aria-label="Отметить как правильный"
+                                >
+                                  <CheckCircleOutlineIcon fontSize="small" />
+                                </IconButton>
+                              </Tooltip>
+                              <Tooltip title="Неверный">
+                                <IconButton
+                                  size="small"
+                                  color={!option.isCorrect ? "error" : "default"}
+                                  onClick={() => {
+                                    updateOption(selectedQuestionIndex, oIndex, {
+                                      isCorrect: false,
+                                    });
+                                  }}
+                                  aria-pressed={!option.isCorrect}
+                                  aria-label="Отметить как неверный"
+                                >
+                                  <HighlightOffOutlinedIcon fontSize="small" />
+                                </IconButton>
+                              </Tooltip>
+                            </Stack>
+                          )}
                         <IconButton
                           onClick={() => removeOption(selectedQuestionIndex, oIndex)}
-                          disabled={questionForms[selectedQuestionIndex].options.length <= 2}
+                          disabled={
+                            questionForms[selectedQuestionIndex].type === "tag_cloud" &&
+                            isEditorQuizMode(questionForms[selectedQuestionIndex])
+                              ? questionForms[selectedQuestionIndex].options.length <= 1
+                              : questionForms[selectedQuestionIndex].type === "ranking"
+                                ? questionForms[selectedQuestionIndex].options.length <= 3
+                                : questionForms[selectedQuestionIndex].options.length <= 2
+                          }
                           sx={{ flexShrink: 0, mt: 0.5 }}
                           aria-label="Удалить вариант"
                         >
@@ -1730,19 +3385,42 @@ export function AdminEventPage() {
                   />
                 </>
               )}
+              <Divider />
               <Stack direction={{ xs: "column", md: "row" }} spacing={1.5}>
                 <TextField
                   select
                   label="Тип ответа"
-                  value={questionForms[selectedQuestionIndex].type}
-                  onChange={(e) =>
-                    updateQuestion(selectedQuestionIndex, { type: e.target.value as QuestionType })
-                  }
+                  value={getQuestionTypeSelectValue(questionForms[selectedQuestionIndex])}
+                  onChange={(e) => {
+                    const value = e.target.value as
+                      | "single"
+                      | "multi"
+                      | "ranking"
+                      | "tag_cloud"
+                      | "poll";
+                    if (value === "poll") {
+                      updateQuestion(selectedQuestionIndex, {
+                        type: "single",
+                        editorQuizMode: false,
+                        options: questionForms[selectedQuestionIndex].options.map((opt) => ({
+                          ...opt,
+                          isCorrect: false,
+                        })),
+                      });
+                      return;
+                    }
+                    updateQuestion(selectedQuestionIndex, {
+                      type: value as QuestionType,
+                      editorQuizMode: true,
+                    });
+                  }}
                   size="small"
                   sx={{ minWidth: 220 }}
                 >
+                  <MenuItem value="poll">Обычное голосование</MenuItem>
                   <MenuItem value="single">Один правильный</MenuItem>
                   <MenuItem value="multi">Несколько правильных</MenuItem>
+                  <MenuItem value="ranking">Ранжирование</MenuItem>
                   <MenuItem value="tag_cloud">Облако тегов</MenuItem>
                 </TextField>
                 {questionForms[selectedQuestionIndex].type === "tag_cloud" ? (
@@ -1751,39 +3429,146 @@ export function AdminEventPage() {
                     label="Макс. ответов"
                     value={questionForms[selectedQuestionIndex].maxAnswers}
                     onChange={(e) =>
-                      updateQuestion(selectedQuestionIndex, { maxAnswers: Math.min(5, Math.max(1, Number(e.target.value) || 1)) })
+                      updateQuestion(selectedQuestionIndex, {
+                        maxAnswers: Math.min(5, Math.max(1, Number(e.target.value) || 1)),
+                      })
                     }
                     size="small"
                     sx={{ minWidth: 140 }}
                     helperText="От 1 до 5"
                   />
-                ) : (
-                  isEditorQuizMode(questionForms[selectedQuestionIndex]) &&
-                  questionForms[selectedQuestionIndex].subQuizId != null && (
+                ) : null}
+                {isEditorQuizMode(questionForms[selectedQuestionIndex]) &&
+                  (questionForms[selectedQuestionIndex].type === "ranking"
+                    ? questionForms[selectedQuestionIndex].subQuizId != null &&
+                      questionForms[selectedQuestionIndex].rankingKind !== "jury"
+                    : questionForms[selectedQuestionIndex].subQuizId != null) && (
+                    <Stack
+                      direction="row"
+                      spacing={0.75}
+                      alignItems="center"
+                      sx={{ width: { xs: "100%", md: "50%" }, minWidth: 220 }}
+                    >
+                      <TextField
+                        type="number"
+                        label={
+                          questionForms[selectedQuestionIndex].type === "ranking"
+                            ? "Баллы за полный ответ"
+                            : "Баллы"
+                        }
+                        value={questionForms[selectedQuestionIndex].points}
+                        onChange={(e) =>
+                          updateQuestion(selectedQuestionIndex, {
+                            points: Number(e.target.value) || 1,
+                          })
+                        }
+                        size="small"
+                        sx={{ flex: 1, minWidth: 0 }}
+                      />
+                    </Stack>
+                  )}
+              </Stack>
+              {questionForms[selectedQuestionIndex].type === "ranking" && (
+                <Stack spacing={1.25} sx={{ pt: 0.25 }}>
+                  <Typography variant="overline" color="text.secondary">
+                    Настройки ранжирования
+                  </Typography>
+                  <Stack direction="row" spacing={0.75} alignItems="center" sx={{ width: "100%" }}>
                     <TextField
-                      type="number"
-                      label="Баллы"
-                      value={questionForms[selectedQuestionIndex].points}
+                      select
+                      label="Режим"
+                      value={questionForms[selectedQuestionIndex].rankingKind ?? "jury"}
                       onChange={(e) =>
-                        updateQuestion(selectedQuestionIndex, { points: Number(e.target.value) || 1 })
+                        updateQuestion(selectedQuestionIndex, {
+                          rankingKind: e.target.value as "quiz" | "jury",
+                          rankingPointsByRank:
+                            (e.target.value as "quiz" | "jury") === "jury"
+                              ? Array.from(
+                                  { length: questionForms[selectedQuestionIndex].options.length },
+                                  (_, j) =>
+                                    Math.max(
+                                      1,
+                                      questionForms[selectedQuestionIndex].options.length - j,
+                                    ),
+                                )
+                              : Array.from(
+                                  { length: questionForms[selectedQuestionIndex].options.length },
+                                  (_, j) => j + 1,
+                                ),
+                          rankingPlayerHint:
+                            (questionForms[selectedQuestionIndex].rankingPlayerHint ?? "").trim()
+                              .length > 0
+                              ? questionForms[selectedQuestionIndex].rankingPlayerHint
+                              : (e.target.value as "quiz" | "jury") === "quiz"
+                                ? defaultRankingQuizHint
+                                : defaultRankingJuryHint,
+                        })
                       }
                       size="small"
-                      sx={{ minWidth: 120 }}
-                    />
-                  )
-                )}
-              </Stack>
-              {questionForms[selectedQuestionIndex].type !== "tag_cloud" &&
-                questionForms[selectedQuestionIndex].subQuizId == null && (
-                <FormControlLabel
-                  control={(
-                    <Switch
-                      checked={questionForms[selectedQuestionIndex].editorQuizMode}
-                      onChange={(_event, checked) => toggleNoCorrectMode(selectedQuestionIndex, !checked)}
-                    />
+                      sx={{ minWidth: 320, flex: 1 }}
+                    >
+                      <MenuItem value="quiz">Квиз (эталон и зачёт баллов)</MenuItem>
+                      <MenuItem value="jury">Жюри (без эталона и без зачёта в таблице)</MenuItem>
+                    </TextField>
+                    <Tooltip
+                      title={
+                        questionForms[selectedQuestionIndex].rankingKind === "jury"
+                          ? "Жюри: нет эталона и зачёта в таблице лидеров; баллы в колонке у строк задают награду за 1-е, 2-е… место в ответе (для сводки на проекторе)."
+                          : "Квиз: засчитывается только полное совпадение порядка с эталоном."
+                      }
+                    >
+                      <IconButton size="small" aria-label="Подсказка по режиму ранжирования">
+                        <InfoOutlinedIcon fontSize="small" />
+                      </IconButton>
+                    </Tooltip>
+                  </Stack>
+                  {questionForms[selectedQuestionIndex].rankingKind === "jury" ? (
+                    <>
+                      <Typography variant="body2" color="text.secondary">
+                        Баллы у каждой строки — за 1-е, 2-е… место в ответе участника. Для жюри все
+                        позиции должны быть заданы.
+                      </Typography>
+                      <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
+                        <Button
+                          size="small"
+                          variant="outlined"
+                          onClick={() => fillRankingTiersDescending(selectedQuestionIndex)}
+                        >
+                          Заполнить n…1
+                        </Button>
+                      </Stack>
+                    </>
+                  ) : (
+                    <Typography variant="body2" color="text.secondary">
+                      Для квиза эталон задаётся в колонке «Эталон (место)». Участник видит варианты
+                      в текущем порядке, а баллы начисляются только при полном совпадении со скрытым
+                      эталоном.
+                    </Typography>
                   )}
-                  label="Правильные ответы"
-                />
+                  {questionForms[selectedQuestionIndex].id ? null : (
+                    <TextField
+                      select
+                      label="Проектор: метрика"
+                      value={
+                        questionForms[selectedQuestionIndex].rankingProjectorMetric ?? "avg_score"
+                      }
+                      onChange={(e) =>
+                        updateQuestion(selectedQuestionIndex, {
+                          rankingProjectorMetric: e.target.value as
+                            | "avg_rank"
+                            | "avg_score"
+                            | "total_score",
+                        })
+                      }
+                      size="small"
+                      sx={{ minWidth: 280 }}
+                    >
+                      <MenuItem value="avg_rank">Средний ранг</MenuItem>
+                      <MenuItem value="avg_score">Средний балл (по варианту)</MenuItem>
+                      <MenuItem value="total_score">Сумма баллов (по варианту)</MenuItem>
+                    </TextField>
+                  )}
+                </Stack>
               )}
             </Stack>
           )}
@@ -1827,13 +3612,19 @@ export function AdminEventPage() {
               multiline
               minRows={6}
               maxRows={12}
-              value={tagInputDialogQuestionIndex !== null ? (questionForms[tagInputDialogQuestionIndex]?.injectedTagsInput ?? "") : ""}
+              value={
+                tagInputDialogQuestionIndex !== null
+                  ? (questionForms[tagInputDialogQuestionIndex]?.injectedTagsInput ?? "")
+                  : ""
+              }
               onChange={(e) => {
                 if (tagInputDialogQuestionIndex === null) return;
                 const value = e.target.value;
-                setQuestionForms((prev) => prev.map((q, idx) => (
-                  idx === tagInputDialogQuestionIndex ? { ...q, injectedTagsInput: value } : q
-                )));
+                setQuestionForms((prev) =>
+                  prev.map((q, idx) =>
+                    idx === tagInputDialogQuestionIndex ? { ...q, injectedTagsInput: value } : q,
+                  ),
+                );
               }}
               placeholder={"синий 10\nзеленый: 4\nкрасный (2)"}
               fullWidth
@@ -1917,7 +3708,13 @@ export function AdminEventPage() {
                   <Stack direction="row" spacing={0.5} alignItems="center">
                     <IconButton
                       size="small"
-                      onClick={() => updateTagCountOverride(tagResultsDialogQuestionIndex, tag.text, tag.count - 1)}
+                      onClick={() =>
+                        updateTagCountOverride(
+                          tagResultsDialogQuestionIndex,
+                          tag.text,
+                          tag.count - 1,
+                        )
+                      }
                     >
                       <RemoveIcon fontSize="small" />
                     </IconButton>
@@ -1925,13 +3722,25 @@ export function AdminEventPage() {
                       type="number"
                       size="small"
                       value={tag.count}
-                      onChange={(e) => updateTagCountOverride(tagResultsDialogQuestionIndex, tag.text, Number(e.target.value))}
+                      onChange={(e) =>
+                        updateTagCountOverride(
+                          tagResultsDialogQuestionIndex,
+                          tag.text,
+                          Number(e.target.value),
+                        )
+                      }
                       inputProps={{ min: 0, step: 1 }}
                       sx={{ width: 92 }}
                     />
                     <IconButton
                       size="small"
-                      onClick={() => updateTagCountOverride(tagResultsDialogQuestionIndex, tag.text, tag.count + 1)}
+                      onClick={() =>
+                        updateTagCountOverride(
+                          tagResultsDialogQuestionIndex,
+                          tag.text,
+                          tag.count + 1,
+                        )
+                      }
                     >
                       <AddIcon fontSize="small" />
                     </IconButton>

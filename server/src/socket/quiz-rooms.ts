@@ -23,7 +23,26 @@ export function emitToQuizDashboard(io: Server, quizId: string, event: string, p
 }
 
 /** События, которые должны получать и игроки, и подписчики дашборда (отдельные комнаты). */
-export function emitToQuizPlayersAndDashboard(io: Server, quizId: string, event: string, payload?: unknown) {
+export function emitToQuizPlayersAndDashboard(
+  io: Server,
+  quizId: string,
+  event: string,
+  payload?: unknown,
+) {
   emitToQuizPlayers(io, quizId, event, payload);
   emitToQuizDashboard(io, quizId, event, payload);
+}
+
+/** Количество онлайн-игроков (уникальные participantId, без админов). */
+export async function emitQuizOnlineCount(io: Server, quizId: string) {
+  const sockets = await io.in(quizPlayerRoom(quizId)).fetchSockets();
+  const participants = new Set<string>();
+  for (const socket of sockets) {
+    if (socket.data?.isAdmin) continue;
+    const participantId = socket.data?.participantId;
+    if (typeof participantId === "string" && participantId.trim().length > 0) {
+      participants.add(participantId);
+    }
+  }
+  emitToQuizDashboard(io, quizId, "quiz:online:count", { count: participants.size });
 }

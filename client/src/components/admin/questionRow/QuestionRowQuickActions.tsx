@@ -1,17 +1,22 @@
 import EmojiEventsIcon from "@mui/icons-material/EmojiEvents";
 import EmojiEventsOutlinedIcon from "@mui/icons-material/EmojiEventsOutlined";
+import BarChartIcon from "@mui/icons-material/BarChart";
 import SettingsIcon from "@mui/icons-material/Settings";
 import SettingsOutlinedIcon from "@mui/icons-material/SettingsOutlined";
 import SlideshowIcon from "@mui/icons-material/Slideshow";
 import SlideshowOutlinedIcon from "@mui/icons-material/SlideshowOutlined";
-import ToggleOffIcon from "@mui/icons-material/ToggleOff";
-import ToggleOnIcon from "@mui/icons-material/ToggleOn";
+import PhoneDisabledIcon from "@mui/icons-material/PhoneDisabled";
+import PhoneIphoneIcon from "@mui/icons-material/PhoneIphone";
 import { IconButton, Stack, Tooltip } from "@mui/material";
 import type { MouseEvent } from "react";
 
 type Props = {
+  questionType: "single" | "multi" | "tag_cloud" | "ranking";
+  questionOnProjector: boolean;
   chartsOnProjector: boolean;
   winnersOnProjector: boolean;
+  revealButtonVisible: boolean;
+  revealResultsOnProjector: boolean;
   showTrophyButton: boolean;
   questionActive: boolean;
   settingsExpanded: boolean;
@@ -19,13 +24,18 @@ type Props = {
   onTrophy: (e: MouseEvent<HTMLButtonElement>) => void;
   onToggleActive: (e: MouseEvent<HTMLButtonElement>) => void;
   onToggleSettings: (e: MouseEvent<HTMLButtonElement>) => void;
+  onRevealResults: (e: MouseEvent<HTMLButtonElement>) => void;
 };
 
 /** Кнопки справа в строке списка вопросов (проектор, кубок, активность, настройки). */
 export function QuestionRowQuickActions(props: Props) {
   const {
+    questionType,
+    questionOnProjector,
     chartsOnProjector,
     winnersOnProjector,
+    revealButtonVisible,
+    revealResultsOnProjector,
     showTrophyButton,
     questionActive,
     settingsExpanded,
@@ -33,15 +43,28 @@ export function QuestionRowQuickActions(props: Props) {
     onTrophy,
     onToggleActive,
     onToggleSettings,
+    onRevealResults,
   } = props;
+  const revealTitle =
+    questionType === "tag_cloud"
+      ? revealResultsOnProjector
+        ? "Скрыть облако тегов"
+        : "Показать облако тегов"
+      : revealResultsOnProjector
+        ? "Скрыть графики и проценты"
+        : "Показать графики и проценты";
 
   return (
-    <Stack direction="row" spacing={0.25} alignItems="center" flexShrink={0} onClick={(e) => e.stopPropagation()}>
+    <Stack
+      direction="row"
+      spacing={0.25}
+      alignItems="center"
+      flexShrink={0}
+      onClick={(e) => e.stopPropagation()}
+    >
       <Tooltip
         title={
-          chartsOnProjector
-            ? "Скрыть результаты на экране"
-            : "Показать результаты на экране (график, без блока победителя)"
+          chartsOnProjector ? "Скрыть вопрос с экрана" : "Показать вопрос и варианты на экране"
         }
       >
         <span>
@@ -49,7 +72,10 @@ export function QuestionRowQuickActions(props: Props) {
             size="small"
             color={chartsOnProjector ? "primary" : "default"}
             onClick={onSlideshow}
-            aria-label="Показать или скрыть результаты на экране"
+            aria-label={
+              chartsOnProjector ? "Скрыть вопрос с экрана" : "Показать вопрос и варианты на экране"
+            }
+            aria-pressed={chartsOnProjector}
           >
             {chartsOnProjector ? (
               <SlideshowIcon fontSize="small" />
@@ -59,12 +85,25 @@ export function QuestionRowQuickActions(props: Props) {
           </IconButton>
         </span>
       </Tooltip>
+      {revealButtonVisible ? (
+        <Tooltip title={revealTitle}>
+          <span>
+            <IconButton
+              size="small"
+              color={revealResultsOnProjector ? "success" : "default"}
+              onClick={onRevealResults}
+              aria-label={revealTitle}
+              aria-pressed={revealResultsOnProjector}
+            >
+              <BarChartIcon fontSize="small" />
+            </IconButton>
+          </span>
+        </Tooltip>
+      ) : null}
       {showTrophyButton ? (
         <Tooltip
           title={
-            winnersOnProjector
-              ? "Скрыть победителя на экране"
-              : "Показать победителя на экране"
+            winnersOnProjector ? "Скрыть победителя на экране" : "Показать победителя на экране"
           }
         >
           <span>
@@ -73,9 +112,7 @@ export function QuestionRowQuickActions(props: Props) {
               color={winnersOnProjector ? "warning" : "default"}
               onClick={onTrophy}
               aria-label={
-                winnersOnProjector
-                  ? "Скрыть победителя на экране"
-                  : "Показать победителя на экране"
+                winnersOnProjector ? "Скрыть победителя на экране" : "Показать победителя на экране"
               }
               aria-pressed={winnersOnProjector}
             >
@@ -88,7 +125,9 @@ export function QuestionRowQuickActions(props: Props) {
           </span>
         </Tooltip>
       ) : null}
-      <Tooltip title={questionActive ? "Отключить вопрос (не принимать ответы)" : "Включить вопрос"}>
+      <Tooltip
+        title={questionActive ? "Отключить вопрос (не принимать ответы)" : "Включить вопрос"}
+      >
         <span>
           <IconButton
             size="small"
@@ -96,17 +135,25 @@ export function QuestionRowQuickActions(props: Props) {
             onClick={onToggleActive}
             aria-label={questionActive ? "Отключить вопрос" : "Включить вопрос"}
           >
-            {questionActive ? <ToggleOnIcon fontSize="small" /> : <ToggleOffIcon fontSize="small" />}
+            {questionActive ? (
+              <PhoneIphoneIcon fontSize="small" />
+            ) : (
+              <PhoneDisabledIcon fontSize="small" />
+            )}
           </IconButton>
         </span>
       </Tooltip>
-      <Tooltip title={settingsExpanded ? "Свернуть настройки и результаты" : "Настройки и результаты"}>
+      <Tooltip
+        title={settingsExpanded ? "Свернуть настройки и результаты" : "Настройки и результаты"}
+      >
         <IconButton
           size="small"
           onClick={onToggleSettings}
           color={settingsExpanded ? "primary" : "default"}
           aria-expanded={settingsExpanded}
-          aria-label={settingsExpanded ? "Свернуть настройки вопроса" : "Раскрыть настройки вопроса"}
+          aria-label={
+            settingsExpanded ? "Свернуть настройки вопроса" : "Раскрыть настройки вопроса"
+          }
         >
           {settingsExpanded ? (
             <SettingsIcon fontSize="small" />

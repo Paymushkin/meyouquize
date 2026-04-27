@@ -1,28 +1,53 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
 import {
   Alert,
   Box,
   Button,
-  Card,
-  CardContent,
   Chip,
   Container,
-  IconButton,
+  CircularProgress,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
   Stack,
   TextField,
   Typography,
 } from "@mui/material";
-import CheckCircleIcon from "@mui/icons-material/CheckCircle";
+import { SPEAKER_TILE_ID } from "@meyouquize/shared";
 import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
-import EmojiEventsIcon from "@mui/icons-material/EmojiEvents";
+import KeyboardArrowDownIcon from "@mui/icons-material/KeyboardArrowDown";
+import KeyboardArrowUpIcon from "@mui/icons-material/KeyboardArrowUp";
 import { API_BASE } from "../config";
+import { SpeakerQuestionsDialog } from "../components/quiz/SpeakerQuestionsDialog";
+import { PlayerVisibleResultTiles } from "../components/quiz/PlayerVisibleResultTiles";
+import { PlayerVoteResultsDialog } from "../components/quiz/PlayerVoteResultsDialog";
 import { useQuizPlayCompletion } from "../hooks/useQuizPlayCompletion";
 import { useQuizPlayScrollLock } from "../hooks/useQuizPlayScrollLock";
 import { useQuizPlaySocket } from "../hooks/useQuizPlaySocket";
+import { useBrandFont } from "../hooks/useBrandFont";
+import { useEventFavicon } from "../hooks/useEventFavicon";
 import { socket } from "../socket";
 import { getNickname, getOrCreateDeviceId, randomNickname, setNickname } from "../storage";
-import type { QuizState } from "./quiz-play/types";
+import { resolveClientAssetUrl } from "../utils/resolveClientAssetUrl";
+import { buildBrandBackground } from "../features/branding/brandVisual";
+import { buildPlayerTilesOrder, getVisiblePlayerBanners } from "../features/quizPlay/tiles";
+import {
+  buildQuizPlayContainerSx,
+  CompletionOverlay,
+  EventTitleBlock,
+  JoinCard,
+  PlayerIdentityBar,
+  PlayerTilesGrid,
+  QuestionPopupCard,
+  ReactionsDock,
+  RestoreJoinPendingBlock,
+} from "./quiz-play/QuizPlayBrandingBlocks";
+import type { QuizState, ReactionType } from "./quiz-play/types";
+import type { SpeakerQuestionsPayload } from "../types/speakerQuestions";
+const REACTION_WINDOW_MS = 1000;
+const REACTION_MAX_PER_WINDOW = 10;
 
 function getRoomJoinKey(slug: string) {
   return `mq_joined_${slug}`;
@@ -30,6 +55,30 @@ function getRoomJoinKey(slug: string) {
 
 function getRoomNickKey(slug: string) {
   return `mq_nickname_${slug}`;
+}
+
+function wasRoomJoined(slug: string): boolean {
+  return localStorage.getItem(getRoomJoinKey(slug)) === "1";
+}
+
+function ruBallLabel(n: number): string {
+  const v = Math.abs(Math.trunc(n));
+  const mod100 = v % 100;
+  if (mod100 >= 11 && mod100 <= 14) return `${n} баллов`;
+  const mod10 = v % 10;
+  if (mod10 === 1) return `${n} балл`;
+  if (mod10 >= 2 && mod10 <= 4) return `${n} балла`;
+  return `${n} баллов`;
+}
+
+function buildConnectionChip(status: "online" | "reconnecting" | "offline") {
+  if (status === "online") {
+    return { label: "Онлайн", color: "success" as const, variant: "filled" as const };
+  }
+  if (status === "reconnecting") {
+    return { label: "Переподключение", color: "warning" as const, variant: "outlined" as const };
+  }
+  return { label: "Нет соединения", color: "error" as const, variant: "outlined" as const };
 }
 
 function emitJoinWithLog(slug: string, reason: "manual" | "restore", nick: string) {
@@ -60,21 +109,55 @@ export function QuizPlayPage() {
   const [quizTitle, setQuizTitle] = useState("");
   const [nickname, setNick] = useState(() => {
     const roomNickname = slug ? localStorage.getItem(getRoomNickKey(slug)) : "";
-    return roomNickname || getNickname() || randomNickname();
+    return roomNickname || getNickname() || "";
   });
   const [joined, setJoined] = useState(false);
+  const [restoreJoinPending, setRestoreJoinPending] = useState(() => {
+    if (typeof window === "undefined" || !slug) return false;
+    const wasJoined = wasRoomJoined(slug);
+    const roomNickname = localStorage.getItem(getRoomNickKey(slug)) || "";
+    const persistedNick = roomNickname || getNickname() || "";
+    return wasJoined && persistedNick.trim().length > 0;
+  });
   const [quiz, setQuiz] = useState<QuizState | null>(null);
   const [selected, setSelected] = useState<string[]>([]);
+  const [rankOrder, setRankOrder] = useState<string[]>([]);
   const [tagAnswers, setTagAnswers] = useState<string[]>([""]);
   const [submittedAnswers, setSubmittedAnswers] = useState<Record<string, string[]>>({});
   const [submittedQuestionIds, setSubmittedQuestionIds] = useState<string[]>([]);
+  const [playerAnswersHydrated, setPlayerAnswersHydrated] = useState(false);
+  const [acceptedQuestionId, setAcceptedQuestionId] = useState<string | null>(null);
+  const [dismissedQuestionId, setDismissedQuestionId] = useState<string | null>(null);
   const [error, setError] = useState("");
+  const [metaBrandPlayerBackgroundImageUrl, setMetaBrandPlayerBackgroundImageUrl] = useState("");
+  const [metaBrandBackgroundOverlayColor, setMetaBrandBackgroundOverlayColor] = useState("#000000");
+  const [metaBrandBodyBackgroundColor, setMetaBrandBodyBackgroundColor] = useState("#000000");
+  const [connectionStatus, setConnectionStatus] = useState<"online" | "reconnecting" | "offline">(
+    "reconnecting",
+  );
+  const [speakerQuestions, setSpeakerQuestions] = useState<SpeakerQuestionsPayload | null>(null);
+  const [speakerDialogOpen, setSpeakerDialogOpen] = useState(false);
+  const [nicknameDialogOpen, setNicknameDialogOpen] = useState(false);
+  const [nicknameDraft, setNicknameDraft] = useState("");
+  const [speakerName, setSpeakerName] = useState("Все спикеры");
+  const [speakerQuestionText, setSpeakerQuestionText] = useState("");
+  const [resultsDialogQuestionId, setResultsDialogQuestionId] = useState<string | null>(null);
+  const [bootLoading, setBootLoading] = useState(true);
+  const nicknameInputRef = useRef<HTMLInputElement | null>(null);
   const activeQuestionIdRef = useRef<string | null>(null);
-  const activeQuestionTypeRef = useRef<"single" | "multi" | "tag_cloud" | null>(null);
+  const activeQuestionTypeRef = useRef<"single" | "multi" | "tag_cloud" | "ranking" | null>(null);
   const selectedRef = useRef<string[]>([]);
+  const rankOrderRef = useRef<string[]>([]);
   const tagAnswersRef = useRef<string[]>([""]);
+  const rankRowRefs = useRef<Map<string, HTMLDivElement>>(new Map());
+  const prevRankRowTopsRef = useRef<Map<string, number>>(new Map());
+  const reactionTimestampsRef = useRef<number[]>([]);
   /** Последний известный активный вопрос сабквиза (чтобы при снятии вопроса с экрана понять, что это был последний). */
-  const lastSubQuizProgressRef = useRef<{ questionId: string; index: number; total: number } | null>(null);
+  const lastSubQuizProgressRef = useRef<{
+    questionId: string;
+    index: number;
+    total: number;
+  } | null>(null);
 
   const {
     subQuizCompleteOpen,
@@ -91,25 +174,66 @@ export function QuizPlayPage() {
     submittedQuestionIds,
     lastSubQuizProgressRef,
   });
+  const handleQuestionSubmitted = useCallback((questionId: string) => {
+    setAcceptedQuestionId(questionId);
+  }, []);
+
+  const nonQuizActiveQuestion = useMemo(() => {
+    if (!quiz) return null;
+    const activeList = Array.isArray(quiz.activeQuestions)
+      ? quiz.activeQuestions
+      : quiz.activeQuestion
+        ? [quiz.activeQuestion]
+        : [];
+    if (acceptedQuestionId) {
+      const accepted = activeList.find((q) => q.id === acceptedQuestionId);
+      if (accepted) return accepted;
+    }
+    // В не-quiz режиме (без прогресса сабквиза) показываем вопросы по очереди:
+    // первый активный, на который пользователь еще не ответил.
+    if (!quiz.quizProgress) {
+      return activeList.find((q) => !submittedQuestionIds.includes(q.id)) ?? null;
+    }
+    return quiz.activeQuestion;
+  }, [quiz, submittedQuestionIds, acceptedQuestionId]);
 
   useEffect(() => {
-    activeQuestionIdRef.current = quiz?.activeQuestion?.id ?? null;
-    activeQuestionTypeRef.current = quiz?.activeQuestion?.type ?? null;
-  }, [quiz]);
+    activeQuestionIdRef.current = nonQuizActiveQuestion?.id ?? null;
+    activeQuestionTypeRef.current = nonQuizActiveQuestion?.type ?? null;
+  }, [nonQuizActiveQuestion]);
 
   useEffect(() => {
     selectedRef.current = selected;
   }, [selected]);
 
   useEffect(() => {
+    rankOrderRef.current = rankOrder;
+  }, [rankOrder]);
+
+  useEffect(() => {
     tagAnswersRef.current = tagAnswers;
   }, [tagAnswers]);
+
+  useEffect(() => {
+    const q = nonQuizActiveQuestion;
+    if (!q || q.type !== "ranking") {
+      setRankOrder([]);
+      return;
+    }
+    setRankOrder(q.options.map((o) => o.id));
+  }, [nonQuizActiveQuestion]);
 
   useEffect(() => {
     if (!slug) return;
     const roomNickname = localStorage.getItem(getRoomNickKey(slug));
     if (roomNickname) setNick(roomNickname);
   }, [slug]);
+
+  useEffect(() => {
+    if (!joined) {
+      setPlayerAnswersHydrated(false);
+    }
+  }, [joined, slug]);
 
   useQuizPlayScrollLock({
     joined,
@@ -123,15 +247,55 @@ export function QuizPlayPage() {
     activeQuestionIdRef,
     activeQuestionTypeRef,
     selectedRef,
+    rankOrderRef,
     tagAnswersRef,
     setQuiz,
     setSelected,
+    setRankOrder,
     setTagAnswers,
     setSubmittedAnswers,
     setSubmittedQuestionIds,
+    setPlayerAnswersHydrated,
+    onQuestionSubmitted: handleQuestionSubmitted,
     setError,
     setJoined,
+    setConnectionStatus,
+    setSpeakerQuestions,
   });
+
+  useEffect(() => {
+    if (!slug || !joined) return;
+    socket.emit("speaker:questions:subscribe", { slug, viewer: "player" });
+  }, [slug, joined]);
+
+  useEffect(() => {
+    if (!slug) return;
+    const reconnectAndRejoinIfNeeded = () => {
+      if (typeof document !== "undefined" && document.visibilityState !== "visible") return;
+      if (!socket.connected) socket.connect();
+      if (joined) {
+        const safeNick = (nickname || "").trim() || "Игрок";
+        emitJoinWithLog(slug, "restore", safeNick);
+      }
+    };
+    const onVisibilityChange = () => {
+      reconnectAndRejoinIfNeeded();
+    };
+    const onPageShow = () => {
+      reconnectAndRejoinIfNeeded();
+    };
+    const onOnline = () => {
+      reconnectAndRejoinIfNeeded();
+    };
+    document.addEventListener("visibilitychange", onVisibilityChange);
+    window.addEventListener("pageshow", onPageShow);
+    window.addEventListener("online", onOnline);
+    return () => {
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+      window.removeEventListener("pageshow", onPageShow);
+      window.removeEventListener("online", onOnline);
+    };
+  }, [joined, nickname, slug]);
 
   useEffect(() => {
     document.title = quiz?.title?.trim() || "Квиз";
@@ -146,9 +310,29 @@ export function QuizPlayPage() {
           signal: controller.signal,
         });
         if (!response.ok) return;
-        const payload = (await response.json()) as { title?: string };
+        const payload = (await response.json()) as {
+          title?: string;
+          brandPlayerBackgroundImageUrl?: string;
+          brandBackgroundOverlayColor?: string;
+          brandBodyBackgroundColor?: string;
+        };
         if (typeof payload.title === "string") {
           setQuizTitle(payload.title);
+        }
+        if (typeof payload.brandPlayerBackgroundImageUrl === "string") {
+          setMetaBrandPlayerBackgroundImageUrl(payload.brandPlayerBackgroundImageUrl);
+        }
+        if (
+          typeof payload.brandBackgroundOverlayColor === "string" &&
+          payload.brandBackgroundOverlayColor.trim()
+        ) {
+          setMetaBrandBackgroundOverlayColor(payload.brandBackgroundOverlayColor);
+        }
+        if (
+          typeof payload.brandBodyBackgroundColor === "string" &&
+          payload.brandBodyBackgroundColor.trim()
+        ) {
+          setMetaBrandBodyBackgroundColor(payload.brandBodyBackgroundColor);
         }
       } catch {
         // ignore network errors, socket state can still provide title later
@@ -159,291 +343,549 @@ export function QuizPlayPage() {
 
   useEffect(() => {
     if (!slug || !nickname.trim()) return;
-    const wasJoined = localStorage.getItem(getRoomJoinKey(slug)) === "1";
+    const wasJoined = wasRoomJoined(slug);
     if (!wasJoined) return;
+    setRestoreJoinPending(true);
     emitJoinWithLog(slug, "restore", nickname.trim());
   }, [slug, nickname]);
 
-  const canSubmit = useMemo(() => {
-    if (!quiz?.activeQuestion) return false;
-    const alreadySubmitted = submittedQuestionIds.includes(quiz.activeQuestion.id);
-    if (quiz.activeQuestion.type === "tag_cloud") {
-      const filled = tagAnswers.map((value) => value.trim()).filter(Boolean);
-      return filled.length > 0 && !quiz.activeQuestion.isClosed && !alreadySubmitted;
+  useEffect(() => {
+    if (joined && restoreJoinPending) {
+      setRestoreJoinPending(false);
     }
-    return selected.length > 0 && !quiz.activeQuestion.isClosed && !alreadySubmitted;
-  }, [quiz, selected, submittedQuestionIds, tagAnswers]);
+  }, [joined, restoreJoinPending]);
+
+  useEffect(() => {
+    if (!restoreJoinPending) return;
+    const timer = window.setTimeout(() => setRestoreJoinPending(false), 1200);
+    return () => window.clearTimeout(timer);
+  }, [restoreJoinPending]);
+
+  useEffect(() => {
+    if (!restoreJoinPending) return;
+    if (error) setRestoreJoinPending(false);
+  }, [restoreJoinPending, error]);
+
+  useEffect(() => {
+    // Fail-safe: не блокируем UI ожиданием всех сокет-событий на мобильной сети.
+    const readyForJoined = joined;
+    const readyForLogin = !joined && !restoreJoinPending;
+    if (readyForJoined || readyForLogin) {
+      setBootLoading(false);
+      return;
+    }
+    setBootLoading(true);
+  }, [joined, restoreJoinPending]);
+
+  useEffect(() => {
+    if (!bootLoading) return;
+    const timer = window.setTimeout(() => {
+      // Аварийный фолбэк: если сокет не восстановился, показываем UI входа вместо чёрного экрана.
+      if (!joined) {
+        setRestoreJoinPending(false);
+        setBootLoading(false);
+      }
+    }, 3500);
+    return () => window.clearTimeout(timer);
+  }, [bootLoading, joined]);
+
+  useEffect(() => {
+    if (joined || restoreJoinPending) return;
+    const timer = window.setTimeout(() => {
+      nicknameInputRef.current?.focus();
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, [joined, restoreJoinPending]);
+
+  const persistNickname = useCallback(
+    (nextRaw: string) => {
+      const next = nextRaw.trim();
+      setNick(next);
+      setNickname(next);
+      if (slug) localStorage.setItem(getRoomNickKey(slug), next);
+    },
+    [slug],
+  );
+
+  const canSubmit = useMemo(() => {
+    if (!quiz || !nonQuizActiveQuestion) return false;
+    const alreadySubmitted = submittedQuestionIds.includes(nonQuizActiveQuestion.id);
+    if (nonQuizActiveQuestion.type === "tag_cloud") {
+      const filled = tagAnswers.map((value) => value.trim()).filter(Boolean);
+      return filled.length > 0 && !nonQuizActiveQuestion.isClosed && !alreadySubmitted;
+    }
+    if (nonQuizActiveQuestion.type === "ranking") {
+      const n = nonQuizActiveQuestion.options.length;
+      const setOk = new Set(rankOrder);
+      return (
+        n > 0 &&
+        rankOrder.length === n &&
+        rankOrder.every((id) => setOk.has(id)) &&
+        setOk.size === n &&
+        !nonQuizActiveQuestion.isClosed &&
+        !alreadySubmitted
+      );
+    }
+    return selected.length > 0 && !nonQuizActiveQuestion.isClosed && !alreadySubmitted;
+  }, [quiz, nonQuizActiveQuestion, selected, rankOrder, submittedQuestionIds, tagAnswers]);
 
   function join() {
     const trimmed = nickname.trim();
-    if (!trimmed) return;
-    setNickname(trimmed);
+    if (!trimmed) {
+      setError("Введите имя или используйте случайное");
+      nicknameInputRef.current?.focus();
+      return;
+    }
     emitJoinWithLog(slug, "manual", trimmed);
     localStorage.setItem(getRoomJoinKey(slug), "1");
-    localStorage.setItem(getRoomNickKey(slug), trimmed);
-    setNick(trimmed);
+    persistNickname(trimmed);
     setError("");
   }
 
+  function editNickname() {
+    if (!joined || !quiz?.id) return;
+    setNicknameDraft(nickname.trim());
+    setNicknameDialogOpen(true);
+  }
+
+  function submitNicknameUpdate() {
+    if (!quiz?.id) return;
+    const next = nicknameDraft.trim();
+    if (!next) {
+      setError("Имя не может быть пустым");
+      return;
+    }
+    if (next === nickname.trim()) {
+      setNicknameDialogOpen(false);
+      return;
+    }
+    socket.emit("quiz:nickname:update", {
+      quizId: quiz.id,
+      nickname: next,
+    });
+    setNicknameDialogOpen(false);
+  }
+
   function toggleOption(id: string) {
-    if (!quiz?.activeQuestion) return;
-    if (quiz.activeQuestion.type === "single") {
-      setSelected([id]);
+    if (!nonQuizActiveQuestion) return;
+    if (nonQuizActiveQuestion.type === "single") {
+      setSelected((prev) => (prev.includes(id) ? [] : [id]));
       return;
     }
     setSelected((prev) => (prev.includes(id) ? prev.filter((v) => v !== id) : [...prev, id]));
   }
 
+  function moveRankOption(id: string, direction: -1 | 1) {
+    setRankOrder((prev) => {
+      const i = prev.indexOf(id);
+      if (i < 0) return prev;
+      const j = i + direction;
+      if (j < 0 || j >= prev.length) return prev;
+      const next = [...prev];
+      const tmp = next[i];
+      next[i] = next[j]!;
+      next[j] = tmp!;
+      return next;
+    });
+  }
+
   function submit() {
-    if (!quiz?.activeQuestion || !canSubmit) return;
-    if (quiz.activeQuestion.type === "tag_cloud") {
+    if (!quiz || !nonQuizActiveQuestion || !canSubmit) return;
+    if (nonQuizActiveQuestion.type === "tag_cloud") {
       socket.emit("answer:submit", {
         quizId: quiz.id,
-        questionId: quiz.activeQuestion.id,
+        questionId: nonQuizActiveQuestion.id,
         tagAnswers: tagAnswers.map((value) => value.trim()).filter(Boolean),
+      });
+      return;
+    }
+    if (nonQuizActiveQuestion.type === "ranking") {
+      socket.emit("answer:submit", {
+        quizId: quiz.id,
+        questionId: nonQuizActiveQuestion.id,
+        rankedOptionIds: rankOrder,
       });
       return;
     }
     socket.emit("answer:submit", {
       quizId: quiz.id,
-      questionId: quiz.activeQuestion.id,
+      questionId: nonQuizActiveQuestion.id,
       optionIds: selected,
     });
   }
 
+  function submitSpeakerQuestion() {
+    if (!quiz?.id || !speakerQuestionText.trim()) return;
+    socket.emit("speaker:question:create", {
+      quizId: quiz.id,
+      speakerName: speakerName.trim() || "Все спикеры",
+      text: speakerQuestionText.trim(),
+    });
+    setSpeakerQuestionText("");
+  }
+
+  function reactSpeakerQuestion(questionId: string, reaction: string) {
+    if (!quiz?.id) return;
+    socket.emit("speaker:question:react", {
+      quizId: quiz.id,
+      speakerQuestionId: questionId,
+      reaction,
+    });
+  }
+
+  function toggleReaction(reactionType: ReactionType) {
+    if (!quiz?.id) return;
+    const now = Date.now();
+    const freshTimestamps = reactionTimestampsRef.current.filter(
+      (ts) => now - ts <= REACTION_WINDOW_MS,
+    );
+    if (freshTimestamps.length >= REACTION_MAX_PER_WINDOW) return;
+    freshTimestamps.push(now);
+    reactionTimestampsRef.current = freshTimestamps;
+    socket.emit("reaction:toggle", { quizId: quiz.id, reactionType });
+  }
+
+  useEffect(() => {
+    const onNicknameUpdated = (payload: { nickname: string }) => {
+      persistNickname(payload.nickname);
+      setError("");
+      setNicknameDialogOpen(false);
+    };
+    socket.on("quiz:nickname:updated", onNicknameUpdated);
+    return () => {
+      socket.off("quiz:nickname:updated", onNicknameUpdated);
+    };
+  }, [persistNickname]);
+
   const answeredCurrentQuestion =
-    !!quiz?.activeQuestion?.id && submittedQuestionIds.includes(quiz.activeQuestion.id);
+    !!nonQuizActiveQuestion?.id && submittedQuestionIds.includes(nonQuizActiveQuestion.id);
+  const isShowingAcceptedInPopup =
+    !!nonQuizActiveQuestion?.id && acceptedQuestionId === nonQuizActiveQuestion.id;
+  const shouldHideAnsweredPopup = answeredCurrentQuestion && !isShowingAcceptedInPopup;
+  const shouldHideAnsweredUntilHydrated = !playerAnswersHydrated;
+  const shouldHideDismissedPopup =
+    !!nonQuizActiveQuestion?.id && dismissedQuestionId === nonQuizActiveQuestion.id;
   const displayedSelected =
-    quiz?.activeQuestion?.id && submittedAnswers[quiz.activeQuestion.id]
-      ? submittedAnswers[quiz.activeQuestion.id]
-      : selected;
+    nonQuizActiveQuestion?.id && submittedAnswers[nonQuizActiveQuestion.id]
+      ? submittedAnswers[nonQuizActiveQuestion.id]
+      : nonQuizActiveQuestion?.type === "ranking"
+        ? rankOrder
+        : selected;
   const titleText = quiz?.title?.trim() || quizTitle.trim() || "Квиз";
+  const shouldShowEventTitle = quiz?.showEventTitleOnPlayer ?? true;
+  const visiblePlayerBanners = useMemo(
+    () => getVisiblePlayerBanners(quiz?.playerBanners),
+    [quiz?.playerBanners],
+  );
+  const visibleBannerById = useMemo(
+    () => new Map(visiblePlayerBanners.map((x) => [x.id, x])),
+    [visiblePlayerBanners],
+  );
+  const speakerTileText = quiz?.speakerTileText?.trim() || "Вопросы спикерам";
+  const speakerTileBackgroundColor = quiz?.speakerTileBackgroundColor?.trim() || "#1976d2";
+  const speakerTileVisible = quiz?.speakerTileVisible ?? true;
+  const programTileText = quiz?.programTileText?.trim() || "Программа";
+  const programTileBackgroundColor = quiz?.programTileBackgroundColor?.trim() || "#6a1b9a";
+  const programTileLinkUrl = quiz?.programTileLinkUrl?.trim() || "";
+  const programTileVisible = quiz?.programTileVisible ?? false;
+  const brandPrimaryColor = quiz?.brandPrimaryColor?.trim() || "#7c5acb";
+  const brandFontFamily = quiz?.brandFontFamily?.trim() || "Jost, Arial, sans-serif";
+  const brandLogoUrl = resolveClientAssetUrl(quiz?.brandLogoUrl?.trim() ?? "");
+  const brandPlayerBackgroundImageUrl = resolveClientAssetUrl(
+    quiz?.brandPlayerBackgroundImageUrl?.trim() || metaBrandPlayerBackgroundImageUrl.trim(),
+  );
+  const brandBodyBackgroundColor =
+    quiz?.brandBodyBackgroundColor?.trim() || metaBrandBodyBackgroundColor;
+  const brandBackground = buildBrandBackground({
+    backgroundImageUrl: brandPlayerBackgroundImageUrl,
+    overlayColor: quiz?.brandBackgroundOverlayColor ?? metaBrandBackgroundOverlayColor,
+  });
+  useBrandFont(brandFontFamily, quiz?.brandFontUrl);
+  useEventFavicon(brandLogoUrl);
+  const tileOrder = useMemo(
+    () => buildPlayerTilesOrder(quiz?.playerTilesOrder, visiblePlayerBanners),
+    [quiz?.playerTilesOrder, visiblePlayerBanners],
+  );
+  const connectionChip = buildConnectionChip(connectionStatus);
+  const reactionMeta = useMemo(() => {
+    const source = quiz?.reactionSession?.reactions;
+    const fallback = ["👍", "👏", "🔥", "🤔"];
+    const reactions = Array.isArray(source) && source.length > 0 ? source : fallback;
+    return reactions.map((reaction) => ({
+      type: reaction as ReactionType,
+      emoji: reaction,
+      label: reaction,
+    }));
+  }, [quiz?.reactionSession?.reactions]);
+  const hasPlayerTiles =
+    (Boolean(speakerQuestions?.settings.enabled) && speakerTileVisible) ||
+    visiblePlayerBanners.length > 0 ||
+    (programTileVisible && programTileLinkUrl.length > 0);
+  const visibleResultTiles = quiz?.playerVisibleResults ?? [];
+  const selectedResultTile = useMemo(
+    () => visibleResultTiles.find((item) => item.questionId === resultsDialogQuestionId) ?? null,
+    [resultsDialogQuestionId, visibleResultTiles],
+  );
+  useEffect(() => {
+    const prevBgColor = document.body.style.backgroundColor;
+    const prevBgImage = document.body.style.backgroundImage;
+    const prevBgAttachment = document.body.style.backgroundAttachment;
+    const prevOverflowX = document.body.style.overflowX;
+    const hadPlayerBrandClass = document.body.classList.contains("mq-player-brand-bg");
+    const root = document.getElementById("root");
+    const prevRootBg = root?.style.backgroundColor ?? "";
+    document.body.style.backgroundColor = brandBodyBackgroundColor;
+    document.body.style.backgroundImage = "none";
+    document.body.style.backgroundAttachment = "";
+    document.body.style.overflowX = "";
+    document.body.classList.add("mq-player-brand-bg");
+    if (root) root.style.backgroundColor = "transparent";
+    return () => {
+      document.body.style.backgroundColor = prevBgColor;
+      document.body.style.backgroundImage = prevBgImage;
+      document.body.style.backgroundAttachment = prevBgAttachment;
+      document.body.style.overflowX = prevOverflowX;
+      if (!hadPlayerBrandClass) document.body.classList.remove("mq-player-brand-bg");
+      if (root) root.style.backgroundColor = prevRootBg;
+    };
+  }, [brandBodyBackgroundColor]);
+
+  useEffect(() => {
+    if (!acceptedQuestionId) return;
+    const timer = window.setTimeout(() => {
+      setDismissedQuestionId(acceptedQuestionId);
+      setAcceptedQuestionId(null);
+    }, 2200);
+    return () => window.clearTimeout(timer);
+  }, [acceptedQuestionId]);
+
+  useEffect(() => {
+    if (!showSubQuizCompleteCard && !showFinishedCompletionCard) return;
+    const timer = window.setTimeout(() => {
+      setFinalCompletionDismissed(true);
+    }, 3000);
+    return () => window.clearTimeout(timer);
+  }, [setFinalCompletionDismissed, showFinishedCompletionCard, showSubQuizCompleteCard]);
+
+  useEffect(() => {
+    const activeQuestionId = nonQuizActiveQuestion?.id;
+    if (!activeQuestionId) {
+      setDismissedQuestionId(null);
+      return;
+    }
+    if (dismissedQuestionId && dismissedQuestionId !== activeQuestionId) {
+      setDismissedQuestionId(null);
+    }
+  }, [nonQuizActiveQuestion?.id, dismissedQuestionId]);
+
+  function closeQuestionPopup() {
+    const activeQuestionId = nonQuizActiveQuestion?.id;
+    if (!activeQuestionId) return;
+    setDismissedQuestionId(activeQuestionId);
+    if (acceptedQuestionId === activeQuestionId) {
+      setAcceptedQuestionId(null);
+    }
+  }
+
+  useLayoutEffect(() => {
+    if (
+      !nonQuizActiveQuestion ||
+      nonQuizActiveQuestion.type !== "ranking" ||
+      answeredCurrentQuestion
+    ) {
+      prevRankRowTopsRef.current = new Map();
+      return;
+    }
+    const nextTops = new Map<string, number>();
+    rankOrder.forEach((id) => {
+      const el = rankRowRefs.current.get(id);
+      if (!el) return;
+      nextTops.set(id, el.getBoundingClientRect().top);
+    });
+    const prevTops = prevRankRowTopsRef.current;
+    if (prevTops.size > 0) {
+      rankOrder.forEach((id) => {
+        const el = rankRowRefs.current.get(id);
+        const prevTop = prevTops.get(id);
+        const nextTop = nextTops.get(id);
+        if (!el || prevTop == null || nextTop == null) return;
+        const deltaY = prevTop - nextTop;
+        if (Math.abs(deltaY) < 0.5) return;
+        el.animate([{ transform: `translateY(${deltaY}px)` }, { transform: "translateY(0)" }], {
+          duration: 190,
+          easing: "cubic-bezier(0.2, 0, 0, 1)",
+        });
+      });
+    }
+    prevRankRowTopsRef.current = nextTops;
+  }, [rankOrder, nonQuizActiveQuestion, answeredCurrentQuestion]);
 
   return (
     <Container
       maxWidth="md"
-      sx={{
-        py: 4,
-        minHeight: "100vh",
-        height: hasActiveQuestion ? "auto" : "100dvh",
-        overflowY: hasActiveQuestion ? "auto" : "hidden",
-        boxSizing: "border-box",
-        display: "flex",
-        flexDirection: "column",
-        justifyContent: hasActiveQuestion ? "center" : "flex-start",
-      }}
+      sx={buildQuizPlayContainerSx({ brandBackground, brandFontFamily, hasActiveQuestion })}
     >
-      <Box
-        sx={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          minHeight: { xs: 96, sm: 128 },
-          ...(hasActiveQuestion ? { minHeight: 0, mb: 2 } : {}),
-          ...(!joined ? { flex: 1 } : {}),
-        }}
-      >
-        <Typography variant="h3" gutterBottom align="center" sx={{ fontWeight: 700, letterSpacing: 0.3 }}>
-          {titleText}
-        </Typography>
-      </Box>
-      {!joined && (
-        <Card
-          variant="outlined"
-          sx={{ mt: "auto", mb: { xs: 3, md: 5 }, width: "100%", maxWidth: 520, mx: "auto" }}
+      {bootLoading ? (
+        <Box
+          sx={{
+            flex: 1,
+            minHeight: "100dvh",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+          }}
         >
-          <CardContent>
-            <Stack spacing={2}>
-              <Stack direction={{ xs: "column", sm: "row" }} spacing={1}>
-                <TextField
-                  value={nickname}
-                  onChange={(e) => setNick(e.target.value)}
-                  placeholder="Ваш ник"
-                  label="Никнейм"
-                  fullWidth
-                  sx={{
-                    "& .MuiOutlinedInput-root": { minHeight: 56 },
-                  }}
-                />
-                <Button
-                  variant="outlined"
-                  onClick={() => setNick(randomNickname())}
-                  sx={{
-                    color: "#ffffff",
-                    borderColor: "rgba(255, 255, 255, 0.5)",
-                    minHeight: 56,
-                    px: 4,
-                    mx: { xs: 0, sm: 1 },
-                    minWidth: { sm: 180 },
-                    whiteSpace: "nowrap",
-                  }}
-                >
-                  Случайное имя
-                </Button>
-              </Stack>
-              <Button variant="contained" onClick={join}>
-                Войти
-              </Button>
-            </Stack>
-          </CardContent>
-        </Card>
-      )}
-      {joined && quiz?.activeQuestion && !showSubQuizCompleteCard && (
-        <Card variant="outlined">
-          <CardContent>
-            <Stack spacing={2}>
-              <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap justifyContent="flex-end">
-                {quiz.quizProgress && quiz.quizProgress.total > 0 ? (
-                  <Chip
-                    label={`Вопрос ${quiz.quizProgress.index} / ${quiz.quizProgress.total}`}
-                    size="small"
-                    sx={{
-                      height: 24,
-                      "& .MuiChip-label": { px: 1, fontSize: "0.72rem", fontWeight: 600 },
-                    }}
-                  />
-                ) : null}
-                <Chip
-                  label={
-                    quiz.activeQuestion.type === "single"
-                      ? "Один ответ"
-                      : quiz.activeQuestion.type === "multi"
-                        ? "Несколько ответов"
-                        : "Облако тегов"
-                  }
-                  size="small"
-                  sx={{
-                    height: 24,
-                    "& .MuiChip-label": { px: 1, fontSize: "0.72rem", fontWeight: 600 },
-                  }}
-                />
-              </Stack>
-              <Typography
-                variant="h4"
-                sx={{ fontWeight: 700, lineHeight: 1.2, fontSize: { xs: "2rem", sm: "2.25rem" }, pb: 2 }}
-              >
-                {quiz.activeQuestion.text}
-              </Typography>
-              {quiz.activeQuestion.type !== "tag_cloud" && (
-                <Stack direction="row" spacing={1.25} flexWrap="wrap" useFlexGap sx={{ pb: 4 }}>
-                  {quiz.activeQuestion.options.map((option) => (
-                    <Button
-                      key={option.id}
-                      variant={displayedSelected.includes(option.id) ? "contained" : "outlined"}
-                      color={displayedSelected.includes(option.id) ? "primary" : "inherit"}
-                      disabled={answeredCurrentQuestion}
-                      onClick={() => toggleOption(option.id)}
-                      startIcon={displayedSelected.includes(option.id) ? <CheckCircleIcon /> : undefined}
-                    >
-                      {option.text}
-                    </Button>
-                  ))}
-                </Stack>
-              )}
-              {quiz.activeQuestion.type === "tag_cloud" && (
-                <Stack spacing={1.5}>
-                  {(answeredCurrentQuestion
-                    ? (submittedAnswers[quiz.activeQuestion.id] ?? [])
-                    : tagAnswers
-                  ).map((value, index) => (
-                    <Stack key={`tag-answer-${index}`} direction="row" spacing={1} alignItems="center">
-                      <TextField
-                        value={value}
-                        onChange={(e) => {
-                          const nextValue = e.target.value;
-                          const limit = quiz.activeQuestion?.maxAnswers ?? 5;
-                          setTagAnswers((prev) => {
-                            const next = prev.map((item, i) => (i === index ? nextValue : item));
-                            const isLastField = index === next.length - 1;
-                            if (isLastField && nextValue.trim() && next.length < limit) {
-                              next.push("");
-                            }
-                            return next;
-                          });
-                        }}
-                        placeholder={`Ответ ${index + 1}`}
-                        size="small"
-                        disabled={answeredCurrentQuestion}
-                        multiline
-                        minRows={1}
-                        maxRows={3}
-                        sx={{ flex: 1 }}
-                      />
-                      {!answeredCurrentQuestion && index > 0 && (
-                        <IconButton
-                          aria-label="Удалить ответ"
-                          color="inherit"
-                          onClick={() =>
-                            setTagAnswers((prev) => (prev.length <= 1 ? prev : prev.filter((_, i) => i !== index)))
-                          }
-                        >
-                          <DeleteOutlineIcon />
-                        </IconButton>
-                      )}
-                    </Stack>
-                  ))}
-                </Stack>
-              )}
-            </Stack>
-            {!answeredCurrentQuestion && (
-              <Box sx={{ pt: 1 }}>
-                <Button
-                  disabled={!canSubmit}
-                  onClick={submit}
-                  variant="contained"
-                  size="large"
-                  fullWidth
-                  sx={{ minHeight: 52, fontSize: "1.05rem", fontWeight: 700 }}
-                >
-                  Отправить ответ
-                </Button>
-              </Box>
-            )}
-          </CardContent>
-        </Card>
-      )}
-      {joined && showSubQuizCompleteCard && (
-        <Card variant="outlined" sx={{ width: "100%", maxWidth: 520, mx: "auto", mt: 2 }}>
-          <CardContent>
-            <Stack alignItems="center" spacing={2} sx={{ textAlign: "center", py: 1 }}>
-              <EmojiEventsIcon sx={{ fontSize: 64, color: "success.main" }} aria-hidden />
-              <Typography variant="h5" component="p" sx={{ fontWeight: 700 }}>
-                Квиз завершён
-              </Typography>
-              <Typography variant="body1" color="text.secondary">
-                Вы прошли все вопросы. Спасибо за участие!
-              </Typography>
-              <Button variant="outlined" size="large" sx={{ mt: 1, minWidth: 200 }} onClick={() => setFinalCompletionDismissed(true)}>
-                Закрыть
-              </Button>
-            </Stack>
-          </CardContent>
-        </Card>
-      )}
-      {joined && showFinishedCompletionCard && (
-        <Card variant="outlined" sx={{ width: "100%", maxWidth: 520, mx: "auto", mt: 2 }}>
-          <CardContent>
-            <Stack alignItems="center" spacing={2} sx={{ textAlign: "center", py: 2 }}>
-              <EmojiEventsIcon sx={{ fontSize: 64, color: "success.main" }} aria-hidden />
-              <Typography variant="h5" component="p" sx={{ fontWeight: 700 }}>
-                Квиз завершён
-              </Typography>
-              <Typography variant="body1" color="text.secondary">
-                Спасибо за участие!
-              </Typography>
-              <Button variant="outlined" size="large" sx={{ mt: 1, minWidth: 200 }} onClick={() => setFinalCompletionDismissed(true)}>
-                Закрыть
-              </Button>
-            </Stack>
-          </CardContent>
-        </Card>
-      )}
-      {showIdleWaiting && <Alert severity="info">Ожидаем следующий вопрос...</Alert>}
-      {!!error && (
-        <Box sx={{ mt: 2 }}>
-          <Alert severity="error">{error}</Alert>
+          <CircularProgress size={46} />
         </Box>
-      )}
+      ) : null}
+      {!bootLoading ? (
+        <>
+          {joined ? (
+            <PlayerIdentityBar
+              nickname={nickname}
+              connectionChip={connectionChip}
+              onNicknameClick={editNickname}
+            />
+          ) : null}
+          {joined && quiz?.reactionSession?.isActive ? (
+            <ReactionsDock
+              reactions={reactionMeta}
+              onToggleReaction={toggleReaction}
+              brandPrimaryColor={brandPrimaryColor}
+            />
+          ) : null}
+          {(!joined || shouldShowEventTitle) && !(restoreJoinPending && !joined) ? (
+            <EventTitleBlock
+              joined={joined}
+              shouldShowEventTitle={shouldShowEventTitle}
+              restoreJoinPending={restoreJoinPending}
+              hasActiveQuestion={hasActiveQuestion}
+              brandLogoUrl={brandLogoUrl}
+              titleText={titleText}
+            />
+          ) : null}
+          {joined ? (
+            <PlayerTilesGrid
+              tileOrder={tileOrder}
+              visibleBannerById={visibleBannerById}
+              speakerEnabled={Boolean(speakerQuestions?.settings.enabled)}
+              speakerTileVisible={speakerTileVisible}
+              onSpeakerOpen={() => setSpeakerDialogOpen(true)}
+              speakerTileBackgroundColor={speakerTileBackgroundColor}
+              brandPrimaryColor={brandPrimaryColor}
+              speakerTileText={speakerTileText}
+              programTileText={programTileText}
+              programTileBackgroundColor={programTileBackgroundColor}
+              programTileLinkUrl={programTileLinkUrl}
+              programTileVisible={programTileVisible}
+            />
+          ) : null}
+          {joined && visibleResultTiles.length > 0 ? (
+            <PlayerVisibleResultTiles
+              tiles={visibleResultTiles}
+              brandPrimaryColor={brandPrimaryColor}
+              onSelectQuestion={setResultsDialogQuestionId}
+            />
+          ) : null}
+          {!joined && !restoreJoinPending && (
+            <JoinCard
+              nickname={nickname}
+              nicknameInputRef={nicknameInputRef}
+              onNicknameChange={setNick}
+              onRandomNickname={() => setNick(randomNickname())}
+              onJoin={join}
+            />
+          )}
+          {!joined && restoreJoinPending && <RestoreJoinPendingBlock />}
+          <PlayerVoteResultsDialog
+            open={Boolean(selectedResultTile)}
+            tile={selectedResultTile}
+            brandPrimaryColor={brandPrimaryColor}
+            submittedAnswersByQuestionId={submittedAnswers}
+            onClose={() => setResultsDialogQuestionId(null)}
+          />
+          {joined &&
+            nonQuizActiveQuestion &&
+            !showSubQuizCompleteCard &&
+            !shouldHideAnsweredPopup &&
+            !shouldHideAnsweredUntilHydrated &&
+            !shouldHideDismissedPopup && (
+              <QuestionPopupCard
+                brandPrimaryColor={brandPrimaryColor}
+                question={nonQuizActiveQuestion}
+                quizProgress={quiz?.quizProgress ?? null}
+                displayedSelected={displayedSelected}
+                answeredCurrentQuestion={answeredCurrentQuestion}
+                submittedAnswers={submittedAnswers}
+                rankOrder={rankOrder}
+                rankRowRefs={rankRowRefs}
+                moveRankOption={moveRankOption}
+                toggleOption={toggleOption}
+                closeQuestionPopup={closeQuestionPopup}
+                tagAnswers={tagAnswers}
+                setTagAnswers={setTagAnswers}
+                canSubmit={canSubmit}
+                submit={submit}
+                ruBallLabel={ruBallLabel}
+              />
+            )}
+          {joined && showSubQuizCompleteCard && (
+            <CompletionOverlay
+              brandPrimaryColor={brandPrimaryColor}
+              message="Вы прошли все вопросы. Спасибо за участие!"
+              compact
+              onClose={() => setFinalCompletionDismissed(true)}
+            />
+          )}
+          {joined && showFinishedCompletionCard && (
+            <CompletionOverlay
+              brandPrimaryColor={brandPrimaryColor}
+              message="Спасибо за участие!"
+              onClose={() => setFinalCompletionDismissed(true)}
+            />
+          )}
+          {!!error && (
+            <Box sx={{ mt: 2 }}>
+              <Alert severity="error">{error}</Alert>
+            </Box>
+          )}
+          <SpeakerQuestionsDialog
+            open={speakerDialogOpen}
+            speakerQuestions={speakerQuestions}
+            speakerName={speakerName}
+            speakerQuestionText={speakerQuestionText}
+            onClose={() => setSpeakerDialogOpen(false)}
+            onSpeakerNameChange={setSpeakerName}
+            onSpeakerQuestionTextChange={setSpeakerQuestionText}
+            onSubmit={submitSpeakerQuestion}
+            onReact={reactSpeakerQuestion}
+          />
+          <Dialog
+            open={nicknameDialogOpen}
+            onClose={() => setNicknameDialogOpen(false)}
+            fullWidth
+            maxWidth="xs"
+          >
+            <DialogTitle>Изменить имя</DialogTitle>
+            <DialogContent>
+              <TextField
+                autoFocus
+                margin="dense"
+                fullWidth
+                value={nicknameDraft}
+                onChange={(e) => setNicknameDraft(e.target.value)}
+                placeholder="Введите новое имя"
+              />
+            </DialogContent>
+            <DialogActions>
+              <Button onClick={() => setNicknameDialogOpen(false)}>Отмена</Button>
+              <Button variant="contained" onClick={submitNicknameUpdate}>
+                Сохранить
+              </Button>
+            </DialogActions>
+          </Dialog>
+        </>
+      ) : null}
     </Container>
   );
 }

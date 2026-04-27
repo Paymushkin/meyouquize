@@ -1,16 +1,30 @@
-import { Stack, Button, Card, CardContent, Divider, TextField, Typography } from "@mui/material";
+import { useState } from "react";
+import {
+  Card,
+  CardContent,
+  Dialog,
+  DialogContent,
+  DialogTitle,
+  FormControlLabel,
+  IconButton,
+  Stack,
+  Switch,
+  TextField,
+  Tooltip,
+  Typography,
+} from "@mui/material";
+import ContentCopyIcon from "@mui/icons-material/ContentCopy";
+import QrCode2Icon from "@mui/icons-material/QrCode2";
+import QRCode from "qrcode";
 
 type Props = {
   editableTitle: string;
   setEditableTitle: (value: string) => void;
   saveQuizTitle: () => void;
   joinUrl: string;
-  qrData: string;
-  quizId: string;
-  setQuizId: (value: string) => void;
-  questionId: string;
-  setQuestionId: (value: string) => void;
-  finishQuiz: () => void;
+  screenUrl: string;
+  showEventTitleOnPlayer: boolean;
+  onToggleShowEventTitleOnPlayer: (next: boolean) => void;
 };
 
 export function AdminGeneralSection(props: Props) {
@@ -19,13 +33,30 @@ export function AdminGeneralSection(props: Props) {
     setEditableTitle,
     saveQuizTitle,
     joinUrl,
-    qrData,
-    quizId,
-    setQuizId,
-    questionId,
-    setQuestionId,
-    finishQuiz,
+    screenUrl,
+    showEventTitleOnPlayer,
+    onToggleShowEventTitleOnPlayer,
   } = props;
+  const [qrOpen, setQrOpen] = useState(false);
+  const [qrLabel, setQrLabel] = useState("");
+  const [qrDataUrl, setQrDataUrl] = useState("");
+
+  async function copyToClipboard(value: string) {
+    if (!value) return;
+    try {
+      await navigator.clipboard.writeText(value);
+    } catch {
+      // ignored: unsupported browser / denied permission
+    }
+  }
+
+  async function openQr(label: string, value: string) {
+    if (!value) return;
+    const nextQrData = await QRCode.toDataURL(value, { margin: 1, width: 320 });
+    setQrLabel(label);
+    setQrDataUrl(nextQrData);
+    setQrOpen(true);
+  }
 
   return (
     <>
@@ -38,40 +69,91 @@ export function AdminGeneralSection(props: Props) {
             onBlur={saveQuizTitle}
             fullWidth
             size="small"
+            multiline
+            minRows={2}
+            maxRows={4}
             sx={{ mb: 2 }}
           />
-          <Typography color="text.secondary" sx={{ mb: 2 }}>
-            Ссылка для участников: {joinUrl}
-          </Typography>
-          {qrData && <img src={qrData} alt="quiz-qr" style={{ width: 220, height: 220, borderRadius: 12 }} />}
+          <Stack spacing={0.5} sx={{ mb: 2 }}>
+            <Stack direction="row" alignItems="center" spacing={0.5}>
+              <Typography color="text.secondary" sx={{ flex: 1, minWidth: 0 }}>
+                Ссылка на ивент
+              </Typography>
+              <Tooltip title="Скопировать ссылку">
+                <span>
+                  <IconButton
+                    size="small"
+                    onClick={() => void copyToClipboard(joinUrl)}
+                    disabled={!joinUrl}
+                  >
+                    <ContentCopyIcon fontSize="small" />
+                  </IconButton>
+                </span>
+              </Tooltip>
+              <Tooltip title="Показать QR">
+                <span>
+                  <IconButton
+                    size="small"
+                    onClick={() => void openQr("Ссылка на ивент", joinUrl)}
+                    disabled={!joinUrl}
+                  >
+                    <QrCode2Icon fontSize="small" />
+                  </IconButton>
+                </span>
+              </Tooltip>
+            </Stack>
+            <Stack direction="row" alignItems="center" spacing={0.5}>
+              <Typography color="text.secondary" sx={{ flex: 1, minWidth: 0 }}>
+                Ссылка на проектор
+              </Typography>
+              <Tooltip title="Скопировать ссылку">
+                <span>
+                  <IconButton
+                    size="small"
+                    onClick={() => void copyToClipboard(screenUrl)}
+                    disabled={!screenUrl}
+                  >
+                    <ContentCopyIcon fontSize="small" />
+                  </IconButton>
+                </span>
+              </Tooltip>
+              <Tooltip title="Показать QR">
+                <span>
+                  <IconButton
+                    size="small"
+                    onClick={() => void openQr("Ссылка на проектор", screenUrl)}
+                    disabled={!screenUrl}
+                  >
+                    <QrCode2Icon fontSize="small" />
+                  </IconButton>
+                </span>
+              </Tooltip>
+            </Stack>
+          </Stack>
+          <FormControlLabel
+            sx={{ m: 0 }}
+            control={
+              <Switch
+                checked={showEventTitleOnPlayer}
+                onChange={(_, next) => onToggleShowEventTitleOnPlayer(next)}
+              />
+            }
+            label="Показывать название ивента у пользователя"
+          />
         </CardContent>
       </Card>
-
-      <Card variant="outlined">
-        <CardContent>
-          <Typography variant="h6" gutterBottom>
-            Управление раундом
-          </Typography>
-          <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-            Запуск/остановка вопросов выполняется кнопками Вкл/Выкл в списке вопросов.
-          </Typography>
-          <Stack direction={{ xs: "column", md: "row" }} spacing={2}>
-            <TextField value={quizId} onChange={(e) => setQuizId(e.target.value)} label="Quiz ID" fullWidth />
-            <TextField
-              value={questionId}
-              onChange={(e) => setQuestionId(e.target.value)}
-              label="Current Question ID"
-              fullWidth
+      <Dialog open={qrOpen} onClose={() => setQrOpen(false)}>
+        <DialogTitle>{qrLabel}</DialogTitle>
+        <DialogContent sx={{ display: "flex", justifyContent: "center", pb: 3 }}>
+          {qrDataUrl ? (
+            <img
+              src={qrDataUrl}
+              alt="qr-code"
+              style={{ width: 320, height: 320, maxWidth: "75vw", maxHeight: "75vw" }}
             />
-          </Stack>
-          <Divider sx={{ my: 2 }} />
-          <Stack direction={{ xs: "column", md: "row" }} spacing={1.5}>
-            <Button onClick={finishQuiz} color="error" variant="outlined">
-              Завершить квиз
-            </Button>
-          </Stack>
-        </CardContent>
-      </Card>
+          ) : null}
+        </DialogContent>
+      </Dialog>
     </>
   );
 }

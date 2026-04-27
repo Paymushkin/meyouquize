@@ -21,6 +21,7 @@ model Quiz {
   questions   Question[]
   participants Participant[]
   answers     Answer[]
+  speakerQuestions SpeakerQuestion[]
 }
 
 model SubQuiz {
@@ -55,6 +56,16 @@ model Question {
   projectorShowFirstCorrect Boolean @default(true)
   /** Сколько первых верно ответивших показывать на проекторе (1–20), если projectorShowFirstCorrect. */
   projectorFirstCorrectWinnersCount Int @default(1)
+  /** Для RANKING: баллы за совпадение на каждой позиции (индекс 0 = верх списка «лучший»). Null — старый режим: весь вопрос даёт `points` только при полном совпадении. */
+  rankingPointsByRank Json?
+  /** Для RANKING: что показывать на проекторе по вариантам */
+  rankingProjectorMetric RankingProjectorMetric @default(AVG_RANK)
+  /** RANKING: квиз (эталон, зачёт) или жюри (нет верного ответа, баллы только для статистики) */
+  rankingKind RankingKind @default(QUIZ)
+  /** Для RANKING: пользовательская подсказка на экране игрока (если null — используется текст по умолчанию). */
+  rankingPlayerHint String?
+  /** Когда вопрос был выведен на экран для ответов (для подсчёта responseMs). */
+  activatedAt DateTime?
   options     Option[]
   answers     Answer[]
 
@@ -68,6 +79,8 @@ model Option {
   question   Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
   text       String
   isCorrect  Boolean  @default(false)
+  /** Порядок варианта в вопросе (0 = лучший при ранжировании). Для SINGLE/MULTI задаётся при сохранении. */
+  sortOrder  Int      @default(0)
 }
 
 model Participant {
@@ -78,9 +91,73 @@ model Participant {
   nickname  String
   createdAt DateTime @default(now())
   answers   Answer[]
+  speakerQuestions SpeakerQuestion[]
+  speakerQuestionLikes SpeakerQuestionLike[]
+  speakerQuestionDislikes SpeakerQuestionDislike[]
+  speakerQuestionReactions SpeakerQuestionReaction[]
 
   @@unique([quizId, deviceId])
   @@index([quizId])
+}
+
+model SpeakerQuestion {
+  id            String                @id @default(cuid())
+  quizId         String
+  quiz           Quiz                  @relation(fields: [quizId], references: [id], onDelete: Cascade)
+  participantId  String
+  participant    Participant           @relation(fields: [participantId], references: [id], onDelete: Cascade)
+  speakerName    String
+  text           String
+  isVisibleToUsers Boolean              @default(true)
+  status         SpeakerQuestionStatus @default(PENDING)
+  isOnScreen     Boolean               @default(false)
+  createdAt      DateTime              @default(now())
+  updatedAt      DateTime              @updatedAt
+  likes          SpeakerQuestionLike[]
+  dislikes       SpeakerQuestionDislike[]
+  reactions      SpeakerQuestionReaction[]
+
+  @@index([quizId, createdAt])
+  @@index([quizId, status, createdAt])
+  @@index([quizId, isOnScreen, createdAt])
+}
+
+model SpeakerQuestionReaction {
+  id                String          @id @default(cuid())
+  speakerQuestionId String
+  speakerQuestion   SpeakerQuestion @relation(fields: [speakerQuestionId], references: [id], onDelete: Cascade)
+  participantId     String
+  participant       Participant     @relation(fields: [participantId], references: [id], onDelete: Cascade)
+  reaction          String
+  createdAt         DateTime        @default(now())
+
+  @@unique([speakerQuestionId, participantId, reaction])
+  @@index([speakerQuestionId])
+  @@index([participantId])
+}
+
+model SpeakerQuestionLike {
+  id                String         @id @default(cuid())
+  speakerQuestionId String
+  speakerQuestion   SpeakerQuestion @relation(fields: [speakerQuestionId], references: [id], onDelete: Cascade)
+  participantId     String
+  participant       Participant     @relation(fields: [participantId], references: [id], onDelete: Cascade)
+  createdAt         DateTime        @default(now())
+
+  @@unique([speakerQuestionId, participantId])
+  @@index([participantId])
+}
+
+model SpeakerQuestionDislike {
+  id                String          @id @default(cuid())
+  speakerQuestionId String
+  speakerQuestion   SpeakerQuestion @relation(fields: [speakerQuestionId], references: [id], onDelete: Cascade)
+  participantId     String
+  participant       Participant     @relation(fields: [participantId], references: [id], onDelete: Cascade)
+  createdAt         DateTime        @default(now())
+
+  @@unique([speakerQuestionId, participantId])
+  @@index([participantId])
 }
 
 model Answer {
@@ -94,6 +171,8 @@ model Answer {
   selectedOptionIds String
   isCorrect         Boolean
   scoreAwarded      Int         @default(0)
+  /** Время ответа в миллисекундах относительно момента активации вопроса. */
+  responseMs        Int         @default(0)
   submittedAt       DateTime    @default(now())
 
   @@unique([questionId, participantId])
@@ -102,6 +181,8 @@ model Answer {
   @@index([participantId])
   /** Выборки лидербордов и getParticipantAnswersMap по комнате + участнику */
   @@index([quizId, participantId])
+  /** Для tie-break в лидербордах: score DESC, totalResponseMs ASC. */
+  @@index([quizId, participantId, responseMs])
 }
 
 model AdminSession {
@@ -116,14 +197,34 @@ enum ScoringMode {
   QUIZ
 }
 
+/** Метрика на проекторе для вопросов RANKING */
+enum RankingProjectorMetric {
+  AVG_RANK
+  AVG_SCORE
+  TOTAL_SCORE
+}
+
+/** RANKING: квиз с эталоном или «жюри» без правильного ответа */
+enum RankingKind {
+  QUIZ
+  JURY
+}
+
 enum QuestionType {
   SINGLE
   MULTI
   TAG_CLOUD
+  RANKING
 }
 
 enum QuizStatus {
   DRAFT
   LIVE
   FINISHED
+}
+
+enum SpeakerQuestionStatus {
+  PENDING
+  APPROVED
+  REJECTED
 }

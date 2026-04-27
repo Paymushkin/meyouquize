@@ -20,9 +20,15 @@ import { AdminLoginForm } from "../components/AdminLoginForm";
 import { API_BASE } from "../config";
 
 type DetailPayload = {
-  question: { id: string; text: string; type: "single" | "multi" | "tag_cloud" };
+  question: { id: string; text: string; type: "single" | "multi" | "tag_cloud" | "ranking" };
   firstCorrect: null | { participantId: string; nickname: string; submittedAt: string };
-  optionStats: Array<{ optionId: string; text: string; count: number; isCorrect: boolean }>;
+  optionStats: Array<{
+    optionId: string;
+    text: string;
+    count: number;
+    isCorrect: boolean;
+    avgRank?: number;
+  }>;
   tagCloud: Array<{ text: string; count: number }>;
   answerRows: Array<{
     participantId: string;
@@ -60,7 +66,11 @@ export function AdminVoteDetailPage() {
           { credentials: "include", signal: controller.signal },
         );
         if (!response.ok) {
-          setError(response.status === 404 ? "Вопрос не найден или не голосование комнаты." : "Ошибка загрузки");
+          setError(
+            response.status === 404
+              ? "Вопрос не найден или не голосование комнаты."
+              : "Ошибка загрузки",
+          );
           setDetail(null);
           return;
         }
@@ -112,24 +122,35 @@ export function AdminVoteDetailPage() {
               <Typography variant="h5" gutterBottom sx={{ fontWeight: 700 }}>
                 {detail.question.text}
               </Typography>
-              {detail.question.type === "single" && (
+              {(detail.question.type === "single" || detail.question.type === "ranking") && (
                 <Box sx={{ my: 2 }}>
                   <Typography variant="subtitle2" gutterBottom>
-                    Первый верный ответ
+                    {detail.question.type === "ranking"
+                      ? "Первый полностью верный порядок"
+                      : "Первый верный ответ"}
                   </Typography>
                   {detail.firstCorrect ? (
                     <Typography>
                       {detail.firstCorrect.nickname}
-                      <Typography component="span" variant="body2" color="text.secondary" sx={{ ml: 1 }}>
+                      <Typography
+                        component="span"
+                        variant="body2"
+                        color="text.secondary"
+                        sx={{ ml: 1 }}
+                      >
                         {new Date(detail.firstCorrect.submittedAt).toLocaleString("ru-RU")}
                       </Typography>
                     </Typography>
                   ) : (
-                    <Typography color="text.secondary">Нет подходящей записи (не SINGLE с одним правильным или пока никто не угадал).</Typography>
+                    <Typography color="text.secondary">
+                      {detail.question.type === "ranking"
+                        ? "Пока никто не угадал эталонный порядок."
+                        : "Нет подходящей записи (не SINGLE с одним правильным или пока никто не угадал)."}
+                    </Typography>
                   )}
                 </Box>
               )}
-              {detail.question.type !== "tag_cloud" && (
+              {detail.question.type !== "tag_cloud" && detail.question.type !== "ranking" && (
                 <>
                   <Typography variant="subtitle2" sx={{ mt: 2, mb: 1 }}>
                     Сводка по вариантам
@@ -148,6 +169,35 @@ export function AdminVoteDetailPage() {
                           <TableCell>{o.text}</TableCell>
                           <TableCell align="right">{o.count}</TableCell>
                           <TableCell>{o.isCorrect ? "да" : "нет"}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </>
+              )}
+              {detail.question.type === "ranking" && (
+                <>
+                  <Typography variant="subtitle2" sx={{ mt: 2, mb: 1 }}>
+                    Сводка по ранжированию
+                  </Typography>
+                  <Table size="small">
+                    <TableHead>
+                      <TableRow>
+                        <TableCell>Вариант</TableCell>
+                        <TableCell align="right">Эталон (место)</TableCell>
+                        <TableCell align="right">Средний ранг</TableCell>
+                      </TableRow>
+                    </TableHead>
+                    <TableBody>
+                      {detail.optionStats.map((o, index) => (
+                        <TableRow key={o.optionId}>
+                          <TableCell>{o.text}</TableCell>
+                          <TableCell align="right">{index + 1}</TableCell>
+                          <TableCell align="right">
+                            {typeof o.avgRank === "number" && o.avgRank > 0
+                              ? o.avgRank.toFixed(2)
+                              : "—"}
+                          </TableCell>
                         </TableRow>
                       ))}
                     </TableBody>

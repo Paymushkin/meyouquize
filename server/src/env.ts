@@ -25,7 +25,8 @@ dotenv.config();
 function allowLanViteOrigins(): boolean {
   if (process.env.CLIENT_ORIGIN_ALLOW_LAN === "0") return false;
   if (process.env.CLIENT_ORIGIN_ALLOW_LAN === "1") return true;
-  return process.env.NODE_ENV !== "production";
+  // По умолчанию включено для локальных мероприятий в одной Wi-Fi сети.
+  return true;
 }
 
 export const env = {
@@ -46,4 +47,5 @@ export const env = {
     0,
     Number.parseInt(process.env.DASHBOARD_RESULTS_DEBOUNCE_MS ?? "220", 10) || 220,
   ),
+  mediaDir: process.env.MEDIA_DIR?.trim() || path.resolve(serverSrcDir, "../../media"),
 };
