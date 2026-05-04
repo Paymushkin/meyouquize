@@ -32,7 +32,7 @@ export function registerResultsDashboardHandlers(socket: EnrichedSocket, io: Ser
       socket.emit("results:dashboard", results);
       socket.emit("results:public:view", toPublicViewPayload(view, quiz.title));
       socket.emit("state:quiz", quizState);
-      await emitQuizOnlineCount(io, quiz.id);
+      emitQuizOnlineCount(io, quiz.id);
     } catch (error) {
       fail(socket, error instanceof Error ? error.message : "Subscribe failed");
     }

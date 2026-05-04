@@ -59,7 +59,7 @@ export function registerQuizPlayHandlers(socket: EnrichedSocket, io: Server) {
       socket.emit("quiz:joined", { ok: true });
       socket.emit("player:answers", answersMap);
       socket.emit("state:quiz", state);
-      await emitQuizOnlineCount(io, joined.quizId);
+      emitQuizOnlineCount(io, joined.quizId);
     } catch (error) {
       fail(socket, error instanceof Error ? error.message : "Join failed");
     }
