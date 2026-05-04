@@ -1,0 +1,3 @@
+[socket-load] joined_ok=120/120
+[socket-load] join_ack_ms p50=192 p95=238 max=252
+[socket-load] join SLO: без ошибок при заданном PLAYER_COUNT — условно пройдено.

@@ -23,7 +23,12 @@
     "deploy:lan": "cp deploy/env/.env.lan.example deploy/env/.env.runtime && cp deploy/caddy/Caddyfile.lan deploy/caddy/Caddyfile.active",
     "prisma:generate": "npm run prisma:generate -w server",
     "prisma:migrate": "npm run prisma:migrate -w server",
-    "prisma:migrate:deploy": "npm run prisma:migrate:deploy -w server"
+    "prisma:migrate:deploy": "npm run prisma:migrate:deploy -w server",
+    "load:smoke": "bash load/run.sh smoke",
+    "load:nominal": "bash load/run.sh nominal",
+    "load:peak": "bash load/run.sh peak",
+    "load:soak": "bash load/run.sh soak",
+    "load:socket:artillery": "npx artillery run load/artillery-socket.yml"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.1",

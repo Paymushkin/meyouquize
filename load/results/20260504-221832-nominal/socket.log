@@ -1,0 +1,7 @@
+[socket-load] observer results:subscribe ok, dashboard_events_total=1
+[socket-load] joined_ok=268/500
+[socket-load] join_ack_ms p50=107 p95=440 max=857
+[socket-load] submit_ok=0/268 (question=cmorjx56…, source=state:quiz)
+[socket-load] dashboard_pushes_after_submit_burst count=0 (waited_ms=3500)
+[socket-load] dashboard_events_total=1
+[socket-load] hold connections for 30000 ms (for online counter / live observation)

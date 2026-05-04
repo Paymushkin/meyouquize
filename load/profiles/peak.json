@@ -1,0 +1,10 @@
+{
+  "http_vus": 50,
+  "http_duration": "4m",
+  "player_count": 800,
+  "run_submit": true,
+  "submit_players": 560,
+  "run_dashboard": true,
+  "dashboard_wait_ms": 4000,
+  "hold_ms": 45000
+}

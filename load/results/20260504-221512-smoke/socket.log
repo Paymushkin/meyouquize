@@ -1,0 +1,6 @@
+[socket-load] joined_ok=120/120
+[socket-load] join_ack_ms p50=309 p95=336 max=585
+[socket-load] submit_ok=80/80 (question=cmorkom3…, source=state:quiz)
+[socket-load] submit_roundtrip_ms p50=171 p95=195 max=465
+[socket-load] hold connections for 30000 ms (for online counter / live observation)
+[socket-load] join SLO: без ошибок при заданном PLAYER_COUNT — условно пройдено.

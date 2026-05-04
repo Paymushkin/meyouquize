@@ -1,0 +1,33 @@
+config:
+  target: "{{ $processEnvironment.BASE_URL }}"
+  phases:
+    - duration: 120
+      arrivalRate: 5
+      rampTo: 20
+      name: ramp_up
+    - duration: 300
+      arrivalRate: 20
+      name: steady
+  engines:
+    socketio-v3: {}
+  processor: "./processor.js"
+
+scenarios:
+  - name: player_socket_flow
+    engine: socketio-v3
+    flow:
+      - function: "initVars"
+      - emit:
+          channel: "quiz:join"
+          data:
+            slug: "{{ slug }}"
+            nickname: "{{ nickname }}"
+            deviceId: "{{ deviceId }}"
+      - think: 1
+      - function: "emitSubmitIfConfigured"
+      - think: 1
+      - emit:
+          channel: "reaction:toggle"
+          data:
+            quizId: "{{ quizId }}"
+            reactionType: "clap"
