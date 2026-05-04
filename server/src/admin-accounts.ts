@@ -2,6 +2,21 @@ import { Buffer } from "node:buffer";
 
 export type AdminAccount = { login: string; password: string };
 
+function firstNonEmptyStringField(rec: Record<string, unknown>, ...keys: string[]): string {
+  for (const key of keys) {
+    const v = rec[key];
+    if (typeof v === "string") {
+      const t = v.trim();
+      if (t.length > 0) return t;
+    }
+    if (typeof v === "number" && Number.isFinite(v)) {
+      const s = String(v);
+      if (s.length > 0) return s;
+    }
+  }
+  return "";
+}
+
 /**
  * JSON из `ADMIN_ACCOUNTS_BASE64` (UTF-8) — предпочтительно в production: в значении нет `$`/`!`,
  * которые systemd / docker подменяют.
@@ -28,13 +43,18 @@ export function parseAdminAccountsJsonArray(raw: string | undefined): AdminAccou
     const parsed = JSON.parse(trimmed) as unknown;
     if (!Array.isArray(parsed)) return [];
     const out: AdminAccount[] = [];
-    for (const row of parsed) {
+    for (let i = 0; i < parsed.length; i++) {
+      const row = parsed[i];
       if (!row || typeof row !== "object") continue;
       const rec = row as Record<string, unknown>;
-      const login = typeof rec.login === "string" ? rec.login.trim() : "";
-      const password = typeof rec.password === "string" ? rec.password.trim() : "";
+      const login = firstNonEmptyStringField(rec, "login", "Login", "LOGIN");
+      const password = firstNonEmptyStringField(rec, "password", "Password", "PASSWORD");
       if (login.length > 0 && password.length > 0 && login.length <= 80 && password.length <= 500) {
         out.push({ login, password });
+      } else {
+        console.warn(
+          `[env] ADMIN_ACCOUNTS: element #${i + 1} skipped (need non-empty login and password as strings).`,
+        );
       }
     }
     return out;
@@ -50,7 +70,12 @@ export function dedupeAdminAccountsByLogin(accounts: AdminAccount[]): AdminAccou
   const out: AdminAccount[] = [];
   for (const acc of accounts) {
     const key = acc.login.toLowerCase();
-    if (seen.has(key)) continue;
+    if (seen.has(key)) {
+      console.warn(
+        `[env] Duplicate admin login "${acc.login}" (case-insensitive match); keeping only the first entry's password.`,
+      );
+      continue;
+    }
     seen.add(key);
     out.push(acc);
   }
@@ -65,7 +90,8 @@ export function adminCredentialMatch(
   const loginNorm = login.trim();
   const passwordNorm = password.trim();
   const loginKey = loginNorm.toLowerCase();
-  return accounts.some(
-    (a) => a.login.trim().toLowerCase() === loginKey && a.password === passwordNorm,
-  );
+  return accounts.some((a) => {
+    const storedPassword = a.password.trim();
+    return a.login.trim().toLowerCase() === loginKey && storedPassword === passwordNorm;
+  });
 }

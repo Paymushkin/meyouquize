@@ -1,5 +1,5 @@
 import { Buffer } from "node:buffer";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
   adminCredentialMatch,
   dedupeAdminAccountsByLogin,
@@ -9,6 +9,7 @@ import {
 
 describe("admin-accounts", () => {
   it("dedupes by login (case-insensitive), first wins", () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
     const list = dedupeAdminAccountsByLogin([
       { login: "admin", password: "a" },
       { login: "Anna", password: "b" },
@@ -18,6 +19,8 @@ describe("admin-accounts", () => {
       { login: "admin", password: "a" },
       { login: "Anna", password: "b" },
     ]);
+    expect(warn).toHaveBeenCalled();
+    warn.mockRestore();
   });
 
   it("parses valid JSON array", () => {
@@ -46,5 +49,19 @@ describe("admin-accounts", () => {
     expect(adminCredentialMatch(accounts, "Admin", "p1")).toBe(true);
     expect(adminCredentialMatch(accounts, "ADMIN", "p1")).toBe(true);
     expect(adminCredentialMatch(accounts, "Admin", "P1")).toBe(false);
+  });
+
+  it("matches second account from a two-entry ADMIN_ACCOUNTS JSON line", () => {
+    const raw =
+      '[{"login":"admin","password":"Paymushkin0073Meyou!"},{"login":"Anna","password":"aA125fee"}]';
+    const accounts = dedupeAdminAccountsByLogin(parseAdminAccountsJsonArray(raw));
+    expect(accounts).toHaveLength(2);
+    expect(adminCredentialMatch(accounts, "Anna", "aA125fee")).toBe(true);
+    expect(adminCredentialMatch(accounts, "ANNA", "aA125fee")).toBe(true);
+  });
+
+  it("parses Login/Password key aliases", () => {
+    const parsed = parseAdminAccountsJsonArray('[{"Login":"x","Password":"y"}]');
+    expect(parsed).toEqual([{ login: "x", password: "y" }]);
   });
 });
