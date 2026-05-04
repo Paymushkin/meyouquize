@@ -2,7 +2,8 @@
   encode zstd gzip
 
   # /socket.io/* не матчит путь /socket.io — иначе long-polling попадает в SPA (index.html вместо JS).
-  @api path /api/* /socket.io*
+  # /media/* — статика с backend (multer), не из client/dist.
+  @api path /api/* /socket.io* /media*
   handle @api {
     reverse_proxy 127.0.0.1:4000
   }
