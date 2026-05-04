@@ -64,5 +64,8 @@ export function adminCredentialMatch(
 ): boolean {
   const loginNorm = login.trim();
   const passwordNorm = password.trim();
-  return accounts.some((a) => a.login === loginNorm && a.password === passwordNorm);
+  const loginKey = loginNorm.toLowerCase();
+  return accounts.some(
+    (a) => a.login.trim().toLowerCase() === loginKey && a.password === passwordNorm,
+  );
 }

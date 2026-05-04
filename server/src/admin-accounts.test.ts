@@ -40,4 +40,11 @@ describe("admin-accounts", () => {
     expect(adminCredentialMatch(accounts, "  Anna  ", "  p2  ")).toBe(true);
     expect(adminCredentialMatch(accounts, "Anna", "wrong")).toBe(false);
   });
+
+  it("matches login case-insensitively (password still exact)", () => {
+    const accounts = [{ login: "admin", password: "p1" }];
+    expect(adminCredentialMatch(accounts, "Admin", "p1")).toBe(true);
+    expect(adminCredentialMatch(accounts, "ADMIN", "p1")).toBe(true);
+    expect(adminCredentialMatch(accounts, "Admin", "P1")).toBe(false);
+  });
 });
