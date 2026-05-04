@@ -3,8 +3,17 @@
 
   # /socket.io/* не матчит путь /socket.io — иначе long-polling попадает в SPA (index.html вместо JS).
   # /media/* — статика с backend (multer), не из client/dist.
-  # healthz/readyz — с бэкенда; иначе SPA отдаёт index.html и внешний мониторинг врёт.
-  @api path /api/* /socket.io* /media* /healthz /readyz
+  # healthz/readyz — отдельно: иначе try_files отдаёт SPA на эти пути.
+  @health {
+    path /healthz /readyz
+  }
+  handle @health {
+    reverse_proxy 127.0.0.1:4000 {
+      flush_interval -1
+    }
+  }
+
+  @api path /api/* /socket.io* /media*
   handle @api {
     reverse_proxy 127.0.0.1:4000 {
       # Socket.IO (polling + upgrade): низкая задержка сброса буфера — иначе соединение часто рвётся на «half-open».

@@ -3,7 +3,16 @@
 
   # /socket.io/* не матчит путь /socket.io — иначе long-polling попадает в SPA (index.html вместо JS).
   # /media/* — статика с backend (multer), не из client/dist.
-  @api path /api/* /socket.io* /media* /healthz /readyz
+  @health {
+    path /healthz /readyz
+  }
+  handle @health {
+    reverse_proxy 127.0.0.1:4000 {
+      flush_interval -1
+    }
+  }
+
+  @api path /api/* /socket.io* /media*
   handle @api {
     reverse_proxy 127.0.0.1:4000 {
       flush_interval -1

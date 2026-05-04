@@ -27,10 +27,12 @@ npm run deploy:internet
 - Set real `CLIENT_ORIGIN` (HTTPS domain).
 - Set strong `ADMIN_PASSWORD`.
 
-Use Caddy config:
+Use Caddy config (обязательно **перезаписать** `/etc/caddy/Caddyfile` из репозитория после `git pull`, иначе `reload` не подхватит правки):
 
 ```bash
-cp deploy/caddy/Caddyfile.internet /etc/caddy/Caddyfile
+sudo cp /opt/meyouquize/current/deploy/caddy/Caddyfile.internet /etc/caddy/Caddyfile
+# при необходимости замените {$DOMAIN} на ваш хост или задайте переменные окружения для Caddy
+diff /opt/meyouquize/current/deploy/caddy/Caddyfile.internet /etc/caddy/Caddyfile
 ```
 
 ### LAN mode
