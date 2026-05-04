@@ -2,9 +2,8 @@ import dotenv from "dotenv";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import {
-  mergeAdminAccounts,
-  parseExtraAdminAccountsJson,
-  parseOptionalSecondAdminFromEnv,
+  dedupeAdminAccountsByLogin,
+  parseAdminAccountsJsonArray,
   tryDecodeAdminAccountsBase64,
   type AdminAccount,
 } from "./admin-accounts.js";
@@ -72,6 +71,9 @@ function validateProductionSecurity(
   if (mode === "internet" && origins.length === 0) {
     throw new Error("CLIENT_ORIGIN must contain at least one origin in production internet mode");
   }
+  if (accounts.length === 0) {
+    throw new Error("At least one admin account is required in production");
+  }
   for (const acc of accounts) {
     if (acc.password === "change-me") {
       throw new Error(
@@ -81,36 +83,45 @@ function validateProductionSecurity(
   }
 }
 
+function explicitAdminAccountsJsonRaw(): string {
+  if (process.env.ADMIN_ACCOUNTS_BASE64?.trim() && process.env.ADMIN_ACCOUNTS?.trim()) {
+    console.warn("[env] Both ADMIN_ACCOUNTS_BASE64 and ADMIN_ACCOUNTS set; using BASE64 only.");
+  }
+  const decoded =
+    tryDecodeAdminAccountsBase64(process.env.ADMIN_ACCOUNTS_BASE64) ??
+    process.env.ADMIN_ACCOUNTS?.trim() ??
+    "";
+  return decoded.trim();
+}
+
+/**
+ * Все админы — один JSON-массив в `ADMIN_ACCOUNTS` или в `ADMIN_ACCOUNTS_BASE64` (рекомендуется в production).
+ * Если переменные не заданы — fallback на `ADMIN_LOGIN` + `ADMIN_PASSWORD` (один админ), для локальной разработки.
+ */
+function resolveAdminAccounts(): AdminAccount[] {
+  const raw = explicitAdminAccountsJsonRaw();
+  if (raw) {
+    const list = dedupeAdminAccountsByLogin(parseAdminAccountsJsonArray(raw));
+    if (list.length === 0) {
+      const msg =
+        'ADMIN_ACCOUNTS / ADMIN_ACCOUNTS_BASE64 must be a valid JSON array with at least one {"login":"...","password":"..."} object.';
+      if (process.env.NODE_ENV === "production") {
+        throw new Error(msg);
+      }
+      console.warn(`[env] ${msg} Falling back to ADMIN_LOGIN / ADMIN_PASSWORD.`);
+      return [{ login: readAdminLogin(), password: readAdminPassword() }];
+    }
+    return list;
+  }
+  return [{ login: readAdminLogin(), password: readAdminPassword() }];
+}
+
 const networkMode = parseNetworkMode();
 const clientOrigins = (process.env.CLIENT_ORIGIN ?? "http://localhost:5173")
   .split(",")
   .map((origin) => origin.trim().replace(/\/+$/, ""))
   .filter(Boolean);
-const adminPassword = readAdminPassword();
-const primaryAdmin: AdminAccount = { login: readAdminLogin(), password: adminPassword };
-const extraAccountsRaw =
-  tryDecodeAdminAccountsBase64(process.env.ADMIN_ACCOUNTS_BASE64) ??
-  process.env.ADMIN_ACCOUNTS?.trim() ??
-  "";
-if (process.env.ADMIN_ACCOUNTS_BASE64?.trim() && process.env.ADMIN_ACCOUNTS?.trim()) {
-  console.warn("[env] Set both ADMIN_ACCOUNTS_BASE64 and ADMIN_ACCOUNTS; using BASE64 only.");
-}
-const fromJsonAccounts = parseExtraAdminAccountsJson(extraAccountsRaw || undefined);
-const secondAdmin = parseOptionalSecondAdminFromEnv(process.env);
-const plaintextAdminAccounts = process.env.ADMIN_ACCOUNTS?.trim();
-if (
-  plaintextAdminAccounts &&
-  !process.env.ADMIN_ACCOUNTS_BASE64?.trim() &&
-  fromJsonAccounts.length === 0
-) {
-  console.warn(
-    "[env] ADMIN_ACCOUNTS is set but JSON did not parse to any account (often `$`/`!` in password). Use ADMIN_ACCOUNTS_BASE64 or ADMIN_SECOND_LOGIN + ADMIN_SECOND_PASSWORD_B64.",
-  );
-}
-const adminAccounts = mergeAdminAccounts(primaryAdmin, [
-  ...fromJsonAccounts,
-  ...(secondAdmin ? [secondAdmin] : []),
-]);
+const adminAccounts = resolveAdminAccounts();
 validateProductionSecurity(networkMode, clientOrigins, adminAccounts);
 
 console.info(
@@ -122,10 +133,8 @@ export const env = {
   networkMode,
   clientOrigins,
   allowLanViteOrigins: allowLanViteOrigins(),
-  /** Все допустимые пары логин/пароль (основная + JSON / второй админ из env). */
+  /** Все пары логин/пароль из одного JSON-массива (или legacy ADMIN_LOGIN / ADMIN_PASSWORD). */
   adminAccounts,
-  adminLogin: primaryAdmin.login,
-  adminPassword: primaryAdmin.password,
   databaseUrl:
     process.env.DATABASE_URL ?? "postgresql://postgres:postgres@localhost:5432/meyouquize",
   adminSessionHours: Number(process.env.ADMIN_SESSION_HOURS ?? 8),

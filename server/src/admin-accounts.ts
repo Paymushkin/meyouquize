@@ -3,8 +3,8 @@ import { Buffer } from "node:buffer";
 export type AdminAccount = { login: string; password: string };
 
 /**
- * JSON из `ADMIN_ACCOUNTS_BASE64` (UTF-8), если в пароле есть `$`, `!` и т.п. —
- * так надёжнее, чем одна строка в `.env` (systemd/docker иногда подставляют переменные).
+ * JSON из `ADMIN_ACCOUNTS_BASE64` (UTF-8) — предпочтительно в production: в значении нет `$`/`!`,
+ * которые systemd / docker подменяют.
  */
 export function tryDecodeAdminAccountsBase64(b64: string | undefined): string | undefined {
   const t = b64?.trim();
@@ -19,10 +19,9 @@ export function tryDecodeAdminAccountsBase64(b64: string | undefined): string | 
 }
 
 /**
- * Дополнительные админы из `ADMIN_ACCOUNTS` (JSON-массив объектов `{ "login", "password" }`).
- * Основная пара `ADMIN_LOGIN` / `ADMIN_PASSWORD` всегда первая и не перезаписывается.
+ * JSON-массив объектов `{ "login", "password" }` — все админы в одном месте.
  */
-export function parseExtraAdminAccountsJson(raw: string | undefined): AdminAccount[] {
+export function parseAdminAccountsJsonArray(raw: string | undefined): AdminAccount[] {
   const trimmed = raw?.trim();
   if (!trimmed) return [];
   try {
@@ -45,15 +44,17 @@ export function parseExtraAdminAccountsJson(raw: string | undefined): AdminAccou
   }
 }
 
-export function mergeAdminAccounts(primary: AdminAccount, extras: AdminAccount[]): AdminAccount[] {
-  const primaryKey = primary.login.toLowerCase();
-  const merged: AdminAccount[] = [primary];
-  for (const acc of extras) {
-    if (acc.login.toLowerCase() === primaryKey) continue;
-    if (merged.some((m) => m.login.toLowerCase() === acc.login.toLowerCase())) continue;
-    merged.push(acc);
+/** Первое вхождение логина (без учёта регистра) сохраняется. */
+export function dedupeAdminAccountsByLogin(accounts: AdminAccount[]): AdminAccount[] {
+  const seen = new Set<string>();
+  const out: AdminAccount[] = [];
+  for (const acc of accounts) {
+    const key = acc.login.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(acc);
   }
-  return merged;
+  return out;
 }
 
 export function adminCredentialMatch(
@@ -64,37 +65,4 @@ export function adminCredentialMatch(
   const loginNorm = login.trim();
   const passwordNorm = password.trim();
   return accounts.some((a) => a.login === loginNorm && a.password === passwordNorm);
-}
-
-/**
- * Второй админ без JSON: логин в plain, пароль лучше в base64 (`ADMIN_SECOND_PASSWORD_B64`),
- * чтобы символы `$`, `!` и т.д. не ломались в systemd / docker.
- */
-export function parseOptionalSecondAdminFromEnv(env: NodeJS.ProcessEnv): AdminAccount | null {
-  const login = env.ADMIN_SECOND_LOGIN?.trim();
-  if (!login) return null;
-  const b64 = env.ADMIN_SECOND_PASSWORD_B64?.trim();
-  const plain = env.ADMIN_SECOND_PASSWORD?.trim();
-  if (b64) {
-    try {
-      const password = Buffer.from(b64, "base64").toString("utf8").trim();
-      if (!password) {
-        console.warn(
-          "[env] ADMIN_SECOND_PASSWORD_B64 decoded to empty password, ignoring second admin",
-        );
-        return null;
-      }
-      return { login, password };
-    } catch {
-      console.warn("[env] ADMIN_SECOND_PASSWORD_B64 is not valid base64, ignoring second admin");
-      return null;
-    }
-  }
-  if (plain) {
-    return { login, password: plain };
-  }
-  console.warn(
-    "[env] ADMIN_SECOND_LOGIN is set but neither ADMIN_SECOND_PASSWORD_B64 nor ADMIN_SECOND_PASSWORD — ignoring second admin",
-  );
-  return null;
 }
