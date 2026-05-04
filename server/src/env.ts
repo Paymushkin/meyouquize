@@ -143,7 +143,23 @@ function resolveClusterWorkers(): number {
 
 const clusterWorkers = resolveClusterWorkers();
 const socketIoRequiresRedis = clusterWorkers > 1;
+const socketIoPingTimeoutMs = Math.max(
+  5_000,
+  Number.parseInt(process.env.SOCKET_IO_PING_TIMEOUT_MS ?? "60000", 10) || 60_000,
+);
+const socketIoPingIntervalRaw = Math.max(
+  3_000,
+  Number.parseInt(process.env.SOCKET_IO_PING_INTERVAL_MS ?? "25000", 10) || 25_000,
+);
+const socketIoPingIntervalMs = Math.min(
+  socketIoPingIntervalRaw,
+  Math.max(3_000, socketIoPingTimeoutMs - 2_000),
+);
+
 console.info(`[env] CLUSTER_WORKERS=${clusterWorkers} (set CLUSTER_WORKERS=1 to disable cluster)`);
+console.info(
+  `[env] Socket.IO pingInterval=${socketIoPingIntervalMs}ms pingTimeout=${socketIoPingTimeoutMs}ms`,
+);
 
 export const env = {
   port: Number(process.env.PORT ?? 4000),
@@ -174,4 +190,6 @@ export const env = {
   clusterWorkers,
   /** При true Redis-адаптер Socket.IO обязателен и при ошибке подключения процесс падает. */
   socketIoRequiresRedis,
+  socketIoPingTimeoutMs,
+  socketIoPingIntervalMs,
 };
