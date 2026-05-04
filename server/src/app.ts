@@ -590,7 +590,13 @@ export async function buildServer() {
     }
     next();
   });
-  if (env.redisUrl) {
+  if (env.socketIoRequiresRedis) {
+    if (!env.redisUrl) {
+      throw new Error("CLUSTER_WORKERS>1 requires REDIS_URL (Socket.IO rooms across processes)");
+    }
+    await attachSocketIoRedisAdapter(io, env.redisUrl);
+    console.info("[server] Redis: Socket.IO cluster adapter enabled (required for multi-worker)");
+  } else if (env.redisUrl) {
     try {
       await attachSocketIoRedisAdapter(io, env.redisUrl);
       console.info("[server] Redis: Socket.IO cluster adapter enabled");

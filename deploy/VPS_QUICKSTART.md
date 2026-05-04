@@ -82,3 +82,11 @@ curl -f http://127.0.0.1:4000/readyz
 ```
 
 Если всё ок, открой домен в браузере и проверь вход в админку.
+
+## Мультиядро (по желанию)
+
+```bash
+sudo apt install -y redis-server && sudo systemctl enable --now redis-server
+```
+
+В `deploy/env/.env.runtime` задайте `REDIS_URL=redis://127.0.0.1:6379` и `CLUSTER_WORKERS=auto` (или число воркеров), уменьшите `connection_limit` в `DATABASE_URL` на воркер, затем `sudo systemctl restart meyouquize`.

@@ -13,6 +13,8 @@ Restart=always
 RestartSec=3
 TimeoutStopSec=15
 KillSignal=SIGTERM
+# Сотни WebSocket × несколько воркеров — поднимите лимит дескрипторов при «too many open files».
+LimitNOFILE=65535
 
 [Install]
 WantedBy=multi-user.target

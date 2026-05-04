@@ -5,6 +5,7 @@
 - Linux host with Node 20+, npm, and Caddy.
 - App directory: `/opt/meyouquize/current`.
 - PostgreSQL reachable from the host.
+- **Мультиядро (рекомендуется на VPS ≥2 vCPU):** локальный Redis (`redis-server`) и в `.env.runtime` переменные `CLUSTER_WORKERS=auto` (или `4`) и `REDIS_URL=redis://127.0.0.1:6379`. Один процесс Node использует по сути одно ядро под JS; `node:cluster` поднимает несколько воркеров на **том же** `PORT`, Caddy менять не нужно. В `DATABASE_URL` уменьшите `connection_limit` на воркер так, чтобы `воркеры × лимит` не забивали Postgres.
 
 ## 2) Build & migrate
 

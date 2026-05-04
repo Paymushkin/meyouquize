@@ -1,4 +1,5 @@
 import dotenv from "dotenv";
+import { availableParallelism } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import {
@@ -16,10 +17,9 @@ dotenv.config({ path: projectRootEnv });
 dotenv.config();
 
 /**
- * Малая инфраструктура: один процесс Node + Postgres. В `DATABASE_URL` для продакшена
- * задайте лимит пула, например `?connection_limit=5` (или через PgBouncer), чтобы не
- * исчерпать соединения на малом инстансе. `REDIS_URL` нужен только для нескольких
- * инстансов Socket.IO (см. attachSocketIoRedisAdapter).
+ * Малая инфраструктура: Node + Postgres. В `DATABASE_URL` задайте лимит пула, например
+ * `?connection_limit=5` (или PgBouncer). Несколько воркеров: `CLUSTER_WORKERS` в
+ * `server/src/index.ts` + обязательный `REDIS_URL` для Socket.IO (см. attachSocketIoRedisAdapter).
  *
  * Дашборд результатов: `DASHBOARD_RESULTS_DEBOUNCE_MS` — пауза перед пересчётом после
  * всплеска `answer:submit` (меньше — живее UI, больше — меньше нагрузки на Postgres).
@@ -128,6 +128,23 @@ console.info(
   `[env] Admin accounts: ${adminAccounts.length} (logins: ${adminAccounts.map((a) => a.login).join(", ")})`,
 );
 
+/** Несколько воркеров на одном порту (node:cluster). >1 требует REDIS_URL для Socket.IO. */
+function resolveClusterWorkers(): number {
+  const raw = (process.env.CLUSTER_WORKERS ?? "").trim().toLowerCase();
+  if (raw === "" || raw === "1") return 1;
+  if (raw === "0" || raw === "auto") {
+    const n = availableParallelism();
+    return Math.min(Math.max(n, 1), 8);
+  }
+  const parsed = Number.parseInt(raw, 10);
+  if (!Number.isFinite(parsed) || parsed < 1) return 1;
+  return Math.min(parsed, 16);
+}
+
+const clusterWorkers = resolveClusterWorkers();
+const socketIoRequiresRedis = clusterWorkers > 1;
+console.info(`[env] CLUSTER_WORKERS=${clusterWorkers} (set CLUSTER_WORKERS=1 to disable cluster)`);
+
 export const env = {
   port: Number(process.env.PORT ?? 4000),
   networkMode,
@@ -144,5 +161,17 @@ export const env = {
     0,
     Number.parseInt(process.env.DASHBOARD_RESULTS_DEBOUNCE_MS ?? "220", 10) || 220,
   ),
+  /**
+   * После join/disconnect пересчёт онлайна через fetchSockets по комнате — дорогой при сотнях сокетов.
+   * Дебаунс склеивает всплески (один проход вместо сотен подряд). 0 = без дебаунса (только для отладки).
+   */
+  quizOnlineCountDebounceMs: Math.max(
+    0,
+    Number.parseInt(process.env.QUIZ_ONLINE_COUNT_DEBOUNCE_MS ?? "250", 10) || 250,
+  ),
   mediaDir: process.env.MEDIA_DIR?.trim() || path.resolve(serverSrcDir, "../../media"),
+  /** Количество Node-воркеров (см. `server/src/index.ts`). */
+  clusterWorkers,
+  /** При true Redis-адаптер Socket.IO обязателен и при ошибке подключения процесс падает. */
+  socketIoRequiresRedis,
 };
