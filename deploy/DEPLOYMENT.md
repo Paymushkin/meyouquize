@@ -77,6 +77,8 @@ Also verify from browser:
 - `/api/admin/me` returns `401` without login.
 - Admin login works and sockets connect.
 
+Если в браузере `WebSocket … closed before established`: обновите Caddyfile из репозитория (блок `flush_interval -1` у `reverse_proxy` для `/api` и `/socket.io`), затем `sudo systemctl reload caddy`. Проверьте, что в `.env` в `CLIENT_ORIGIN` указан **ровно** тот же origin, что в адресной строке (например `https://meyou.site`, без лишнего слэша и с тем же `www`/без `www`).
+
 ## 7) Safe update sequence
 
 ```bash
