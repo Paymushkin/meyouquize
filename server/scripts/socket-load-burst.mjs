@@ -11,16 +11,37 @@
  *   BASE_URL=http://localhost:4000 QUIZ_SLUG=room1 node scripts/socket-load-burst.mjs
  *   RUN_SUBMIT=1 SUBMIT_PLAYERS=80 BASE_URL=... QUIZ_SLUG=... node scripts/socket-load-burst.mjs
  *   RUN_SUBMIT=1 RUN_DASHBOARD=1 SUBMIT_PLAYERS=100 BASE_URL=... QUIZ_SLUG=... node scripts/socket-load-burst.mjs
+ *
+ * Реалистичное голосование (распределение по времени, все онлайн до конца окна):
+ *   REALISTIC_VOTE=1 VOTE_WINDOW_MS=60000 SUBMIT_PLAYERS=500 ...
+ *   (VOTE_WINDOW_MS по умолчанию 60000, если задан только REALISTIC_VOTE=1)
+ *
+ * Растягивание подключений (чтобы не убить один процесс Node/Caddy одним мега-handshake):
+ *   JOIN_RAMP_MS=45000 — старт каждого следующего клиента равномерно в окне 0..JOIN_RAMP_MS
+ *   JOIN_ACK_TIMEOUT_MS=25000 — таймаут ожидания quiz:joined (по умолчанию 15000)
  */
 import { io } from "socket.io-client";
 
 const base = process.env.BASE_URL || "http://localhost:4000";
 const slug = process.env.QUIZ_SLUG;
 const players = Number(process.env.PLAYER_COUNT || 120);
+const joinRampMs = Number(process.env.JOIN_RAMP_MS || 0);
+const joinAckTimeoutMs = Number(process.env.JOIN_ACK_TIMEOUT_MS || 15_000);
 const runSubmit = process.env.RUN_SUBMIT === "1" || process.env.RUN_SUBMIT === "true";
 const runDashboard = process.env.RUN_DASHBOARD === "1" || process.env.RUN_DASHBOARD === "true";
 const submitPlayers = Number(process.env.SUBMIT_PLAYERS || players);
 const dashboardWaitMs = Number(process.env.DASHBOARD_WAIT_MS || 3500);
+const holdMs = Number(process.env.HOLD_MS || 0);
+const submitTimeoutMs = Number(process.env.SUBMIT_TIMEOUT_MS || 12_000);
+const voteWindowMsRaw = Number(process.env.VOTE_WINDOW_MS || 0);
+const realisticVoteFlag =
+  process.env.REALISTIC_VOTE === "1" || process.env.REALISTIC_VOTE === "true";
+const useRealisticVote = realisticVoteFlag || voteWindowMsRaw > 0;
+const voteWindowMs = voteWindowMsRaw > 0 ? voteWindowMsRaw : useRealisticVote ? 60_000 : 0;
+const voteDistribution = (process.env.VOTE_DISTRIBUTION || "normal").trim().toLowerCase();
+const forcedQuizId = (process.env.QUIZ_ID || "").trim();
+const forcedQuestionId = (process.env.QUESTION_ID || "").trim();
+const forcedOptionId = (process.env.OPTION_ID || "").trim();
 
 if (!slug) {
   console.error("Задайте QUIZ_SLUG (slug комнаты / квиза).");
@@ -34,6 +55,57 @@ function sleep(ms) {
   return new Promise((r) => setTimeout(r, ms));
 }
 
+function bumpReason(map, reason) {
+  const key = (reason || "unknown").toString();
+  map.set(key, (map.get(key) ?? 0) + 1);
+}
+
+function printTopReasons(prefix, map) {
+  if (map.size === 0) return;
+  const top = [...map.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 8)
+    .map(([reason, count]) => `${reason}:${count}`)
+    .join(", ");
+  console.info(`${prefix} ${top}`);
+}
+
+/** N(0,1) через Box–Muller */
+function randomStdNormal() {
+  let u = 0;
+  let v = 0;
+  while (u === 0) u = Math.random();
+  while (v === 0) v = Math.random();
+  return Math.sqrt(-2.0 * Math.log(u)) * Math.cos(2.0 * Math.PI * v);
+}
+
+/** Случайная задержка в [0, windowMs): по умолчанию нормальное распределение вокруг середины окна. */
+function sampleVoteDelayMs(windowMs) {
+  if (windowMs <= 1) return 0;
+  if (voteDistribution === "uniform") {
+    return Math.floor(Math.random() * windowMs);
+  }
+  const mean = windowMs / 2;
+  const std = windowMs / 6;
+  for (let k = 0; k < 24; k += 1) {
+    const x = mean + std * randomStdNormal();
+    if (x >= 0 && x < windowMs) return Math.floor(x);
+  }
+  return Math.floor(Math.random() * windowMs);
+}
+
+function resolveSubmitTargetFromState(state) {
+  const quizId = typeof state?.id === "string" ? state.id : "";
+  const question = state?.activeQuestion;
+  const questionId = typeof question?.id === "string" ? question.id : "";
+  const optionId = question?.options?.[0]?.id;
+  return {
+    quizId,
+    questionId,
+    optionId: typeof optionId === "string" ? optionId : "",
+  };
+}
+
 function connectObserver(dashTimes) {
   return new Promise((resolve, reject) => {
     const s = io(base, { transports: ["websocket"], reconnection: false });
@@ -43,7 +115,7 @@ function connectObserver(dashTimes) {
       reject(new Error("observer_timeout (нет results:dashboard после subscribe)"));
     }, 20_000);
     s.on("connect", () => {
-      s.emit("results:subscribe", { slug });
+      s.emit("results:subscribe", { slug, viewer: "projector" });
     });
     s.once("results:dashboard", () => {
       clearTimeout(to);
@@ -60,44 +132,47 @@ function connectObserver(dashTimes) {
   });
 }
 
-function makeClient(i) {
+function makeClient(i, startDelayMs = 0, ackTimeoutMs = joinAckTimeoutMs) {
   return new Promise((resolve) => {
-    const s = io(base, { transports: ["websocket"], reconnection: false });
-    const nickname = `load_${i}_${Date.now()}`;
-    const deviceId = `dev_${i}_${Math.random().toString(36).slice(2)}`;
-    s.on("connect", () => {
-      const t0 = Date.now();
-      s.emit("quiz:join", { slug, nickname, deviceId });
-      s.once("quiz:joined", () => {
-        joinLatencies.push(Date.now() - t0);
+    const armTimeout = (client) =>
+      setTimeout(() => resolve({ ok: false, err: "timeout", client }), ackTimeoutMs);
+
+    const start = () => {
+      const s = io(base, { transports: ["websocket"], reconnection: false });
+      const client = { socket: s, lastState: null };
+      const to = armTimeout(client);
+      const nickname = `load_${i}_${Date.now()}`;
+      const deviceId = `dev_${i}_${Math.random().toString(36).slice(2)}`;
+      s.on("state:quiz", (state) => {
+        client.lastState = state;
       });
-    });
-    s.on("quiz:joined", () => {
-      resolve({ ok: true, socket: s });
-    });
-    s.on("error:message", (e) => {
-      resolve({ ok: false, err: e?.message, socket: s });
-    });
-    s.on("connect_error", () => {
-      resolve({ ok: false, err: "connect_error", socket: s });
-    });
-    setTimeout(() => resolve({ ok: false, err: "timeout", socket: s }), 15_000);
-  });
-}
-
-function waitQuizState(socket, ms) {
-  return new Promise((resolve) => {
-    const t = setTimeout(() => resolve(null), ms);
-    const onState = (state) => {
-      clearTimeout(t);
-      socket.off("state:quiz", onState);
-      resolve(state);
+      s.on("connect", () => {
+        const t0 = Date.now();
+        s.emit("quiz:join", { slug, nickname, deviceId });
+        s.once("quiz:joined", () => {
+          joinLatencies.push(Date.now() - t0);
+        });
+      });
+      s.on("quiz:joined", () => {
+        clearTimeout(to);
+        resolve({ ok: true, client });
+      });
+      s.on("error:message", (e) => {
+        clearTimeout(to);
+        resolve({ ok: false, err: e?.message, client });
+      });
+      s.on("connect_error", () => {
+        clearTimeout(to);
+        resolve({ ok: false, err: "connect_error", client });
+      });
     };
-    socket.on("state:quiz", onState);
+
+    if (startDelayMs > 0) setTimeout(start, startDelayMs);
+    else start();
   });
 }
 
-function submitAnswer(socket, quizId, questionId, optionId) {
+function submitAnswer(socket, quizId, questionId, optionId, ackTimeoutMs = submitTimeoutMs) {
   return new Promise((resolve) => {
     let settled = false;
     const t0 = Date.now();
@@ -117,7 +192,7 @@ function submitAnswer(socket, quizId, questionId, optionId) {
     function onErr(e) {
       finish(false, e?.message || "error");
     }
-    timer = setTimeout(() => finish(false, "submit_timeout"), 12_000);
+    timer = setTimeout(() => finish(false, "submit_timeout"), ackTimeoutMs);
     socket.on("answer:submitted", onOk);
     socket.on("error:message", onErr);
     socket.emit("answer:submit", {
@@ -134,6 +209,28 @@ function percentile(sorted, p) {
   return sorted[idx];
 }
 
+async function resolveSubmitTarget(joinedClients, timeoutMs = 10_000) {
+  if (forcedQuizId && forcedQuestionId && forcedOptionId) {
+    return {
+      quizId: forcedQuizId,
+      questionId: forcedQuestionId,
+      optionId: forcedOptionId,
+      source: "env",
+    };
+  }
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    for (const c of joinedClients) {
+      const target = resolveSubmitTargetFromState(c.lastState);
+      if (target.quizId && target.questionId && target.optionId) {
+        return { ...target, source: "state:quiz" };
+      }
+    }
+    await sleep(250);
+  }
+  return null;
+}
+
 const dashboardTimestamps = [];
 let observerSocket = null;
 if (runDashboard) {
@@ -148,15 +245,37 @@ if (runDashboard) {
   }
 }
 
-const results = await Promise.all(Array.from({ length: players }, (_, i) => makeClient(i)));
+if (joinRampMs > 0) {
+  console.info(
+    `[socket-load] join_ramp_ms=${joinRampMs} join_ack_timeout_ms=${joinAckTimeoutMs} (staggered connect)`,
+  );
+} else {
+  console.info(`[socket-load] join_ack_timeout_ms=${joinAckTimeoutMs}`);
+}
+
+const results = await Promise.all(
+  Array.from({ length: players }, (_, i) => {
+    const delay =
+      joinRampMs > 0 && players > 0 ? Math.floor((i * joinRampMs) / Math.max(players, 1)) : 0;
+    return makeClient(i, delay, joinAckTimeoutMs);
+  }),
+);
 
 let failed = 0;
-const joinedSockets = [];
+const joinedClients = [];
+const joinFailReasons = new Map();
 for (const r of results) {
-  if (!r.ok) failed += 1;
-  else joinedSockets.push(r.socket);
+  if (!r.ok) {
+    failed += 1;
+    bumpReason(joinFailReasons, r.err);
+  } else {
+    joinedClients.push(r.client);
+  }
 }
 console.info(`[socket-load] joined_ok=${players - failed}/${players}`);
+if (failed > 0) {
+  printTopReasons("[socket-load] join_fail_reasons", joinFailReasons);
+}
 if (joinLatencies.length > 0) {
   const j = [...joinLatencies].sort((a, b) => a - b);
   console.info(
@@ -166,27 +285,80 @@ if (joinLatencies.length > 0) {
 
 let submitEndedAt = 0;
 
-if (runSubmit && joinedSockets.length > 0) {
-  const probe = joinedSockets[0];
-  const state = await waitQuizState(probe, 8000);
-  const q = state?.activeQuestion;
-  const quizId = state?.id;
-  if (!quizId || !q?.id || !q.options?.length) {
+if (runSubmit && joinedClients.length > 0) {
+  const resolveTargetMs = joinRampMs > 0 ? 20_000 : 12_000;
+  const target = await resolveSubmitTarget(joinedClients, resolveTargetMs);
+  if (!target) {
     console.warn(
-      "[socket-load] RUN_SUBMIT: нет активного вопроса с вариантами в state:quiz — фаза submit пропущена.",
+      "[socket-load] RUN_SUBMIT: нет quizId/questionId/optionId. Укажите QUIZ_ID + QUESTION_ID + OPTION_ID или откройте активный вопрос.",
     );
   } else {
-    const optionId = q.options[0].id;
-    const n = Math.min(submitPlayers, joinedSockets.length);
-    const submitResults = await Promise.all(
-      joinedSockets.slice(0, n).map((sock) => submitAnswer(sock, quizId, q.id, optionId)),
-    );
+    const n = Math.min(submitPlayers, joinedClients.length);
+    if (n < submitPlayers) {
+      console.warn(
+        `[socket-load] RUN_SUBMIT: SUBMIT_PLAYERS=${submitPlayers}, но в join только ${joinedClients.length} — голосуют ${n}.`,
+      );
+    }
+    let submitResults;
+    if (useRealisticVote && voteWindowMs > 0) {
+      console.info(
+        `[socket-load] realistic_vote window_ms=${voteWindowMs} voters=${n} distribution=${voteDistribution} submit_timeout_ms=${submitTimeoutMs}`,
+      );
+      const delays = [];
+      for (let i = 0; i < n; i += 1) delays.push(sampleVoteDelayMs(voteWindowMs));
+      delays.sort((a, b) => a - b);
+      const p50d = percentile([...delays], 50);
+      const p95d = percentile([...delays], 95);
+      console.info(
+        `[socket-load] vote_schedule_delay_ms p50=${p50d} p95=${p95d} max=${delays[delays.length - 1]}`,
+      );
+      submitResults = await Promise.all(
+        joinedClients.slice(0, n).map(
+          (c, idx) =>
+            new Promise((resolve) => {
+              const delayMs = delays[idx] ?? 0;
+              setTimeout(() => {
+                submitAnswer(
+                  c.socket,
+                  target.quizId,
+                  target.questionId,
+                  target.optionId,
+                  submitTimeoutMs,
+                ).then(resolve);
+              }, delayMs);
+            }),
+        ),
+      );
+    } else {
+      submitResults = await Promise.all(
+        joinedClients
+          .slice(0, n)
+          .map((c) =>
+            submitAnswer(
+              c.socket,
+              target.quizId,
+              target.questionId,
+              target.optionId,
+              submitTimeoutMs,
+            ),
+          ),
+      );
+    }
     submitEndedAt = Date.now();
     let submitFail = 0;
+    const submitFailReasons = new Map();
     for (const sr of submitResults) {
-      if (!sr.ok) submitFail += 1;
+      if (!sr.ok) {
+        submitFail += 1;
+        bumpReason(submitFailReasons, sr.err);
+      }
     }
-    console.info(`[socket-load] submit_ok=${n - submitFail}/${n} (question=${q.id.slice(0, 8)}…)`);
+    console.info(
+      `[socket-load] submit_ok=${n - submitFail}/${n} (question=${target.questionId.slice(0, 8)}…, source=${target.source})`,
+    );
+    if (submitFail > 0) {
+      printTopReasons("[socket-load] submit_fail_reasons", submitFailReasons);
+    }
     if (submitLatencies.length > 0) {
       const s = [...submitLatencies].sort((a, b) => a - b);
       console.info(
@@ -210,10 +382,17 @@ if (runDashboard && observerSocket && submitEndedAt > 0) {
   console.info(`[socket-load] dashboard_events_total=${dashboardTimestamps.length}`);
 }
 
+if (holdMs > 0) {
+  console.info(
+    `[socket-load] hold connections for ${holdMs} ms (for online counter / live observation)`,
+  );
+  await sleep(holdMs);
+}
+
 if (observerSocket) observerSocket.close();
 
 for (const r of results) {
-  r.socket?.close();
+  r.client?.socket?.close();
 }
 
 if (failed > 0) {
