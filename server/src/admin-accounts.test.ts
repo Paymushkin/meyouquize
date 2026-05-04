@@ -1,8 +1,10 @@
+import { Buffer } from "node:buffer";
 import { describe, expect, it } from "vitest";
 import {
   adminCredentialMatch,
   mergeAdminAccounts,
   parseExtraAdminAccountsJson,
+  tryDecodeAdminAccountsBase64,
 } from "./admin-accounts.js";
 
 describe("admin-accounts", () => {
@@ -22,6 +24,12 @@ describe("admin-accounts", () => {
   it("parses valid JSON array", () => {
     const parsed = parseExtraAdminAccountsJson('[{"login":"Anna","password":"x"}]');
     expect(parsed).toEqual([{ login: "Anna", password: "x" }]);
+  });
+
+  it("decodes ADMIN_ACCOUNTS_BASE64 payload (special chars survive)", () => {
+    const json = JSON.stringify([{ login: "Anna", password: "x%$!y" }]);
+    const b64 = Buffer.from(json, "utf8").toString("base64");
+    expect(tryDecodeAdminAccountsBase64(b64)).toBe(json);
   });
 
   it("matches credentials", () => {

@@ -1,4 +1,22 @@
+import { Buffer } from "node:buffer";
+
 export type AdminAccount = { login: string; password: string };
+
+/**
+ * JSON из `ADMIN_ACCOUNTS_BASE64` (UTF-8), если в пароле есть `$`, `!` и т.п. —
+ * так надёжнее, чем одна строка в `.env` (systemd/docker иногда подставляют переменные).
+ */
+export function tryDecodeAdminAccountsBase64(b64: string | undefined): string | undefined {
+  const t = b64?.trim();
+  if (!t) return undefined;
+  try {
+    const decoded = Buffer.from(t, "base64").toString("utf8").trim();
+    return decoded.length > 0 ? decoded : undefined;
+  } catch {
+    console.warn("[env] ADMIN_ACCOUNTS_BASE64 decode failed, ignoring");
+    return undefined;
+  }
+}
 
 /**
  * Дополнительные админы из `ADMIN_ACCOUNTS` (JSON-массив объектов `{ "login", "password" }`).

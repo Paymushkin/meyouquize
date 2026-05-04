@@ -4,6 +4,7 @@ import { fileURLToPath } from "node:url";
 import {
   mergeAdminAccounts,
   parseExtraAdminAccountsJson,
+  tryDecodeAdminAccountsBase64,
   type AdminAccount,
 } from "./admin-accounts.js";
 
@@ -86,9 +87,16 @@ const clientOrigins = (process.env.CLIENT_ORIGIN ?? "http://localhost:5173")
   .filter(Boolean);
 const adminPassword = readAdminPassword();
 const primaryAdmin: AdminAccount = { login: readAdminLogin(), password: adminPassword };
+const extraAccountsRaw =
+  tryDecodeAdminAccountsBase64(process.env.ADMIN_ACCOUNTS_BASE64) ??
+  process.env.ADMIN_ACCOUNTS?.trim() ??
+  "";
+if (process.env.ADMIN_ACCOUNTS_BASE64?.trim() && process.env.ADMIN_ACCOUNTS?.trim()) {
+  console.warn("[env] Set both ADMIN_ACCOUNTS_BASE64 and ADMIN_ACCOUNTS; using BASE64 only.");
+}
 const adminAccounts = mergeAdminAccounts(
   primaryAdmin,
-  parseExtraAdminAccountsJson(process.env.ADMIN_ACCOUNTS),
+  parseExtraAdminAccountsJson(extraAccountsRaw || undefined),
 );
 validateProductionSecurity(networkMode, clientOrigins, adminAccounts);
 
