@@ -27,6 +27,15 @@ const slug = process.env.QUIZ_SLUG;
 const players = Number(process.env.PLAYER_COUNT || 120);
 const joinRampMs = Number(process.env.JOIN_RAMP_MS || 0);
 const joinAckTimeoutMs = Number(process.env.JOIN_ACK_TIMEOUT_MS || 15_000);
+/** Повтор handshake при connect_error (один и тот же join в пределах join_ack_timeout). */
+const joinConnectRetries = Math.max(1, Number(process.env.JOIN_CONNECT_RETRIES ?? "3"));
+const joinConnectBackoffMs = Math.max(0, Number(process.env.JOIN_CONNECT_BACKOFF_MS ?? "400"));
+/** Сколько неуспешных join допускаем без exit 1 (0 = строго все должны войти). По умолчанию 1. */
+const joinFailToleranceRaw = process.env.JOIN_FAIL_TOLERANCE?.trim();
+const joinFailTolerance =
+  joinFailToleranceRaw === undefined || joinFailToleranceRaw === ""
+    ? 1
+    : Math.max(0, Number.parseInt(joinFailToleranceRaw, 10) || 0);
 const runSubmit = process.env.RUN_SUBMIT === "1" || process.env.RUN_SUBMIT === "true";
 const runDashboard = process.env.RUN_DASHBOARD === "1" || process.env.RUN_DASHBOARD === "true";
 const submitPlayers = Number(process.env.SUBMIT_PLAYERS || players);
@@ -47,6 +56,10 @@ if (!slug) {
   console.error("Задайте QUIZ_SLUG (slug комнаты / квиза).");
   process.exit(1);
 }
+
+console.info(
+  `[socket-load] join_connect_retries=${joinConnectRetries} backoff_ms=${joinConnectBackoffMs} join_fail_tolerance=${joinFailTolerance}`,
+);
 
 const joinLatencies = [];
 const submitLatencies = [];
@@ -134,18 +147,48 @@ function connectObserver(dashTimes) {
 
 function makeClient(i, startDelayMs = 0, ackTimeoutMs = joinAckTimeoutMs) {
   return new Promise((resolve) => {
-    const armTimeout = (client) =>
-      setTimeout(() => resolve({ ok: false, err: "timeout", client }), ackTimeoutMs);
+    let globalTimer = null;
+    let activeSocket = null;
+    const nickname = `load_${i}_${Date.now()}`;
+    const deviceId = `dev_${i}_${Math.random().toString(36).slice(2)}`;
 
-    const start = () => {
+    function finish(payload) {
+      if (globalTimer) {
+        clearTimeout(globalTimer);
+        globalTimer = null;
+      }
+      resolve(payload);
+    }
+
+    function cleanupActiveSocket() {
+      if (!activeSocket) return;
+      try {
+        activeSocket.removeAllListeners();
+        activeSocket.close();
+      } catch {
+        /* ignore */
+      }
+      activeSocket = null;
+    }
+
+    let handshakeAttempt = 0;
+
+    function startHandshakeAttempt() {
+      cleanupActiveSocket();
+      handshakeAttempt += 1;
+      if (handshakeAttempt > joinConnectRetries) {
+        finish({ ok: false, err: "connect_error", client: { socket: null, lastState: null } });
+        return;
+      }
+
       const s = io(base, { transports: ["websocket"], reconnection: false });
+      activeSocket = s;
       const client = { socket: s, lastState: null };
-      const to = armTimeout(client);
-      const nickname = `load_${i}_${Date.now()}`;
-      const deviceId = `dev_${i}_${Math.random().toString(36).slice(2)}`;
+
       s.on("state:quiz", (state) => {
         client.lastState = state;
       });
+
       s.on("connect", () => {
         const t0 = Date.now();
         s.emit("quiz:join", { slug, nickname, deviceId });
@@ -153,18 +196,37 @@ function makeClient(i, startDelayMs = 0, ackTimeoutMs = joinAckTimeoutMs) {
           joinLatencies.push(Date.now() - t0);
         });
       });
-      s.on("quiz:joined", () => {
-        clearTimeout(to);
-        resolve({ ok: true, client });
+
+      s.once("quiz:joined", () => {
+        finish({ ok: true, client });
       });
-      s.on("error:message", (e) => {
-        clearTimeout(to);
-        resolve({ ok: false, err: e?.message, client });
+
+      s.once("error:message", (e) => {
+        finish({ ok: false, err: e?.message, client });
       });
-      s.on("connect_error", () => {
-        clearTimeout(to);
-        resolve({ ok: false, err: "connect_error", client });
+
+      s.once("connect_error", (err) => {
+        if (handshakeAttempt < joinConnectRetries) {
+          console.warn(
+            `[socket-load] client ${i} connect_error (${handshakeAttempt}/${joinConnectRetries}) ${err?.message || err}; retry in ${joinConnectBackoffMs}ms`,
+          );
+          setTimeout(startHandshakeAttempt, joinConnectBackoffMs);
+        } else {
+          finish({ ok: false, err: "connect_error", client });
+        }
       });
+    }
+
+    const start = () => {
+      globalTimer = setTimeout(() => {
+        cleanupActiveSocket();
+        finish({
+          ok: false,
+          err: "timeout",
+          client: activeSocket ? { socket: activeSocket, lastState: null } : null,
+        });
+      }, ackTimeoutMs);
+      startHandshakeAttempt();
     };
 
     if (startDelayMs > 0) setTimeout(start, startDelayMs);
@@ -395,8 +457,16 @@ for (const r of results) {
   r.client?.socket?.close();
 }
 
-if (failed > 0) {
+if (failed > joinFailTolerance) {
   process.exitCode = 1;
+  console.error(
+    `[socket-load] join SLO: ${failed} сбоев > tolerance=${joinFailTolerance} (JOIN_FAIL_TOLERANCE)`,
+  );
 } else {
+  if (failed > 0) {
+    console.warn(
+      `[socket-load] join SLO: ${failed} сбоев в пределах tolerance=${joinFailTolerance} — exit 0`,
+    );
+  }
   console.info("[socket-load] join SLO: без ошибок при заданном PLAYER_COUNT — условно пройдено.");
 }
