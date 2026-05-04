@@ -565,6 +565,8 @@ export async function buildServer() {
   const app = buildApp();
   const httpServer = createServer(app);
   const io = new Server(httpServer, {
+    // Сотни WS: deflate съедает CPU на event loop; для квиза полезная нагрузка в JSON и так невелика.
+    perMessageDeflate: false,
     cors: {
       origin: (origin, callback) => {
         const allowed = isCorsOriginAllowed(origin ?? undefined);

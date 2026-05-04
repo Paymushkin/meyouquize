@@ -1,0 +1,17 @@
+{
+  "run_http": false,
+  "http_vus": 5,
+  "http_duration": "30s",
+  "player_count": 220,
+  "run_submit": true,
+  "submit_players": 220,
+  "run_dashboard": true,
+  "dashboard_wait_ms": 3500,
+  "hold_ms": 8000,
+  "join_ramp_ms": 60000,
+  "join_ack_timeout_ms": 32000,
+  "realistic_vote": true,
+  "vote_window_ms": 60000,
+  "vote_distribution": "normal",
+  "submit_timeout_ms": 25000
+}
