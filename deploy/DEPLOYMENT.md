@@ -72,6 +72,13 @@ curl -f http://127.0.0.1:4000/healthz
 curl -f http://127.0.0.1:4000/readyz
 ```
 
+С домена по HTTPS (после обновления Caddyfile из репозитория — пути `/healthz` и `/readyz` проксируются на бэкенд, иначе отдавался бы SPA):
+
+```bash
+curl -sf https://YOUR_DOMAIN/healthz
+curl -sf https://YOUR_DOMAIN/readyz
+```
+
 Also verify from browser:
 
 - `/` opens frontend.
