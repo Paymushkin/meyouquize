@@ -73,7 +73,7 @@ function validateProductionSecurity(
 const networkMode = parseNetworkMode();
 const clientOrigins = (process.env.CLIENT_ORIGIN ?? "http://localhost:5173")
   .split(",")
-  .map((origin) => origin.trim())
+  .map((origin) => origin.trim().replace(/\/+$/, ""))
   .filter(Boolean);
 const adminPassword = readAdminPassword();
 validateProductionSecurity(networkMode, clientOrigins, adminPassword);

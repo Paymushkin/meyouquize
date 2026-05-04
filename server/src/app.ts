@@ -208,7 +208,8 @@ export function buildApp() {
       sameSite: "lax",
       httpOnly: true,
       secure: cookieSecure,
-      path: "/api/admin",
+      /** `/api/admin` не отправляется на `/socket.io` — handshake без сессии, assertAdmin падает. */
+      path: "/",
       expires: expiresAt,
     });
     return res.json({ ok: true });
