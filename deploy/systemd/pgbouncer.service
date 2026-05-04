@@ -1,0 +1,18 @@
+[Unit]
+Description=PgBouncer PostgreSQL connection pooler
+Documentation=https://www.pgbouncer.org/
+After=network.target postgresql.service
+Wants=postgresql.service
+
+[Service]
+Type=simple
+User=postgres
+Group=postgres
+# Бинарник: при ошибке ExecStart проверьте /usr/bin/pgbouncer (см. which pgbouncer).
+ExecStart=/usr/sbin/pgbouncer /etc/pgbouncer/pgbouncer.ini
+ExecReload=/bin/kill -HUP $MAINPID
+Restart=on-failure
+RestartSec=2
+
+[Install]
+WantedBy=multi-user.target

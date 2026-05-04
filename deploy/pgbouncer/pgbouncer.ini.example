@@ -1,0 +1,25 @@
+;; Скопируйте в /etc/pgbouncer/pgbouncer.ini и поправьте dbname/хост при необходимости.
+;; Слушает только localhost — приложение и Prisma ходят в пулер по 127.0.0.1:6432.
+;;
+;; trust: пароль клиента к PgBouncer не проверяется (имеет смысл только при listen на 127.0.0.1).
+;; Для проверки паролей используйте auth_file + scram-sha-256 / md5 (см. документацию PgBouncer).
+
+[databases]
+meyouquize = host=127.0.0.1 port=5432 dbname=meyouquize
+
+[pgbouncer]
+listen_addr = 127.0.0.1
+listen_port = 6432
+auth_type = trust
+pool_mode = transaction
+max_client_conn = 300
+default_pool_size = 25
+min_pool_size = 2
+reserve_pool_size = 8
+reserve_pool_timeout = 5
+server_reset_query = DISCARD ALL
+ignore_startup_parameters = extra_float_digits,search_path,statement_timeout,lock_timeout,idle_in_transaction_session_timeout
+admin_users = postgres
+stats_users = postgres
+logfile = /var/log/postgresql/pgbouncer.log
+pidfile = /var/run/postgresql/pgbouncer.pid

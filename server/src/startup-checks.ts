@@ -1,8 +1,9 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import type { Prisma } from "@prisma/client";
+import { PrismaClient, type Prisma } from "@prisma/client";
 import { normalizePublicViewState } from "@meyouquize/shared";
+import { env } from "./env.js";
 import { prisma } from "./prisma.js";
 
 type MigrationRow = {
@@ -19,9 +20,19 @@ export async function ensureMigrationsAppliedOrThrow() {
     .map((entry) => entry.name)
     .sort();
 
-  const appliedRows = await prisma.$queryRawUnsafe<MigrationRow[]>(
-    "SELECT migration_name FROM _prisma_migrations WHERE finished_at IS NOT NULL ORDER BY migration_name ASC",
-  );
+  // Читаем `_prisma_migrations` только по прямому URL (как `migrate deploy`), не через PgBouncer:
+  // иначе при `DATABASE_URL` на пулер возможны расхождения auth/параметров с systemd.
+  const directPrisma = new PrismaClient({
+    datasources: { db: { url: env.directDatabaseUrl } },
+  });
+  let appliedRows: MigrationRow[];
+  try {
+    appliedRows = await directPrisma.$queryRawUnsafe<MigrationRow[]>(
+      "SELECT migration_name FROM _prisma_migrations WHERE finished_at IS NOT NULL ORDER BY migration_name ASC",
+    );
+  } finally {
+    await directPrisma.$disconnect();
+  }
   const appliedSet = new Set(appliedRows.map((row) => row.migration_name));
   const missing = localMigrationNames.filter((name) => !appliedSet.has(name));
 

@@ -5,7 +5,43 @@
 - Linux host with Node 20+, npm, and Caddy.
 - App directory: `/opt/meyouquize/current`.
 - PostgreSQL reachable from the host.
-- **Мультиядро (рекомендуется на VPS ≥2 vCPU):** локальный Redis (`redis-server`) и в `.env.runtime` переменные `CLUSTER_WORKERS=auto` (или `4`) и `REDIS_URL=redis://127.0.0.1:6379`. Один процесс Node использует по сути одно ядро под JS; `node:cluster` поднимает несколько воркеров на **том же** `PORT`, Caddy менять не нужно. В `DATABASE_URL` уменьшите `connection_limit` на воркер так, чтобы `воркеры × лимит` не забивали Postgres.
+- **Мультиядро (рекомендуется на VPS ≥2 vCPU):** локальный Redis (`redis-server`) и в `.env.runtime` переменные `CLUSTER_WORKERS=auto` (или `4`) и `REDIS_URL=redis://127.0.0.1:6379`. Один процесс Node использует по сути одно ядро под JS; `node:cluster` поднимает несколько воркеров на **том же** `PORT`, Caddy менять не нужно. В `DATABASE_URL` задайте `connection_limit` на воркер; при **PgBouncer** реальные сессии к Postgres ограничивает пулер (см. ниже).
+
+### PgBouncer (transaction pooling, рекомендуется на одном VPS с Postgres)
+
+Снимает пики по соединениям: Prisma открывает много лёгких клиентов к PgBouncer, а к Postgres уходит меньше backend-сессий.
+
+1. Установка и конфиг:
+
+```bash
+sudo apt install -y pgbouncer
+sudo cp /opt/meyouquize/current/deploy/pgbouncer/pgbouncer.ini.example /etc/pgbouncer/pgbouncer.ini
+sudo nano /etc/pgbouncer/pgbouncer.ini
+```
+
+В `[databases]` укажите тот же `dbname`, что у приложения. В `[pgbouncer]` при необходимости снизьте `default_pool_size`, чтобы `default_pool_size + reserve_pool_size + запас под админа` **не приближались** к `max_connections` в Postgres.
+
+2. systemd (если в дистрибутиве нет подходящего unit или нужен явный путь к бинарнику):
+
+```bash
+sudo cp /opt/meyouquize/current/deploy/systemd/pgbouncer.service /etc/systemd/system/pgbouncer.service
+# При ошибке ExecStart замените путь на результат: command -v pgbouncer
+sudo systemctl daemon-reload
+sudo systemctl enable --now pgbouncer
+```
+
+3. Переменные в `deploy/env/.env.runtime`:
+
+- **`DATABASE_URL`** — на PgBouncer, **обязательно** параметр `pgbouncer=true` (требование Prisma при `pool_mode=transaction`). Пример:  
+  `postgresql://USER:PASSWORD@127.0.0.1:6432/meyouquize?pgbouncer=true&connection_limit=12`
+- **`DIRECT_URL`** — прямое подключение к Postgres для миграций (порт **5432**, без `pgbouncer=true`):  
+  `postgresql://USER:PASSWORD@127.0.0.1:5432/meyouquize`
+
+Локально без пула оба URL указывают на один и тот же `:5432`.
+
+4. Порядок старта: в `/etc/systemd/system/meyouquize.service` при желании добавьте в `[Unit]` строку `After=… pgbouncer.service` (и при необходимости `postgresql.service`), затем `daemon-reload`.
+
+5. Проверка: `ss -lntp | grep 6432`, затем `curl` к приложению и `npm run prisma:migrate:deploy` с тем же `.env`, где заданы оба URL.
 
 ## 2) Build & migrate
 
@@ -98,6 +134,8 @@ Also verify from browser:
 Если в браузере `WebSocket … closed before established`: обновите Caddyfile из репозитория (блок `flush_interval -1` у `reverse_proxy` для `/api` и `/socket.io`), затем `sudo systemctl reload caddy`. Проверьте, что в `.env` в `CLIENT_ORIGIN` указан **ровно** тот же origin, что в адресной строке (например `https://meyou.site`, без лишнего слэша и с тем же `www`/без `www`).
 
 ## 7) Safe update sequence
+
+После обновления, где в Prisma появился `directUrl`: в `deploy/env/.env.runtime` (или в `.env` для локальных команд) добавьте **`DIRECT_URL`** — прямой Postgres `:5432`; без PgBouncer скопируйте тот же URL, что и у `DATABASE_URL` (только порт/хост как у реальной БД).
 
 ```bash
 cd /opt/meyouquize/current

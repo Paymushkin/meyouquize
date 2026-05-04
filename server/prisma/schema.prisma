@@ -3,8 +3,10 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  /** Прямое подключение к Postgres (порт 5432). Нужно для migrate/introspect при PgBouncer на `DATABASE_URL`. */
+  directUrl = env("DIRECT_URL")
 }
 
 model Quiz {

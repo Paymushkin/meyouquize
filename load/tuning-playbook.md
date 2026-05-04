@@ -8,8 +8,9 @@
 
 ## 2) Если упираемся в PostgreSQL connections
 
-- Установить `connection_limit` в `DATABASE_URL` под размер VM.
-- Проверить PgBouncer (если ожидается горизонтальный рост инстансов).
+- Включить **PgBouncer** (`pool_mode = transaction`): `DATABASE_URL` → `127.0.0.1:6432?pgbouncer=true&connection_limit=…`, `DIRECT_URL` → прямой Postgres `:5432` (см. `deploy/DEPLOYMENT.md`).
+- Подстроить `default_pool_size` в PgBouncer так, чтобы реальные backend-сессии к Postgres оставляли запас до `max_connections`.
+- Без пула: `connection_limit` в `DATABASE_URL` под размер VM; `DIRECT_URL` совпадает с `DATABASE_URL`.
 - Перезапустить и повторить `nominal` + `soak`.
 
 ## 3) Если много отказов по submit anti-flood

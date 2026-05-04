@@ -92,4 +92,4 @@ curl -f http://127.0.0.1:4000/readyz
 sudo apt install -y redis-server && sudo systemctl enable --now redis-server
 ```
 
-В `deploy/env/.env.runtime` задайте `REDIS_URL=redis://127.0.0.1:6379` и `CLUSTER_WORKERS=auto` (или число воркеров), уменьшите `connection_limit` в `DATABASE_URL` на воркер, затем `sudo systemctl restart meyouquize`.
+В `deploy/env/.env.runtime` задайте `REDIS_URL=redis://127.0.0.1:6379` и `CLUSTER_WORKERS=auto` (или число воркеров). Для снятия лимита по соединениям к Postgres включите **PgBouncer** и разведите `DATABASE_URL` (порт 6432, `pgbouncer=true`) и `DIRECT_URL` (порт 5432) — пошагово в [DEPLOYMENT.md](./DEPLOYMENT.md). Затем `sudo systemctl restart meyouquize`.

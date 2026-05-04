@@ -17,8 +17,9 @@ dotenv.config({ path: projectRootEnv });
 dotenv.config();
 
 /**
- * Малая инфраструктура: Node + Postgres. В `DATABASE_URL` задайте лимит пула, например
- * `?connection_limit=5` (или PgBouncer). Несколько воркеров: `CLUSTER_WORKERS` в
+ * Малая инфраструктура: Node + Postgres. В `DATABASE_URL` — лимит Prisma (`?connection_limit=…`);
+ * с PgBouncer (transaction) добавьте `?pgbouncer=true` и задайте `DIRECT_URL` на Postgres :5432 для migrate.
+ * Несколько воркеров: `CLUSTER_WORKERS` в
  * `server/src/index.ts` + обязательный `REDIS_URL` для Socket.IO (см. attachSocketIoRedisAdapter).
  *
  * Дашборд результатов: `DASHBOARD_RESULTS_DEBOUNCE_MS` — пауза перед пересчётом после
@@ -170,6 +171,11 @@ export const env = {
   adminAccounts,
   databaseUrl:
     process.env.DATABASE_URL ?? "postgresql://postgres:postgres@localhost:5432/meyouquize",
+  /** Прямой Postgres (как `directUrl` в schema.prisma). Без PgBouncer совпадает с `databaseUrl`. */
+  directDatabaseUrl:
+    process.env.DIRECT_URL?.trim() ||
+    process.env.DATABASE_URL ||
+    "postgresql://postgres:postgres@localhost:5432/meyouquize",
   adminSessionHours: Number(process.env.ADMIN_SESSION_HOURS ?? 8),
   redisUrl: process.env.REDIS_URL?.trim() || undefined,
   /** Склейка всплесков пересчёта дашборда (мс). */

@@ -8,7 +8,8 @@
 - Те же ключевые env-переменные:
   - `APP_NETWORK_MODE`
   - `CLIENT_ORIGIN`
-  - `DATABASE_URL` (включая `connection_limit`)
+  - `DATABASE_URL` (включая `connection_limit`, при PgBouncer — `pgbouncer=true`)
+  - `DIRECT_URL` (прямой Postgres для migrate; без пула совпадает с `DATABASE_URL`)
   - `DASHBOARD_RESULTS_DEBOUNCE_MS`
   - `REDIS_URL` (если в production используется horizontal scale Socket.IO)
 
