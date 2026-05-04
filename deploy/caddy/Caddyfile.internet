@@ -1,3 +1,5 @@
+# Домен: подставьте через DOMAIN=meyou.site bash deploy/caddy/render-internet.sh | sudo tee /etc/caddy/Caddyfile
+# либо задайте переменную DOMAIN окружению процесса Caddy.
 {$DOMAIN} {
   encode zstd gzip
 

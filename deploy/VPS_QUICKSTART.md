@@ -71,7 +71,10 @@ sudo cp /opt/meyouquize/current/deploy/systemd/meyouquize.service /etc/systemd/s
 12.
 
 ```bash
-sudo cp /opt/meyouquize/current/deploy/caddy/Caddyfile.internet /etc/caddy/Caddyfile && sudo systemctl enable --now caddy && sudo systemctl restart caddy
+chmod +x /opt/meyouquize/current/deploy/caddy/render-internet.sh
+DOMAIN=ВАШ_ДОМЕН bash /opt/meyouquize/current/deploy/caddy/render-internet.sh | sudo tee /etc/caddy/Caddyfile
+sudo caddy validate --config /etc/caddy/Caddyfile
+sudo systemctl enable --now caddy && sudo systemctl reload caddy
 ```
 
 ## Проверка

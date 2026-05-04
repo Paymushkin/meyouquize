@@ -27,13 +27,21 @@ npm run deploy:internet
 - Set real `CLIENT_ORIGIN` (HTTPS domain).
 - Set strong `ADMIN_PASSWORD`.
 
-Use Caddy config (обязательно **перезаписать** `/etc/caddy/Caddyfile` из репозитория после `git pull`, иначе `reload` не подхватит правки):
+Use Caddy config после `git pull`: **нельзя** просто `cp Caddyfile.internet` — в файле плейсхолдер **`{$DOMAIN}`**. Если переменная окружения **`DOMAIN`** при запуске Caddy не задана, получится строка вида `{` без имени сайта и ошибка **`unrecognized global option: encode`**.
+
+Вариант A — подставить домен при установке:
 
 ```bash
-sudo cp /opt/meyouquize/current/deploy/caddy/Caddyfile.internet /etc/caddy/Caddyfile
-# при необходимости замените {$DOMAIN} на ваш хост или задайте переменные окружения для Caddy
-diff /opt/meyouquize/current/deploy/caddy/Caddyfile.internet /etc/caddy/Caddyfile
+cd /opt/meyouquize/current
+chmod +x deploy/caddy/render-internet.sh
+DOMAIN=meyou.site bash deploy/caddy/render-internet.sh | sudo tee /etc/caddy/Caddyfile
+sudo caddy validate --config /etc/caddy/Caddyfile
+sudo systemctl reload caddy
 ```
+
+Вариант B — оставить `{$DOMAIN}` в файле и задать **`DOMAIN`** для процесса Caddy (например `Environment=DOMAIN=meyou.site` в override unit), тогда подстановка сделает сам Caddy.
+
+Если после неудачного `reload` сайт не поднимается — восстановите предыдущий `/etc/caddy/Caddyfile` из бэкапа и снова `validate` + `reload`.
 
 ### LAN mode
 
@@ -98,8 +106,9 @@ npm ci
 npm run build
 npm run prisma:migrate:deploy
 sudo systemctl restart meyouquize
-sudo systemctl restart caddy
 ```
+
+Если в этом релизе менялся `deploy/caddy/Caddyfile.internet`, обновите Caddy **через `render-internet.sh`** (см. §3), затем `validate` и `reload`, а не «голый» `cp` без `DOMAIN`.
 
 ## 8) Fresh VPS quickstart
 
