@@ -39,6 +39,8 @@ sudo systemctl enable --now pgbouncer
 
 Локально без пула оба URL указывают на один и тот же `:5432`.
 
+**systemd `EnvironmentFile`:** если в URL есть **`&`** (например `?pgbouncer=true&connection_limit=…`), оберните **всё значение** в **двойные кавычки**, иначе строка может разобраться неверно и Prisma получит обрезанный URL → `password authentication failed` на PgBouncer. Спецсимволы в пароле (например `!`) лучше кодировать как **`%21`** в URI.
+
 4. Порядок старта: в `/etc/systemd/system/meyouquize.service` при желании добавьте в `[Unit]` строку `After=… pgbouncer.service` (и при необходимости `postgresql.service`), затем `daemon-reload`.
 
 5. Проверка: `ss -lntp | grep 6432`, затем `curl` к приложению и `npm run prisma:migrate:deploy` с тем же `.env`, где заданы оба URL.
