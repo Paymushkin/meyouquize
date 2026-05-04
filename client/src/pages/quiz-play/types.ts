@@ -91,7 +91,12 @@ export type QuizState = {
   brandBodyBackgroundColor?: string;
   reactionSession?: ReactionSession | null;
   status: string;
-  quizProgress: { subQuizId: string; index: number; total: number } | null;
+  quizProgress: {
+    subQuizId: string;
+    questionFlowMode?: "manual" | "auto";
+    index: number;
+    total: number;
+  } | null;
   activeQuestions?: ActiveQuestion[];
   activeQuestion: ActiveQuestion | null;
 };

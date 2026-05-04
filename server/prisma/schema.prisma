@@ -29,11 +29,17 @@ model SubQuiz {
   quizId               String
   quiz                 Quiz       @relation(fields: [quizId], references: [id], onDelete: Cascade)
   title                String     @default("Квиз")
+  questionFlowMode     QuestionFlowMode @default(MANUAL)
   sortOrder            Int        @default(0)
   currentQuestionIndex Int        @default(0)
   questions            Question[]
 
   @@index([quizId])
+}
+
+enum QuestionFlowMode {
+  MANUAL
+  AUTO
 }
 
 model Question {
@@ -92,8 +98,6 @@ model Participant {
   createdAt DateTime @default(now())
   answers   Answer[]
   speakerQuestions SpeakerQuestion[]
-  speakerQuestionLikes SpeakerQuestionLike[]
-  speakerQuestionDislikes SpeakerQuestionDislike[]
   speakerQuestionReactions SpeakerQuestionReaction[]
 
   @@unique([quizId, deviceId])
@@ -113,8 +117,6 @@ model SpeakerQuestion {
   isOnScreen     Boolean               @default(false)
   createdAt      DateTime              @default(now())
   updatedAt      DateTime              @updatedAt
-  likes          SpeakerQuestionLike[]
-  dislikes       SpeakerQuestionDislike[]
   reactions      SpeakerQuestionReaction[]
 
   @@index([quizId, createdAt])
@@ -133,30 +135,6 @@ model SpeakerQuestionReaction {
 
   @@unique([speakerQuestionId, participantId, reaction])
   @@index([speakerQuestionId])
-  @@index([participantId])
-}
-
-model SpeakerQuestionLike {
-  id                String         @id @default(cuid())
-  speakerQuestionId String
-  speakerQuestion   SpeakerQuestion @relation(fields: [speakerQuestionId], references: [id], onDelete: Cascade)
-  participantId     String
-  participant       Participant     @relation(fields: [participantId], references: [id], onDelete: Cascade)
-  createdAt         DateTime        @default(now())
-
-  @@unique([speakerQuestionId, participantId])
-  @@index([participantId])
-}
-
-model SpeakerQuestionDislike {
-  id                String          @id @default(cuid())
-  speakerQuestionId String
-  speakerQuestion   SpeakerQuestion @relation(fields: [speakerQuestionId], references: [id], onDelete: Cascade)
-  participantId     String
-  participant       Participant     @relation(fields: [participantId], references: [id], onDelete: Cascade)
-  createdAt         DateTime        @default(now())
-
-  @@unique([speakerQuestionId, participantId])
   @@index([participantId])
 }
 

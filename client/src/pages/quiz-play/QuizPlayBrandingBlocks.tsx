@@ -30,6 +30,7 @@ import { alpha, type SxProps, type Theme } from "@mui/material/styles";
 import { useState, type Dispatch, type RefObject, type SetStateAction } from "react";
 import type { ActiveQuestion, QuizState, ReactionType } from "./types";
 import { resolveClientAssetUrl } from "../../utils/resolveClientAssetUrl";
+import { sanitizeClientAssetUrl, sanitizeExternalHttpUrl } from "../../utils/safeUrls";
 
 type BannerTile = {
   id: string;
@@ -99,6 +100,7 @@ export function EventTitleBlock(props: EventTitleBlockProps) {
     brandLogoUrl,
     titleText,
   } = props;
+  const safeBrandLogoUrl = sanitizeClientAssetUrl(brandLogoUrl);
   if (
     (!joined && restoreJoinPending) ||
     (!joined && !shouldShowEventTitle) ||
@@ -120,10 +122,10 @@ export function EventTitleBlock(props: EventTitleBlockProps) {
       }}
     >
       <Stack spacing={1} alignItems="center" sx={{ width: "100%" }}>
-        {brandLogoUrl ? (
+        {safeBrandLogoUrl ? (
           <Box
             component="img"
-            src={brandLogoUrl}
+            src={resolveClientAssetUrl(safeBrandLogoUrl)}
             alt="Логотип"
             sx={{
               alignSelf: "flex-start",
@@ -265,12 +267,13 @@ export function PlayerTilesGrid(props: PlayerTilesGridProps) {
           );
         }
         if (tileId === PROGRAM_TILE_ID) {
-          if (!programTileVisible || !programTileLinkUrl.trim()) return null;
+          const safeProgramTileLinkUrl = sanitizeExternalHttpUrl(programTileLinkUrl);
+          if (!programTileVisible || !safeProgramTileLinkUrl) return null;
           return (
             <Box
               key={PROGRAM_TILE_ID}
               component="a"
-              href={programTileLinkUrl}
+              href={safeProgramTileLinkUrl}
               target="_blank"
               rel="noopener noreferrer"
               sx={{
@@ -331,11 +334,14 @@ export function PlayerTilesGrid(props: PlayerTilesGridProps) {
         }
         const banner = visibleBannerById.get(tileId);
         if (!banner) return null;
+        const safeBannerLinkUrl = sanitizeExternalHttpUrl(banner.linkUrl);
+        const safeBannerBackgroundUrl = sanitizeClientAssetUrl(banner.backgroundUrl);
+        if (!safeBannerLinkUrl || !safeBannerBackgroundUrl) return null;
         return (
           <Box
             key={banner.id}
             component="a"
-            href={banner.linkUrl}
+            href={safeBannerLinkUrl}
             target="_blank"
             rel="noopener noreferrer"
             sx={{
@@ -356,7 +362,7 @@ export function PlayerTilesGrid(props: PlayerTilesGridProps) {
                 banner.size === "1x1" ? "1 / 1" : banner.size === "full" ? "4 / 1" : "2 / 1",
               borderRadius: 2,
               overflow: "hidden",
-              backgroundImage: `url("${resolveClientAssetUrl(banner.backgroundUrl)}")`,
+              backgroundImage: `url("${resolveClientAssetUrl(safeBannerBackgroundUrl)}")`,
               backgroundSize: "cover",
               backgroundPosition: "center",
               backgroundRepeat: "no-repeat",
@@ -708,6 +714,7 @@ type QuestionPopupCardProps = {
   quizProgress: QuizState["quizProgress"];
   displayedSelected: string[];
   answeredCurrentQuestion: boolean;
+  showAcceptedHint?: boolean;
   submittedAnswers: Record<string, string[]>;
   rankOrder: string[];
   rankRowRefs: RefObject<Map<string, HTMLDivElement>>;
@@ -728,6 +735,7 @@ export function QuestionPopupCard(props: QuestionPopupCardProps) {
     quizProgress,
     displayedSelected,
     answeredCurrentQuestion,
+    showAcceptedHint = false,
     submittedAnswers,
     rankOrder,
     rankRowRefs,
@@ -808,6 +816,7 @@ export function QuestionPopupCard(props: QuestionPopupCardProps) {
       >
         <CardContent sx={{ bgcolor: "transparent", color: "inherit" }}>
           <Stack spacing={2}>
+            {showAcceptedHint ? <Alert severity="success">Ответ принят</Alert> : null}
             <Stack direction="row" alignItems="center" justifyContent="space-between">
               <Stack direction="row" spacing={1} alignItems="center">
                 {quizProgress && quizProgress.total > 0 ? (

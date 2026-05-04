@@ -1,5 +1,31 @@
 import { z } from "zod";
 
+function isHttpUrl(value: string): boolean {
+  try {
+    const u = new URL(value);
+    return u.protocol === "http:" || u.protocol === "https:";
+  } catch {
+    return false;
+  }
+}
+
+function isSafeClientAssetUrl(value: string): boolean {
+  const v = value.trim();
+  if (!v) return false;
+  if (v.startsWith("/")) return true;
+  return isHttpUrl(v);
+}
+
+const externalHttpUrlSchema = z.string().trim().min(1).max(1000).refine(isHttpUrl, {
+  message: "URL must use http or https",
+});
+
+const clientAssetUrlSchema = z.string().trim().min(1).max(1000).refine(isSafeClientAssetUrl, {
+  message: "Asset URL must be absolute http(s) or start with /",
+});
+const optionalExternalHttpUrlSchema = z.union([externalHttpUrlSchema, z.literal("")]).optional();
+const optionalClientAssetUrlSchema = z.union([clientAssetUrlSchema, z.literal("")]).optional();
+
 const questionSchema = z
   .object({
     id: z.string().min(1).optional(),
@@ -86,6 +112,7 @@ const questionSchema = z
 const subQuizBlockSchema = z.object({
   id: z.string().min(1).optional(),
   title: z.string().min(1).max(120),
+  questionFlowMode: z.enum(["manual", "auto"]).optional(),
   sortOrder: z.number().int().min(0).max(1000).optional(),
   questions: z.array(questionSchema),
 });
@@ -185,6 +212,7 @@ export const setPublicViewSchema = z.object({
     "speaker_questions",
     "reactions",
     "randomizer",
+    "report",
   ]),
   questionId: z.string().min(1).optional(),
   questionRevealStage: z.enum(["options", "results"]).optional(),
@@ -255,17 +283,17 @@ export const setPublicViewSchema = z.object({
   firstCorrectWinnersCount: z.number().int().min(1).max(20).optional(),
   speakerQuestionsEnabled: z.boolean().optional(),
   speakerQuestionsSpeakers: z.array(z.string().trim().min(1).max(80)).max(100).optional(),
-  speakerQuestionsAllowLikes: z.boolean().optional(),
-  speakerQuestionsShowLikesOnScreen: z.boolean().optional(),
   speakerQuestionsReactions: z.array(z.string().trim().min(1).max(16)).max(12).optional(),
   speakerQuestionsShowAuthorOnScreen: z.boolean().optional(),
+  speakerQuestionsShowRecipientOnScreen: z.boolean().optional(),
+  speakerQuestionsShowReactionsOnScreen: z.boolean().optional(),
   showEventTitleOnPlayer: z.boolean().optional(),
   playerBanners: z
     .array(
       z.object({
         id: z.string().trim().min(1).max(80),
-        linkUrl: z.string().trim().min(1).max(1000),
-        backgroundUrl: z.string().trim().min(1).max(1000),
+        linkUrl: externalHttpUrlSchema,
+        backgroundUrl: clientAssetUrlSchema,
         size: z.enum(["2x1", "1x1", "full"]).optional(),
         isVisible: z.boolean().optional(),
       }),
@@ -284,7 +312,7 @@ export const setPublicViewSchema = z.object({
     .string()
     .regex(/^#([0-9a-fA-F]{6})$/)
     .optional(),
-  programTileLinkUrl: z.string().trim().max(1000).optional(),
+  programTileLinkUrl: optionalExternalHttpUrlSchema,
   programTileVisible: z.boolean().optional(),
   playerTilesOrder: z.array(z.string().trim().min(1).max(80)).max(100).optional(),
   reactionsOverlayText: z.string().trim().max(120).optional(),
@@ -320,6 +348,35 @@ export const setPublicViewSchema = z.object({
     .max(200)
     .optional(),
   randomizerRunId: z.number().int().min(0).max(1000000000).optional(),
+  reportTitle: z.string().trim().max(120).optional(),
+  reportModules: z
+    .array(
+      z.enum([
+        "event_header",
+        "participation_summary",
+        "quiz_results",
+        "vote_results",
+        "reactions_summary",
+        "randomizer_summary",
+        "speaker_questions_summary",
+      ]),
+    )
+    .max(20)
+    .optional(),
+  reportVoteQuestionIds: z.array(z.string().trim().min(1).max(80)).max(400).optional(),
+  reportQuizQuestionIds: z.array(z.string().trim().min(1).max(80)).max(400).optional(),
+  reportQuizSubQuizIds: z.array(z.string().trim().min(1).max(80)).max(400).optional(),
+  reportSubQuizHideParticipantTableIds: z
+    .array(z.string().trim().min(1).max(80))
+    .max(400)
+    .optional(),
+  reportRandomizerRunIds: z
+    .array(z.string().regex(/^(history:\d{1,4}|current)$/))
+    .max(200)
+    .optional(),
+  reportReactionsWidgetIds: z.array(z.string().trim().min(1).max(80)).max(200).optional(),
+  reportSpeakerQuestionIds: z.array(z.string().trim().min(1).max(80)).max(400).optional(),
+  reportPublished: z.boolean().optional(),
   brandPrimaryColor: z
     .string()
     .regex(/^#([0-9a-fA-F]{6})$/)
@@ -337,16 +394,16 @@ export const setPublicViewSchema = z.object({
     .regex(/^#([0-9a-fA-F]{6})$/)
     .optional(),
   brandFontFamily: z.string().trim().max(200).optional(),
-  brandFontUrl: z.string().trim().max(1000).optional(),
-  brandLogoUrl: z.string().trim().max(1000).optional(),
-  brandPlayerBackgroundImageUrl: z.string().trim().max(1000).optional(),
-  brandProjectorBackgroundImageUrl: z.string().trim().max(1000).optional(),
+  brandFontUrl: optionalClientAssetUrlSchema,
+  brandLogoUrl: optionalClientAssetUrlSchema,
+  brandPlayerBackgroundImageUrl: optionalClientAssetUrlSchema,
+  brandProjectorBackgroundImageUrl: optionalClientAssetUrlSchema,
   brandBodyBackgroundColor: z
     .string()
     .regex(/^#([0-9a-fA-F]{6})$/)
     .optional(),
   /** @deprecated */
-  brandBackgroundImageUrl: z.string().trim().max(1000).optional(),
+  brandBackgroundImageUrl: optionalClientAssetUrlSchema,
 });
 
 export const subscribeSpeakerQuestionsSchema = z.object({
@@ -358,16 +415,6 @@ export const createSpeakerQuestionSchema = z.object({
   quizId: z.string().min(1),
   speakerName: z.string().trim().min(1).max(80),
   text: z.string().trim().min(3).max(500),
-});
-
-export const likeSpeakerQuestionSchema = z.object({
-  quizId: z.string().min(1),
-  speakerQuestionId: z.string().min(1),
-});
-
-export const dislikeSpeakerQuestionSchema = z.object({
-  quizId: z.string().min(1),
-  speakerQuestionId: z.string().min(1),
 });
 
 export const speakerQuestionReactSchema = z.object({
@@ -409,10 +456,10 @@ export const adminSpeakerSettingsSchema = z.object({
   quizId: z.string().min(1),
   enabled: z.boolean().optional(),
   speakers: z.array(z.string().trim().min(1).max(80)).max(100).optional(),
-  allowLikes: z.boolean().optional(),
-  showLikesOnScreen: z.boolean().optional(),
   reactions: z.array(z.string().trim().min(1).max(16)).max(12).optional(),
   showAuthorOnScreen: z.boolean().optional(),
+  showRecipientOnScreen: z.boolean().optional(),
+  showReactionsOnScreen: z.boolean().optional(),
 });
 
 export const activateQuestionSchema = z.object({
@@ -456,6 +503,11 @@ export const toggleReactionSchema = z.object({
 
 /** Закрыть все вопросы сабквиза и убрать активный вопрос с экрана (финальный экран у игроков через state без FINISHED комнаты). */
 export const closeSubQuizSchema = z.object({
+  quizId: z.string().min(1),
+  subQuizId: z.string().min(1),
+});
+
+export const startSubQuizAutoSchema = z.object({
   quizId: z.string().min(1),
   subQuizId: z.string().min(1),
 });

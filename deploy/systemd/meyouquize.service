@@ -1,0 +1,18 @@
+[Unit]
+Description=Meyouquize backend service
+After=network.target
+
+[Service]
+Type=simple
+User=meyouquize
+Group=meyouquize
+WorkingDirectory=/opt/meyouquize/current
+EnvironmentFile=/opt/meyouquize/current/deploy/env/.env.runtime
+ExecStart=/usr/bin/npm run start -w server
+Restart=always
+RestartSec=3
+TimeoutStopSec=15
+KillSignal=SIGTERM
+
+[Install]
+WantedBy=multi-user.target

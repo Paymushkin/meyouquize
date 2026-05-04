@@ -42,16 +42,18 @@ import AddIcon from "@mui/icons-material/Add";
 import CloseIcon from "@mui/icons-material/Close";
 import CheckCircleOutlineIcon from "@mui/icons-material/CheckCircleOutline";
 import HighlightOffOutlinedIcon from "@mui/icons-material/HighlightOffOutlined";
-import DashboardIcon from "@mui/icons-material/Dashboard";
-import PaletteIcon from "@mui/icons-material/Palette";
+import SettingsSuggestIcon from "@mui/icons-material/SettingsSuggest";
+import BrandingWatermarkIcon from "@mui/icons-material/BrandingWatermark";
+import RecordVoiceOverIcon from "@mui/icons-material/RecordVoiceOver";
 import HowToVoteIcon from "@mui/icons-material/HowToVote";
 import QuizIcon from "@mui/icons-material/Quiz";
-import LeaderboardIcon from "@mui/icons-material/Leaderboard";
-import WarningAmberIcon from "@mui/icons-material/WarningAmber";
+import InsightsIcon from "@mui/icons-material/Insights";
+import ReportProblemIcon from "@mui/icons-material/ReportProblem";
 import RemoveIcon from "@mui/icons-material/Remove";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
+import DescriptionIcon from "@mui/icons-material/Description";
+import ViewCarouselIcon from "@mui/icons-material/ViewCarousel";
 import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
-import PhotoSizeSelectActualIcon from "@mui/icons-material/PhotoSizeSelectActual";
 import EmojiEmotionsIcon from "@mui/icons-material/EmojiEmotions";
 import { AdminLoginForm } from "../components/AdminLoginForm";
 import { AdminBrandingSection } from "../components/admin/AdminBrandingSection";
@@ -61,6 +63,7 @@ import {
   type ReactionWidget,
 } from "../components/admin/AdminReactionsSection";
 import { AdminRandomizerSection } from "../components/admin/AdminRandomizerSection";
+import { AdminReportSection } from "../components/admin/AdminReportSection";
 import { AdminQuestionsSection } from "../components/admin/AdminQuestionsSection";
 import { AdminResultsSection } from "../components/admin/AdminResultsSection";
 import { AdminSpeakersSection } from "../components/admin/AdminSpeakersSection";
@@ -68,11 +71,18 @@ import { AdminBannersSection } from "../components/admin/AdminBannersSection";
 import { SubQuizControlsCard } from "../components/admin/SubQuizControlsCard";
 import { API_BASE, APP_ORIGIN } from "../config";
 import {
+  applySpeakerQuestionsAdminFieldsFromPublicView,
+  applySpeakerQuestionsScreenVisibilityFromView,
+} from "../features/speakerQuestionsAdmin/adminSpeakerQuestionsSettings";
+import {
   PROGRAM_TILE_ID,
   SPEAKER_TILE_ID,
+  normalizePublicViewState,
   toBrandingState,
   type CloudManualStateByQuestion,
+  type PublicReactionWidgetStats,
   type PublicBanner,
+  type ReportModuleId,
   type PublicViewPayload,
   type PublicViewSetPatch,
   type PublicViewMode,
@@ -89,6 +99,7 @@ import { useAdminEventApi } from "../hooks/useAdminEventApi";
 import { usePublicViewEmitter } from "../hooks/usePublicViewEmitter";
 import { useSpeakerQuestionsAdminActions } from "../hooks/useSpeakerQuestionsAdminActions";
 import { socket } from "../socket";
+import { getStringArrayOrNull } from "../utils/unknownGuards";
 import {
   buildQuestionIndexMapForSubQuiz,
   computeFirstIncompleteSubQuizId,
@@ -129,6 +140,7 @@ type AdminSection =
   | "speakers"
   | "banners"
   | "branding"
+  | "report"
   | "results"
   | "danger";
 
@@ -136,6 +148,39 @@ const ADMIN_BANNER_AUTO_HIDE_MS = 2000;
 const RESULTS_UI_STORAGE_PREFIX = "mq_admin_results_ui_";
 const EXPANDED_SUBQUIZ_STORAGE_PREFIX = "mq_admin_expanded_subquiz_";
 const ADMIN_BODY_BG_FALLBACK = "#22313c";
+const DEFAULT_REPORT_MODULES: ReportModuleId[] = [
+  "event_header",
+  "participation_summary",
+  "quiz_results",
+  "vote_results",
+  "reactions_summary",
+  "randomizer_summary",
+  "speaker_questions_summary",
+];
+
+function normalizeReportModulesForAdmin(value: unknown): ReportModuleId[] {
+  if (!Array.isArray(value)) return [...DEFAULT_REPORT_MODULES];
+  const next: ReportModuleId[] = [];
+  for (const item of value) {
+    if (item === "question_results") {
+      if (!next.includes("quiz_results")) next.push("quiz_results");
+      if (!next.includes("vote_results")) next.push("vote_results");
+      continue;
+    }
+    if (
+      item === "event_header" ||
+      item === "participation_summary" ||
+      item === "quiz_results" ||
+      item === "vote_results" ||
+      item === "reactions_summary" ||
+      item === "randomizer_summary" ||
+      item === "speaker_questions_summary"
+    ) {
+      if (!next.includes(item)) next.push(item);
+    }
+  }
+  return next.length > 0 ? next : [...DEFAULT_REPORT_MODULES];
+}
 
 function buildEffectiveTilesOrder(order: string[], banners: PublicBanner[]): string[] {
   const deduped: string[] = [];
@@ -156,13 +201,14 @@ const ADMIN_NAV: {
   label: string;
   icon: React.ReactNode;
 }[] = [
-  { id: "general", label: "Общее", icon: <DashboardIcon fontSize="small" /> },
+  { id: "general", label: "Общее", icon: <SettingsSuggestIcon fontSize="small" /> },
   { id: "questions", label: "Вопросы", icon: <QuizIcon fontSize="small" /> },
-  { id: "speakers", label: "Спикеры", icon: <HowToVoteIcon fontSize="small" /> },
-  { id: "banners", label: "Баннеры", icon: <PhotoSizeSelectActualIcon fontSize="small" /> },
-  { id: "results", label: "Результаты", icon: <LeaderboardIcon fontSize="small" /> },
-  { id: "branding", label: "Брендирование", icon: <PaletteIcon fontSize="small" /> },
-  { id: "danger", label: "Опасные", icon: <WarningAmberIcon fontSize="small" /> },
+  { id: "speakers", label: "Спикеры", icon: <RecordVoiceOverIcon fontSize="small" /> },
+  { id: "banners", label: "Баннеры", icon: <ViewCarouselIcon fontSize="small" /> },
+  { id: "results", label: "Результаты", icon: <InsightsIcon fontSize="small" /> },
+  { id: "report", label: "Отчет", icon: <DescriptionIcon fontSize="small" /> },
+  { id: "branding", label: "Брендирование", icon: <BrandingWatermarkIcon fontSize="small" /> },
+  { id: "danger", label: "Опасные", icon: <ReportProblemIcon fontSize="small" /> },
 ];
 
 function publicScreenModeLabel(mode: PublicViewMode): string {
@@ -170,6 +216,7 @@ function publicScreenModeLabel(mode: PublicViewMode): string {
   if (mode === "speaker_questions") return "вопросы спикерам";
   if (mode === "reactions") return "реакции";
   if (mode === "randomizer") return "рандомайзер";
+  if (mode === "report") return "отчет";
   if (mode === "question") return "вопрос";
   return "название";
 }
@@ -185,7 +232,8 @@ function isSupportedPublicMode(mode: unknown): mode is PublicViewMode {
     mode === "leaderboard" ||
     mode === "speaker_questions" ||
     mode === "reactions" ||
-    mode === "randomizer"
+    mode === "randomizer" ||
+    mode === "report"
   );
 }
 
@@ -212,12 +260,6 @@ function getPublicBanners(value: unknown): PublicBanner[] {
       } satisfies PublicBanner,
     ];
   });
-}
-
-function getStringArrayOrNull(value: unknown): string[] | null {
-  return Array.isArray(value)
-    ? value.filter((item): item is string => typeof item === "string")
-    : null;
 }
 
 function parseReactionLines(text: string): string[] {
@@ -264,6 +306,27 @@ function getReactionWidgetsOrNull(value: unknown): ReactionWidget[] | null {
     });
   }
   return widgets;
+}
+
+function getReactionWidgetStatsOrNull(
+  value: unknown,
+): Array<{ widgetId: string; counts: Record<string, number> }> | null {
+  if (!Array.isArray(value)) return null;
+  const result: Array<{ widgetId: string; counts: Record<string, number> }> = [];
+  for (const item of value) {
+    if (!item || typeof item !== "object") continue;
+    const row = item as { widgetId?: unknown; counts?: unknown };
+    if (typeof row.widgetId !== "string" || !row.widgetId.trim()) continue;
+    if (!row.counts || typeof row.counts !== "object" || Array.isArray(row.counts)) continue;
+    const counts: Record<string, number> = {};
+    for (const [reaction, rawCount] of Object.entries(row.counts as Record<string, unknown>)) {
+      if (typeof reaction !== "string" || !reaction.trim()) continue;
+      const value = Number(rawCount);
+      counts[reaction.trim()] = Number.isFinite(value) ? Math.max(0, Math.trunc(value)) : 0;
+    }
+    result.push({ widgetId: row.widgetId.trim(), counts });
+  }
+  return result;
 }
 
 function readReactionWidgetsFromStorage(storageKey: string): ReactionWidget[] {
@@ -317,6 +380,9 @@ export function AdminEventPage() {
   const [resultsSubQuizId, setResultsSubQuizId] = useState<string>("");
   const [isQuestionDialogOpen, setIsQuestionDialogOpen] = useState(false);
   const [confirmResetQuestionIndex, setConfirmResetQuestionIndex] = useState<number | null>(null);
+  const [confirmDeleteQuestionIndex, setConfirmDeleteQuestionIndex] = useState<number | null>(null);
+  const [confirmResetDemoOpen, setConfirmResetDemoOpen] = useState(false);
+  const [confirmDeleteSubQuizId, setConfirmDeleteSubQuizId] = useState<string | null>(null);
   const [tagInputDialogQuestionIndex, setTagInputDialogQuestionIndex] = useState<number | null>(
     null,
   );
@@ -352,6 +418,7 @@ export function AdminEventPage() {
   const [reactionWidgets, setReactionWidgets] = useState<ReactionWidget[]>(() =>
     readReactionWidgetsFromStorage(reactionWidgetsStorageKey),
   );
+  const [reactionWidgetStats, setReactionWidgetStats] = useState<PublicReactionWidgetStats[]>([]);
   const [activeReactionWidgetId, setActiveReactionWidgetId] = useState<string | null>(null);
   const [projectorReactionWidgetId, setProjectorReactionWidgetId] = useState<string | null>(null);
   const [randomizerMode, setRandomizerMode] = useState<RandomizerMode>("names");
@@ -366,10 +433,23 @@ export function AdminEventPage() {
   const [randomizerCurrentWinners, setRandomizerCurrentWinners] = useState<string[]>([]);
   const [randomizerHistory, setRandomizerHistory] = useState<RandomizerHistoryEntry[]>([]);
   const [randomizerRunId, setRandomizerRunId] = useState(0);
+  const [reportTitle, setReportTitle] = useState("Отчет мероприятия");
+  const [reportModules, setReportModules] = useState<ReportModuleId[]>(DEFAULT_REPORT_MODULES);
+  const [reportVoteQuestionIds, setReportVoteQuestionIds] = useState<string[]>([]);
+  const [reportQuizQuestionIds, setReportQuizQuestionIds] = useState<string[]>([]);
+  const [reportQuizSubQuizIds, setReportQuizSubQuizIds] = useState<string[]>([]);
+  const [reportSubQuizHideParticipantTableIds, setReportSubQuizHideParticipantTableIds] = useState<
+    string[]
+  >([]);
+  const [reportRandomizerRunIds, setReportRandomizerRunIds] = useState<string[]>([]);
+  const [reportReactionsWidgetIds, setReportReactionsWidgetIds] = useState<string[]>([]);
+  const [reportSpeakerQuestionIds, setReportSpeakerQuestionIds] = useState<string[]>([]);
+  const [reportPublished, setReportPublished] = useState(false);
   const [randomizerIsRunning, setRandomizerIsRunning] = useState(false);
   const randomizerRunTimerRef = useRef<number | null>(null);
   const [eventParticipantNicknames, setEventParticipantNicknames] = useState<string[]>([]);
   const randomizerNamesEditedRef = useRef(false);
+  const reactionsWidgetsResyncDoneRef = useRef<string | null>(null);
   const applyRandomizerFromPublicView = useCallback((payload: PublicViewPayload) => {
     setRandomizerMode(payload.randomizerMode === "numbers" ? "numbers" : "names");
     setRandomizerListMode(
@@ -419,14 +499,62 @@ export function AdminEventPage() {
     if (typeof payload.randomizerRunId === "number") {
       setRandomizerRunId(Math.max(0, Math.trunc(payload.randomizerRunId)));
     }
+    if (typeof payload.reportTitle === "string") {
+      setReportTitle(payload.reportTitle);
+    }
+    if (Array.isArray(payload.reportModules)) {
+      setReportModules(normalizeReportModulesForAdmin(payload.reportModules));
+    }
+    if (Array.isArray(payload.reportVoteQuestionIds)) {
+      setReportVoteQuestionIds(
+        payload.reportVoteQuestionIds.filter((item): item is string => typeof item === "string"),
+      );
+    }
+    if (Array.isArray(payload.reportQuizQuestionIds)) {
+      setReportQuizQuestionIds(
+        payload.reportQuizQuestionIds.filter((item): item is string => typeof item === "string"),
+      );
+    }
+    if (Array.isArray(payload.reportQuizSubQuizIds)) {
+      setReportQuizSubQuizIds(
+        payload.reportQuizSubQuizIds.filter((item): item is string => typeof item === "string"),
+      );
+    }
+    if (Array.isArray(payload.reportSubQuizHideParticipantTableIds)) {
+      setReportSubQuizHideParticipantTableIds(
+        payload.reportSubQuizHideParticipantTableIds.filter(
+          (item): item is string => typeof item === "string",
+        ),
+      );
+    }
+    if (Array.isArray(payload.reportRandomizerRunIds)) {
+      setReportRandomizerRunIds(
+        payload.reportRandomizerRunIds.filter((item): item is string => typeof item === "string"),
+      );
+    }
+    if (Array.isArray(payload.reportReactionsWidgetIds)) {
+      setReportReactionsWidgetIds(
+        payload.reportReactionsWidgetIds.filter((item): item is string => typeof item === "string"),
+      );
+    }
+    if (Array.isArray(payload.reportSpeakerQuestionIds)) {
+      setReportSpeakerQuestionIds(
+        payload.reportSpeakerQuestionIds.filter((item): item is string => typeof item === "string"),
+      );
+    }
+    if (typeof payload.reportPublished === "boolean") {
+      setReportPublished(payload.reportPublished);
+    }
   }, []);
   const [speakerQuestionsEnabled, setSpeakerQuestionsEnabled] = useState(false);
-  const [speakerQuestionsAllowLikes, setSpeakerQuestionsAllowLikes] = useState(true);
-  const [speakerQuestionsShowLikesOnScreen, setSpeakerQuestionsShowLikesOnScreen] = useState(true);
   const [speakerQuestionsReactionsText, setSpeakerQuestionsReactionsText] =
     useState("👍\n🔥\n👏\n❤️");
   const [speakerQuestionsShowAuthorOnScreen, setSpeakerQuestionsShowAuthorOnScreen] =
     useState(false);
+  const [speakerQuestionsShowRecipientOnScreen, setSpeakerQuestionsShowRecipientOnScreen] =
+    useState(true);
+  const [speakerQuestionsShowReactionsOnScreen, setSpeakerQuestionsShowReactionsOnScreen] =
+    useState(true);
   const [showEventTitleOnPlayer, setShowEventTitleOnPlayer] = useState(true);
   const [playerBanners, setPlayerBanners] = useState<PublicBanner[]>([]);
   const [speakerTileText, setSpeakerTileText] = useState("Вопросы спикерам");
@@ -622,6 +750,38 @@ export function AdminEventPage() {
     const si = votesIndexMap.indexOf(selectedQuestionIndex);
     return si < 0 ? 0 : si;
   }, [votesIndexMap, selectedQuestionIndex]);
+  const availableVoteQuestions = useMemo(
+    () =>
+      votesIndexMap
+        .map((index) => questionForms[index])
+        .filter((question): question is QuestionForm => Boolean(question?.id))
+        .map((question) => ({
+          id: question.id!,
+          text: question.text.trim() || "Без названия",
+        })),
+    [questionForms, votesIndexMap],
+  );
+  const availableQuizQuestions = useMemo(() => {
+    const titleById = new Map(
+      subQuizSheets.map((sheet) => [sheet.id, sheet.title.trim() || "Без названия"] as const),
+    );
+    const grouped = new Map<
+      string,
+      { subQuizId: string; subQuizTitle: string; questions: Array<{ id: string; text: string }> }
+    >();
+    for (const question of questionForms) {
+      if (!question.id || !question.subQuizId) continue;
+      const key = question.subQuizId;
+      const group = grouped.get(key) ?? {
+        subQuizId: key,
+        subQuizTitle: titleById.get(key) ?? "Без названия",
+        questions: [],
+      };
+      group.questions.push({ id: question.id, text: question.text.trim() || "Без названия" });
+      grouped.set(key, group);
+    }
+    return Array.from(grouped.values());
+  }, [questionForms, subQuizSheets]);
 
   /** Только набор id подквизов (без порядка): после PUT порядок с сервера может отличаться — не сбрасываем раскрытие. */
   const subQuizIdsKey = useMemo(
@@ -810,10 +970,20 @@ export function AdminEventPage() {
     const onPublicView = (payload: PublicViewPayload) => {
       const widgets = getReactionWidgetsOrNull(payload.reactionsWidgets);
       if (widgets) setReactionWidgets(widgets);
+      const widgetStats = getReactionWidgetStatsOrNull(
+        (payload as { reactionsWidgetStats?: unknown }).reactionsWidgetStats,
+      );
+      if (widgetStats) setReactionWidgetStats(widgetStats);
       if (typeof payload.reactionsOverlayText === "string") {
         setReactionsOverlayText(payload.reactionsOverlayText);
       }
       applyRandomizerFromPublicView(payload);
+      const normalizedView = normalizePublicViewState(payload);
+      applySpeakerQuestionsScreenVisibilityFromView(normalizedView, {
+        setShowAuthorOnScreen: setSpeakerQuestionsShowAuthorOnScreen,
+        setShowRecipientOnScreen: setSpeakerQuestionsShowRecipientOnScreen,
+        setShowReactionsOnScreen: setSpeakerQuestionsShowReactionsOnScreen,
+      });
     };
     socket.on("results:public:view", onPublicView);
     return () => {
@@ -868,6 +1038,16 @@ export function AdminEventPage() {
     randomizerCurrentWinners,
     randomizerHistory,
     randomizerRunId,
+    reportTitle,
+    reportModules,
+    reportVoteQuestionIds,
+    reportQuizQuestionIds,
+    reportQuizSubQuizIds,
+    reportSubQuizHideParticipantTableIds,
+    reportRandomizerRunIds,
+    reportReactionsWidgetIds,
+    reportSpeakerQuestionIds,
+    reportPublished,
     brandPrimaryColor,
     brandAccentColor,
     brandSurfaceColor,
@@ -879,6 +1059,22 @@ export function AdminEventPage() {
     brandProjectorBackgroundImageUrl,
     brandBodyBackgroundColor,
   });
+
+  useEffect(() => {
+    if (!quizId || !room?.publicView || typeof room.publicView !== "object") return;
+    if (reactionsWidgetsResyncDoneRef.current === quizId) return;
+    const serverWidgets = getReactionWidgetsOrNull(
+      (room.publicView as { reactionsWidgets?: unknown }).reactionsWidgets,
+    );
+    if ((serverWidgets?.length ?? 0) > 0) {
+      reactionsWidgetsResyncDoneRef.current = quizId;
+      return;
+    }
+    if (reactionWidgets.length === 0) return;
+    emitPublicViewSet({ reactionsWidgets: reactionWidgets });
+    reactionsWidgetsResyncDoneRef.current = quizId;
+    setMessage("Виджеты реакций восстановлены после перезапуска");
+  }, [emitPublicViewSet, quizId, reactionWidgets, room?.publicView, setMessage]);
 
   useEffect(() => {
     const payload: CloudManualStateByQuestion = {};
@@ -1012,22 +1208,13 @@ export function AdminEventPage() {
     if (typeof pv.firstCorrectWinnersCount === "number") {
       setFirstCorrectWinnersCount(clampInt(pv.firstCorrectWinnersCount, 1, 20));
     }
-    if (typeof pv.speakerQuestionsEnabled === "boolean") {
-      setSpeakerQuestionsEnabled(pv.speakerQuestionsEnabled);
-    }
-    if (typeof pv.speakerQuestionsAllowLikes === "boolean") {
-      setSpeakerQuestionsAllowLikes(pv.speakerQuestionsAllowLikes);
-    }
-    if (typeof pv.speakerQuestionsShowLikesOnScreen === "boolean") {
-      setSpeakerQuestionsShowLikesOnScreen(pv.speakerQuestionsShowLikesOnScreen);
-    }
-    const speakerReactions = getStringArrayOrNull(pv.speakerQuestionsReactions);
-    if (speakerReactions) {
-      setSpeakerQuestionsReactionsText(speakerReactions.join("\n"));
-    }
-    if (typeof pv.speakerQuestionsShowAuthorOnScreen === "boolean") {
-      setSpeakerQuestionsShowAuthorOnScreen(pv.speakerQuestionsShowAuthorOnScreen);
-    }
+    applySpeakerQuestionsAdminFieldsFromPublicView(pv, {
+      setEnabled: setSpeakerQuestionsEnabled,
+      setReactionsText: setSpeakerQuestionsReactionsText,
+      setShowAuthorOnScreen: setSpeakerQuestionsShowAuthorOnScreen,
+      setShowRecipientOnScreen: setSpeakerQuestionsShowRecipientOnScreen,
+      setShowReactionsOnScreen: setSpeakerQuestionsShowReactionsOnScreen,
+    });
     if (typeof pv.showEventTitleOnPlayer === "boolean") {
       setShowEventTitleOnPlayer(pv.showEventTitleOnPlayer);
     }
@@ -1068,6 +1255,12 @@ export function AdminEventPage() {
     if (widgets) {
       setReactionWidgets(widgets);
     }
+    const widgetStats = getReactionWidgetStatsOrNull(
+      (pv as { reactionsWidgetStats?: unknown }).reactionsWidgetStats,
+    );
+    if (widgetStats) {
+      setReactionWidgetStats(widgetStats);
+    }
     setRandomizerMode(pv.randomizerMode === "numbers" ? "numbers" : "names");
     setRandomizerListMode(
       pv.randomizerListMode === "participants_only" ? "participants_only" : "free_list",
@@ -1107,11 +1300,62 @@ export function AdminEventPage() {
     }
     if (typeof pv.randomizerRunId === "number")
       setRandomizerRunId(Math.max(0, Math.trunc(pv.randomizerRunId)));
+    if (typeof pv.reportTitle === "string") setReportTitle(pv.reportTitle);
+    if (Array.isArray(pv.reportModules)) {
+      setReportModules(normalizeReportModulesForAdmin(pv.reportModules));
+    }
+    if (Array.isArray(pv.reportVoteQuestionIds)) {
+      setReportVoteQuestionIds(
+        pv.reportVoteQuestionIds.filter((item): item is string => typeof item === "string"),
+      );
+    }
+    if (Array.isArray(pv.reportQuizQuestionIds)) {
+      setReportQuizQuestionIds(
+        pv.reportQuizQuestionIds.filter((item): item is string => typeof item === "string"),
+      );
+    }
+    if (Array.isArray(pv.reportQuizSubQuizIds)) {
+      setReportQuizSubQuizIds(
+        pv.reportQuizSubQuizIds.filter((item): item is string => typeof item === "string"),
+      );
+    }
+    if (Array.isArray(pv.reportSubQuizHideParticipantTableIds)) {
+      setReportSubQuizHideParticipantTableIds(
+        pv.reportSubQuizHideParticipantTableIds.filter(
+          (item): item is string => typeof item === "string",
+        ),
+      );
+    }
+    if (Array.isArray(pv.reportRandomizerRunIds)) {
+      setReportRandomizerRunIds(
+        pv.reportRandomizerRunIds.filter((item): item is string => typeof item === "string"),
+      );
+    }
+    if (Array.isArray(pv.reportReactionsWidgetIds)) {
+      setReportReactionsWidgetIds(
+        pv.reportReactionsWidgetIds.filter((item): item is string => typeof item === "string"),
+      );
+    }
+    if (Array.isArray(pv.reportSpeakerQuestionIds)) {
+      setReportSpeakerQuestionIds(
+        pv.reportSpeakerQuestionIds.filter((item): item is string => typeof item === "string"),
+      );
+    }
+    if (typeof pv.reportPublished === "boolean") setReportPublished(pv.reportPublished);
     const speakerList = getStringArrayOrNull(pv.speakerQuestionsSpeakers);
     if (speakerList) {
       setSpeakerListText(speakerList.join("\n"));
     }
   }, [room?.id, room?.publicView]);
+
+  const reactionWidgetStatsById = useMemo(
+    () =>
+      reactionWidgetStats.reduce<Record<string, Record<string, number>>>((acc, row) => {
+        acc[row.widgetId] = row.counts;
+        return acc;
+      }, {}),
+    [reactionWidgetStats],
+  );
 
   useEffect(() => {
     if (!isAuth || !quizId || publicViewMode !== "question" || !publicViewQuestionId) return;
@@ -1266,7 +1510,7 @@ export function AdminEventPage() {
   function addSubQuizSheet() {
     const id = `new-${crypto.randomUUID()}`;
     setSubQuizSheets((prev) => {
-      const next = [...prev, { id, title: "Новый квиз" }];
+      const next = [...prev, { id, title: "Новый квиз", questionFlowMode: "manual" as const }];
       syncedSubQuizIdsKeyRef.current = [...next]
         .map((s) => s.id)
         .sort()
@@ -1278,7 +1522,11 @@ export function AdminEventPage() {
   }
 
   async function removeSubQuizSheet(sqId: string) {
-    if (!window.confirm("Удалить квиз и все вопросы в нём?")) return;
+    console.info("[admin][subquiz-delete] requested", {
+      subQuizId: sqId,
+      hasWindow: typeof window !== "undefined",
+    });
+    console.info("[admin][subquiz-delete] applying delete", { subQuizId: sqId });
     const nextSheets = subQuizSheets.filter((s) => s.id !== sqId);
     const nextForms = questionForms.filter((q) => q.subQuizId !== sqId);
     const formErr = validateQuestionsForm(nextForms);
@@ -1312,6 +1560,22 @@ export function AdminEventPage() {
       setMessage("Квиз удалён");
       if (nextForms.length === 0) setQuestionId("");
     }
+  }
+
+  function requestRemoveSubQuizSheet(sqId: string) {
+    console.info("[admin][subquiz-delete] open-confirm-dialog", { subQuizId: sqId });
+    setConfirmDeleteSubQuizId(sqId);
+  }
+
+  function closeDeleteSubQuizDialog() {
+    setConfirmDeleteSubQuizId(null);
+  }
+
+  async function runConfirmedRemoveSubQuiz() {
+    if (!confirmDeleteSubQuizId) return;
+    const sqId = confirmDeleteSubQuizId;
+    closeDeleteSubQuizDialog();
+    await removeSubQuizSheet(sqId);
   }
 
   function addQuestionToSubQuiz(sqId: string | null) {
@@ -1377,6 +1641,21 @@ export function AdminEventPage() {
         pinExpandedSubQuiz(subQuizIdForAccordion);
       }
     }
+  }
+
+  function requestRemoveQuestion(index: number) {
+    setConfirmDeleteQuestionIndex(index);
+  }
+
+  function closeDeleteQuestionDialog() {
+    setConfirmDeleteQuestionIndex(null);
+  }
+
+  async function runConfirmedRemoveQuestion() {
+    if (confirmDeleteQuestionIndex === null) return;
+    const index = confirmDeleteQuestionIndex;
+    closeDeleteQuestionDialog();
+    await removeQuestion(index);
   }
 
   function updateQuestion(index: number, patch: Partial<QuestionForm>) {
@@ -1785,6 +2064,38 @@ export function AdminEventPage() {
     });
   }, [emitPublicViewSet]);
 
+  const resetDemoToDefault = useCallback(async () => {
+    try {
+      const res = await fetch(
+        `${API_BASE}/api/admin/rooms/${encodeURIComponent(eventName)}/reset-test-data`,
+        {
+          method: "POST",
+          credentials: "include",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({}), // endpoint currently doesn't use body
+        },
+      );
+      if (!res.ok) {
+        setMessage("Не удалось сбросить demo");
+        return;
+      }
+      const data = (await res.json()) as { quizId?: string };
+      setConfirmResetDemoOpen(false);
+      setMessage("Demo сброшен");
+      await loadRoom();
+      socket.emit("results:subscribe", { slug: eventName });
+      socket.emit("speaker:questions:subscribe", { slug: eventName, viewer: "admin" });
+      if (data.quizId) {
+        socket.emit("quiz:state:refresh", { quizId: data.quizId });
+      } else if (quizId) {
+        socket.emit("quiz:state:refresh", { quizId });
+      }
+    } catch {
+      setConfirmResetDemoOpen(false);
+      setMessage("Не удалось сбросить demo");
+    }
+  }, [API_BASE, eventName, loadRoom, quizId, setMessage]);
+
   const clearRandomizerScreenData = useCallback(() => {
     if (randomizerRunTimerRef.current != null) {
       window.clearTimeout(randomizerRunTimerRef.current);
@@ -1796,6 +2107,160 @@ export function AdminEventPage() {
       randomizerCurrentWinners: [],
     });
   }, [emitPublicViewSet]);
+
+  function toggleReportModule(moduleId: ReportModuleId, enabled: boolean) {
+    const next = enabled
+      ? reportModules.includes(moduleId)
+        ? reportModules
+        : [...reportModules, moduleId]
+      : reportModules.filter((id) => id !== moduleId);
+    setReportModules(next);
+    emitPublicViewSet({ reportModules: next });
+  }
+
+  function moveReportModule(moduleId: ReportModuleId, direction: -1 | 1) {
+    const index = reportModules.indexOf(moduleId);
+    if (index < 0) return;
+    const nextIndex = index + direction;
+    if (nextIndex < 0 || nextIndex >= reportModules.length) return;
+    const next = [...reportModules];
+    const temp = next[index];
+    next[index] = next[nextIndex]!;
+    next[nextIndex] = temp!;
+    setReportModules(next);
+    emitPublicViewSet({ reportModules: next });
+  }
+
+  function toggleReportVoteQuestion(questionId: string, enabled: boolean) {
+    const allIds = availableVoteQuestions.map((item) => item.id);
+    const current =
+      reportVoteQuestionIds.length === 0
+        ? [...allIds]
+        : reportVoteQuestionIds.filter((id) => allIds.includes(id));
+    const next = enabled
+      ? Array.from(new Set([...current, questionId]))
+      : current.filter((id) => id !== questionId);
+    setReportVoteQuestionIds(next);
+    emitPublicViewSet({ reportVoteQuestionIds: next });
+  }
+
+  function toggleReportQuizQuestion(questionId: string, enabled: boolean) {
+    const allIds = availableQuizQuestions.flatMap((group) =>
+      group.questions.map((question) => question.id),
+    );
+    const current =
+      reportQuizQuestionIds.length === 0
+        ? [...allIds]
+        : reportQuizQuestionIds.filter((id) => allIds.includes(id));
+    const next = enabled
+      ? Array.from(new Set([...current, questionId]))
+      : current.filter((id) => id !== questionId);
+    setReportQuizQuestionIds(next);
+    const parentSubQuizId =
+      availableQuizQuestions.find((group) =>
+        group.questions.some((question) => question.id === questionId),
+      )?.subQuizId ?? null;
+    const nextSubQuizIds = (() => {
+      if (!parentSubQuizId) return reportQuizSubQuizIds;
+      const base =
+        reportQuizSubQuizIds.length === 0
+          ? availableQuizQuestions.map((group) => group.subQuizId)
+          : reportQuizSubQuizIds;
+      return enabled ? Array.from(new Set([...base, parentSubQuizId])) : base;
+    })();
+    setReportQuizSubQuizIds(nextSubQuizIds);
+    emitPublicViewSet({ reportQuizQuestionIds: next, reportQuizSubQuizIds: nextSubQuizIds });
+  }
+
+  function toggleReportQuiz(subQuizId: string, enabled: boolean) {
+    const group = availableQuizQuestions.find((item) => item.subQuizId === subQuizId);
+    if (!group) return;
+    const allIds = availableQuizQuestions.flatMap((item) =>
+      item.questions.map((question) => question.id),
+    );
+    const current =
+      reportQuizQuestionIds.length === 0
+        ? [...allIds]
+        : reportQuizQuestionIds.filter((id) => allIds.includes(id));
+    const groupIds = group.questions.map((question) => question.id);
+    const next = enabled
+      ? Array.from(new Set([...current, ...groupIds]))
+      : current.filter((id) => !groupIds.includes(id));
+    const nextSubQuizIds = enabled
+      ? Array.from(
+          new Set([
+            ...(reportQuizSubQuizIds.length === 0
+              ? availableQuizQuestions.map((item) => item.subQuizId)
+              : reportQuizSubQuizIds),
+            subQuizId,
+          ]),
+        )
+      : (reportQuizSubQuizIds.length === 0
+          ? availableQuizQuestions.map((item) => item.subQuizId)
+          : reportQuizSubQuizIds
+        ).filter((id) => id !== subQuizId);
+    setReportQuizQuestionIds(next);
+    setReportQuizSubQuizIds(nextSubQuizIds);
+    emitPublicViewSet({
+      reportQuizQuestionIds: next,
+      reportQuizSubQuizIds: nextSubQuizIds,
+    });
+  }
+
+  function toggleReportSubQuizParticipantTable(subQuizId: string, enabled: boolean) {
+    const allIds = availableQuizQuestions.map((item) => item.subQuizId);
+    const base = reportSubQuizHideParticipantTableIds.filter((id) => allIds.includes(id));
+    const next = enabled
+      ? base.filter((id) => id !== subQuizId)
+      : Array.from(new Set([...base, subQuizId]));
+    setReportSubQuizHideParticipantTableIds(next);
+    emitPublicViewSet({ reportSubQuizHideParticipantTableIds: next });
+  }
+
+  function allReportRandomizerRunIds(): string[] {
+    const ids = randomizerHistory.map((_, i) => `history:${i}`);
+    if (randomizerCurrentWinners.length > 0) ids.push("current");
+    return ids;
+  }
+
+  function toggleReportRandomizerRun(runId: string, enabled: boolean) {
+    const all = allReportRandomizerRunIds();
+    const current =
+      reportRandomizerRunIds.length === 0
+        ? [...all]
+        : reportRandomizerRunIds.filter((id) => all.includes(id));
+    const next = enabled
+      ? Array.from(new Set([...current, runId]))
+      : current.filter((id) => id !== runId);
+    setReportRandomizerRunIds(next);
+    emitPublicViewSet({ reportRandomizerRunIds: next });
+  }
+
+  function toggleReportReactionsWidget(widgetId: string, enabled: boolean) {
+    const all = reactionWidgets.map((w) => w.id);
+    const current =
+      reportReactionsWidgetIds.length === 0
+        ? [...all]
+        : reportReactionsWidgetIds.filter((id) => all.includes(id));
+    const next = enabled
+      ? Array.from(new Set([...current, widgetId]))
+      : current.filter((id) => id !== widgetId);
+    setReportReactionsWidgetIds(next);
+    emitPublicViewSet({ reportReactionsWidgetIds: next });
+  }
+
+  function toggleReportSpeakerQuestion(questionId: string, enabled: boolean) {
+    const all = (speakerQuestionsPayload?.items ?? []).map((q) => q.id);
+    const current =
+      reportSpeakerQuestionIds.length === 0
+        ? [...all]
+        : reportSpeakerQuestionIds.filter((id) => all.includes(id));
+    const next = enabled
+      ? Array.from(new Set([...current, questionId]))
+      : current.filter((id) => id !== questionId);
+    setReportSpeakerQuestionIds(next);
+    emitPublicViewSet({ reportSpeakerQuestionIds: next });
+  }
 
   function createPlayerBanner(
     linkUrl: string,
@@ -2072,6 +2537,25 @@ export function AdminEventPage() {
     socket.emit("quiz:state:refresh", { quizId });
   }
 
+  const speakerQuestionsAdminSettings = useMemo(
+    () => ({
+      enabled: speakerQuestionsEnabled,
+      reactionsText: speakerQuestionsReactionsText,
+      showAuthorOnScreen: speakerQuestionsShowAuthorOnScreen,
+      showRecipientOnScreen: speakerQuestionsShowRecipientOnScreen,
+      showReactionsOnScreen: speakerQuestionsShowReactionsOnScreen,
+      speakersText: speakerListText,
+    }),
+    [
+      speakerQuestionsEnabled,
+      speakerQuestionsReactionsText,
+      speakerQuestionsShowAuthorOnScreen,
+      speakerQuestionsShowRecipientOnScreen,
+      speakerQuestionsShowReactionsOnScreen,
+      speakerListText,
+    ],
+  );
+
   const {
     saveSpeakerSettings,
     setSpeakerQuestionOnScreen,
@@ -2082,12 +2566,7 @@ export function AdminEventPage() {
     deleteSpeakerQuestion,
   } = useSpeakerQuestionsAdminActions({
     quizId,
-    speakerQuestionsEnabled,
-    speakerQuestionsAllowLikes,
-    speakerQuestionsShowLikesOnScreen,
-    speakerQuestionsReactionsText,
-    speakerQuestionsShowAuthorOnScreen,
-    speakerListText,
+    speakerSettings: speakerQuestionsAdminSettings,
     setMessage,
   });
 
@@ -2754,6 +3233,20 @@ export function AdminEventPage() {
                       }
                     }}
                   />
+                  {eventName === "demo" && (
+                    <Card variant="outlined" sx={{ borderColor: "warning.main" }}>
+                      <CardContent>
+                        <Button
+                          variant="outlined"
+                          color="warning"
+                          onClick={() => setConfirmResetDemoOpen(true)}
+                          sx={{ textTransform: "none", alignSelf: "flex-start" }}
+                        >
+                          Вернуть тестовые данные
+                        </Button>
+                      </CardContent>
+                    </Card>
+                  )}
                 </Stack>
               )}
 
@@ -2906,7 +3399,10 @@ export function AdminEventPage() {
                                             aria-label="Удалить квиз"
                                             onClick={(e) => {
                                               e.stopPropagation();
-                                              void removeSubQuizSheet(sq.id);
+                                              console.info("[admin][subquiz-delete] click", {
+                                                subQuizId: sq.id,
+                                              });
+                                              requestRemoveSubQuizSheet(sq.id);
                                             }}
                                           >
                                             <DeleteOutlineIcon fontSize="small" />
@@ -2986,6 +3482,37 @@ export function AdminEventPage() {
                                             activeLocalIndex={activeLocalIndex}
                                             quizIndexMap={quizIndexMap}
                                             quizId={quizId}
+                                            questionFlowMode={sq.questionFlowMode ?? "manual"}
+                                            onChangeQuestionFlowMode={(mode) =>
+                                              setSubQuizSheets((prev) => {
+                                                const current = prev.find(
+                                                  (item) => item.id === sq.id,
+                                                );
+                                                const next = prev.map((item) =>
+                                                  item.id === sq.id
+                                                    ? { ...item, questionFlowMode: mode }
+                                                    : item,
+                                                );
+                                                if (
+                                                  current?.questionFlowMode === "auto" &&
+                                                  mode === "manual" &&
+                                                  quizId
+                                                ) {
+                                                  socket.emit("sub-quiz:close", {
+                                                    quizId,
+                                                    subQuizId: sq.id,
+                                                  });
+                                                }
+                                                return next;
+                                              })
+                                            }
+                                            onStartAuto={() => {
+                                              if (!quizId) return;
+                                              socket.emit("sub-quiz:start-auto", {
+                                                quizId,
+                                                subQuizId: sq.id,
+                                              });
+                                            }}
                                             isLeaderboardShown={publicViewMode === "leaderboard"}
                                             firstCorrectWinnersCount={firstCorrectWinnersCount}
                                             highlightedLeadersCount={highlightedLeadersCount}
@@ -3248,6 +3775,7 @@ export function AdminEventPage() {
                         <AdminReactionsSection
                           widgets={reactionWidgets}
                           session={reactionSession}
+                          widgetStatsById={reactionWidgetStatsById}
                           activeWidgetId={activeReactionWidgetId}
                           projectorWidgetId={projectorReactionWidgetId}
                           projectorMode={publicViewMode === "reactions"}
@@ -3377,20 +3905,17 @@ export function AdminEventPage() {
 
               {activeSection === "speakers" && (
                 <AdminSpeakersSection
-                  enabled={speakerQuestionsEnabled}
-                  allowLikes={speakerQuestionsAllowLikes}
-                  showLikesOnScreen={speakerQuestionsShowLikesOnScreen}
-                  reactionsText={speakerQuestionsReactionsText}
-                  showAuthorOnScreen={speakerQuestionsShowAuthorOnScreen}
-                  speakersText={speakerListText}
+                  settings={speakerQuestionsAdminSettings}
+                  panelActions={{
+                    onToggleEnabled: setSpeakerQuestionsEnabled,
+                    onReactionsTextChange: setSpeakerQuestionsReactionsText,
+                    onToggleShowAuthorOnScreen: setSpeakerQuestionsShowAuthorOnScreen,
+                    onToggleShowRecipientOnScreen: setSpeakerQuestionsShowRecipientOnScreen,
+                    onToggleShowReactionsOnScreen: setSpeakerQuestionsShowReactionsOnScreen,
+                    onSpeakersTextChange: setSpeakerListText,
+                    onSaveSettings: saveSpeakerSettingsAndOpenProjector,
+                  }}
                   questions={speakerQuestionsPayload?.items ?? []}
-                  onToggleEnabled={setSpeakerQuestionsEnabled}
-                  onToggleAllowLikes={setSpeakerQuestionsAllowLikes}
-                  onToggleShowLikesOnScreen={setSpeakerQuestionsShowLikesOnScreen}
-                  onReactionsTextChange={setSpeakerQuestionsReactionsText}
-                  onToggleShowAuthorOnScreen={setSpeakerQuestionsShowAuthorOnScreen}
-                  onSpeakersTextChange={setSpeakerListText}
-                  onSaveSettings={saveSpeakerSettingsAndOpenProjector}
                   onHide={hideSpeakerQuestion}
                   onRestore={restoreSpeakerQuestion}
                   onSetUserVisible={setSpeakerQuestionUserVisible}
@@ -3501,6 +4026,44 @@ export function AdminEventPage() {
                   }))}
                   selectedResultsSubQuizId={resultsSubQuizId}
                   onSelectResultsSubQuiz={setResultsSubQuizId}
+                />
+              )}
+              {activeSection === "report" && (
+                <AdminReportSection
+                  reportTitle={reportTitle}
+                  onReportTitleChange={setReportTitle}
+                  onReportTitleCommit={() => emitPublicViewSet({ reportTitle })}
+                  reportModules={reportModules}
+                  onToggleModule={toggleReportModule}
+                  onMoveModule={moveReportModule}
+                  availableQuizQuestions={availableQuizQuestions}
+                  selectedQuizIds={reportQuizSubQuizIds}
+                  selectedQuizQuestionIds={reportQuizQuestionIds}
+                  onToggleQuiz={toggleReportQuiz}
+                  onToggleQuizQuestion={toggleReportQuizQuestion}
+                  reportSubQuizHideParticipantTableIds={reportSubQuizHideParticipantTableIds}
+                  onToggleSubQuizParticipantTable={toggleReportSubQuizParticipantTable}
+                  randomizerHistory={randomizerHistory}
+                  randomizerCurrentWinners={randomizerCurrentWinners}
+                  reportRandomizerRunIds={reportRandomizerRunIds}
+                  onToggleRandomizerRun={toggleReportRandomizerRun}
+                  reactionWidgets={reactionWidgets}
+                  reportReactionsWidgetIds={reportReactionsWidgetIds}
+                  onToggleReactionsWidget={toggleReportReactionsWidget}
+                  speakerQuestionsForReport={speakerQuestionsPayload?.items ?? []}
+                  reportSpeakerQuestionIds={reportSpeakerQuestionIds}
+                  onToggleSpeakerQuestion={toggleReportSpeakerQuestion}
+                  availableVoteQuestions={availableVoteQuestions}
+                  selectedVoteQuestionIds={reportVoteQuestionIds}
+                  onToggleVoteQuestion={toggleReportVoteQuestion}
+                  reportPublished={reportPublished}
+                  onTogglePublished={(next) => {
+                    setReportPublished(next);
+                    emitPublicViewSet({ reportPublished: next });
+                    setMessage(next ? "Публичный отчет опубликован" : "Публичный отчет скрыт");
+                  }}
+                  publicReportUrl={`${APP_ORIGIN}/report/${room.slug}`}
+                  pdfReportUrl={`${API_BASE}/api/quiz/by-slug/${encodeURIComponent(room.slug)}/public-report.pdf`}
                 />
               )}
               {activeSection === "danger" && (
@@ -3925,7 +4488,7 @@ export function AdminEventPage() {
           <Button
             variant="outlined"
             color="error"
-            onClick={() => removeQuestion(selectedQuestionIndex)}
+            onClick={() => requestRemoveQuestion(selectedQuestionIndex)}
           >
             Удалить вопрос
           </Button>
@@ -4107,6 +4670,67 @@ export function AdminEventPage() {
           <Button onClick={() => setConfirmResetQuestionIndex(null)}>Отмена</Button>
           <Button color="warning" variant="contained" onClick={runConfirmedResetQuestionAnswers}>
             Обнулить
+          </Button>
+        </DialogActions>
+      </Dialog>
+      <Dialog
+        open={confirmDeleteSubQuizId !== null}
+        onClose={closeDeleteSubQuizDialog}
+        maxWidth="xs"
+        fullWidth
+      >
+        <DialogTitle>Удалить квиз</DialogTitle>
+        <DialogContent>
+          <Typography>Удалить квиз? Это действие нельзя отменить.</Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={closeDeleteSubQuizDialog}>Отмена</Button>
+          <Button
+            color="error"
+            variant="contained"
+            onClick={() => void runConfirmedRemoveSubQuiz()}
+          >
+            Удалить
+          </Button>
+        </DialogActions>
+      </Dialog>
+      <Dialog
+        open={confirmDeleteQuestionIndex !== null}
+        onClose={closeDeleteQuestionDialog}
+        maxWidth="xs"
+        fullWidth
+      >
+        <DialogTitle>Удалить голосование</DialogTitle>
+        <DialogContent>
+          <Typography>Удалить это голосование? Это действие нельзя отменить.</Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={closeDeleteQuestionDialog}>Отмена</Button>
+          <Button
+            color="error"
+            variant="contained"
+            onClick={() => void runConfirmedRemoveQuestion()}
+          >
+            Удалить
+          </Button>
+        </DialogActions>
+      </Dialog>
+      <Dialog
+        open={confirmResetDemoOpen}
+        onClose={() => setConfirmResetDemoOpen(false)}
+        maxWidth="xs"
+        fullWidth
+      >
+        <DialogTitle>Сбросить demo</DialogTitle>
+        <DialogContent>
+          <Typography>
+            Сбросить ивент `demo` к тестовым данным? Все текущие изменения будут перезаписаны.
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setConfirmResetDemoOpen(false)}>Отмена</Button>
+          <Button color="error" variant="contained" onClick={() => void resetDemoToDefault()}>
+            Сбросить
           </Button>
         </DialogActions>
       </Dialog>

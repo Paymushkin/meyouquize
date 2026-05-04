@@ -42,10 +42,19 @@ export type PublicViewMode =
   | "leaderboard"
   | "speaker_questions"
   | "reactions"
-  | "randomizer";
+  | "randomizer"
+  | "report";
 export type QuestionRevealStage = "options" | "results";
 export type RandomizerMode = "names" | "numbers";
 export type RandomizerListMode = "participants_only" | "free_list";
+export type ReportModuleId =
+  | "event_header"
+  | "participation_summary"
+  | "quiz_results"
+  | "vote_results"
+  | "reactions_summary"
+  | "randomizer_summary"
+  | "speaker_questions_summary";
 
 export type CloudWordCount = { text: string; count: number };
 export type PublicBanner = {
@@ -59,6 +68,10 @@ export type PublicReactionWidget = {
   id: string;
   title: string;
   reactions: string[];
+};
+export type PublicReactionWidgetStats = {
+  widgetId: string;
+  counts: Record<string, number>;
 };
 export type RandomizerHistoryEntry = {
   timestamp: string;
@@ -101,14 +114,14 @@ export interface PublicViewState {
   speakerQuestionsEnabled: boolean;
   /** Секция «Вопросы спикерам»: список спикеров (можно выбрать конкретного или "всем") */
   speakerQuestionsSpeakers: string[];
-  /** Секция «Вопросы спикерам»: разрешить лайки от других участников */
-  speakerQuestionsAllowLikes: boolean;
-  /** Секция «Вопросы спикерам»: показывать лайки в режиме проектора */
-  speakerQuestionsShowLikesOnScreen: boolean;
   /** Секция «Вопросы спикерам»: список доступных реакций */
   speakerQuestionsReactions: string[];
   /** Секция «Вопросы спикерам»: показывать автора вопроса в режиме проектора */
   speakerQuestionsShowAuthorOnScreen: boolean;
+  /** Секция «Вопросы спикерам»: показывать подпись «кому: …» на проекторе */
+  speakerQuestionsShowRecipientOnScreen: boolean;
+  /** Секция «Вопросы спикерам»: показывать счётчики реакций на проекторе */
+  speakerQuestionsShowReactionsOnScreen: boolean;
   /** Показывать название ивента в интерфейсе игрока */
   showEventTitleOnPlayer: boolean;
   /** Баннеры для пользовательского интерфейса */
@@ -135,6 +148,8 @@ export interface PublicViewState {
   reactionsOverlayText: string;
   /** Набор сохраненных виджетов реакций для админки */
   reactionsWidgets: PublicReactionWidget[];
+  /** Сохраненные счетчики реакций по виджетам (персистентно) */
+  reactionsWidgetStats: PublicReactionWidgetStats[];
   /** Список questionId, для которых у пользователя показываются плитки результатов */
   playerVisibleResultQuestionIds: string[];
   /** Рандомайзер: режим выбора (имена/числа) */
@@ -161,6 +176,32 @@ export interface PublicViewState {
   randomizerHistory: RandomizerHistoryEntry[];
   /** Рандомайзер: счётчик запусков (триггер анимации на проекторе) */
   randomizerRunId: number;
+  /** Отчет: заголовок публичной страницы */
+  reportTitle: string;
+  /** Отчет: включенные блоки и их порядок */
+  reportModules: ReportModuleId[];
+  /** Отчет: какие голосования показывать (пусто = все) */
+  reportVoteQuestionIds: string[];
+  /** Отчет: какие вопросы квизов показывать (пусто = все) */
+  reportQuizQuestionIds: string[];
+  /** Отчет: какие квизы показывать (пусто = все) */
+  reportQuizSubQuizIds: string[];
+  /**
+   * Отчет: id субквизов, для которых скрыта таблица баллов участников по вопросам
+   * (как на странице результатов в админке). Пусто = таблица показывается для всех включённых квизов.
+   */
+  reportSubQuizHideParticipantTableIds: string[];
+  /**
+   * Отчет: какие запуски рандомайзера показывать (`history:0`, `history:1`, … и/или `current`).
+   * Пусто = все запуски из истории и текущие победители (как раньше).
+   */
+  reportRandomizerRunIds: string[];
+  /** Отчет: какие виджеты реакций показывать (id). Пусто = все. */
+  reportReactionsWidgetIds: string[];
+  /** Отчет: какие вопросы спикерам показывать (id). Пусто = все (в пределах лимита на сервере). */
+  reportSpeakerQuestionIds: string[];
+  /** Отчет: опубликован ли отчет по публичной ссылке */
+  reportPublished: boolean;
   /** Бренд: базовый акцентный цвет интерфейса */
   brandPrimaryColor: string;
   /** Бренд: дополнительный цвет интерфейса */
@@ -221,10 +262,10 @@ export const DEFAULT_PUBLIC_VIEW_STATE: PublicViewState = {
   firstCorrectWinnersCount: 1,
   speakerQuestionsEnabled: false,
   speakerQuestionsSpeakers: [],
-  speakerQuestionsAllowLikes: true,
-  speakerQuestionsShowLikesOnScreen: true,
   speakerQuestionsReactions: ["👍", "🔥", "👏", "❤️"],
   speakerQuestionsShowAuthorOnScreen: false,
+  speakerQuestionsShowRecipientOnScreen: true,
+  speakerQuestionsShowReactionsOnScreen: true,
   showEventTitleOnPlayer: true,
   playerBanners: [],
   activePlayerBannerId: undefined,
@@ -238,6 +279,7 @@ export const DEFAULT_PUBLIC_VIEW_STATE: PublicViewState = {
   playerTilesOrder: [SPEAKER_TILE_ID, PROGRAM_TILE_ID],
   reactionsOverlayText: "Реакции аудитории",
   reactionsWidgets: [],
+  reactionsWidgetStats: [],
   playerVisibleResultQuestionIds: [],
   randomizerMode: "names",
   randomizerListMode: "free_list",
@@ -251,6 +293,24 @@ export const DEFAULT_PUBLIC_VIEW_STATE: PublicViewState = {
   randomizerCurrentWinners: [],
   randomizerHistory: [],
   randomizerRunId: 0,
+  reportTitle: "Отчет мероприятия",
+  reportModules: [
+    "event_header",
+    "participation_summary",
+    "quiz_results",
+    "vote_results",
+    "reactions_summary",
+    "randomizer_summary",
+    "speaker_questions_summary",
+  ],
+  reportVoteQuestionIds: [],
+  reportQuizQuestionIds: [],
+  reportQuizSubQuizIds: [],
+  reportSubQuizHideParticipantTableIds: [],
+  reportRandomizerRunIds: [],
+  reportReactionsWidgetIds: [],
+  reportSpeakerQuestionIds: [],
+  reportPublished: false,
   brandPrimaryColor: "#7c5acb",
   brandAccentColor: "#1976d2",
   brandSurfaceColor: "#ffffff",
@@ -361,6 +421,30 @@ function sanitizeReactionWidgets(
   return result;
 }
 
+function sanitizeReactionWidgetStats(
+  items: PublicReactionWidgetStats[] | undefined,
+): PublicReactionWidgetStats[] {
+  if (!Array.isArray(items)) return [];
+  const deduped = new Set<string>();
+  const result: PublicReactionWidgetStats[] = [];
+  for (const item of items) {
+    if (!item || typeof item.widgetId !== "string" || typeof item.counts !== "object") continue;
+    const widgetId = item.widgetId.trim().slice(0, 80);
+    if (!widgetId || deduped.has(widgetId)) continue;
+    const counts: Record<string, number> = {};
+    for (const [reaction, rawCount] of Object.entries(item.counts ?? {})) {
+      const key = reaction.trim().slice(0, 16);
+      if (!key) continue;
+      const count = Number.isFinite(rawCount) ? Math.max(0, Math.trunc(rawCount)) : 0;
+      counts[key] = count;
+    }
+    deduped.add(widgetId);
+    result.push({ widgetId, counts });
+    if (result.length >= 100) break;
+  }
+  return result;
+}
+
 function sanitizeRandomizerHistory(
   items: RandomizerHistoryEntry[] | undefined,
 ): RandomizerHistoryEntry[] {
@@ -380,6 +464,35 @@ function sanitizeRandomizerHistory(
     .slice(0, 200);
 }
 
+function sanitizeReportModules(
+  items: Array<ReportModuleId | "question_results"> | undefined,
+  fallback: ReportModuleId[],
+): ReportModuleId[] {
+  const allowed = new Set<ReportModuleId>([
+    "event_header",
+    "participation_summary",
+    "quiz_results",
+    "vote_results",
+    "reactions_summary",
+    "randomizer_summary",
+    "speaker_questions_summary",
+  ]);
+  if (!Array.isArray(items)) return [...fallback];
+  const next: ReportModuleId[] = [];
+  for (const item of items) {
+    // Backward compatibility: old single block becomes two separated blocks.
+    if (item === "question_results") {
+      if (!next.includes("quiz_results")) next.push("quiz_results");
+      if (!next.includes("vote_results")) next.push("vote_results");
+      continue;
+    }
+    if (!allowed.has(item)) continue;
+    if (!next.includes(item)) next.push(item);
+  }
+  if (next.length === 0) return [...fallback];
+  return next.slice(0, 20);
+}
+
 export function normalizePublicViewState(
   value: Partial<PublicViewState> | undefined,
 ): PublicViewState {
@@ -390,7 +503,8 @@ export function normalizePublicViewState(
     value?.mode === "title" ||
     value?.mode === "speaker_questions" ||
     value?.mode === "reactions" ||
-    value?.mode === "randomizer"
+    value?.mode === "randomizer" ||
+    value?.mode === "report"
       ? value.mode
       : base.mode;
   const rawQuestionId =
@@ -499,14 +613,6 @@ export function normalizePublicViewState(
           .map((item) => item.trim().slice(0, 80))
           .slice(0, 100)
       : [...base.speakerQuestionsSpeakers],
-    speakerQuestionsAllowLikes:
-      typeof value?.speakerQuestionsAllowLikes === "boolean"
-        ? value.speakerQuestionsAllowLikes
-        : base.speakerQuestionsAllowLikes,
-    speakerQuestionsShowLikesOnScreen:
-      typeof value?.speakerQuestionsShowLikesOnScreen === "boolean"
-        ? value.speakerQuestionsShowLikesOnScreen
-        : base.speakerQuestionsShowLikesOnScreen,
     speakerQuestionsReactions: Array.isArray(value?.speakerQuestionsReactions)
       ? value.speakerQuestionsReactions
           .filter((item) => typeof item === "string")
@@ -518,6 +624,14 @@ export function normalizePublicViewState(
       typeof value?.speakerQuestionsShowAuthorOnScreen === "boolean"
         ? value.speakerQuestionsShowAuthorOnScreen
         : base.speakerQuestionsShowAuthorOnScreen,
+    speakerQuestionsShowRecipientOnScreen:
+      typeof value?.speakerQuestionsShowRecipientOnScreen === "boolean"
+        ? value.speakerQuestionsShowRecipientOnScreen
+        : base.speakerQuestionsShowRecipientOnScreen,
+    speakerQuestionsShowReactionsOnScreen:
+      typeof value?.speakerQuestionsShowReactionsOnScreen === "boolean"
+        ? value.speakerQuestionsShowReactionsOnScreen
+        : base.speakerQuestionsShowReactionsOnScreen,
     showEventTitleOnPlayer:
       typeof value?.showEventTitleOnPlayer === "boolean"
         ? value.showEventTitleOnPlayer
@@ -558,6 +672,7 @@ export function normalizePublicViewState(
         ? value.reactionsOverlayText.trim().slice(0, 120)
         : base.reactionsOverlayText,
     reactionsWidgets: sanitizeReactionWidgets(value?.reactionsWidgets),
+    reactionsWidgetStats: sanitizeReactionWidgetStats(value?.reactionsWidgetStats),
     playerVisibleResultQuestionIds: Array.isArray(value?.playerVisibleResultQuestionIds)
       ? value.playerVisibleResultQuestionIds
           .filter((item): item is string => typeof item === "string")
@@ -613,6 +728,62 @@ export function normalizePublicViewState(
       : [...base.randomizerCurrentWinners],
     randomizerHistory: sanitizeRandomizerHistory(value?.randomizerHistory),
     randomizerRunId: clampInt(value?.randomizerRunId ?? base.randomizerRunId, 0, 1000000000),
+    reportTitle:
+      typeof value?.reportTitle === "string"
+        ? value.reportTitle.trim().slice(0, 120)
+        : base.reportTitle,
+    reportModules: sanitizeReportModules(value?.reportModules, base.reportModules),
+    reportVoteQuestionIds: Array.isArray(value?.reportVoteQuestionIds)
+      ? value.reportVoteQuestionIds
+          .filter((id): id is string => typeof id === "string")
+          .map((id) => id.trim())
+          .filter((id) => id.length > 0)
+          .slice(0, 400)
+      : [...base.reportVoteQuestionIds],
+    reportQuizQuestionIds: Array.isArray(value?.reportQuizQuestionIds)
+      ? value.reportQuizQuestionIds
+          .filter((id): id is string => typeof id === "string")
+          .map((id) => id.trim())
+          .filter((id) => id.length > 0)
+          .slice(0, 400)
+      : [...base.reportQuizQuestionIds],
+    reportQuizSubQuizIds: Array.isArray(value?.reportQuizSubQuizIds)
+      ? value.reportQuizSubQuizIds
+          .filter((id): id is string => typeof id === "string")
+          .map((id) => id.trim())
+          .filter((id) => id.length > 0)
+          .slice(0, 400)
+      : [...base.reportQuizSubQuizIds],
+    reportSubQuizHideParticipantTableIds: Array.isArray(value?.reportSubQuizHideParticipantTableIds)
+      ? value.reportSubQuizHideParticipantTableIds
+          .filter((id): id is string => typeof id === "string")
+          .map((id) => id.trim())
+          .filter((id) => id.length > 0)
+          .slice(0, 400)
+      : [...base.reportSubQuizHideParticipantTableIds],
+    reportRandomizerRunIds: Array.isArray(value?.reportRandomizerRunIds)
+      ? value.reportRandomizerRunIds
+          .filter((id): id is string => typeof id === "string")
+          .map((id) => id.trim())
+          .filter((id) => id === "current" || /^history:\d{1,4}$/.test(id))
+          .slice(0, 200)
+      : [...base.reportRandomizerRunIds],
+    reportReactionsWidgetIds: Array.isArray(value?.reportReactionsWidgetIds)
+      ? value.reportReactionsWidgetIds
+          .filter((id): id is string => typeof id === "string")
+          .map((id) => id.trim())
+          .filter((id) => id.length > 0)
+          .slice(0, 200)
+      : [...base.reportReactionsWidgetIds],
+    reportSpeakerQuestionIds: Array.isArray(value?.reportSpeakerQuestionIds)
+      ? value.reportSpeakerQuestionIds
+          .filter((id): id is string => typeof id === "string")
+          .map((id) => id.trim())
+          .filter((id) => id.length > 0)
+          .slice(0, 400)
+      : [...base.reportSpeakerQuestionIds],
+    reportPublished:
+      typeof value?.reportPublished === "boolean" ? value.reportPublished : base.reportPublished,
     brandPrimaryColor: sanitizeHex6(value?.brandPrimaryColor, base.brandPrimaryColor),
     brandAccentColor: sanitizeHex6(value?.brandAccentColor, base.brandAccentColor),
     brandSurfaceColor: sanitizeHex6(value?.brandSurfaceColor, base.brandSurfaceColor),

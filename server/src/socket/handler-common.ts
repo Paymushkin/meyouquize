@@ -1,4 +1,5 @@
 import type { Socket } from "socket.io";
+import { isAdminTokenValid } from "../admin-session-cache.js";
 
 export type SocketData = {
   participantId?: string;
@@ -47,4 +48,22 @@ export function fail(socket: Socket, error: string | Partial<SocketErrorPayload>
           details: error.details,
         };
   socket.emit("error:message", payload);
+}
+
+function readCookieValue(cookieHeader: string, key: string): string | null {
+  const item = cookieHeader
+    .split(";")
+    .map((v) => v.trim())
+    .find((v) => v.startsWith(`${key}=`));
+  if (!item) return null;
+  const value = item.slice(key.length + 1).trim();
+  return value || null;
+}
+
+export async function assertAdmin(socket: EnrichedSocket): Promise<void> {
+  const token = readCookieValue(socket.handshake?.headers?.cookie ?? "", "mq_admin");
+  if (!token) throw new Error("Forbidden");
+  const valid = await isAdminTokenValid(token);
+  socket.data.isAdmin = valid;
+  if (!valid) throw new Error("Forbidden");
 }

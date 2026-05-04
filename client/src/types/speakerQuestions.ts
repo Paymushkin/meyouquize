@@ -1,10 +1,12 @@
 export type SpeakerQuestionsSettings = {
   enabled: boolean;
   speakers: string[];
-  allowLikes: boolean;
-  showLikesOnScreen?: boolean;
   reactions?: string[];
   showAuthorOnScreen?: boolean;
+  /** Подпись «кому: …» на проекторе */
+  showRecipientOnScreen?: boolean;
+  /** Счётчики реакций на проекторе */
+  showReactionsOnScreen?: boolean;
 };
 
 export type SpeakerQuestionItem = {
@@ -15,10 +17,6 @@ export type SpeakerQuestionItem = {
   status: "PENDING" | "APPROVED" | "REJECTED";
   userVisible: boolean;
   isOnScreen: boolean;
-  likeCount: number;
-  dislikeCount: number;
-  likedByMe: boolean;
-  dislikedByMe: boolean;
   reactionCounts?: Record<string, number>;
   myReactions?: string[];
   createdAt: string;

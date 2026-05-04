@@ -3,6 +3,8 @@ import {
   SPEAKER_TILE_ID,
   type CloudWordCount,
   type PublicBanner,
+  type PublicReactionWidgetStats,
+  type ReportModuleId,
   type PublicViewMode,
   type PublicViewPatch as SharedPublicViewPatch,
   type PublicViewPayload as SharedPublicViewPayload,
@@ -74,7 +76,13 @@ export type PublicViewSetPatch = SharedPublicViewPatch & {
   programTileVisible?: boolean;
 };
 
-export type { CloudWordCount, PublicBanner, PublicViewMode };
+export type {
+  CloudWordCount,
+  PublicBanner,
+  PublicReactionWidgetStats,
+  PublicViewMode,
+  ReportModuleId,
+};
 export { normalizePublicViewState, SPEAKER_TILE_ID };
 
 export function toBrandingState(payload: Partial<PublicViewPayload>): BrandingState {

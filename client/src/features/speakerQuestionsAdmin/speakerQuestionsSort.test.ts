@@ -11,10 +11,6 @@ function makeItem(overrides: Partial<SpeakerQuestionItem>): SpeakerQuestionItem 
     status: "PENDING",
     userVisible: true,
     isOnScreen: false,
-    likeCount: 0,
-    dislikeCount: 0,
-    likedByMe: false,
-    dislikedByMe: false,
     createdAt: "2026-01-01T00:00:00.000Z",
     ...overrides,
   };

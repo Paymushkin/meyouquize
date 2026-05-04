@@ -1,4 +1,5 @@
 import { useEffect } from "react";
+import { sanitizeClientAssetUrl } from "../utils/safeUrls";
 
 function cssEscapeFamily(value: string): string {
   return value.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
@@ -6,7 +7,7 @@ function cssEscapeFamily(value: string): string {
 
 export function useBrandFont(fontFamily: string, fontUrl?: string) {
   useEffect(() => {
-    const url = fontUrl?.trim();
+    const url = sanitizeClientAssetUrl(fontUrl);
     if (!url) return;
     const familyCandidate =
       fontFamily

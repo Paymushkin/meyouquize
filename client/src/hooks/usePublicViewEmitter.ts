@@ -70,6 +70,24 @@ type UsePublicViewEmitterParams = {
   randomizerCurrentWinners: string[];
   randomizerHistory: RandomizerHistoryEntry[];
   randomizerRunId: number;
+  reportTitle: string;
+  reportModules: Array<
+    | "event_header"
+    | "participation_summary"
+    | "quiz_results"
+    | "vote_results"
+    | "reactions_summary"
+    | "randomizer_summary"
+    | "speaker_questions_summary"
+  >;
+  reportVoteQuestionIds: string[];
+  reportQuizQuestionIds: string[];
+  reportQuizSubQuizIds: string[];
+  reportSubQuizHideParticipantTableIds: string[];
+  reportRandomizerRunIds: string[];
+  reportReactionsWidgetIds: string[];
+  reportSpeakerQuestionIds: string[];
+  reportPublished: boolean;
   brandPrimaryColor: string;
   brandAccentColor: string;
   brandSurfaceColor: string;
@@ -130,6 +148,16 @@ export function usePublicViewEmitter(params: UsePublicViewEmitterParams) {
     randomizerCurrentWinners,
     randomizerHistory,
     randomizerRunId,
+    reportTitle,
+    reportModules,
+    reportVoteQuestionIds,
+    reportQuizQuestionIds,
+    reportQuizSubQuizIds,
+    reportSubQuizHideParticipantTableIds,
+    reportRandomizerRunIds,
+    reportReactionsWidgetIds,
+    reportSpeakerQuestionIds,
+    reportPublished,
     brandPrimaryColor,
     brandAccentColor,
     brandSurfaceColor,
@@ -217,6 +245,17 @@ export function usePublicViewEmitter(params: UsePublicViewEmitterParams) {
         randomizerCurrentWinners: patch.randomizerCurrentWinners ?? randomizerCurrentWinners,
         randomizerHistory: patch.randomizerHistory ?? randomizerHistory,
         randomizerRunId: patch.randomizerRunId ?? randomizerRunId,
+        reportTitle: patch.reportTitle ?? reportTitle,
+        reportModules: patch.reportModules ?? reportModules,
+        reportVoteQuestionIds: patch.reportVoteQuestionIds ?? reportVoteQuestionIds,
+        reportQuizQuestionIds: patch.reportQuizQuestionIds ?? reportQuizQuestionIds,
+        reportQuizSubQuizIds: patch.reportQuizSubQuizIds ?? reportQuizSubQuizIds,
+        reportSubQuizHideParticipantTableIds:
+          patch.reportSubQuizHideParticipantTableIds ?? reportSubQuizHideParticipantTableIds,
+        reportRandomizerRunIds: patch.reportRandomizerRunIds ?? reportRandomizerRunIds,
+        reportReactionsWidgetIds: patch.reportReactionsWidgetIds ?? reportReactionsWidgetIds,
+        reportSpeakerQuestionIds: patch.reportSpeakerQuestionIds ?? reportSpeakerQuestionIds,
+        reportPublished: patch.reportPublished ?? reportPublished,
         brandPrimaryColor: patch.brandPrimaryColor ?? brandPrimaryColor,
         brandAccentColor: patch.brandAccentColor ?? brandAccentColor,
         brandSurfaceColor: patch.brandSurfaceColor ?? brandSurfaceColor,
@@ -279,6 +318,16 @@ export function usePublicViewEmitter(params: UsePublicViewEmitterParams) {
       randomizerCurrentWinners,
       randomizerHistory,
       randomizerRunId,
+      reportTitle,
+      reportModules,
+      reportVoteQuestionIds,
+      reportQuizQuestionIds,
+      reportQuizSubQuizIds,
+      reportSubQuizHideParticipantTableIds,
+      reportRandomizerRunIds,
+      reportReactionsWidgetIds,
+      reportSpeakerQuestionIds,
+      reportPublished,
       brandPrimaryColor,
       brandAccentColor,
       brandSurfaceColor,

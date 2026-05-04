@@ -23,6 +23,8 @@ type Params = {
   setJoined: Dispatch<SetStateAction<boolean>>;
   setConnectionStatus: Dispatch<SetStateAction<"online" | "reconnecting" | "offline">>;
   setSpeakerQuestions: Dispatch<SetStateAction<SpeakerQuestionsPayload | null>>;
+  onParticipantMissing?: () => void;
+  onQuizJoined?: () => void;
 };
 
 export function useQuizPlaySocket({
@@ -43,6 +45,8 @@ export function useQuizPlaySocket({
   setJoined,
   setConnectionStatus,
   setSpeakerQuestions,
+  onParticipantMissing,
+  onQuizJoined,
 }: Params) {
   useEffect(() => {
     if (!socket.connected) socket.connect();
@@ -90,6 +94,11 @@ export function useQuizPlaySocket({
         }
         return;
       }
+      if (message === "Participant not found" || code === "NOT_JOINED") {
+        onParticipantMissing?.();
+        setError("");
+        return;
+      }
       setError(message);
     };
     const onConnectError = () => {
@@ -107,6 +116,7 @@ export function useQuizPlaySocket({
     };
     const onJoined = () => {
       setJoined(true);
+      onQuizJoined?.();
     };
     const onPlayerAnswers = (answers: Record<string, string[]>) => {
       hydrateSubmittedAnswers(answers);
@@ -195,5 +205,7 @@ export function useQuizPlaySocket({
     selectedRef,
     tagAnswersRef,
     setSpeakerQuestions,
+    onParticipantMissing,
+    onQuizJoined,
   ]);
 }

@@ -9,8 +9,6 @@ import {
   adminSpeakerQuestionUserVisibleSchema,
   adminSpeakerQuestionStatusSchema,
   createSpeakerQuestionSchema,
-  dislikeSpeakerQuestionSchema,
-  likeSpeakerQuestionSchema,
   speakerQuestionReactSchema,
   subscribeSpeakerQuestionsSchema,
 } from "../../schemas.js";
@@ -18,7 +16,7 @@ import { prisma } from "../../prisma.js";
 import { containsProfanity } from "../../profanity.js";
 import { getQuizBySlug } from "../../quiz-service.js";
 import type { EnrichedSocket } from "../handler-common.js";
-import { fail } from "../handler-common.js";
+import { assertAdmin, fail } from "../handler-common.js";
 import { getStoredPublicView } from "../public-view-store.js";
 import { saveStoredPublicView } from "../public-view-store.js";
 import { toPublicViewPayload } from "../public-view-helpers.js";
@@ -37,10 +35,6 @@ type SpeakerQuestionWire = {
   status: "PENDING" | "APPROVED" | "REJECTED";
   userVisible: boolean;
   isOnScreen: boolean;
-  likeCount: number;
-  dislikeCount: number;
-  likedByMe: boolean;
-  dislikedByMe: boolean;
   reactionCounts: Record<string, number>;
   myReactions: string[];
   createdAt: string;
@@ -48,47 +42,27 @@ type SpeakerQuestionWire = {
 
 type ViewerMode = "player" | "projector" | "admin";
 
-function hasDislikesSupport(): boolean {
-  const p = prisma as unknown as { speakerQuestionDislike?: unknown };
-  return !!p.speakerQuestionDislike;
-}
-
 async function buildSpeakerQuestionsPayload(
   quizId: string,
   participantId?: string | null,
   viewMode: ViewerMode = "player",
 ) {
   const view = await getStoredPublicView(quizId);
-  const dislikesSupported = hasDislikesSupport();
   const availableReactions =
     Array.isArray(view.speakerQuestionsReactions) && view.speakerQuestionsReactions.length > 0
       ? view.speakerQuestionsReactions
       : ["👍", "🔥", "👏", "❤️"];
-  const [rows, likes, dislikes, reactions, myReactionRows] = await Promise.all([
+  const [rows, reactions, myReactionRows] = await Promise.all([
     prisma.speakerQuestion.findMany({
       where: { quizId },
       orderBy: [{ isOnScreen: "desc" }, { createdAt: "desc" }],
       include: {
         participant: { select: { nickname: true } },
         _count: {
-          select: dislikesSupported
-            ? ({ likes: true, dislikes: true } as const)
-            : ({ likes: true } as const),
+          select: { reactions: true },
         },
       },
     }),
-    participantId
-      ? prisma.speakerQuestionLike.findMany({
-          where: { participantId, speakerQuestion: { quizId } },
-          select: { speakerQuestionId: true },
-        })
-      : Promise.resolve([]),
-    participantId && dislikesSupported
-      ? prisma.speakerQuestionDislike.findMany({
-          where: { participantId, speakerQuestion: { quizId } },
-          select: { speakerQuestionId: true },
-        })
-      : Promise.resolve([]),
     prisma.speakerQuestionReaction.findMany({
       where: { speakerQuestion: { quizId } },
       select: { speakerQuestionId: true, reaction: true },
@@ -100,8 +74,6 @@ async function buildSpeakerQuestionsPayload(
         })
       : Promise.resolve([]),
   ]);
-  const likedByMe = new Set(likes.map((x) => x.speakerQuestionId));
-  const dislikedByMe = new Set(dislikes.map((x) => x.speakerQuestionId));
   const reactionCountsByQuestion = new Map<string, Record<string, number>>();
   for (const row of reactions) {
     const prev = reactionCountsByQuestion.get(row.speakerQuestionId) ?? {};
@@ -132,10 +104,6 @@ async function buildSpeakerQuestionsPayload(
       status: row.status,
       userVisible: row.isVisibleToUsers,
       isOnScreen: row.isOnScreen,
-      likeCount: row._count.likes,
-      dislikeCount: dislikesSupported ? ((row._count as { dislikes?: number }).dislikes ?? 0) : 0,
-      likedByMe: likedByMe.has(row.id),
-      dislikedByMe: dislikedByMe.has(row.id),
       reactionCounts: reactionCountsByQuestion.get(row.id) ?? {},
       myReactions: myReactionsByQuestion.get(row.id) ?? [],
       createdAt: row.createdAt.toISOString(),
@@ -144,10 +112,10 @@ async function buildSpeakerQuestionsPayload(
     settings: {
       enabled: view.speakerQuestionsEnabled,
       speakers: view.speakerQuestionsSpeakers,
-      allowLikes: view.speakerQuestionsAllowLikes,
-      showLikesOnScreen: view.speakerQuestionsShowLikesOnScreen,
       reactions: availableReactions,
       showAuthorOnScreen: view.speakerQuestionsShowAuthorOnScreen,
+      showRecipientOnScreen: view.speakerQuestionsShowRecipientOnScreen,
+      showReactionsOnScreen: view.speakerQuestionsShowReactionsOnScreen,
     },
     items,
   };
@@ -194,46 +162,12 @@ function resolveViewerMode(socket: EnrichedSocket, rawViewer?: ViewerMode): View
   return rawViewer === "projector" ? "projector" : "player";
 }
 
-function assertAdmin(socket: EnrichedSocket) {
-  if (!socket.data.isAdmin) throw new Error("Forbidden");
-}
-
 async function ensureQuestionInQuiz(questionId: string, quizId: string) {
   const question = await prisma.speakerQuestion.findUnique({
     where: { id: questionId },
     select: { id: true, quizId: true },
   });
   if (!question || question.quizId !== quizId) throw new Error("Question not found");
-}
-
-async function toggleLikeForParticipant(speakerQuestionId: string, participantId: string) {
-  await prisma.$transaction(async (tx) => {
-    await tx.speakerQuestionDislike.deleteMany({ where: { speakerQuestionId, participantId } });
-    const existing = await tx.speakerQuestionLike.findUnique({
-      where: { speakerQuestionId_participantId: { speakerQuestionId, participantId } },
-      select: { id: true },
-    });
-    if (existing) {
-      await tx.speakerQuestionLike.delete({ where: { id: existing.id } });
-      return;
-    }
-    await tx.speakerQuestionLike.create({ data: { speakerQuestionId, participantId } });
-  });
-}
-
-async function toggleDislikeForParticipant(speakerQuestionId: string, participantId: string) {
-  await prisma.$transaction(async (tx) => {
-    await tx.speakerQuestionLike.deleteMany({ where: { speakerQuestionId, participantId } });
-    const existing = await tx.speakerQuestionDislike.findUnique({
-      where: { speakerQuestionId_participantId: { speakerQuestionId, participantId } },
-      select: { id: true },
-    });
-    if (existing) {
-      await tx.speakerQuestionDislike.delete({ where: { id: existing.id } });
-      return;
-    }
-    await tx.speakerQuestionDislike.create({ data: { speakerQuestionId, participantId } });
-  });
 }
 
 export function registerSpeakerQuestionsHandlers(socket: EnrichedSocket, io: Server) {
@@ -257,16 +191,20 @@ export function registerSpeakerQuestionsHandlers(socket: EnrichedSocket, io: Ser
 
   socket.on("admin:speaker:settings:set", async (raw: unknown) => {
     try {
-      assertAdmin(socket);
+      await assertAdmin(socket);
       const payload = adminSpeakerSettingsSchema.parse(raw);
       const prev = await getStoredPublicView(payload.quizId);
       const next = mergePublicViewState(prev, {
         speakerQuestionsEnabled: payload.enabled,
         speakerQuestionsSpeakers: payload.speakers,
-        speakerQuestionsAllowLikes: payload.allowLikes,
-        speakerQuestionsShowLikesOnScreen: payload.showLikesOnScreen,
         speakerQuestionsReactions: payload.reactions,
         speakerQuestionsShowAuthorOnScreen: payload.showAuthorOnScreen,
+        ...(payload.showRecipientOnScreen !== undefined
+          ? { speakerQuestionsShowRecipientOnScreen: payload.showRecipientOnScreen }
+          : {}),
+        ...(payload.showReactionsOnScreen !== undefined
+          ? { speakerQuestionsShowReactionsOnScreen: payload.showReactionsOnScreen }
+          : {}),
       });
       await saveStoredPublicView(payload.quizId, next);
       const quiz = await prisma.quiz.findUnique({
@@ -321,55 +259,11 @@ export function registerSpeakerQuestionsHandlers(socket: EnrichedSocket, io: Ser
     }
   });
 
-  socket.on("speaker:question:like", async (raw: unknown) => {
-    try {
-      const payload = likeSpeakerQuestionSchema.parse(raw);
-      if (!socket.data.participantId) throw new Error("Not joined");
-      const view = await getStoredPublicView(payload.quizId);
-      if (!view.speakerQuestionsAllowLikes) throw new Error("Оценки отключены администратором");
-      await ensureQuestionInQuiz(payload.speakerQuestionId, payload.quizId);
-      await toggleLikeForParticipant(payload.speakerQuestionId, socket.data.participantId);
-      const result = await buildSpeakerQuestionsPayload(
-        payload.quizId,
-        socket.data.participantId,
-        "player",
-      );
-      socket.emit("speaker:questions:update", result);
-      await broadcastSpeakerQuestions(io, payload.quizId, socket.id);
-    } catch (error) {
-      fail(socket, error instanceof Error ? error.message : "Like speaker question failed");
-    }
-  });
-
-  socket.on("speaker:question:dislike", async (raw: unknown) => {
-    try {
-      if (!hasDislikesSupport()) {
-        throw new Error("Нужно применить миграции/перезапустить сервер для дизлайков");
-      }
-      const payload = dislikeSpeakerQuestionSchema.parse(raw);
-      if (!socket.data.participantId) throw new Error("Not joined");
-      const view = await getStoredPublicView(payload.quizId);
-      if (!view.speakerQuestionsAllowLikes) throw new Error("Оценки отключены администратором");
-      await ensureQuestionInQuiz(payload.speakerQuestionId, payload.quizId);
-      await toggleDislikeForParticipant(payload.speakerQuestionId, socket.data.participantId);
-      const result = await buildSpeakerQuestionsPayload(
-        payload.quizId,
-        socket.data.participantId,
-        "player",
-      );
-      socket.emit("speaker:questions:update", result);
-      await broadcastSpeakerQuestions(io, payload.quizId, socket.id);
-    } catch (error) {
-      fail(socket, error instanceof Error ? error.message : "Dislike speaker question failed");
-    }
-  });
-
   socket.on("speaker:question:react", async (raw: unknown) => {
     try {
       const payload = speakerQuestionReactSchema.parse(raw);
       if (!socket.data.participantId) throw new Error("Not joined");
       const view = await getStoredPublicView(payload.quizId);
-      if (!view.speakerQuestionsAllowLikes) throw new Error("Реакции отключены администратором");
       const allowedReactions =
         Array.isArray(view.speakerQuestionsReactions) && view.speakerQuestionsReactions.length > 0
           ? view.speakerQuestionsReactions
@@ -410,7 +304,7 @@ export function registerSpeakerQuestionsHandlers(socket: EnrichedSocket, io: Ser
 
   socket.on("admin:speaker:question:status", async (raw: unknown) => {
     try {
-      assertAdmin(socket);
+      await assertAdmin(socket);
       const payload = adminSpeakerQuestionStatusSchema.parse(raw);
       await prisma.speakerQuestion.update({
         where: { id: payload.speakerQuestionId },
@@ -427,7 +321,7 @@ export function registerSpeakerQuestionsHandlers(socket: EnrichedSocket, io: Ser
 
   socket.on("admin:speaker:question:screen", async (raw: unknown) => {
     try {
-      assertAdmin(socket);
+      await assertAdmin(socket);
       const payload = adminSpeakerQuestionScreenSchema.parse(raw);
       await ensureQuestionInQuiz(payload.speakerQuestionId, payload.quizId);
       await prisma.speakerQuestion.update({
@@ -445,7 +339,7 @@ export function registerSpeakerQuestionsHandlers(socket: EnrichedSocket, io: Ser
 
   socket.on("admin:speaker:question:user-visible", async (raw: unknown) => {
     try {
-      assertAdmin(socket);
+      await assertAdmin(socket);
       const payload = adminSpeakerQuestionUserVisibleSchema.parse(raw);
       await prisma.speakerQuestion.update({
         where: { id: payload.speakerQuestionId },
@@ -462,7 +356,7 @@ export function registerSpeakerQuestionsHandlers(socket: EnrichedSocket, io: Ser
 
   socket.on("admin:speaker:question:update", async (raw: unknown) => {
     try {
-      assertAdmin(socket);
+      await assertAdmin(socket);
       const payload = adminSpeakerQuestionUpdateSchema.parse(raw);
       await prisma.speakerQuestion.update({
         where: { id: payload.speakerQuestionId },
@@ -476,18 +370,10 @@ export function registerSpeakerQuestionsHandlers(socket: EnrichedSocket, io: Ser
 
   socket.on("admin:speaker:question:delete", async (raw: unknown) => {
     try {
-      assertAdmin(socket);
+      await assertAdmin(socket);
       const payload = adminSpeakerQuestionDeleteSchema.parse(raw);
       await ensureQuestionInQuiz(payload.speakerQuestionId, payload.quizId);
       await prisma.$transaction(async (tx) => {
-        await tx.speakerQuestionLike.deleteMany({
-          where: { speakerQuestionId: payload.speakerQuestionId },
-        });
-        if (hasDislikesSupport()) {
-          await tx.speakerQuestionDislike.deleteMany({
-            where: { speakerQuestionId: payload.speakerQuestionId },
-          });
-        }
         await tx.speakerQuestionReaction.deleteMany({
           where: { speakerQuestionId: payload.speakerQuestionId },
         });

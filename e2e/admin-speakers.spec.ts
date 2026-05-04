@@ -10,9 +10,9 @@ const mockRoom = {
     mode: "question",
     speakerQuestionsEnabled: true,
     speakerQuestionsSpeakers: ["Иванов", "Сидоров"],
-    speakerQuestionsAllowLikes: true,
-    speakerQuestionsShowLikesOnScreen: true,
     speakerQuestionsShowAuthorOnScreen: false,
+    speakerQuestionsShowRecipientOnScreen: true,
+    speakerQuestionsShowReactionsOnScreen: true,
   },
 };
 
@@ -70,9 +70,8 @@ test("админка: панель настроек спикеров содер�
   await page.getByRole("button", { name: "Спикеры" }).click();
 
   await expect(page.getByLabel("Кнопка у пользователей")).toBeVisible();
-  await expect(page.getByLabel("Оценки")).toBeVisible();
-  await expect(page.getByLabel("Лайки на экране")).toBeVisible();
   await expect(page.getByLabel("Автор на экране")).toBeVisible();
+  await expect(page.getByLabel("Реакции (по одной в строке, например 👍)")).toBeVisible();
   await expect(page.getByLabel("Список спикеров (по одному в строке)")).toBeVisible();
   await expect(page.getByRole("button", { name: "Сохранить настройки" })).toBeVisible();
 });

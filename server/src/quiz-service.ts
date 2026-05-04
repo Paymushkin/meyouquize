@@ -1,7 +1,8 @@
-import { normalizeTagComparable } from "@meyouquize/shared";
+import { normalizeTagComparable, type PublicViewState } from "@meyouquize/shared";
 import {
   Prisma,
   QuestionType,
+  QuestionFlowMode,
   QuizStatus,
   RankingKind,
   RankingProjectorMetric,
@@ -180,6 +181,7 @@ function rankingExpectedIdsFromQuestion(
 export type SubQuizReplaceInput = {
   id?: string;
   title: string;
+  questionFlowMode?: "manual" | "auto";
   sortOrder?: number;
   questions: QuestionReplaceInput[];
 };
@@ -506,6 +508,8 @@ export async function replaceRoomContent(eventName: string, content: RoomContent
           where: { id: sq.id },
           data: {
             title: sq.title,
+            questionFlowMode:
+              sq.questionFlowMode === "auto" ? QuestionFlowMode.AUTO : QuestionFlowMode.MANUAL,
             sortOrder: nextSortOrder,
           },
         });
@@ -516,6 +520,8 @@ export async function replaceRoomContent(eventName: string, content: RoomContent
           data: {
             quizId: roomId,
             title: sq.title,
+            questionFlowMode:
+              sq.questionFlowMode === "auto" ? QuestionFlowMode.AUTO : QuestionFlowMode.MANUAL,
             sortOrder: nextSortOrder,
           },
         });
@@ -611,6 +617,7 @@ export async function replaceQuizQuestions(
 
 export type QuizProgressPayload = {
   subQuizId: string;
+  questionFlowMode: "manual" | "auto";
   index: number;
   total: number;
 };
@@ -651,15 +658,22 @@ export async function getQuizPublicState(quizId: string) {
     view.playerVisibleResultQuestionIds ?? [],
   );
   if (activeQuestion?.subQuizId) {
-    const inSub = await prisma.question.findMany({
-      where: { subQuizId: activeQuestion.subQuizId },
-      orderBy: { order: "asc" },
-      select: { id: true },
-    });
+    const [inSub, subQuiz] = await Promise.all([
+      prisma.question.findMany({
+        where: { subQuizId: activeQuestion.subQuizId },
+        orderBy: { order: "asc" },
+        select: { id: true },
+      }),
+      prisma.subQuiz.findUnique({
+        where: { id: activeQuestion.subQuizId },
+        select: { questionFlowMode: true },
+      }),
+    ]);
     const idx = inSub.findIndex((q) => q.id === activeQuestion.id);
     if (idx >= 0) {
       quizProgress = {
         subQuizId: activeQuestion.subQuizId,
+        questionFlowMode: subQuiz?.questionFlowMode === QuestionFlowMode.AUTO ? "auto" : "manual",
         index: idx + 1,
         total: inSub.length,
       };
@@ -1033,19 +1047,13 @@ export type SubQuizDetailedResults = {
   }>;
 };
 
-/** Детальные баллы по вопросам сабквиза (для админской страницы результатов). */
-export async function getSubQuizDetailedResults(
-  eventName: string,
+/** Детальные баллы по вопросам сабквиза (по quizId, без поиска комнаты по slug). */
+export async function getSubQuizDetailedResultsForQuiz(
+  quizId: string,
   subQuizId: string,
 ): Promise<SubQuizDetailedResults | null> {
-  const room = await prisma.quiz.findUnique({
-    where: { slug: eventName },
-    select: { id: true },
-  });
-  if (!room) return null;
-
   const subQuiz = await prisma.subQuiz.findFirst({
-    where: { id: subQuizId, quizId: room.id },
+    where: { id: subQuizId, quizId },
     select: { id: true, title: true, quizId: true },
   });
   if (!subQuiz) return null;
@@ -1117,6 +1125,58 @@ export async function getSubQuizDetailedResults(
     })),
     rows,
   };
+}
+
+function filterSubQuizDetailedForReportQuestions(
+  detailed: SubQuizDetailedResults,
+  allowedQuestionIds: Set<string>,
+): SubQuizDetailedResults | null {
+  const questions = detailed.questions.filter((q) => allowedQuestionIds.has(q.questionId));
+  if (questions.length === 0) return null;
+  const qids = questions.map((q) => q.questionId);
+  const rows = detailed.rows
+    .map((row) => {
+      const scoresByQuestionId: Record<string, number | null> = {};
+      for (const qid of qids) {
+        scoresByQuestionId[qid] = row.scoresByQuestionId[qid] ?? null;
+      }
+      const totalScore = qids.reduce((sum, qid) => {
+        const v = scoresByQuestionId[qid];
+        return sum + (v === null || v === undefined ? 0 : v);
+      }, 0);
+      return {
+        participantId: row.participantId,
+        nickname: row.nickname,
+        scoresByQuestionId,
+        totalScore,
+        totalResponseMs: row.totalResponseMs,
+      };
+    })
+    .sort(
+      (a, b) =>
+        b.totalScore - a.totalScore ||
+        a.totalResponseMs - b.totalResponseMs ||
+        a.nickname.localeCompare(b.nickname, "ru"),
+    );
+
+  return {
+    ...detailed,
+    questions: questions.map((q) => ({ ...q, isActive: false })),
+    rows,
+  };
+}
+
+/** Детальные баллы по вопросам сабквиза (для админской страницы результатов). */
+export async function getSubQuizDetailedResults(
+  eventName: string,
+  subQuizId: string,
+): Promise<SubQuizDetailedResults | null> {
+  const room = await prisma.quiz.findUnique({
+    where: { slug: eventName },
+    select: { id: true },
+  });
+  if (!room) return null;
+  return getSubQuizDetailedResultsForQuiz(room.id, subQuizId);
 }
 
 export type DashboardResults = {
@@ -1217,6 +1277,308 @@ export async function getQuizBySlug(slug: string) {
   return prisma.quiz.findUnique({
     where: { slug },
   });
+}
+
+export type PublicEventReport = {
+  title: string;
+  slug: string;
+  generatedAt: string;
+  branding: {
+    brandPrimaryColor: string;
+    brandAccentColor: string;
+    brandSurfaceColor: string;
+    brandTextColor: string;
+    brandFontFamily: string;
+    brandLogoUrl: string;
+    brandProjectorBackgroundImageUrl: string;
+    brandBodyBackgroundColor: string;
+  };
+  config: {
+    reportTitle: string;
+    reportModules: Array<
+      | "event_header"
+      | "participation_summary"
+      | "quiz_results"
+      | "vote_results"
+      | "reactions_summary"
+      | "randomizer_summary"
+      | "speaker_questions_summary"
+    >;
+    reportVoteQuestionIds: string[];
+    reportQuizQuestionIds: string[];
+    reportQuizSubQuizIds: string[];
+    reportPublished: boolean;
+  };
+  summary: {
+    participantsCount: number;
+    questionsCount: number;
+    subQuizzesCount: number;
+    answersCount: number;
+  };
+  leaderboard: DashboardResults["leaderboard"];
+  quizQuestions: Array<
+    DashboardResults["perQuestion"][number] & {
+      subQuizTitle?: string;
+    }
+  >;
+  voteQuestions: Array<
+    DashboardResults["perQuestion"][number] & {
+      subQuizTitle?: string;
+    }
+  >;
+  randomizer: {
+    currentWinners: string[];
+    history: Array<{ timestamp: string; winners: string[]; mode: "names" | "numbers" }>;
+  };
+  reactions: {
+    overlayText: string;
+    widgets: Array<{
+      id: string;
+      title: string;
+      reactions: string[];
+      reactionStats: Array<{ reaction: string; count: number }>;
+    }>;
+  };
+  speakerQuestions: {
+    enabled: boolean;
+    total: number;
+    onScreen: number;
+    items: Array<{
+      id: string;
+      speakerName: string;
+      text: string;
+      author: string;
+      reactions: Array<{ reaction: string; count: number }>;
+    }>;
+  };
+  /** Таблицы результатов по участникам (только для субквизов без флага скрытия в настройках отчёта). */
+  subQuizParticipantTables: SubQuizDetailedResults[];
+};
+
+function buildReportRandomizerSubset(view: PublicViewState): {
+  currentWinners: string[];
+  history: PublicViewState["randomizerHistory"];
+} {
+  const allHistory = view.randomizerHistory;
+  const allCurrent = view.randomizerCurrentWinners;
+  const ids = view.reportRandomizerRunIds;
+  if (!ids || ids.length === 0) {
+    return { currentWinners: [...allCurrent], history: [...allHistory] };
+  }
+  const wantCurrent = ids.includes("current");
+  const indexSet = new Set(
+    ids
+      .filter((id) => id.startsWith("history:"))
+      .map((id) => Number.parseInt(id.slice("history:".length), 10))
+      .filter((n) => Number.isFinite(n) && n >= 0 && n < allHistory.length),
+  );
+  const history = allHistory.filter((_, i) => indexSet.has(i));
+  return { currentWinners: wantCurrent ? [...allCurrent] : [], history };
+}
+
+export async function getPublicReportBySlug(slug: string): Promise<PublicEventReport | null> {
+  const quiz = await prisma.quiz.findUnique({
+    where: { slug },
+    select: {
+      id: true,
+      title: true,
+      slug: true,
+      publicView: true,
+    },
+  });
+  if (!quiz) return null;
+  const view = publicViewJsonToState(quiz.publicView);
+  if (!view.reportPublished) return null;
+
+  const [dash, participantsCount, answersCount, speakerStats, speakerItemsRaw] = await Promise.all([
+    getDashboardResults(quiz.id),
+    prisma.participant.count({ where: { quizId: quiz.id } }),
+    prisma.answer.count({ where: { quizId: quiz.id } }),
+    prisma.speakerQuestion.groupBy({
+      by: ["isOnScreen"],
+      where: { quizId: quiz.id },
+      _count: { _all: true },
+    }),
+    prisma.speakerQuestion.findMany({
+      where: { quizId: quiz.id },
+      orderBy: { createdAt: "desc" },
+      take: 100,
+      select: {
+        id: true,
+        speakerName: true,
+        text: true,
+        participant: { select: { nickname: true } },
+        reactions: { select: { reaction: true } },
+      },
+    }),
+  ]);
+
+  const onScreen = speakerStats.find((row) => row.isOnScreen)?._count._all ?? 0;
+  const total = speakerStats.reduce((sum, row) => sum + row._count._all, 0);
+  const reactionSession = getReactionSessionPublic(quiz.id);
+  const latestReactionCounts =
+    reactionSession?.counts ??
+    reactionSession?.history[0]?.counts ??
+    ({} as Record<string, number>);
+
+  const voteQuestionIdSet = new Set(view.reportVoteQuestionIds);
+  const quizQuestionIdSet = new Set(view.reportQuizQuestionIds);
+  const quizSubQuizIdSet = new Set(view.reportQuizSubQuizIds);
+  const subQuizTitleById = new Map(
+    dash.leaderboardsBySubQuiz.map((row) => [row.subQuizId, row.title] as const),
+  );
+  const quizQuestions = dash.perQuestion.filter((row) => {
+    if (row.subQuizId == null) return false;
+    if (quizQuestionIdSet.size > 0) return quizQuestionIdSet.has(row.questionId);
+    if (quizSubQuizIdSet.size === 0) return true;
+    return quizSubQuizIdSet.has(row.subQuizId);
+  });
+  const voteQuestions = dash.perQuestion.filter((row) => {
+    if (row.subQuizId != null) return false;
+    if (voteQuestionIdSet.size === 0) return true;
+    return voteQuestionIdSet.has(row.questionId);
+  });
+  const speakerItems = speakerItemsRaw.map((item) => {
+    const reactionCountByValue = new Map<string, number>();
+    for (const reaction of item.reactions) {
+      reactionCountByValue.set(
+        reaction.reaction,
+        (reactionCountByValue.get(reaction.reaction) ?? 0) + 1,
+      );
+    }
+    return {
+      id: item.id,
+      speakerName: item.speakerName,
+      text: item.text,
+      author: item.participant.nickname,
+      reactions: Array.from(reactionCountByValue.entries()).map(([reaction, count]) => ({
+        reaction,
+        count,
+      })),
+    };
+  });
+
+  const hideParticipantTableSet = new Set(view.reportSubQuizHideParticipantTableIds);
+  const quizQuestionIdsBySubQuiz = new Map<string, Set<string>>();
+  for (const row of quizQuestions) {
+    if (row.subQuizId == null) continue;
+    let idSet = quizQuestionIdsBySubQuiz.get(row.subQuizId);
+    if (!idSet) {
+      idSet = new Set();
+      quizQuestionIdsBySubQuiz.set(row.subQuizId, idSet);
+    }
+    idSet.add(row.questionId);
+  }
+
+  const orderedSubQuizIdsForTables = dash.leaderboardsBySubQuiz
+    .map((row) => row.subQuizId)
+    .filter((id) => {
+      const set = quizQuestionIdsBySubQuiz.get(id);
+      return Boolean(set && set.size > 0 && !hideParticipantTableSet.has(id));
+    });
+
+  const subQuizParticipantTablesRaw = await Promise.all(
+    orderedSubQuizIdsForTables.map((sid) => getSubQuizDetailedResultsForQuiz(quiz.id, sid)),
+  );
+  const subQuizParticipantTables: SubQuizDetailedResults[] = [];
+  for (let i = 0; i < orderedSubQuizIdsForTables.length; i++) {
+    const sid = orderedSubQuizIdsForTables[i]!;
+    const detailed = subQuizParticipantTablesRaw[i];
+    if (!detailed) continue;
+    const allowed = quizQuestionIdsBySubQuiz.get(sid);
+    if (!allowed || allowed.size === 0) continue;
+    const filtered = filterSubQuizDetailedForReportQuestions(detailed, allowed);
+    if (filtered) subQuizParticipantTables.push(filtered);
+  }
+
+  return {
+    title: quiz.title,
+    slug: quiz.slug,
+    generatedAt: new Date().toISOString(),
+    branding: {
+      brandPrimaryColor: view.brandPrimaryColor,
+      brandAccentColor: view.brandAccentColor,
+      brandSurfaceColor: view.brandSurfaceColor,
+      brandTextColor: view.brandTextColor,
+      brandFontFamily: view.brandFontFamily,
+      brandLogoUrl: view.brandLogoUrl,
+      brandProjectorBackgroundImageUrl: view.brandProjectorBackgroundImageUrl,
+      brandBodyBackgroundColor: view.brandBodyBackgroundColor,
+    },
+    config: {
+      reportTitle: view.reportTitle,
+      reportModules: view.reportModules,
+      reportVoteQuestionIds: view.reportVoteQuestionIds,
+      reportQuizQuestionIds: view.reportQuizQuestionIds,
+      reportQuizSubQuizIds: view.reportQuizSubQuizIds,
+      reportPublished: view.reportPublished,
+    },
+    summary: {
+      participantsCount,
+      questionsCount: dash.perQuestion.length,
+      subQuizzesCount: dash.leaderboardsBySubQuiz.length,
+      answersCount,
+    },
+    leaderboard: dash.leaderboard.slice(0, 200),
+    quizQuestions: quizQuestions.slice(0, 500).map((row) => ({
+      ...row,
+      subQuizTitle: row.subQuizId ? (subQuizTitleById.get(row.subQuizId) ?? undefined) : undefined,
+    })),
+    voteQuestions: voteQuestions.slice(0, 500).map((row) => ({
+      ...row,
+      subQuizTitle: row.subQuizId ? (subQuizTitleById.get(row.subQuizId) ?? undefined) : undefined,
+    })),
+    randomizer: (() => {
+      const r = buildReportRandomizerSubset(view);
+      return { currentWinners: r.currentWinners, history: r.history };
+    })(),
+    reactions: {
+      overlayText: view.reactionsOverlayText,
+      widgets: (() => {
+        const persistedStatsByWidget = new Map(
+          view.reactionsWidgetStats.map((row) => [row.widgetId, row.counts] as const),
+        );
+        const normalizedOverlay = view.reactionsOverlayText.trim();
+        const activeWidgetIndex = view.reactionsWidgets.findIndex(
+          (widget) => widget.title.trim() === normalizedOverlay,
+        );
+        const widgetSet =
+          view.reportReactionsWidgetIds.length > 0 ? new Set(view.reportReactionsWidgetIds) : null;
+        return view.reactionsWidgets
+          .map((widget, originalIndex) => ({ widget, originalIndex }))
+          .filter(({ widget }) => widgetSet === null || widgetSet.has(widget.id))
+          .map(({ widget, originalIndex }) => {
+            const isActiveWidget =
+              activeWidgetIndex >= 0
+                ? originalIndex === activeWidgetIndex
+                : view.reactionsWidgets.length === 1;
+            return {
+              ...widget,
+              reactionStats: widget.reactions.map((reaction) => ({
+                reaction,
+                count: isActiveWidget
+                  ? (latestReactionCounts[reaction] ??
+                    persistedStatsByWidget.get(widget.id)?.[reaction] ??
+                    0)
+                  : (persistedStatsByWidget.get(widget.id)?.[reaction] ?? 0),
+              })),
+            };
+          });
+      })(),
+    },
+    speakerQuestions: (() => {
+      const qSet =
+        view.reportSpeakerQuestionIds.length > 0 ? new Set(view.reportSpeakerQuestionIds) : null;
+      const items = qSet === null ? speakerItems : speakerItems.filter((item) => qSet.has(item.id));
+      return {
+        enabled: view.speakerQuestionsEnabled,
+        total: items.length,
+        onScreen,
+        items,
+      };
+    })(),
+    subQuizParticipantTables,
+  };
 }
 
 export async function activateNextQuestion(quizId: string, subQuizId?: string) {
@@ -1331,6 +1693,30 @@ export async function closeSubQuiz(quizId: string, subQuizId: string) {
   return getQuizPublicState(quizId);
 }
 
+export async function startSubQuizAuto(quizId: string, subQuizId: string) {
+  const sq = await prisma.subQuiz.findFirst({ where: { id: subQuizId, quizId } });
+  if (!sq) throw new Error("SubQuiz not found");
+  await prisma.$transaction([
+    prisma.question.updateMany({
+      where: { quizId },
+      data: { isActive: false, isClosed: true },
+    }),
+    prisma.question.updateMany({
+      where: { quizId, subQuizId },
+      data: { isActive: true, isClosed: false, activatedAt: new Date() },
+    }),
+    prisma.subQuiz.update({
+      where: { id: subQuizId },
+      data: { currentQuestionIndex: 0 },
+    }),
+    prisma.quiz.update({
+      where: { id: quizId },
+      data: { status: QuizStatus.LIVE },
+    }),
+  ]);
+  return getQuizPublicState(quizId);
+}
+
 export async function joinQuiz(payload: { slug: string; nickname: string; deviceId: string }) {
   let nickname = payload.nickname.trim();
   if (containsProfanity(nickname)) {
@@ -1419,6 +1805,13 @@ export async function submitAnswer(payload: {
   tagAnswers?: string[];
   participantId: string;
 }) {
+  const participant = await prisma.participant.findFirst({
+    where: { id: payload.participantId, quizId: payload.quizId },
+    select: { id: true },
+  });
+  if (!participant) {
+    throw new Error("Participant not found");
+  }
   const question = await prisma.question.findFirst({
     where: { id: payload.questionId, quizId: payload.quizId },
     include: { options: { orderBy: { sortOrder: "asc" } } },

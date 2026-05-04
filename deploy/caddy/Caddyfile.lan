@@ -1,0 +1,14 @@
+:80 {
+  encode zstd gzip
+
+  @api path /api/* /socket.io/*
+  handle @api {
+    reverse_proxy 127.0.0.1:4000
+  }
+
+  handle {
+    root * /opt/meyouquize/current/client/dist
+    try_files {path} /index.html
+    file_server
+  }
+}

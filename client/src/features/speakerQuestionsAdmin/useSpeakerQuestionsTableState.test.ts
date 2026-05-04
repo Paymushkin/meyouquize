@@ -13,10 +13,6 @@ function makeItem(overrides: Partial<SpeakerQuestionItem>): SpeakerQuestionItem 
     status: "PENDING",
     userVisible: true,
     isOnScreen: false,
-    likeCount: 0,
-    dislikeCount: 0,
-    likedByMe: false,
-    dislikedByMe: false,
     createdAt: "2026-01-01T00:00:00.000Z",
     ...overrides,
   };
@@ -25,9 +21,9 @@ function makeItem(overrides: Partial<SpeakerQuestionItem>): SpeakerQuestionItem 
 describe("useSpeakerQuestionsTableState", () => {
   it("по умолчанию сортирует по рейтингу по убыванию", () => {
     const rows = [
-      makeItem({ id: "low", likeCount: 0, dislikeCount: 2 }),
-      makeItem({ id: "high", likeCount: 5, dislikeCount: 1 }),
-      makeItem({ id: "mid", likeCount: 2, dislikeCount: 1 }),
+      makeItem({ id: "low", reactionCounts: { "👍": 1 } }),
+      makeItem({ id: "high", reactionCounts: { "🔥": 4, "👏": 1 } }),
+      makeItem({ id: "mid", reactionCounts: { "❤️": 2 } }),
     ];
     const { result } = renderHook(() => useSpeakerQuestionsTableState(rows));
     expect(result.current.sortedRows.map((x) => x.id)).toEqual(["high", "mid", "low"]);

@@ -7,6 +7,7 @@ import {
   finishQuizSchema,
   refreshQuizStateSchema,
   startReactionSessionSchema,
+  startSubQuizAutoSchema,
   stopReactionSessionSchema,
   toggleQuestionSchema,
 } from "../../schemas.js";
@@ -18,12 +19,14 @@ import {
   finishQuiz,
   getQuizPublicState,
   setQuestionEnabled,
+  startSubQuizAuto,
 } from "../../quiz-service.js";
 import { startReactionSession, stopReactionSession } from "../../reactions-service.js";
+import { persistReactionWidgetCounts } from "../../reaction-widget-stats.js";
 import { broadcastDashboardResultsNow } from "../dashboard-results.js";
 import { emitToQuizPlayersAndDashboard } from "../quiz-rooms.js";
 import type { EnrichedSocket } from "../handler-common.js";
-import { fail } from "../handler-common.js";
+import { assertAdmin, fail } from "../handler-common.js";
 
 const reactionStopTimers = new Map<string, NodeJS.Timeout>();
 const recentAdminCommands = new Map<string, number>();
@@ -48,7 +51,7 @@ function shouldSkipDuplicateCommand(socketId: string, eventName: string, raw: un
 export function registerQuizAdminHandlers(socket: EnrichedSocket, io: Server) {
   socket.on("quiz:create", async (raw: unknown) => {
     try {
-      if (!socket.data.isAdmin) throw new Error("Forbidden");
+      await assertAdmin(socket);
       const payload = createQuizSchema.parse(raw);
       const quiz = await createQuiz(payload);
       socket.emit("quiz:created", quiz);
@@ -59,7 +62,7 @@ export function registerQuizAdminHandlers(socket: EnrichedSocket, io: Server) {
 
   socket.on("question:activate", async (raw: unknown) => {
     try {
-      if (!socket.data.isAdmin) throw new Error("Forbidden");
+      await assertAdmin(socket);
       if (shouldSkipDuplicateCommand(socket.id, "question:activate", raw)) return;
       const payload = activateQuestionSchema.parse(raw);
       const state = await activateNextQuestion(payload.quizId, payload.subQuizId);
@@ -71,7 +74,7 @@ export function registerQuizAdminHandlers(socket: EnrichedSocket, io: Server) {
 
   socket.on("question:close", async (raw: unknown) => {
     try {
-      if (!socket.data.isAdmin) throw new Error("Forbidden");
+      await assertAdmin(socket);
       if (shouldSkipDuplicateCommand(socket.id, "question:close", raw)) return;
       const payload = closeQuestionSchema.parse(raw);
       await closeQuestion(payload.quizId, payload.questionId);
@@ -83,7 +86,7 @@ export function registerQuizAdminHandlers(socket: EnrichedSocket, io: Server) {
 
   socket.on("question:toggle", async (raw: unknown) => {
     try {
-      if (!socket.data.isAdmin) throw new Error("Forbidden");
+      await assertAdmin(socket);
       const payload = toggleQuestionSchema.parse(raw);
       const state = await setQuestionEnabled(payload.quizId, payload.questionId, payload.enabled);
       emitToQuizPlayersAndDashboard(io, payload.quizId, "state:quiz", state);
@@ -94,7 +97,7 @@ export function registerQuizAdminHandlers(socket: EnrichedSocket, io: Server) {
 
   socket.on("quiz:finish", async (raw: unknown) => {
     try {
-      if (!socket.data.isAdmin) throw new Error("Forbidden");
+      await assertAdmin(socket);
       if (shouldSkipDuplicateCommand(socket.id, "quiz:finish", raw)) return;
       const payload = finishQuizSchema.parse(raw);
       const state = await finishQuiz(payload.quizId);
@@ -106,7 +109,7 @@ export function registerQuizAdminHandlers(socket: EnrichedSocket, io: Server) {
 
   socket.on("quiz:state:refresh", async (raw: unknown) => {
     try {
-      if (!socket.data.isAdmin) throw new Error("Forbidden");
+      await assertAdmin(socket);
       const payload = refreshQuizStateSchema.parse(raw);
       const state = await getQuizPublicState(payload.quizId);
       emitToQuizPlayersAndDashboard(io, payload.quizId, "state:quiz", state);
@@ -118,9 +121,10 @@ export function registerQuizAdminHandlers(socket: EnrichedSocket, io: Server) {
 
   socket.on("reactions:start", async (raw: unknown) => {
     try {
-      if (!socket.data.isAdmin) throw new Error("Forbidden");
+      await assertAdmin(socket);
       const payload = startReactionSessionSchema.parse(raw);
-      startReactionSession(payload.quizId, payload.durationSec, payload.reactions);
+      const session = startReactionSession(payload.quizId, payload.durationSec, payload.reactions);
+      await persistReactionWidgetCounts(payload.quizId, session.reactions, session.counts);
       const prevTimer = reactionStopTimers.get(payload.quizId);
       if (prevTimer) clearTimeout(prevTimer);
       const timer = setTimeout(async () => {
@@ -143,7 +147,7 @@ export function registerQuizAdminHandlers(socket: EnrichedSocket, io: Server) {
 
   socket.on("reactions:stop", async (raw: unknown) => {
     try {
-      if (!socket.data.isAdmin) throw new Error("Forbidden");
+      await assertAdmin(socket);
       const payload = stopReactionSessionSchema.parse(raw);
       stopReactionSession(payload.quizId);
       const prevTimer = reactionStopTimers.get(payload.quizId);
@@ -160,7 +164,7 @@ export function registerQuizAdminHandlers(socket: EnrichedSocket, io: Server) {
 
   socket.on("sub-quiz:close", async (raw: unknown) => {
     try {
-      if (!socket.data.isAdmin) throw new Error("Forbidden");
+      await assertAdmin(socket);
       if (shouldSkipDuplicateCommand(socket.id, "sub-quiz:close", raw)) return;
       const payload = closeSubQuizSchema.parse(raw);
       const state = await closeSubQuiz(payload.quizId, payload.subQuizId);
@@ -168,6 +172,18 @@ export function registerQuizAdminHandlers(socket: EnrichedSocket, io: Server) {
       await broadcastDashboardResultsNow(io, payload.quizId);
     } catch (error) {
       fail(socket, error instanceof Error ? error.message : "Close sub-quiz failed");
+    }
+  });
+
+  socket.on("sub-quiz:start-auto", async (raw: unknown) => {
+    try {
+      await assertAdmin(socket);
+      if (shouldSkipDuplicateCommand(socket.id, "sub-quiz:start-auto", raw)) return;
+      const payload = startSubQuizAutoSchema.parse(raw);
+      const state = await startSubQuizAuto(payload.quizId, payload.subQuizId);
+      emitToQuizPlayersAndDashboard(io, payload.quizId, "state:quiz", state);
+    } catch (error) {
+      fail(socket, error instanceof Error ? error.message : "Start auto sub-quiz failed");
     }
   });
 }

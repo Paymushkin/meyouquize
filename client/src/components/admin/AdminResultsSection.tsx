@@ -1,6 +1,7 @@
 import DownloadIcon from "@mui/icons-material/Download";
 import { useEffect, useMemo, useState } from "react";
 import {
+  Box,
   Card,
   CardContent,
   FormControl,
@@ -79,15 +80,6 @@ export function AdminResultsSection(props: Props) {
     const start = page * rowsPerPage;
     return displayedLeaderboard.slice(start, start + rowsPerPage);
   }, [displayedLeaderboard, page, rowsPerPage]);
-  const sortLabel = useMemo(() => {
-    if (leaderboardSort === "place_asc") return "Место: по возрастанию";
-    if (leaderboardSort === "place_desc") return "Место: по убыванию";
-    if (leaderboardSort === "score_desc") return "Баллы: по убыванию";
-    if (leaderboardSort === "score_asc") return "Баллы: по возрастанию";
-    if (leaderboardSort === "name_desc") return "Участник: Я-А";
-    return "Участник: А-Я";
-  }, [leaderboardSort]);
-
   useEffect(() => {
     setPage(0);
   }, [displayedLeaderboard.length, rowsPerPage, leaderboardSort]);
@@ -98,30 +90,31 @@ export function AdminResultsSection(props: Props) {
         <Typography variant="h6" gutterBottom>
           Результаты пользователей
         </Typography>
-        {subQuizLeaderboardOptions.length > 1 ? (
-          <FormControl size="small" sx={{ minWidth: 220, mb: 2 }}>
-            <InputLabel id="mq-subquiz-lb-label">Таблица по квизу</InputLabel>
-            <Select
-              labelId="mq-subquiz-lb-label"
-              label="Таблица по квизу"
-              value={selectedResultsSubQuizId}
-              onChange={(e) => onSelectResultsSubQuiz(String(e.target.value))}
-            >
-              {subQuizLeaderboardOptions.map((o) => (
-                <MenuItem key={o.subQuizId} value={o.subQuizId}>
-                  {o.title}
-                </MenuItem>
-              ))}
-            </Select>
-          </FormControl>
-        ) : null}
         <Stack
           direction="row"
           spacing={1.5}
           alignItems="center"
           flexWrap="nowrap"
-          sx={{ mb: 1, pt: 0.5, overflowX: "auto" }}
+          sx={{ mb: 2, pt: 0.5, overflowX: "auto" }}
         >
+          {subQuizLeaderboardOptions.length > 1 ? (
+            <FormControl size="small" sx={{ minWidth: 220, flexShrink: 0 }}>
+              <InputLabel id="mq-subquiz-lb-label">Таблица по квизу</InputLabel>
+              <Select
+                labelId="mq-subquiz-lb-label"
+                label="Таблица по квизу"
+                value={selectedResultsSubQuizId}
+                onChange={(e) => onSelectResultsSubQuiz(String(e.target.value))}
+              >
+                {subQuizLeaderboardOptions.map((o) => (
+                  <MenuItem key={o.subQuizId} value={o.subQuizId}>
+                    {o.title}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+          ) : null}
+          <Box sx={{ flex: 1, minWidth: 0 }} />
           <Tooltip title="Экспорт CSV">
             <IconButton
               onClick={exportLeaderboardCsv}
@@ -138,9 +131,6 @@ export function AdminResultsSection(props: Props) {
           <Typography color="text.secondary">Пока нет ответов пользователей.</Typography>
         ) : (
           <>
-            <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-              Сортировка: {sortLabel}
-            </Typography>
             <TableContainer
               sx={{ maxHeight: 480, border: 1, borderColor: "divider", borderRadius: 1 }}
             >

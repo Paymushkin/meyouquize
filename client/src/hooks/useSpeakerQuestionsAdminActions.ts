@@ -1,57 +1,35 @@
 import { useCallback } from "react";
 import { socket } from "../socket";
+import type { AdminSpeakerQuestionsSettingsValues } from "../features/speakerQuestionsAdmin/adminSpeakerQuestionsSettings";
 
 type Params = {
   quizId: string;
-  speakerQuestionsEnabled: boolean;
-  speakerQuestionsAllowLikes: boolean;
-  speakerQuestionsShowLikesOnScreen: boolean;
-  speakerQuestionsReactionsText: string;
-  speakerQuestionsShowAuthorOnScreen: boolean;
-  speakerListText: string;
+  speakerSettings: AdminSpeakerQuestionsSettingsValues;
   setMessage: (value: string) => void;
 };
 
-export function useSpeakerQuestionsAdminActions({
-  quizId,
-  speakerQuestionsEnabled,
-  speakerQuestionsAllowLikes,
-  speakerQuestionsShowLikesOnScreen,
-  speakerQuestionsReactionsText,
-  speakerQuestionsShowAuthorOnScreen,
-  speakerListText,
-  setMessage,
-}: Params) {
+export function useSpeakerQuestionsAdminActions({ quizId, speakerSettings, setMessage }: Params) {
   const saveSpeakerSettings = useCallback(() => {
     if (!quizId) return;
-    const speakers = speakerListText
+    const speakers = speakerSettings.speakersText
       .split("\n")
       .map((x) => x.trim())
       .filter(Boolean);
-    const reactions = speakerQuestionsReactionsText
+    const reactions = speakerSettings.reactionsText
       .split("\n")
       .map((x) => x.trim())
       .filter(Boolean);
     socket.emit("admin:speaker:settings:set", {
       quizId,
-      enabled: speakerQuestionsEnabled,
+      enabled: speakerSettings.enabled,
       speakers,
-      allowLikes: speakerQuestionsAllowLikes,
-      showLikesOnScreen: speakerQuestionsShowLikesOnScreen,
       reactions,
-      showAuthorOnScreen: speakerQuestionsShowAuthorOnScreen,
+      showAuthorOnScreen: speakerSettings.showAuthorOnScreen,
+      showRecipientOnScreen: speakerSettings.showRecipientOnScreen,
+      showReactionsOnScreen: speakerSettings.showReactionsOnScreen,
     });
     setMessage("Настройки секции спикеров сохранены");
-  }, [
-    quizId,
-    setMessage,
-    speakerListText,
-    speakerQuestionsAllowLikes,
-    speakerQuestionsEnabled,
-    speakerQuestionsReactionsText,
-    speakerQuestionsShowAuthorOnScreen,
-    speakerQuestionsShowLikesOnScreen,
-  ]);
+  }, [quizId, setMessage, speakerSettings]);
 
   const setSpeakerQuestionStatus = useCallback(
     (id: string, status: "PENDING" | "APPROVED" | "REJECTED") => {

@@ -2,12 +2,24 @@ import ChevronLeftIcon from "@mui/icons-material/ChevronLeft";
 import ChevronRightIcon from "@mui/icons-material/ChevronRight";
 import DoneAllIcon from "@mui/icons-material/DoneAll";
 import LeaderboardIcon from "@mui/icons-material/Leaderboard";
-import { Button, Card, CardContent, Divider, Stack, TextField, Tooltip } from "@mui/material";
+import {
+  Button,
+  Card,
+  CardContent,
+  Divider,
+  MenuItem,
+  Stack,
+  TextField,
+  Tooltip,
+} from "@mui/material";
 
 type Props = {
   activeLocalIndex: number;
   quizIndexMap: number[];
   quizId: string;
+  questionFlowMode: "manual" | "auto";
+  onChangeQuestionFlowMode: (mode: "manual" | "auto") => void;
+  onStartAuto: () => void;
   isLeaderboardShown: boolean;
   firstCorrectWinnersCount: number;
   highlightedLeadersCount: number;
@@ -26,6 +38,9 @@ export function SubQuizControlsCard(props: Props) {
     activeLocalIndex,
     quizIndexMap,
     quizId,
+    questionFlowMode,
+    onChangeQuestionFlowMode,
+    onStartAuto,
     isLeaderboardShown,
     firstCorrectWinnersCount,
     highlightedLeadersCount,
@@ -43,12 +58,23 @@ export function SubQuizControlsCard(props: Props) {
     <Card variant="outlined">
       <CardContent sx={{ py: 1.5, "&:last-child": { pb: 1.5 } }}>
         <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap alignItems="center">
+          <TextField
+            select
+            size="small"
+            label="Запуск вопросов"
+            value={questionFlowMode}
+            onChange={(e) => onChangeQuestionFlowMode(e.target.value as "manual" | "auto")}
+            sx={{ minWidth: 190 }}
+          >
+            <MenuItem value="manual">Ручной</MenuItem>
+            <MenuItem value="auto">Автоматический</MenuItem>
+          </TextField>
           <Button
             variant="outlined"
             size="small"
             startIcon={<ChevronLeftIcon />}
             onClick={onPrev}
-            disabled={activeLocalIndex <= 0}
+            disabled={questionFlowMode === "auto" || activeLocalIndex <= 0}
             sx={{
               textTransform: "none",
               borderColor: "divider",
@@ -61,11 +87,15 @@ export function SubQuizControlsCard(props: Props) {
             variant="contained"
             size="small"
             endIcon={<ChevronRightIcon />}
-            onClick={onNext}
+            onClick={questionFlowMode === "auto" ? onStartAuto : onNext}
             disabled={quizIndexMap.length === 0}
             sx={{ textTransform: "none" }}
           >
-            {activeLocalIndex < 0 ? "Начать" : "Вперёд"}
+            {questionFlowMode === "auto"
+              ? "Запустить квиз"
+              : activeLocalIndex < 0
+                ? "Начать"
+                : "Вперёд"}
           </Button>
           <Tooltip title="Снять все вопросы этого квиза с экрана и показать участникам экран «Квиз завершён»">
             <span>

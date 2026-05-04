@@ -40,4 +40,10 @@ export type ProjectorQuestionResult = {
   firstCorrectNicknames?: string[];
 };
 
-export type ProjectorLeader = { participantId: string; nickname: string; score: number };
+export type ProjectorLeader = {
+  participantId: string;
+  nickname: string;
+  score: number;
+  /** Время ответов (тай-брейк): сумма responseMs по всем вопросам в сабквизе. */
+  totalResponseMs: number;
+};

@@ -11,12 +11,13 @@ import {
   quizDashboardRoom,
 } from "../quiz-rooms.js";
 import type { EnrichedSocket } from "../handler-common.js";
-import { fail } from "../handler-common.js";
+import { assertAdmin, fail } from "../handler-common.js";
 import { toPublicViewPayload } from "../public-view-helpers.js";
 
 export function registerResultsDashboardHandlers(socket: EnrichedSocket, io: Server) {
   socket.on("results:subscribe", async (raw: unknown) => {
     try {
+      await assertAdmin(socket);
       const payload = subscribeResultsSchema.parse(raw);
       const quiz = await getQuizBySlug(payload.slug);
       if (!quiz) throw new Error("Quiz not found");
@@ -36,7 +37,7 @@ export function registerResultsDashboardHandlers(socket: EnrichedSocket, io: Ser
 
   socket.on("admin:results:view:set", async (raw: unknown) => {
     try {
-      if (!socket.data.isAdmin) throw new Error("Forbidden");
+      await assertAdmin(socket);
       const payload = setPublicViewSchema.parse(raw);
       const quiz = await getQuizPublicState(payload.quizId);
       if (!quiz) throw new Error("Quiz not found");

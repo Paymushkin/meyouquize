@@ -121,29 +121,27 @@ export function SpeakerQuestionsDialog({
                     <Typography variant="body1" sx={{ fontSize: "1rem", lineHeight: 1.4 }}>
                       {item.text}
                     </Typography>
-                    {speakerQuestions?.settings.allowLikes ? (
-                      <Stack direction="row" spacing={1}>
-                        {reactions.map((reaction) => {
-                          const isSelected = (item.myReactions ?? []).includes(reaction);
-                          const count = item.reactionCounts?.[reaction] ?? 0;
-                          return (
-                            <Chip
-                              key={`${item.id}_${reaction}`}
-                              size="small"
-                              clickable
-                              variant="filled"
-                              label={count > 0 ? `${reaction} ${count}` : reaction}
-                              onClick={() => onReact(item.id, reaction)}
-                              sx={{
-                                bgcolor: "transparent",
-                                color: "#fff",
-                                border: isSelected ? "1px solid rgba(255,255,255,0.95)" : "none",
-                              }}
-                            />
-                          );
-                        })}
-                      </Stack>
-                    ) : null}
+                    <Stack direction="row" spacing={1}>
+                      {reactions.map((reaction) => {
+                        const isSelected = (item.myReactions ?? []).includes(reaction);
+                        const count = item.reactionCounts?.[reaction] ?? 0;
+                        return (
+                          <Chip
+                            key={`${item.id}_${reaction}`}
+                            size="small"
+                            clickable
+                            variant="filled"
+                            label={count > 0 ? `${reaction} ${count}` : reaction}
+                            onClick={() => onReact(item.id, reaction)}
+                            sx={{
+                              bgcolor: "transparent",
+                              color: "#fff",
+                              border: isSelected ? "1px solid rgba(255,255,255,0.95)" : "none",
+                            }}
+                          />
+                        );
+                      })}
+                    </Stack>
                     {idx < arr.length - 1 ? <Divider /> : null}
                   </Stack>
                 ))}

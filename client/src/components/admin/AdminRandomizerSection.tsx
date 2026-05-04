@@ -9,6 +9,10 @@ import {
   Card,
   CardContent,
   Collapse,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
   FormControlLabel,
   IconButton,
   MenuItem,
@@ -84,6 +88,7 @@ export function AdminRandomizerSection(props: Props) {
     onToggleProjector,
   } = props;
   const [showAdvanced, setShowAdvanced] = useState(false);
+  const [confirmResetOpen, setConfirmResetOpen] = useState(false);
 
   return (
     <Stack spacing={2}>
@@ -304,15 +309,36 @@ export function AdminRandomizerSection(props: Props) {
           variant="outlined"
           color="error"
           startIcon={<RefreshIcon />}
-          onClick={() => {
-            if (!window.confirm("Сбросить историю и список выбранных победителей?")) return;
-            onReset();
-          }}
+          onClick={() => setConfirmResetOpen(true)}
           sx={{ alignSelf: "flex-start" }}
         >
           сбросить историю
         </Button>
       </Stack>
+      <Dialog
+        open={confirmResetOpen}
+        onClose={() => setConfirmResetOpen(false)}
+        maxWidth="xs"
+        fullWidth
+      >
+        <DialogTitle>Сбросить историю</DialogTitle>
+        <DialogContent>
+          <Typography>Сбросить историю и список выбранных победителей?</Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setConfirmResetOpen(false)}>Отмена</Button>
+          <Button
+            color="error"
+            variant="contained"
+            onClick={() => {
+              onReset();
+              setConfirmResetOpen(false);
+            }}
+          >
+            Сбросить
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Stack>
   );
 }

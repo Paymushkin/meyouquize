@@ -151,6 +151,13 @@ export function QuizPlayPage() {
   const rankRowRefs = useRef<Map<string, HTMLDivElement>>(new Map());
   const prevRankRowTopsRef = useRef<Map<string, number>>(new Map());
   const reactionTimestampsRef = useRef<number[]>([]);
+  const pendingSubmitPayloadRef = useRef<{
+    quizId: string;
+    questionId: string;
+    optionIds?: string[];
+    rankedOptionIds?: string[];
+    tagAnswers?: string[];
+  } | null>(null);
   /** Последний известный активный вопрос сабквиза (чтобы при снятии вопроса с экрана понять, что это был последний). */
   const lastSubQuizProgressRef = useRef<{
     questionId: string;
@@ -175,6 +182,19 @@ export function QuizPlayPage() {
   });
   const handleQuestionSubmitted = useCallback((questionId: string) => {
     setAcceptedQuestionId(questionId);
+    if (pendingSubmitPayloadRef.current?.questionId === questionId) {
+      pendingSubmitPayloadRef.current = null;
+    }
+  }, []);
+  const handleParticipantMissing = useCallback(() => {
+    if (!slug) return;
+    const safeNick = (nickname || "").trim() || "Игрок";
+    emitJoinWithLog(slug, "restore", safeNick);
+  }, [nickname, slug]);
+  const handleQuizJoined = useCallback(() => {
+    const payload = pendingSubmitPayloadRef.current;
+    if (!payload) return;
+    socket.emit("answer:submit", payload);
   }, []);
 
   const nonQuizActiveQuestion = useMemo(() => {
@@ -188,9 +208,11 @@ export function QuizPlayPage() {
       const accepted = activeList.find((q) => q.id === acceptedQuestionId);
       if (accepted) return accepted;
     }
-    // В не-quiz режиме (без прогресса сабквиза) показываем вопросы по очереди:
-    // первый активный, на который пользователь еще не ответил.
-    if (!quiz.quizProgress) {
+    // Для голосований комнаты и авто-режима квиза показываем первый активный неотвеченный вопрос.
+    const autoFlow =
+      quiz.quizProgress?.questionFlowMode === "auto" ||
+      (Array.isArray(quiz.activeQuestions) && quiz.activeQuestions.length > 1);
+    if (!quiz.quizProgress || autoFlow) {
       return activeList.find((q) => !submittedQuestionIds.includes(q.id)) ?? null;
     }
     return quiz.activeQuestion;
@@ -200,6 +222,22 @@ export function QuizPlayPage() {
     activeQuestionIdRef.current = nonQuizActiveQuestion?.id ?? null;
     activeQuestionTypeRef.current = nonQuizActiveQuestion?.type ?? null;
   }, [nonQuizActiveQuestion]);
+
+  useEffect(() => {
+    if (!nonQuizActiveQuestion) {
+      setSelected([]);
+      setRankOrder([]);
+      setTagAnswers([""]);
+      return;
+    }
+    setSelected([]);
+    setTagAnswers([""]);
+    if (nonQuizActiveQuestion.type === "ranking") {
+      setRankOrder(nonQuizActiveQuestion.options.map((o) => o.id));
+      return;
+    }
+    setRankOrder([]);
+  }, [nonQuizActiveQuestion?.id]);
 
   useEffect(() => {
     selectedRef.current = selected;
@@ -260,6 +298,8 @@ export function QuizPlayPage() {
     setJoined,
     setConnectionStatus,
     setSpeakerQuestions,
+    onParticipantMissing: handleParticipantMissing,
+    onQuizJoined: handleQuizJoined,
   });
 
   useEffect(() => {
@@ -484,26 +524,32 @@ export function QuizPlayPage() {
   function submit() {
     if (!quiz || !nonQuizActiveQuestion || !canSubmit) return;
     if (nonQuizActiveQuestion.type === "tag_cloud") {
-      socket.emit("answer:submit", {
+      const payload = {
         quizId: quiz.id,
         questionId: nonQuizActiveQuestion.id,
         tagAnswers: tagAnswers.map((value) => value.trim()).filter(Boolean),
-      });
+      };
+      pendingSubmitPayloadRef.current = payload;
+      socket.emit("answer:submit", payload);
       return;
     }
     if (nonQuizActiveQuestion.type === "ranking") {
-      socket.emit("answer:submit", {
+      const payload = {
         quizId: quiz.id,
         questionId: nonQuizActiveQuestion.id,
         rankedOptionIds: rankOrder,
-      });
+      };
+      pendingSubmitPayloadRef.current = payload;
+      socket.emit("answer:submit", payload);
       return;
     }
-    socket.emit("answer:submit", {
+    const payload = {
       quizId: quiz.id,
       questionId: nonQuizActiveQuestion.id,
       optionIds: selected,
-    });
+    };
+    pendingSubmitPayloadRef.current = payload;
+    socket.emit("answer:submit", payload);
   }
 
   function submitSpeakerQuestion() {
@@ -563,6 +609,21 @@ export function QuizPlayPage() {
       : nonQuizActiveQuestion?.type === "ranking"
         ? rankOrder
         : selected;
+  const displayedQuizProgress = useMemo(() => {
+    if (!quiz?.quizProgress || !nonQuizActiveQuestion?.id) return quiz?.quizProgress ?? null;
+    const isAuto =
+      quiz.quizProgress.questionFlowMode === "auto" ||
+      (Array.isArray(quiz.activeQuestions) && quiz.activeQuestions.length > 1);
+    if (!isAuto) return quiz.quizProgress;
+    const activeList = Array.isArray(quiz.activeQuestions) ? quiz.activeQuestions : [];
+    const idx = activeList.findIndex((q) => q.id === nonQuizActiveQuestion.id);
+    if (idx < 0) return quiz.quizProgress;
+    return {
+      ...quiz.quizProgress,
+      index: idx + 1,
+      total: Math.max(quiz.quizProgress.total, activeList.length),
+    };
+  }, [quiz?.quizProgress, quiz?.activeQuestions, nonQuizActiveQuestion?.id]);
   const titleText = quiz?.title?.trim() || quizTitle.trim() || "Квиз";
   const shouldShowEventTitle = quiz?.showEventTitleOnPlayer ?? true;
   const visiblePlayerBanners = useMemo(
@@ -807,9 +868,10 @@ export function QuizPlayPage() {
               <QuestionPopupCard
                 brandPrimaryColor={brandPrimaryColor}
                 question={nonQuizActiveQuestion}
-                quizProgress={quiz?.quizProgress ?? null}
+                quizProgress={displayedQuizProgress}
                 displayedSelected={displayedSelected}
                 answeredCurrentQuestion={answeredCurrentQuestion}
+                showAcceptedHint={Boolean(acceptedQuestionId) && !answeredCurrentQuestion}
                 submittedAnswers={submittedAnswers}
                 rankOrder={rankOrder}
                 rankRowRefs={rankRowRefs}

@@ -2,6 +2,7 @@ import cookieParser from "cookie-parser";
 import cors from "cors";
 import express from "express";
 import rateLimit from "express-rate-limit";
+import helmet from "helmet";
 import fs from "node:fs";
 import { createServer } from "node:http";
 import path from "node:path";
@@ -26,6 +27,7 @@ import { publicViewJsonToState } from "./socket/public-view-store.js";
 import {
   createRoom,
   getQuizBySlug,
+  getPublicReportBySlug,
   getQuizPublicState,
   getResults,
   getRoomByEventName,
@@ -37,6 +39,8 @@ import {
   replaceRoomContent,
   updateRoomTitle,
 } from "./quiz-service.js";
+import { renderPublicReportPdf } from "./report-pdf.js";
+import { resetDemoQuizToDefault } from "./demo-seed.js";
 
 const ADMIN_COOKIE = "mq_admin";
 
@@ -48,6 +52,22 @@ type ApiErrorBody = {
 
 function apiError(code: string, message: string, details?: unknown): ApiErrorBody {
   return { error: message, code, details };
+}
+
+function isRequestHttps(req: express.Request): boolean {
+  if (req.secure) return true;
+  const proto = req.get("x-forwarded-proto");
+  return typeof proto === "string" && proto.split(",")[0]?.trim() === "https";
+}
+
+function isCorsOriginAllowed(origin: string | undefined): boolean {
+  if (!origin) return true;
+  if (env.clientOrigins.includes(origin)) return true;
+  if (env.networkMode === "lan" && origin === "null") return true;
+  if (env.networkMode === "lan" && env.allowLanViteOrigins && isPrivateNetworkViteDevPort(origin)) {
+    return true;
+  }
+  return false;
 }
 
 async function adminAuthMiddleware(
@@ -66,6 +86,28 @@ async function adminAuthMiddleware(
 
 export function buildApp() {
   const app = express();
+  app.disable("x-powered-by");
+  if (env.networkMode === "internet") {
+    app.set("trust proxy", 1);
+    app.use(
+      helmet({
+        contentSecurityPolicy: {
+          directives: {
+            defaultSrc: ["'self'"],
+            scriptSrc: ["'self'"],
+            styleSrc: ["'self'", "'unsafe-inline'"],
+            imgSrc: ["'self'", "data:", "blob:", "https:", "http:"],
+            fontSrc: ["'self'", "data:", "https:", "http:"],
+            connectSrc: ["'self'", "https:", "http:", "ws:", "wss:"],
+            objectSrc: ["'none'"],
+            baseUri: ["'self'"],
+            frameAncestors: ["'none'"],
+            formAction: ["'self'"],
+          },
+        },
+      }),
+    );
+  }
   fs.mkdirSync(env.mediaDir, { recursive: true });
   const mediaUpload = multer({
     storage: multer.diskStorage({
@@ -104,30 +146,11 @@ export function buildApp() {
   app.use(
     cors({
       origin: (origin, callback) => {
-        if (env.allowLanViteOrigins) {
-          callback(null, true);
-          return;
+        const allowed = isCorsOriginAllowed(origin ?? undefined);
+        if (!allowed) {
+          console.warn("[cors] reject origin", { origin, mode: env.networkMode });
         }
-        if (!origin) {
-          callback(null, true);
-          return;
-        }
-        if (origin === "null" && env.allowLanViteOrigins) {
-          callback(null, true);
-          return;
-        }
-        if (env.clientOrigins.includes(origin)) {
-          callback(null, true);
-          return;
-        }
-        if (env.allowLanViteOrigins && isPrivateNetworkViteDevPort(origin)) {
-          callback(null, true);
-          return;
-        }
-        if (env.allowLanViteOrigins) {
-          console.warn("[cors] reject origin", { origin });
-        }
-        callback(null, false);
+        callback(null, allowed);
       },
       credentials: true,
     }),
@@ -140,12 +163,32 @@ export function buildApp() {
     return res.json({ service: "meyouquize-backend", status: "ok" });
   });
 
+  app.get("/healthz", (_req, res) => {
+    return res.status(200).json({ ok: true });
+  });
+
+  app.get("/readyz", async (_req, res) => {
+    try {
+      await prisma.$queryRaw`SELECT 1`;
+      return res.status(200).json({ ok: true });
+    } catch {
+      return res.status(503).json({ ok: false, error: "DB_NOT_READY" });
+    }
+  });
+
   const authLimiter = rateLimit({
     windowMs: 60_000,
     limit: 10,
     standardHeaders: true,
     legacyHeaders: false,
     message: { error: "Too many login attempts. Please try again in 60 seconds." },
+  });
+  const adminApiLimiter = rateLimit({
+    windowMs: 60_000,
+    limit: 240,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { error: "Too many admin API requests. Please try again in a minute." },
   });
 
   app.post("/api/admin/auth", authLimiter, async (req, res) => {
@@ -160,10 +203,12 @@ export function buildApp() {
     await prisma.adminSession.create({
       data: { token, expiresAt },
     });
+    const cookieSecure = env.networkMode === "internet" ? true : isRequestHttps(req);
     res.cookie(ADMIN_COOKIE, token, {
       sameSite: "lax",
       httpOnly: true,
-      secure: false,
+      secure: cookieSecure,
+      path: "/api/admin",
       expires: expiresAt,
     });
     return res.json({ ok: true });
@@ -172,6 +217,7 @@ export function buildApp() {
   app.get("/api/admin/me", adminAuthMiddleware, (_req, res) => {
     return res.json({ ok: true });
   });
+  app.use("/api/admin", adminApiLimiter);
 
   app.post("/api/admin/media/upload", adminAuthMiddleware, (req, res) => {
     mediaUpload.single("file")(req, res, (err: unknown) => {
@@ -346,6 +392,23 @@ export function buildApp() {
     }
   });
 
+  app.post("/api/admin/rooms/:eventName/reset-test-data", adminAuthMiddleware, async (req, res) => {
+    const eventName = Array.isArray(req.params.eventName)
+      ? req.params.eventName[0]
+      : req.params.eventName;
+    if (eventName !== "demo") {
+      return res.status(404).json({ error: "Not supported" });
+    }
+    try {
+      const result = await resetDemoQuizToDefault();
+      return res.json(result);
+    } catch (error) {
+      return res.status(500).json({
+        error: error instanceof Error ? error.message : "Failed to reset demo test data",
+      });
+    }
+  });
+
   app.put("/api/admin/rooms/:eventName/questions", adminAuthMiddleware, async (req, res) => {
     const eventName = Array.isArray(req.params.eventName)
       ? req.params.eventName[0]
@@ -456,6 +519,37 @@ export function buildApp() {
     });
   });
 
+  app.get("/api/quiz/by-slug/:slug/public-report", async (req, res) => {
+    const slug = Array.isArray(req.params.slug) ? req.params.slug[0] : req.params.slug;
+    const report = await getPublicReportBySlug(slug);
+    if (!report) return res.status(404).json({ error: "Not found" });
+    return res.json(report);
+  });
+
+  app.get("/api/quiz/by-slug/:slug/public-report.pdf", async (req, res) => {
+    const slug = Array.isArray(req.params.slug) ? req.params.slug[0] : req.params.slug;
+    const report = await getPublicReportBySlug(slug);
+    if (!report) return res.status(404).json({ error: "Not found" });
+    const clientOrigin = env.clientOrigins[0]?.replace(/\/+$/, "") || "http://localhost:5173";
+    const pageUrl = `${clientOrigin}/report/${encodeURIComponent(slug)}?pdf=1`;
+    try {
+      const pdf = await renderPublicReportPdf(report, { pageUrl });
+      res.setHeader("Content-Type", "application/pdf");
+      res.setHeader("Content-Disposition", `attachment; filename="report-${slug}.pdf"`);
+      return res.send(pdf);
+    } catch (error) {
+      console.error("[public-report.pdf] browser render failed", {
+        slug,
+        pageUrl,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      return res.status(500).json({
+        error:
+          "Не удалось сформировать PDF в браузерном режиме. Проверьте CLIENT_ORIGIN и установленный Chromium для Playwright.",
+      });
+    }
+  });
+
   app.get("/api/admin/quiz/:quizId/results", adminAuthMiddleware, async (req, res) => {
     const quizId = Array.isArray(req.params.quizId) ? req.params.quizId[0] : req.params.quizId;
     const results = await getResults(quizId);
@@ -471,30 +565,11 @@ export async function buildServer() {
   const io = new Server(httpServer, {
     cors: {
       origin: (origin, callback) => {
-        if (env.allowLanViteOrigins) {
-          callback(null, true);
-          return;
+        const allowed = isCorsOriginAllowed(origin ?? undefined);
+        if (!allowed) {
+          console.warn("[socket.cors] reject origin", { origin, mode: env.networkMode });
         }
-        if (!origin) {
-          callback(null, true);
-          return;
-        }
-        if (origin === "null" && env.allowLanViteOrigins) {
-          callback(null, true);
-          return;
-        }
-        if (env.clientOrigins.includes(origin)) {
-          callback(null, true);
-          return;
-        }
-        if (env.allowLanViteOrigins && isPrivateNetworkViteDevPort(origin)) {
-          callback(null, true);
-          return;
-        }
-        if (env.allowLanViteOrigins) {
-          console.warn("[socket.cors] reject origin", { origin });
-        }
-        callback(null, false);
+        callback(null, allowed);
       },
       credentials: true,
     },

@@ -17,12 +17,7 @@ export function nextDir(active: boolean, dir: "asc" | "desc"): "asc" | "desc" {
 }
 
 function ratingValue(row: SpeakerQuestionItem): number {
-  const reactionTotal = Object.values(row.reactionCounts ?? {}).reduce(
-    (sum, count) => sum + count,
-    0,
-  );
-  if (reactionTotal > 0) return reactionTotal;
-  return row.likeCount - row.dislikeCount;
+  return Object.values(row.reactionCounts ?? {}).reduce((sum, count) => sum + count, 0);
 }
 
 export function compareRows(

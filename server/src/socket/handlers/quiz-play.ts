@@ -27,6 +27,7 @@ import { allowAnswerSubmit } from "../submit-rate-limit.js";
 import type { EnrichedSocket } from "../handler-common.js";
 import { fail } from "../handler-common.js";
 import { addReaction } from "../../reactions-service.js";
+import { persistReactionWidgetCounts } from "../../reaction-widget-stats.js";
 
 const REACTION_WINDOW_MS = 1000;
 const REACTION_MAX_PER_WINDOW = 10;
@@ -115,7 +116,18 @@ export function registerQuizPlayHandlers(socket: EnrichedSocket, io: Server) {
       const payload = toggleReactionSchema.parse(raw);
       if (!socket.data.participantId) throw new Error("Not joined");
       if (!allowReactionBurst(socket.id)) return;
-      addReaction(payload.quizId, socket.data.participantId, payload.reactionType);
+      const reactionSession = addReaction(
+        payload.quizId,
+        socket.data.participantId,
+        payload.reactionType,
+      );
+      if (reactionSession) {
+        await persistReactionWidgetCounts(
+          payload.quizId,
+          reactionSession.reactions,
+          reactionSession.counts,
+        );
+      }
       const state = await getQuizPublicState(payload.quizId);
       emitToQuizPlayersAndDashboard(io, payload.quizId, "state:quiz", state);
     } catch (error) {

@@ -111,7 +111,7 @@ function buildDemoRoomContent(): RoomContentReplaceInput {
         points: 10,
         scoringMode: "quiz",
         rankingKind: "quiz",
-        rankingPointsByRank: [4, 2, 1, 3],
+        rankingPointsByRank: [3, 2, 4, 1],
         // В режиме quiz правильность определяется порядком.
         options: [
           { text: "Земля", isCorrect: false },
@@ -120,14 +120,14 @@ function buildDemoRoomContent(): RoomContentReplaceInput {
           { text: "Меркурий", isCorrect: false },
         ],
       } satisfies QuestionReplaceInput,
-      // RANKING (jury)
+      // RANKING (quiz)
       {
         type: "ranking",
         text: "Расположите материки по размеру (попробуйте угадай порядок):",
         points: 5,
         scoringMode: "quiz",
-        rankingKind: "jury",
-        rankingPointsByRank: [4, 3, 2, 1],
+        rankingKind: "quiz",
+        rankingPointsByRank: [3, 2, 4, 1],
         options: [
           { text: "Северная Америка", isCorrect: false },
           { text: "Африка", isCorrect: false },
@@ -237,10 +237,10 @@ function buildDemoRoomContent(): RoomContentReplaceInput {
       } satisfies QuestionReplaceInput,
       {
         type: "ranking",
-        text: "Расположите способы обучения по удобству (угадай порядок):",
+        text: "Расположите форматы обучения по интерактивности (от меньшей к большей):",
         points: 5,
         scoringMode: "quiz",
-        rankingKind: "jury",
+        rankingKind: "quiz",
         rankingPointsByRank: [4, 3, 2, 1],
         options: [
           { text: "Чтение", isCorrect: false },
@@ -447,6 +447,8 @@ function buildDemoPublicView(params: {
     randomizerHistory: params.randomizerHistory,
     speakerQuestionsEnabled: true,
     speakerQuestionsShowAuthorOnScreen: false,
+    speakerQuestionsShowRecipientOnScreen: true,
+    speakerQuestionsShowReactionsOnScreen: true,
     speakerQuestionsSpeakers: [
       "Александр Петров",
       "Екатерина Смирнова",

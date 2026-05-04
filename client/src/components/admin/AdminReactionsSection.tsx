@@ -37,6 +37,7 @@ export type ReactionWidget = {
 type Props = {
   widgets: ReactionWidget[];
   session: ReactionSession | null;
+  widgetStatsById?: Record<string, Record<string, number>>;
   activeWidgetId: string | null;
   projectorWidgetId: string | null;
   projectorMode: boolean;
@@ -53,6 +54,7 @@ type Props = {
 export function AdminReactionsSection({
   widgets,
   session,
+  widgetStatsById,
   activeWidgetId,
   projectorWidgetId,
   projectorMode,
@@ -78,6 +80,7 @@ export function AdminReactionsSection({
   const [editOpen, setEditOpen] = useState(false);
   const [expandedWidgetId, setExpandedWidgetId] = useState<string | null>(null);
   const [editingWidgetId, setEditingWidgetId] = useState<string | null>(null);
+  const [confirmDeleteWidgetId, setConfirmDeleteWidgetId] = useState<string | null>(null);
   const [newTitle, setNewTitle] = useState("Новый виджет реакций");
   const [newReactionsText, setNewReactionsText] = useState("👍\n👏\n🔥\n🤔");
   const [editTitle, setEditTitle] = useState("");
@@ -233,10 +236,15 @@ export function AdminReactionsSection({
                         : 0;
                     const latestHistoryCount =
                       historyByWidget.get(widget.id)?.[0]?.counts?.[reaction] ?? 0;
+                    const persistedCount = widgetStatsById?.[widget.id]?.[reaction] ?? 0;
                     const latestHistoryUsers =
                       historyByWidget.get(widget.id)?.[0]?.uniqueReactorsByReaction?.[reaction] ??
                       0;
-                    const displayCount = isWidgetActive ? currentCount : latestHistoryCount;
+                    const displayCount = isWidgetActive
+                      ? currentCount
+                      : latestHistoryCount > 0
+                        ? latestHistoryCount
+                        : persistedCount;
                     const displayUsers = isWidgetActive ? currentUsers : latestHistoryUsers;
                     return (
                       <Typography
@@ -398,8 +406,7 @@ export function AdminReactionsSection({
             sx={{ mr: "auto" }}
             onClick={() => {
               if (!editingWidgetId) return;
-              onDeleteWidget(editingWidgetId);
-              setEditOpen(false);
+              setConfirmDeleteWidgetId(editingWidgetId);
             }}
           >
             Удалить
@@ -413,6 +420,32 @@ export function AdminReactionsSection({
             }}
           >
             Сохранить
+          </Button>
+        </DialogActions>
+      </Dialog>
+      <Dialog
+        open={confirmDeleteWidgetId !== null}
+        onClose={() => setConfirmDeleteWidgetId(null)}
+        maxWidth="xs"
+        fullWidth
+      >
+        <DialogTitle>Удалить виджет реакций</DialogTitle>
+        <DialogContent>
+          <Typography>Удалить виджет реакций? Это действие нельзя отменить.</Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setConfirmDeleteWidgetId(null)}>Отмена</Button>
+          <Button
+            color="error"
+            variant="contained"
+            onClick={() => {
+              if (!confirmDeleteWidgetId) return;
+              onDeleteWidget(confirmDeleteWidgetId);
+              setConfirmDeleteWidgetId(null);
+              setEditOpen(false);
+            }}
+          >
+            Удалить
           </Button>
         </DialogActions>
       </Dialog>

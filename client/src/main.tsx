@@ -10,6 +10,7 @@ import { AdminRoomsPage } from "./pages/AdminRoomsPage";
 import { AdminEventPage } from "./pages/AdminEventPage";
 import { AdminVoteDetailPage } from "./pages/AdminVoteDetailPage";
 import { AdminSubQuizResultsPage } from "./pages/AdminSubQuizResultsPage";
+import { PublicReportPage } from "./pages/PublicReportPage";
 
 const theme = createTheme({
   palette: {
@@ -105,6 +106,7 @@ function App() {
           <Route path="/q/:slug" element={<QuizPlayPage />} />
           <Route path="/q/:slug/results" element={<ResultsPage />} />
           <Route path="/p/:slug" element={<ResultsPage />} />
+          <Route path="/report/:slug" element={<PublicReportPage />} />
           <Route path="/admin" element={<AdminSectionLayout />}>
             <Route index element={<AdminRoomsPage />} />
             <Route path=":eventName/votes/:questionId" element={<AdminVoteDetailPage />} />

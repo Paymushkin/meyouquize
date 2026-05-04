@@ -2,25 +2,18 @@ import { Card, CardContent, Stack } from "@mui/material";
 import VisibilityOffOutlinedIcon from "@mui/icons-material/VisibilityOffOutlined";
 import UndoOutlinedIcon from "@mui/icons-material/UndoOutlined";
 import type { SpeakerQuestionItem } from "../../types/speakerQuestions";
+import type {
+  AdminSpeakerQuestionsPanelActions,
+  AdminSpeakerQuestionsSettingsValues,
+} from "../../features/speakerQuestionsAdmin/adminSpeakerQuestionsSettings";
 import { SpeakerQuestionsTable } from "./SpeakerQuestionsTable";
 import { AdminSpeakerSettingsPanel } from "./AdminSpeakerSettingsPanel";
 import { useSpeakerQuestionsSplit } from "../../features/speakerQuestionsAdmin/useSpeakerQuestionsSplit";
 
 type Props = {
-  enabled: boolean;
-  allowLikes: boolean;
-  showLikesOnScreen: boolean;
-  reactionsText: string;
-  showAuthorOnScreen: boolean;
-  speakersText: string;
+  settings: AdminSpeakerQuestionsSettingsValues;
+  panelActions: AdminSpeakerQuestionsPanelActions;
   questions: SpeakerQuestionItem[];
-  onToggleEnabled: (next: boolean) => void;
-  onToggleAllowLikes: (next: boolean) => void;
-  onToggleShowLikesOnScreen: (next: boolean) => void;
-  onReactionsTextChange: (next: string) => void;
-  onToggleShowAuthorOnScreen: (next: boolean) => void;
-  onSpeakersTextChange: (next: string) => void;
-  onSaveSettings: () => void;
   onHide: (id: string) => void;
   onRestore: (id: string) => void;
   onSetUserVisible: (id: string, next: boolean) => void;
@@ -31,20 +24,9 @@ type Props = {
 
 export function AdminSpeakersSection(props: Props) {
   const {
-    enabled,
-    allowLikes,
-    showLikesOnScreen,
-    reactionsText,
-    showAuthorOnScreen,
-    speakersText,
+    settings,
+    panelActions,
     questions,
-    onToggleEnabled,
-    onToggleAllowLikes,
-    onToggleShowLikesOnScreen,
-    onReactionsTextChange,
-    onToggleShowAuthorOnScreen,
-    onSpeakersTextChange,
-    onSaveSettings,
     onHide,
     onRestore,
     onSetUserVisible,
@@ -55,21 +37,7 @@ export function AdminSpeakersSection(props: Props) {
   const { hidden, fresh } = useSpeakerQuestionsSplit(questions);
   return (
     <Stack spacing={2}>
-      <AdminSpeakerSettingsPanel
-        enabled={enabled}
-        allowLikes={allowLikes}
-        showLikesOnScreen={showLikesOnScreen}
-        reactionsText={reactionsText}
-        showAuthorOnScreen={showAuthorOnScreen}
-        speakersText={speakersText}
-        onToggleEnabled={onToggleEnabled}
-        onToggleAllowLikes={onToggleAllowLikes}
-        onToggleShowLikesOnScreen={onToggleShowLikesOnScreen}
-        onReactionsTextChange={onReactionsTextChange}
-        onToggleShowAuthorOnScreen={onToggleShowAuthorOnScreen}
-        onSpeakersTextChange={onSpeakersTextChange}
-        onSaveSettings={onSaveSettings}
-      />
+      <AdminSpeakerSettingsPanel settings={settings} actions={panelActions} />
       <Card variant="outlined">
         <CardContent>
           <SpeakerQuestionsTable

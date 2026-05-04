@@ -357,12 +357,14 @@ export function ResultsPage() {
                         gap: 1.5,
                       }}
                     >
-                      <Typography
-                        variant="caption"
-                        sx={{ color: "#fff", fontWeight: 700, letterSpacing: 0.2 }}
-                      >
-                        {speakerTargetLabel(item.speakerName)}
-                      </Typography>
+                      {view.speakerQuestionsShowRecipientOnScreen ? (
+                        <Typography
+                          variant="caption"
+                          sx={{ color: "#fff", fontWeight: 700, letterSpacing: 0.2 }}
+                        >
+                          {speakerTargetLabel(item.speakerName)}
+                        </Typography>
+                      ) : null}
                       <Typography
                         variant="h4"
                         sx={{
@@ -389,7 +391,7 @@ export function ResultsPage() {
                       ) : (
                         <Box />
                       )}
-                      {view.speakerQuestionsShowLikesOnScreen ? (
+                      {view.speakerQuestionsShowReactionsOnScreen ? (
                         <Stack
                           direction="row"
                           spacing={0.75}

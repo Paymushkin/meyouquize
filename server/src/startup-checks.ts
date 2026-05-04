@@ -1,6 +1,8 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import type { Prisma } from "@prisma/client";
+import { normalizePublicViewState } from "@meyouquize/shared";
 import { prisma } from "./prisma.js";
 
 type MigrationRow = {
@@ -27,5 +29,29 @@ export async function ensureMigrationsAppliedOrThrow() {
     throw new Error(
       `Database migrations are not fully applied. Missing: ${missing.join(", ")}. Run prisma migrate deploy before starting the server.`,
     );
+  }
+}
+
+export async function resetProjectorViewOnStartup() {
+  const rows = await prisma.quiz.findMany({
+    select: { id: true, publicView: true },
+  });
+  for (const row of rows) {
+    const rawView =
+      row.publicView && typeof row.publicView === "object" && !Array.isArray(row.publicView)
+        ? row.publicView
+        : {};
+    const normalized = normalizePublicViewState(rawView);
+    if (normalized.mode === "title" && normalized.questionId === undefined) continue;
+    await prisma.quiz.update({
+      where: { id: row.id },
+      data: {
+        publicView: {
+          ...normalized,
+          mode: "title",
+          questionId: undefined,
+        } as unknown as Prisma.InputJsonValue,
+      },
+    });
   }
 }

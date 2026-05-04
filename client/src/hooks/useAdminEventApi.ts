@@ -61,6 +61,7 @@ export function useAdminEventApi(params: Params) {
     const sheets: SubQuizSheet[] = data.subQuizzes.map((s) => ({
       id: s.id,
       title: s.title,
+      questionFlowMode: s.questionFlowMode === "AUTO" ? "auto" : "manual",
     }));
     setSubQuizSheets(sheets);
     setRoom(data);

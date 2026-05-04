@@ -68,6 +68,7 @@ export type AdminEventRoomQuestion = {
 export type AdminEventSubQuiz = {
   id: string;
   title: string;
+  questionFlowMode?: "MANUAL" | "AUTO";
   sortOrder: number;
   currentQuestionIndex: number;
 };
@@ -94,7 +95,7 @@ export type AdminEventRoom = {
   publicView?: PublicViewPayload | null;
 };
 
-export type SubQuizSheet = { id: string; title: string };
+export type SubQuizSheet = { id: string; title: string; questionFlowMode: "manual" | "auto" };
 
 function parseRankingPointsFromApi(raw: unknown): number[] | null {
   if (raw == null) return null;
@@ -128,6 +129,7 @@ export type RoomContentPayload = {
   subQuizzes: Array<{
     id?: string;
     title: string;
+    questionFlowMode?: "manual" | "auto";
     sortOrder: number;
     questions: ReturnType<typeof toQuestionReplaceInput>[];
   }>;
@@ -213,6 +215,7 @@ export function buildRoomContentPayload(
   const subQuizzes = sheets.map((sq, sortOrder) => ({
     id: sq.id,
     title: sq.title.trim() || "Квиз",
+    questionFlowMode: sq.questionFlowMode ?? "manual",
     sortOrder,
     questions: questionForms.filter((q) => q.subQuizId === sq.id).map(toQuestionReplaceInput),
   }));
@@ -477,6 +480,7 @@ export function mergeRoomReloadIntoState(
   const sheets: SubQuizSheet[] = data.subQuizzes.map((s) => ({
     id: s.id,
     title: s.title,
+    questionFlowMode: s.questionFlowMode === "AUTO" ? "auto" : "manual",
   }));
   const prevById = new Map(mergeFrom.questions.filter((q) => q.id).map((q) => [q.id!, q]));
   const rebuilt = flattenQuestionsFromRoom(data, cloudManual).map((q) => {
