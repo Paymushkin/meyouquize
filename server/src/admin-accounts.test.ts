@@ -4,6 +4,7 @@ import {
   adminCredentialMatch,
   mergeAdminAccounts,
   parseExtraAdminAccountsJson,
+  parseOptionalSecondAdminFromEnv,
   tryDecodeAdminAccountsBase64,
 } from "./admin-accounts.js";
 
@@ -24,6 +25,22 @@ describe("admin-accounts", () => {
   it("parses valid JSON array", () => {
     const parsed = parseExtraAdminAccountsJson('[{"login":"Anna","password":"x"}]');
     expect(parsed).toEqual([{ login: "Anna", password: "x" }]);
+  });
+
+  it("parses optional second admin from env (password via base64)", () => {
+    const pw = "x%$!y";
+    const b64 = Buffer.from(pw, "utf8").toString("base64");
+    const acc = parseOptionalSecondAdminFromEnv({
+      ADMIN_SECOND_LOGIN: "Anna",
+      ADMIN_SECOND_PASSWORD_B64: b64,
+    } as NodeJS.ProcessEnv);
+    expect(acc).toEqual({ login: "Anna", password: pw });
+  });
+
+  it("returns null for second admin when login set but no password", () => {
+    expect(
+      parseOptionalSecondAdminFromEnv({ ADMIN_SECOND_LOGIN: "Anna" } as NodeJS.ProcessEnv),
+    ).toBeNull();
   });
 
   it("decodes ADMIN_ACCOUNTS_BASE64 payload (special chars survive)", () => {

@@ -65,3 +65,36 @@ export function adminCredentialMatch(
   const passwordNorm = password.trim();
   return accounts.some((a) => a.login === loginNorm && a.password === passwordNorm);
 }
+
+/**
+ * Второй админ без JSON: логин в plain, пароль лучше в base64 (`ADMIN_SECOND_PASSWORD_B64`),
+ * чтобы символы `$`, `!` и т.д. не ломались в systemd / docker.
+ */
+export function parseOptionalSecondAdminFromEnv(env: NodeJS.ProcessEnv): AdminAccount | null {
+  const login = env.ADMIN_SECOND_LOGIN?.trim();
+  if (!login) return null;
+  const b64 = env.ADMIN_SECOND_PASSWORD_B64?.trim();
+  const plain = env.ADMIN_SECOND_PASSWORD?.trim();
+  if (b64) {
+    try {
+      const password = Buffer.from(b64, "base64").toString("utf8").trim();
+      if (!password) {
+        console.warn(
+          "[env] ADMIN_SECOND_PASSWORD_B64 decoded to empty password, ignoring second admin",
+        );
+        return null;
+      }
+      return { login, password };
+    } catch {
+      console.warn("[env] ADMIN_SECOND_PASSWORD_B64 is not valid base64, ignoring second admin");
+      return null;
+    }
+  }
+  if (plain) {
+    return { login, password: plain };
+  }
+  console.warn(
+    "[env] ADMIN_SECOND_LOGIN is set but neither ADMIN_SECOND_PASSWORD_B64 nor ADMIN_SECOND_PASSWORD — ignoring second admin",
+  );
+  return null;
+}

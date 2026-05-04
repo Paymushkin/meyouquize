@@ -4,6 +4,7 @@ import { fileURLToPath } from "node:url";
 import {
   mergeAdminAccounts,
   parseExtraAdminAccountsJson,
+  parseOptionalSecondAdminFromEnv,
   tryDecodeAdminAccountsBase64,
   type AdminAccount,
 } from "./admin-accounts.js";
@@ -94,10 +95,22 @@ const extraAccountsRaw =
 if (process.env.ADMIN_ACCOUNTS_BASE64?.trim() && process.env.ADMIN_ACCOUNTS?.trim()) {
   console.warn("[env] Set both ADMIN_ACCOUNTS_BASE64 and ADMIN_ACCOUNTS; using BASE64 only.");
 }
-const adminAccounts = mergeAdminAccounts(
-  primaryAdmin,
-  parseExtraAdminAccountsJson(extraAccountsRaw || undefined),
-);
+const fromJsonAccounts = parseExtraAdminAccountsJson(extraAccountsRaw || undefined);
+const secondAdmin = parseOptionalSecondAdminFromEnv(process.env);
+const plaintextAdminAccounts = process.env.ADMIN_ACCOUNTS?.trim();
+if (
+  plaintextAdminAccounts &&
+  !process.env.ADMIN_ACCOUNTS_BASE64?.trim() &&
+  fromJsonAccounts.length === 0
+) {
+  console.warn(
+    "[env] ADMIN_ACCOUNTS is set but JSON did not parse to any account (often `$`/`!` in password). Use ADMIN_ACCOUNTS_BASE64 or ADMIN_SECOND_LOGIN + ADMIN_SECOND_PASSWORD_B64.",
+  );
+}
+const adminAccounts = mergeAdminAccounts(primaryAdmin, [
+  ...fromJsonAccounts,
+  ...(secondAdmin ? [secondAdmin] : []),
+]);
 validateProductionSecurity(networkMode, clientOrigins, adminAccounts);
 
 console.info(
@@ -109,7 +122,7 @@ export const env = {
   networkMode,
   clientOrigins,
   allowLanViteOrigins: allowLanViteOrigins(),
-  /** Все допустимые пары логин/пароль (основная + из ADMIN_ACCOUNTS). */
+  /** Все допустимые пары логин/пароль (основная + JSON / второй админ из env). */
   adminAccounts,
   adminLogin: primaryAdmin.login,
   adminPassword: primaryAdmin.password,
