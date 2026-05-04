@@ -23,6 +23,17 @@ export function resolveClientAssetUrl(rawUrl: string): string {
         window.location.origin,
       ).toString();
     }
+    /** Загрузчик когда-то вернул тот же хост с :4000 — в проде медиа на 443 через Caddy. */
+    if (
+      parsed.port === "4000" &&
+      parsed.hostname === window.location.hostname &&
+      window.location.port !== "4000"
+    ) {
+      return new URL(
+        `${parsed.pathname}${parsed.search}${parsed.hash}`,
+        window.location.origin,
+      ).toString();
+    }
     return parsed.toString();
   } catch {
     return value;

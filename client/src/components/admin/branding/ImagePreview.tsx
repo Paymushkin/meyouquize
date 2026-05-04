@@ -1,4 +1,5 @@
 import { Box, Typography } from "@mui/material";
+import { resolveClientAssetUrl } from "../../../utils/resolveClientAssetUrl";
 
 type Props = {
   label: string;
@@ -8,6 +9,7 @@ type Props = {
 
 export function ImagePreview(props: Props) {
   const { label, url, height = 150 } = props;
+  const resolved = url.trim() ? resolveClientAssetUrl(url) : "";
   return (
     <Box
       sx={{
@@ -24,11 +26,11 @@ export function ImagePreview(props: Props) {
         justifyContent: "center",
       }}
     >
-      {url.trim() ? (
+      {resolved ? (
         <>
           <Box
             component="img"
-            src={url}
+            src={resolved}
             alt={label}
             sx={{ width: "100%", height: "100%", objectFit: "contain" }}
           />
