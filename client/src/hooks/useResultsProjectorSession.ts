@@ -74,7 +74,7 @@ export function useResultsProjectorSession(
     socket.on("error:message", onError);
     socket.on("speaker:questions:update", onSpeakerQuestions);
     socket.on("state:quiz", onState);
-    socket.emit("results:subscribe", { slug });
+    socket.emit("results:subscribe", { slug, viewer: "projector" });
     socket.emit("speaker:questions:subscribe", { slug, viewer: "projector" });
     return () => {
       socket.off("results:dashboard", onDashboard);

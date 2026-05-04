@@ -17,8 +17,11 @@ import { toPublicViewPayload } from "../public-view-helpers.js";
 export function registerResultsDashboardHandlers(socket: EnrichedSocket, io: Server) {
   socket.on("results:subscribe", async (raw: unknown) => {
     try {
-      await assertAdmin(socket);
       const payload = subscribeResultsSchema.parse(raw);
+      const viewer = payload.viewer ?? "projector";
+      if (viewer === "admin") {
+        await assertAdmin(socket);
+      }
       const quiz = await getQuizBySlug(payload.slug);
       if (!quiz) throw new Error("Quiz not found");
       await socket.join(quizDashboardRoom(quiz.id));

@@ -194,7 +194,7 @@ export function useAdminEventSocket<TQuestion extends QuestionFormPatchable>(
     clearSocketListeners();
     socket.connect();
     socket.on("connect", () => {
-      socket.emit("results:subscribe", { slug: eventName });
+      socket.emit("results:subscribe", { slug: eventName, viewer: "admin" });
       socket.emit("speaker:questions:subscribe", { slug: eventName, viewer: "admin" });
     });
     socket.on("state:quiz", (state: ActiveState) => {

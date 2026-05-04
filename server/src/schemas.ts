@@ -201,6 +201,7 @@ export const resetQuestionAnswersSchema = z.object({
 
 export const subscribeResultsSchema = z.object({
   slug: z.string().min(1),
+  viewer: z.enum(["projector", "admin"]).optional(),
 });
 
 export const setPublicViewSchema = z.object({

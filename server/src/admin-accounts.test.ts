@@ -53,11 +53,11 @@ describe("admin-accounts", () => {
 
   it("matches second account from a two-entry ADMIN_ACCOUNTS JSON line", () => {
     const raw =
-      '[{"login":"admin","password":"Paymushkin0073Meyou!"},{"login":"Anna","password":"aA125fee"}]';
+      '[{"login":"admin","password":"admin_test_pass_001"},{"login":"Anna","password":"anna_test_pass_001"}]';
     const accounts = dedupeAdminAccountsByLogin(parseAdminAccountsJsonArray(raw));
     expect(accounts).toHaveLength(2);
-    expect(adminCredentialMatch(accounts, "Anna", "aA125fee")).toBe(true);
-    expect(adminCredentialMatch(accounts, "ANNA", "aA125fee")).toBe(true);
+    expect(adminCredentialMatch(accounts, "Anna", "anna_test_pass_001")).toBe(true);
+    expect(adminCredentialMatch(accounts, "ANNA", "anna_test_pass_001")).toBe(true);
   });
 
   it("parses Login/Password key aliases", () => {
