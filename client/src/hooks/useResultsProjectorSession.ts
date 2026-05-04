@@ -36,7 +36,20 @@ export function useResultsProjectorSession(
 
   useEffect(() => {
     if (!slug) return;
-    if (!socket.connected) socket.connect();
+
+    const subscribe = () => {
+      socket.emit("results:subscribe", { slug, viewer: "projector" });
+      socket.emit("speaker:questions:subscribe", { slug, viewer: "projector" });
+    };
+
+    if (!socket.connected) {
+      socket.connect();
+    }
+    socket.on("connect", subscribe);
+    if (socket.connected) {
+      subscribe();
+    }
+
     const onDashboard = (payload: {
       perQuestion: ProjectorQuestionResult[];
       leaderboard: ProjectorLeader[];
@@ -74,9 +87,8 @@ export function useResultsProjectorSession(
     socket.on("error:message", onError);
     socket.on("speaker:questions:update", onSpeakerQuestions);
     socket.on("state:quiz", onState);
-    socket.emit("results:subscribe", { slug, viewer: "projector" });
-    socket.emit("speaker:questions:subscribe", { slug, viewer: "projector" });
     return () => {
+      socket.off("connect", subscribe);
       socket.off("results:dashboard", onDashboard);
       socket.off("results:public:view", onPublicView);
       socket.off("error:message", onError);
