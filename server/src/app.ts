@@ -8,6 +8,7 @@ import { createServer } from "node:http";
 import path from "node:path";
 import { Server } from "socket.io";
 import multer from "multer";
+import { adminCredentialMatch } from "./admin-accounts.js";
 import { env } from "./env.js";
 import {
   adminAuthSchema,
@@ -195,7 +196,7 @@ export function buildApp() {
     const parsed = adminAuthSchema.safeParse(req.body);
     if (!parsed.success)
       return res.status(400).json(apiError("INVALID_PAYLOAD", "Invalid payload"));
-    if (parsed.data.login !== env.adminLogin || parsed.data.password !== env.adminPassword) {
+    if (!adminCredentialMatch(env.adminAccounts, parsed.data.login, parsed.data.password)) {
       return res.status(401).json(apiError("WRONG_CREDENTIALS", "Wrong credentials"));
     }
     const token = randomToken();

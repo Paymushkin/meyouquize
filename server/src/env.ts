@@ -1,6 +1,11 @@
 import dotenv from "dotenv";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import {
+  mergeAdminAccounts,
+  parseExtraAdminAccountsJson,
+  type AdminAccount,
+} from "./admin-accounts.js";
 
 const currentFile = fileURLToPath(import.meta.url);
 const serverSrcDir = path.dirname(currentFile);
@@ -59,14 +64,18 @@ function readAdminPassword(): string {
 function validateProductionSecurity(
   mode: AppNetworkMode,
   origins: string[],
-  password: string,
+  accounts: AdminAccount[],
 ): void {
   if (process.env.NODE_ENV !== "production") return;
   if (mode === "internet" && origins.length === 0) {
     throw new Error("CLIENT_ORIGIN must contain at least one origin in production internet mode");
   }
-  if (password === "change-me") {
-    throw new Error("ADMIN_PASSWORD must not be the default value in production");
+  for (const acc of accounts) {
+    if (acc.password === "change-me") {
+      throw new Error(
+        `ADMIN password for "${acc.login}" must not be the default value in production`,
+      );
+    }
   }
 }
 
@@ -76,15 +85,22 @@ const clientOrigins = (process.env.CLIENT_ORIGIN ?? "http://localhost:5173")
   .map((origin) => origin.trim().replace(/\/+$/, ""))
   .filter(Boolean);
 const adminPassword = readAdminPassword();
-validateProductionSecurity(networkMode, clientOrigins, adminPassword);
+const primaryAdmin: AdminAccount = { login: readAdminLogin(), password: adminPassword };
+const adminAccounts = mergeAdminAccounts(
+  primaryAdmin,
+  parseExtraAdminAccountsJson(process.env.ADMIN_ACCOUNTS),
+);
+validateProductionSecurity(networkMode, clientOrigins, adminAccounts);
 
 export const env = {
   port: Number(process.env.PORT ?? 4000),
   networkMode,
   clientOrigins,
   allowLanViteOrigins: allowLanViteOrigins(),
-  adminLogin: readAdminLogin(),
-  adminPassword,
+  /** Все допустимые пары логин/пароль (основная + из ADMIN_ACCOUNTS). */
+  adminAccounts,
+  adminLogin: primaryAdmin.login,
+  adminPassword: primaryAdmin.password,
   databaseUrl:
     process.env.DATABASE_URL ?? "postgresql://postgres:postgres@localhost:5432/meyouquize",
   adminSessionHours: Number(process.env.ADMIN_SESSION_HOURS ?? 8),
