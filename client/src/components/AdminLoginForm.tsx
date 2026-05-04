@@ -1,6 +1,7 @@
 import { FormEvent, useState } from "react";
 import { Alert, Box, Button, Card, CardContent, Stack, TextField, Typography } from "@mui/material";
 import { API_BASE } from "../config";
+import { disconnectSocketForCookieRefresh } from "../socket";
 import { parseApiErrorMessage } from "../utils/apiError";
 
 type Props = {
@@ -41,6 +42,7 @@ export function AdminLoginForm({ onSuccess }: Props) {
         return;
       }
       setMessage("");
+      disconnectSocketForCookieRefresh();
       onSuccess();
     } catch (error) {
       setMessage(

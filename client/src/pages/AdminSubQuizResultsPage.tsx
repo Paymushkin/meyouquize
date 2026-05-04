@@ -129,7 +129,8 @@ export function AdminSubQuizResultsPage() {
 
   useEffect(() => {
     if (!isAuth) return;
-    if (!socket.connected) socket.connect();
+    if (socket.connected) socket.disconnect();
+    socket.connect();
   }, [isAuth]);
 
   useEffect(() => {
