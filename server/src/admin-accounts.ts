@@ -15,7 +15,7 @@ export function parseExtraAdminAccountsJson(raw: string | undefined): AdminAccou
       if (!row || typeof row !== "object") continue;
       const rec = row as Record<string, unknown>;
       const login = typeof rec.login === "string" ? rec.login.trim() : "";
-      const password = typeof rec.password === "string" ? rec.password : "";
+      const password = typeof rec.password === "string" ? rec.password.trim() : "";
       if (login.length > 0 && password.length > 0 && login.length <= 80 && password.length <= 500) {
         out.push({ login, password });
       }
@@ -43,5 +43,7 @@ export function adminCredentialMatch(
   login: string,
   password: string,
 ): boolean {
-  return accounts.some((a) => a.login === login && a.password === password);
+  const loginNorm = login.trim();
+  const passwordNorm = password.trim();
+  return accounts.some((a) => a.login === loginNorm && a.password === passwordNorm);
 }

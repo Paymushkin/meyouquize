@@ -9,18 +9,27 @@ type Props = {
 };
 
 export function AdminLoginForm({ onSuccess }: Props) {
-  const [login, setLogin] = useState("admin");
+  const [login, setLogin] = useState("");
   const [password, setPassword] = useState("");
   const [message, setMessage] = useState("");
 
   async function submit(event: FormEvent) {
     event.preventDefault();
+    const trimmedLogin = login.trim();
+    if (!trimmedLogin) {
+      setMessage("Введите логин (например admin или Anna).");
+      return;
+    }
+    if (!password) {
+      setMessage("Введите пароль.");
+      return;
+    }
     try {
       const response = await fetch(`${API_BASE}/api/admin/auth`, {
         method: "POST",
         credentials: "include",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ login: login.trim() || "admin", password }),
+        body: JSON.stringify({ login: trimmedLogin, password }),
       });
       if (!response.ok) {
         if (response.status === 429) {
@@ -64,6 +73,7 @@ export function AdminLoginForm({ onSuccess }: Props) {
                 label="Логин"
                 value={login}
                 onChange={(e) => setLogin(e.target.value)}
+                placeholder="admin, Anna, …"
                 fullWidth
               />
               <TextField

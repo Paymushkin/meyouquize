@@ -30,6 +30,7 @@ describe("admin-accounts", () => {
       { login: "Anna", password: "p2" },
     ];
     expect(adminCredentialMatch(accounts, "Anna", "p2")).toBe(true);
+    expect(adminCredentialMatch(accounts, "  Anna  ", "  p2  ")).toBe(true);
     expect(adminCredentialMatch(accounts, "Anna", "wrong")).toBe(false);
   });
 });

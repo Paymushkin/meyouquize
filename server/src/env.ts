@@ -92,6 +92,10 @@ const adminAccounts = mergeAdminAccounts(
 );
 validateProductionSecurity(networkMode, clientOrigins, adminAccounts);
 
+console.info(
+  `[env] Admin accounts: ${adminAccounts.length} (logins: ${adminAccounts.map((a) => a.login).join(", ")})`,
+);
+
 export const env = {
   port: Number(process.env.PORT ?? 4000),
   networkMode,
