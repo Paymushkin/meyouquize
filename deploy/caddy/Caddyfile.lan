@@ -1,7 +1,8 @@
 :80 {
   encode zstd gzip
 
-  @api path /api/* /socket.io/*
+  # /socket.io/* не матчит путь /socket.io — иначе long-polling попадает в SPA (index.html вместо JS).
+  @api path /api/* /socket.io*
   handle @api {
     reverse_proxy 127.0.0.1:4000
   }
