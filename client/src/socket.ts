@@ -13,13 +13,15 @@ export function disconnectSocketForCookieRefresh(): void {
 export const socket = io(SOCKET_URL, {
   withCredentials: true,
   autoConnect: false,
+  // При пике нагрузки на сервере дефолтный handshake 20s даёт connect_error "timeout" в админке.
+  timeout: 45_000,
   transports: ["websocket", "polling"],
   upgrade: true,
   rememberUpgrade: true,
   reconnection: true,
   reconnectionAttempts: Infinity,
   reconnectionDelay: 500,
-  reconnectionDelayMax: 2500,
+  reconnectionDelayMax: 15_000,
 });
 
 /** После первого connect следующий connect считаем восстановлением после обрыва. */
