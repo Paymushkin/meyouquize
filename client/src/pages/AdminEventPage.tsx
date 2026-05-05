@@ -1881,17 +1881,6 @@ export function AdminEventPage() {
       setMessage("Сначала сохраните вопросы, чтобы управлять их запуском");
       return;
     }
-    if (enabled) {
-      for (const q of questionForms) {
-        if (q.id && q.id !== question.id && q.isActive) {
-          socket.emit("question:toggle", {
-            quizId,
-            questionId: q.id,
-            enabled: false,
-          });
-        }
-      }
-    }
     socket.emit("question:toggle", {
       quizId,
       questionId: question.id,
@@ -1902,7 +1891,7 @@ export function AdminEventPage() {
       setQuestionForms((prev) =>
         prev.map((q, idx) => ({
           ...q,
-          isActive: idx === questionIndex,
+          isActive: idx === questionIndex ? true : q.isActive,
         })),
       );
     } else {

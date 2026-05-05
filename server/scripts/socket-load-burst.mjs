@@ -26,6 +26,7 @@ const base = process.env.BASE_URL || "http://localhost:4000";
 const slug = process.env.QUIZ_SLUG;
 const players = Number(process.env.PLAYER_COUNT || 120);
 const joinRampMs = Number(process.env.JOIN_RAMP_MS || 0);
+const joinDistribution = (process.env.JOIN_DISTRIBUTION || "uniform").trim().toLowerCase();
 const joinAckTimeoutMs = Number(process.env.JOIN_ACK_TIMEOUT_MS || 15_000);
 /** Повтор handshake при connect_error (один и тот же join в пределах join_ack_timeout). */
 const joinConnectRetries = Math.max(1, Number(process.env.JOIN_CONNECT_RETRIES ?? "3"));
@@ -39,8 +40,15 @@ const joinFailTolerance =
 const runSubmit = process.env.RUN_SUBMIT === "1" || process.env.RUN_SUBMIT === "true";
 const runDashboard = process.env.RUN_DASHBOARD === "1" || process.env.RUN_DASHBOARD === "true";
 const submitPlayers = Number(process.env.SUBMIT_PLAYERS || players);
+const submitOnJoin = process.env.SUBMIT_ON_JOIN === "1" || process.env.SUBMIT_ON_JOIN === "true";
+const submitDelayMinMs = Math.max(0, Number(process.env.SUBMIT_DELAY_MIN_MS || 1000));
+const submitDelayMaxMs = Math.max(
+  submitDelayMinMs,
+  Number(process.env.SUBMIT_DELAY_MAX_MS || 5000),
+);
 const dashboardWaitMs = Number(process.env.DASHBOARD_WAIT_MS || 3500);
 const holdMs = Number(process.env.HOLD_MS || 0);
+const testDurationMs = Math.max(0, Number(process.env.TEST_DURATION_MS || 0));
 const submitTimeoutMs = Number(process.env.SUBMIT_TIMEOUT_MS || 12_000);
 const runWalkthrough =
   process.env.RUN_WALKTHROUGH === "1" || process.env.RUN_WALKTHROUGH === "true";
@@ -67,6 +75,33 @@ const voteDistribution = (process.env.VOTE_DISTRIBUTION || "normal").trim().toLo
 const forcedQuizId = (process.env.QUIZ_ID || "").trim();
 const forcedQuestionId = (process.env.QUESTION_ID || "").trim();
 const forcedOptionId = (process.env.OPTION_ID || "").trim();
+
+function validateConfig() {
+  const issues = [];
+  if (!slug) issues.push("QUIZ_SLUG is required");
+  if (!Number.isFinite(players) || players <= 0) issues.push("PLAYER_COUNT must be > 0");
+  if (!Number.isFinite(submitPlayers) || submitPlayers < 0) {
+    issues.push("SUBMIT_PLAYERS must be >= 0");
+  }
+  if (submitDelayMaxMs < submitDelayMinMs) {
+    issues.push("SUBMIT_DELAY_MAX_MS must be >= SUBMIT_DELAY_MIN_MS");
+  }
+  if (!["uniform", "normal"].includes(joinDistribution)) {
+    issues.push("JOIN_DISTRIBUTION must be one of: uniform, normal");
+  }
+  if (!["uniform", "normal"].includes(voteDistribution)) {
+    issues.push("VOTE_DISTRIBUTION must be one of: uniform, normal");
+  }
+  return issues;
+}
+
+const configIssues = validateConfig();
+if (configIssues.length > 0) {
+  for (const issue of configIssues) {
+    console.error(`[socket-load] config error: ${issue}`);
+  }
+  process.exit(1);
+}
 
 if (!slug) {
   console.error("Задайте QUIZ_SLUG (slug комнаты / квиза).");
@@ -121,6 +156,29 @@ function sampleVoteDelayMs(windowMs) {
     if (x >= 0 && x < windowMs) return Math.floor(x);
   }
   return Math.floor(Math.random() * windowMs);
+}
+
+function sampleJoinDelayMs(windowMs) {
+  if (windowMs <= 1) return 0;
+  if (joinDistribution === "normal") {
+    const mean = windowMs / 2;
+    const std = windowMs / 6;
+    for (let k = 0; k < 24; k += 1) {
+      const x = mean + std * randomStdNormal();
+      if (x >= 0 && x < windowMs) return Math.floor(x);
+    }
+  }
+  return Math.floor(Math.random() * windowMs);
+}
+
+function randomIntBetween(min, max) {
+  if (max <= min) return min;
+  return Math.floor(Math.random() * (max - min + 1)) + min;
+}
+
+function buildJoinSchedule(totalPlayers) {
+  if (joinRampMs <= 0) return Array.from({ length: totalPlayers }, () => 0);
+  return Array.from({ length: totalPlayers }, () => sampleJoinDelayMs(joinRampMs));
 }
 
 function resolveSubmitTargetFromState(state) {
@@ -400,138 +458,138 @@ async function resolveSubmitTarget(joinedClients, timeoutMs = 10_000) {
   return null;
 }
 
-const dashboardTimestamps = [];
-let observerSocket = null;
-if (runDashboard) {
-  try {
-    observerSocket = await connectObserver(dashboardTimestamps);
-    console.info(
-      `[socket-load] observer results:subscribe ok, dashboard_events_total=${dashboardTimestamps.length}`,
-    );
-  } catch (e) {
-    console.error("[socket-load] RUN_DASHBOARD: не удалось подписаться:", e?.message || e);
-    process.exit(1);
+async function resolveSubmitTargetForClient(client, timeoutMs = 12_000) {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    const target = resolveSubmitTargetFromState(client?.lastState);
+    if (target.quizId && target.questionId && target.optionId) {
+      return target;
+    }
+    await sleep(200);
   }
+  return null;
 }
 
-if (joinRampMs > 0) {
-  console.info(
-    `[socket-load] join_ramp_ms=${joinRampMs} join_ack_timeout_ms=${joinAckTimeoutMs} (staggered connect)`,
-  );
-} else {
-  console.info(`[socket-load] join_ack_timeout_ms=${joinAckTimeoutMs}`);
-}
-
-const results = await Promise.all(
-  Array.from({ length: players }, (_, i) => {
-    const delay =
-      joinRampMs > 0 && players > 0 ? Math.floor((i * joinRampMs) / Math.max(players, 1)) : 0;
-    return makeClient(i, delay, joinAckTimeoutMs);
-  }),
-);
-
-let failed = 0;
-const joinedClients = [];
-const joinFailReasons = new Map();
-for (const r of results) {
-  if (!r.ok) {
-    failed += 1;
-    bumpReason(joinFailReasons, r.err);
-  } else {
-    joinedClients.push(r.client);
+function collectJoinStats(resultsList) {
+  let failedCount = 0;
+  const joined = [];
+  const failReasons = new Map();
+  for (const r of resultsList) {
+    if (!r.ok) {
+      failedCount += 1;
+      bumpReason(failReasons, r.err);
+    } else {
+      joined.push(r.client);
+    }
   }
+  return { failedCount, joined, failReasons };
 }
-console.info(`[socket-load] joined_ok=${players - failed}/${players}`);
-if (failed > 0) {
-  printTopReasons("[socket-load] join_fail_reasons", joinFailReasons);
+
+function collectSubmitStats(submitResults) {
+  let failedCount = 0;
+  const failReasons = new Map();
+  for (const sr of submitResults) {
+    if (!sr.ok) {
+      failedCount += 1;
+      bumpReason(failReasons, sr.err);
+    }
+  }
+  return { failedCount, failReasons };
 }
-if (joinLatencies.length > 0) {
-  const j = [...joinLatencies].sort((a, b) => a - b);
+
+function logLatencyStats(prefix, latencies) {
+  if (latencies.length === 0) return;
+  const sorted = [...latencies].sort((a, b) => a - b);
   console.info(
-    `[socket-load] join_ack_ms p50=${percentile(j, 50)} p95=${percentile(j, 95)} max=${j[j.length - 1]}`,
+    `${prefix} p50=${percentile(sorted, 50)} p95=${percentile(sorted, 95)} max=${sorted[sorted.length - 1]}`,
   );
 }
 
-let submitEndedAt = 0;
+async function runSubmitOnJoinFlow(submitOnJoinTasks) {
+  if (!(submitOnJoin && runSubmit && submitOnJoinTasks.length > 0)) return 0;
+  const submitResults = await Promise.all(submitOnJoinTasks);
+  const { failedCount: submitFail, failReasons: submitFailReasons } =
+    collectSubmitStats(submitResults);
+  console.info(
+    `[socket-load] submit_on_join_ok=${submitResults.length - submitFail}/${submitResults.length}`,
+  );
+  if (submitFail > 0) {
+    printTopReasons("[socket-load] submit_on_join_fail_reasons", submitFailReasons);
+  }
+  logLatencyStats("[socket-load] submit_roundtrip_ms", submitLatencies);
+  return Date.now();
+}
 
-if (runSubmit && joinedClients.length > 0) {
+async function runBulkSubmitFlow(joinedClients) {
+  if (!(runSubmit && joinedClients.length > 0)) return 0;
   const resolveTargetMs = joinRampMs > 0 ? 20_000 : 12_000;
   const target = await resolveSubmitTarget(joinedClients, resolveTargetMs);
   if (!target) {
     console.warn(
       "[socket-load] RUN_SUBMIT: нет quizId/questionId/optionId. Укажите QUIZ_ID + QUESTION_ID + OPTION_ID или откройте активный вопрос.",
     );
-  } else {
-    const n = Math.min(submitPlayers, joinedClients.length);
-    if (n < submitPlayers) {
-      console.warn(
-        `[socket-load] RUN_SUBMIT: SUBMIT_PLAYERS=${submitPlayers}, но в join только ${joinedClients.length} — голосуют ${n}.`,
-      );
-    }
-    let submitResults;
-    if (useRealisticVote && voteWindowMs > 0) {
-      console.info(
-        `[socket-load] realistic_vote window_ms=${voteWindowMs} voters=${n} distribution=${voteDistribution} submit_timeout_ms=${submitTimeoutMs}`,
-      );
-      const delays = [];
-      for (let i = 0; i < n; i += 1) delays.push(sampleVoteDelayMs(voteWindowMs));
-      delays.sort((a, b) => a - b);
-      const p50d = percentile([...delays], 50);
-      const p95d = percentile([...delays], 95);
-      console.info(
-        `[socket-load] vote_schedule_delay_ms p50=${p50d} p95=${p95d} max=${delays[delays.length - 1]}`,
-      );
-      submitResults = await Promise.all(
-        joinedClients.slice(0, n).map(
-          (c, idx) =>
-            new Promise((resolve) => {
-              const delayMs = delays[idx] ?? 0;
-              setTimeout(() => {
-                const payload = { optionIds: target.optionId ? [target.optionId] : [] };
-                submitAnswer(
-                  c.socket,
-                  target.quizId,
-                  target.questionId,
-                  payload,
-                  submitTimeoutMs,
-                ).then(resolve);
-              }, delayMs);
-            }),
-        ),
-      );
-    } else {
-      submitResults = await Promise.all(
-        joinedClients.slice(0, n).map((c) => {
-          const payload = { optionIds: target.optionId ? [target.optionId] : [] };
-          return submitAnswer(c.socket, target.quizId, target.questionId, payload, submitTimeoutMs);
-        }),
-      );
-    }
-    submitEndedAt = Date.now();
-    let submitFail = 0;
-    const submitFailReasons = new Map();
-    for (const sr of submitResults) {
-      if (!sr.ok) {
-        submitFail += 1;
-        bumpReason(submitFailReasons, sr.err);
-      }
-    }
-    console.info(
-      `[socket-load] submit_ok=${n - submitFail}/${n} (question=${target.questionId.slice(0, 8)}…, source=${target.source})`,
-    );
-    if (submitFail > 0) {
-      printTopReasons("[socket-load] submit_fail_reasons", submitFailReasons);
-    }
-    if (submitLatencies.length > 0) {
-      const s = [...submitLatencies].sort((a, b) => a - b);
-      console.info(
-        `[socket-load] submit_roundtrip_ms p50=${percentile(s, 50)} p95=${percentile(s, 95)} max=${s[s.length - 1]}`,
-      );
-    }
+    return 0;
   }
+
+  const n = Math.min(submitPlayers, joinedClients.length);
+  if (n < submitPlayers) {
+    console.warn(
+      `[socket-load] RUN_SUBMIT: SUBMIT_PLAYERS=${submitPlayers}, но в join только ${joinedClients.length} — голосуют ${n}.`,
+    );
+  }
+
+  let submitResults;
+  if (useRealisticVote && voteWindowMs > 0) {
+    console.info(
+      `[socket-load] realistic_vote window_ms=${voteWindowMs} voters=${n} distribution=${voteDistribution} submit_timeout_ms=${submitTimeoutMs}`,
+    );
+    const delays = [];
+    for (let i = 0; i < n; i += 1) delays.push(sampleVoteDelayMs(voteWindowMs));
+    delays.sort((a, b) => a - b);
+    console.info(
+      `[socket-load] vote_schedule_delay_ms p50=${percentile([...delays], 50)} p95=${percentile([...delays], 95)} max=${delays[delays.length - 1]}`,
+    );
+    submitResults = await Promise.all(
+      joinedClients.slice(0, n).map(
+        (c, idx) =>
+          new Promise((resolve) => {
+            const delayMs = delays[idx] ?? 0;
+            setTimeout(() => {
+              const payload = { optionIds: target.optionId ? [target.optionId] : [] };
+              submitAnswer(
+                c.socket,
+                target.quizId,
+                target.questionId,
+                payload,
+                submitTimeoutMs,
+              ).then(resolve);
+            }, delayMs);
+          }),
+      ),
+    );
+  } else {
+    submitResults = await Promise.all(
+      joinedClients.slice(0, n).map((c) => {
+        const payload = { optionIds: target.optionId ? [target.optionId] : [] };
+        return submitAnswer(c.socket, target.quizId, target.questionId, payload, submitTimeoutMs);
+      }),
+    );
+  }
+
+  const { failedCount: submitFail, failReasons: submitFailReasons } =
+    collectSubmitStats(submitResults);
+  console.info(
+    `[socket-load] submit_ok=${n - submitFail}/${n} (question=${target.questionId.slice(0, 8)}…, source=${target.source})`,
+  );
+  if (submitFail > 0) {
+    printTopReasons("[socket-load] submit_fail_reasons", submitFailReasons);
+  }
+  logLatencyStats("[socket-load] submit_roundtrip_ms", submitLatencies);
+  return Date.now();
 }
 
-if (runWalkthrough && joinedClients.length > 0) {
+async function runWalkthroughFlow(joinedClients) {
+  if (!(runWalkthrough && joinedClients.length > 0)) return;
   let adminControlSocket = null;
   if (walkthroughAutoAdvance) {
     try {
@@ -573,9 +631,7 @@ if (runWalkthrough && joinedClients.length > 0) {
           targetQuestion = q;
         }
       }
-      if (targetQuestion) {
-        break;
-      }
+      if (targetQuestion) break;
     }
 
     if (!targetState || !targetQuestion?.id) {
@@ -637,6 +693,87 @@ if (runWalkthrough && joinedClients.length > 0) {
   if (adminControlSocket) adminControlSocket.close();
 }
 
+const dashboardTimestamps = [];
+const scriptStartedAt = Date.now();
+let observerSocket = null;
+if (runDashboard) {
+  try {
+    observerSocket = await connectObserver(dashboardTimestamps);
+    console.info(
+      `[socket-load] observer results:subscribe ok, dashboard_events_total=${dashboardTimestamps.length}`,
+    );
+  } catch (e) {
+    console.error("[socket-load] RUN_DASHBOARD: не удалось подписаться:", e?.message || e);
+    process.exit(1);
+  }
+}
+
+if (joinRampMs > 0) {
+  console.info(
+    `[socket-load] join_ramp_ms=${joinRampMs} join_distribution=${joinDistribution} join_ack_timeout_ms=${joinAckTimeoutMs} (staggered connect)`,
+  );
+} else {
+  console.info(`[socket-load] join_ack_timeout_ms=${joinAckTimeoutMs}`);
+}
+
+if (submitOnJoin && runSubmit) {
+  console.info(
+    `[socket-load] submit_on_join=true delay_ms=${submitDelayMinMs}..${submitDelayMaxMs}`,
+  );
+}
+
+const submitOnJoinTasks = [];
+const joinSchedule = buildJoinSchedule(players);
+const results = await Promise.all(
+  Array.from({ length: players }, (_, i) => {
+    const delay = joinSchedule[i] ?? 0;
+    const joinPromise = makeClient(i, delay, joinAckTimeoutMs);
+    if (submitOnJoin && runSubmit && i < submitPlayers) {
+      submitOnJoinTasks.push(
+        joinPromise.then(async (r) => {
+          if (!r.ok || !r.client?.socket) return { ok: false, err: r.err || "join_failed" };
+          const target = await resolveSubmitTargetForClient(r.client, 12_000);
+          if (!target) return { ok: false, err: "submit_target_not_found" };
+          const perClientDelayMs = randomIntBetween(submitDelayMinMs, submitDelayMaxMs);
+          if (perClientDelayMs > 0) await sleep(perClientDelayMs);
+          return submitAnswer(
+            r.client.socket,
+            target.quizId,
+            target.questionId,
+            { optionIds: target.optionId ? [target.optionId] : [] },
+            submitTimeoutMs,
+          );
+        }),
+      );
+    }
+    return joinPromise;
+  }),
+);
+
+const {
+  failedCount: failed,
+  joined: joinedClients,
+  failReasons: joinFailReasons,
+} = collectJoinStats(results);
+console.info(`[socket-load] joined_ok=${players - failed}/${players}`);
+if (failed > 0) {
+  printTopReasons("[socket-load] join_fail_reasons", joinFailReasons);
+}
+if (joinLatencies.length > 0) {
+  const j = [...joinLatencies].sort((a, b) => a - b);
+  console.info(
+    `[socket-load] join_ack_ms p50=${percentile(j, 50)} p95=${percentile(j, 95)} max=${j[j.length - 1]}`,
+  );
+}
+
+let submitEndedAt = 0;
+
+submitEndedAt = await runSubmitOnJoinFlow(submitOnJoinTasks);
+if (submitEndedAt === 0) {
+  submitEndedAt = await runBulkSubmitFlow(joinedClients);
+}
+await runWalkthroughFlow(joinedClients);
+
 if (runDashboard && observerSocket && submitEndedAt > 0) {
   await sleep(dashboardWaitMs);
   const afterBurst = dashboardTimestamps.filter((t) => t > submitEndedAt);
@@ -649,6 +786,15 @@ if (runDashboard && observerSocket && submitEndedAt > 0) {
     );
   }
   console.info(`[socket-load] dashboard_events_total=${dashboardTimestamps.length}`);
+}
+
+if (testDurationMs > 0) {
+  const elapsedMs = Date.now() - scriptStartedAt;
+  const remainingMs = Math.max(0, testDurationMs - elapsedMs);
+  console.info(
+    `[socket-load] test_duration_ms=${testDurationMs} elapsed_ms=${elapsedMs} wait_remaining_ms=${remainingMs}`,
+  );
+  if (remainingMs > 0) await sleep(remainingMs);
 }
 
 if (holdMs > 0) {

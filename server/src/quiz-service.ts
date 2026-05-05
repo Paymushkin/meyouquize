@@ -49,6 +49,17 @@ function parseTagAnswers(raw: string) {
   }
 }
 
+function sortActiveQuestionsByActivation<T extends { activatedAt: Date | null; order: number }>(
+  questions: T[],
+): T[] {
+  return [...questions].sort((a, b) => {
+    const aTs = a.activatedAt?.getTime() ?? Number.POSITIVE_INFINITY;
+    const bTs = b.activatedAt?.getTime() ?? Number.POSITIVE_INFINITY;
+    if (aTs !== bTs) return aTs - bTs;
+    return a.order - b.order;
+  });
+}
+
 function isStoredAnswerValidForQuestion(
   question: { type: QuestionType; options: Array<{ id: string }> },
   rawSelectedOptionIds: string,
@@ -649,7 +660,7 @@ export async function getQuizPublicState(quizId: string) {
     },
   });
   if (!quiz) return null;
-  const activeQuestions = quiz.questions.filter((q) => q.isActive);
+  const activeQuestions = sortActiveQuestionsByActivation(quiz.questions.filter((q) => q.isActive));
   const activeQuestion = activeQuestions[0];
   let quizProgress: QuizProgressPayload | null = null;
   const view = publicViewJsonToState(quiz.publicView as Prisma.JsonValue | null);

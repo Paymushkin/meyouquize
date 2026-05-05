@@ -48,7 +48,12 @@ VOTE_WINDOW_MS="$(parse_json_default "${PROFILE_FILE}" vote_window_ms 0)"
 VOTE_DISTRIBUTION="$(parse_json_default "${PROFILE_FILE}" vote_distribution normal)"
 SUBMIT_TIMEOUT_MS="$(parse_json_default "${PROFILE_FILE}" submit_timeout_ms 12000)"
 JOIN_RAMP_MS="$(parse_json_default "${PROFILE_FILE}" join_ramp_ms 0)"
+JOIN_DISTRIBUTION="$(parse_json_default "${PROFILE_FILE}" join_distribution uniform)"
 JOIN_ACK_TIMEOUT_MS="$(parse_json_default "${PROFILE_FILE}" join_ack_timeout_ms 15000)"
+SUBMIT_ON_JOIN="$(parse_json_default "${PROFILE_FILE}" submit_on_join false)"
+SUBMIT_DELAY_MIN_MS="$(parse_json_default "${PROFILE_FILE}" submit_delay_min_ms 1000)"
+SUBMIT_DELAY_MAX_MS="$(parse_json_default "${PROFILE_FILE}" submit_delay_max_ms 5000)"
+TEST_DURATION_MS="$(parse_json_default "${PROFILE_FILE}" test_duration_ms 0)"
 RUN_WALKTHROUGH="$(parse_json_default "${PROFILE_FILE}" run_walkthrough false)"
 WALKTHROUGH_TIMEOUT_MS="$(parse_json_default "${PROFILE_FILE}" walkthrough_timeout_ms 180000)"
 WALKTHROUGH_VOTE_WINDOW_MS="$(parse_json_default "${PROFILE_FILE}" walkthrough_vote_window_ms 0)"
@@ -60,8 +65,9 @@ echo "[load] out=${out_dir}"
 echo "[load] base=${BASE_URL} slug=${QUIZ_SLUG}"
 echo "[load] run_http=${RUN_HTTP}"
 echo "[load] hold_ms=${HOLD_MS}"
-echo "[load] join_ramp_ms=${JOIN_RAMP_MS} join_ack_timeout_ms=${JOIN_ACK_TIMEOUT_MS}"
+echo "[load] join_ramp_ms=${JOIN_RAMP_MS} join_distribution=${JOIN_DISTRIBUTION} join_ack_timeout_ms=${JOIN_ACK_TIMEOUT_MS}"
 echo "[load] realistic_vote=${REALISTIC_VOTE} vote_window_ms=${VOTE_WINDOW_MS} vote_distribution=${VOTE_DISTRIBUTION} submit_timeout_ms=${SUBMIT_TIMEOUT_MS}"
+echo "[load] submit_on_join=${SUBMIT_ON_JOIN} submit_delay_min_ms=${SUBMIT_DELAY_MIN_MS} submit_delay_max_ms=${SUBMIT_DELAY_MAX_MS} test_duration_ms=${TEST_DURATION_MS}"
 echo "[load] run_walkthrough=${RUN_WALKTHROUGH} walkthrough_timeout_ms=${WALKTHROUGH_TIMEOUT_MS}"
 echo "[load] walkthrough_vote_window_ms=${WALKTHROUGH_VOTE_WINDOW_MS}"
 echo "[load] run_walkthrough_auto_advance=${RUN_WALKTHROUGH_AUTO_ADVANCE} walkthrough_step_pause_ms=${WALKTHROUGH_STEP_PAUSE_MS}"
@@ -112,7 +118,12 @@ set +e
   VOTE_DISTRIBUTION="${VOTE_DISTRIBUTION}" \
   SUBMIT_TIMEOUT_MS="${SUBMIT_TIMEOUT_MS}" \
   JOIN_RAMP_MS="${JOIN_RAMP_MS}" \
+  JOIN_DISTRIBUTION="${JOIN_DISTRIBUTION}" \
   JOIN_ACK_TIMEOUT_MS="${JOIN_ACK_TIMEOUT_MS}" \
+  SUBMIT_ON_JOIN="${SUBMIT_ON_JOIN}" \
+  SUBMIT_DELAY_MIN_MS="${SUBMIT_DELAY_MIN_MS}" \
+  SUBMIT_DELAY_MAX_MS="${SUBMIT_DELAY_MAX_MS}" \
+  TEST_DURATION_MS="${TEST_DURATION_MS}" \
   RUN_WALKTHROUGH="${RUN_WALKTHROUGH}" \
   WALKTHROUGH_TIMEOUT_MS="${WALKTHROUGH_TIMEOUT_MS}" \
   WALKTHROUGH_VOTE_WINDOW_MS="${WALKTHROUGH_VOTE_WINDOW_MS}" \
@@ -144,7 +155,12 @@ VOTE_WINDOW_MS=${VOTE_WINDOW_MS}
 VOTE_DISTRIBUTION=${VOTE_DISTRIBUTION}
 SUBMIT_TIMEOUT_MS=${SUBMIT_TIMEOUT_MS}
 JOIN_RAMP_MS=${JOIN_RAMP_MS}
+JOIN_DISTRIBUTION=${JOIN_DISTRIBUTION}
 JOIN_ACK_TIMEOUT_MS=${JOIN_ACK_TIMEOUT_MS}
+SUBMIT_ON_JOIN=${SUBMIT_ON_JOIN}
+SUBMIT_DELAY_MIN_MS=${SUBMIT_DELAY_MIN_MS}
+SUBMIT_DELAY_MAX_MS=${SUBMIT_DELAY_MAX_MS}
+TEST_DURATION_MS=${TEST_DURATION_MS}
 RUN_WALKTHROUGH=${RUN_WALKTHROUGH}
 WALKTHROUGH_TIMEOUT_MS=${WALKTHROUGH_TIMEOUT_MS}
 WALKTHROUGH_VOTE_WINDOW_MS=${WALKTHROUGH_VOTE_WINDOW_MS}
