@@ -1,0 +1,19 @@
+{
+  "run_http": false,
+  "http_vus": 5,
+  "http_duration": "30s",
+  "player_count": 250,
+  "run_submit": false,
+  "submit_players": 250,
+  "run_dashboard": false,
+  "dashboard_wait_ms": 3500,
+  "hold_ms": 15000,
+  "join_ramp_ms": 20000,
+  "join_ack_timeout_ms": 25000,
+  "submit_timeout_ms": 15000,
+  "run_walkthrough": true,
+  "walkthrough_timeout_ms": 90000,
+  "walkthrough_vote_window_ms": 12000,
+  "run_walkthrough_auto_advance": true,
+  "walkthrough_step_pause_ms": 900
+}

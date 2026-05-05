@@ -42,6 +42,22 @@ const submitPlayers = Number(process.env.SUBMIT_PLAYERS || players);
 const dashboardWaitMs = Number(process.env.DASHBOARD_WAIT_MS || 3500);
 const holdMs = Number(process.env.HOLD_MS || 0);
 const submitTimeoutMs = Number(process.env.SUBMIT_TIMEOUT_MS || 12_000);
+const runWalkthrough =
+  process.env.RUN_WALKTHROUGH === "1" || process.env.RUN_WALKTHROUGH === "true";
+const walkthroughTimeoutMs = Number(process.env.WALKTHROUGH_TIMEOUT_MS || 180_000);
+const walkthroughVoteWindowMs = Math.max(
+  0,
+  Number(
+    process.env.WALKTHROUGH_VOTE_WINDOW_MS ||
+      (runWalkthrough ? Math.max(15_000, Math.min(60_000, Math.floor(players * 150))) : 0),
+  ),
+);
+const walkthroughAutoAdvance =
+  process.env.RUN_WALKTHROUGH_AUTO_ADVANCE === "1" ||
+  process.env.RUN_WALKTHROUGH_AUTO_ADVANCE === "true";
+const walkthroughStepPauseMs = Math.max(250, Number(process.env.WALKTHROUGH_STEP_PAUSE_MS || 900));
+const adminLogin = (process.env.ADMIN_LOGIN || "").trim();
+const adminPassword = (process.env.ADMIN_PASSWORD || "").trim();
 const voteWindowMsRaw = Number(process.env.VOTE_WINDOW_MS || 0);
 const realisticVoteFlag =
   process.env.REALISTIC_VOTE === "1" || process.env.REALISTIC_VOTE === "true";
@@ -117,6 +133,97 @@ function resolveSubmitTargetFromState(state) {
     questionId,
     optionId: typeof optionId === "string" ? optionId : "",
   };
+}
+
+function pickN(list, n) {
+  if (n <= 0) return [];
+  const copy = [...list];
+  for (let i = copy.length - 1; i > 0; i -= 1) {
+    const j = Math.floor(Math.random() * (i + 1));
+    const tmp = copy[i];
+    copy[i] = copy[j];
+    copy[j] = tmp;
+  }
+  return copy.slice(0, Math.min(n, copy.length));
+}
+
+function buildAnswerPayloadFromStateQuestion(question) {
+  const options = Array.isArray(question?.options) ? question.options : [];
+  const optionIds = options.map((o) => o?.id).filter((id) => typeof id === "string");
+  const optionTexts = options.map((o) => o?.text).filter((text) => typeof text === "string");
+  const qType = question?.type;
+
+  if (qType === "single") {
+    return { optionIds: optionIds.length > 0 ? [optionIds[0]] : [] };
+  }
+  if (qType === "multi") {
+    const count = Math.max(1, Math.min(2, optionIds.length));
+    return { optionIds: pickN(optionIds, count) };
+  }
+  if (qType === "ranking") {
+    // Для ranking сервер ждёт rankedOptionIds (полный порядок), не optionIds.
+    return { rankedOptionIds: pickN(optionIds, optionIds.length) };
+  }
+  if (qType === "tag_cloud") {
+    const tags = pickN(
+      optionTexts.length > 0 ? optionTexts : ["тест", "квиз", "demo", "нагрузка"],
+      Math.max(1, Math.min(3, optionTexts.length || 3)),
+    );
+    return { optionIds: [], tagAnswers: tags };
+  }
+
+  return { optionIds: optionIds.length > 0 ? [optionIds[0]] : [] };
+}
+
+function extractCookieValue(setCookieHeaders, name) {
+  if (!Array.isArray(setCookieHeaders)) return "";
+  for (const raw of setCookieHeaders) {
+    const firstPart = String(raw || "").split(";")[0] || "";
+    if (firstPart.startsWith(`${name}=`)) {
+      return firstPart.slice(name.length + 1);
+    }
+  }
+  return "";
+}
+
+async function connectAdminControlSocket() {
+  if (!adminLogin || !adminPassword) {
+    throw new Error("RUN_WALKTHROUGH_AUTO_ADVANCE requires ADMIN_LOGIN and ADMIN_PASSWORD");
+  }
+  const authUrl = new URL("/api/admin/auth", base).toString();
+  const res = await fetch(authUrl, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ login: adminLogin, password: adminPassword }),
+  });
+  if (!res.ok) {
+    throw new Error(`admin auth failed: HTTP ${res.status}`);
+  }
+  const setCookies = res.headers.getSetCookie ? res.headers.getSetCookie() : [];
+  const token = extractCookieValue(setCookies, "mq_admin");
+  if (!token) throw new Error("admin auth cookie mq_admin missing");
+
+  return new Promise((resolve, reject) => {
+    const adminSocket = io(base, {
+      transports: ["websocket"],
+      reconnection: false,
+      extraHeaders: {
+        Cookie: `mq_admin=${token}`,
+      },
+    });
+    const timer = setTimeout(() => {
+      adminSocket.close();
+      reject(new Error("admin control socket timeout"));
+    }, 15_000);
+    adminSocket.once("connect", () => {
+      clearTimeout(timer);
+      resolve(adminSocket);
+    });
+    adminSocket.once("connect_error", (err) => {
+      clearTimeout(timer);
+      reject(err instanceof Error ? err : new Error(String(err)));
+    });
+  });
 }
 
 function connectObserver(dashTimes) {
@@ -234,7 +341,7 @@ function makeClient(i, startDelayMs = 0, ackTimeoutMs = joinAckTimeoutMs) {
   });
 }
 
-function submitAnswer(socket, quizId, questionId, optionId, ackTimeoutMs = submitTimeoutMs) {
+function submitAnswer(socket, quizId, questionId, answerPayload, ackTimeoutMs = submitTimeoutMs) {
   return new Promise((resolve) => {
     let settled = false;
     const t0 = Date.now();
@@ -260,7 +367,7 @@ function submitAnswer(socket, quizId, questionId, optionId, ackTimeoutMs = submi
     socket.emit("answer:submit", {
       quizId,
       questionId,
-      optionIds: optionId ? [optionId] : [],
+      ...answerPayload,
     });
   });
 }
@@ -380,11 +487,12 @@ if (runSubmit && joinedClients.length > 0) {
             new Promise((resolve) => {
               const delayMs = delays[idx] ?? 0;
               setTimeout(() => {
+                const payload = { optionIds: target.optionId ? [target.optionId] : [] };
                 submitAnswer(
                   c.socket,
                   target.quizId,
                   target.questionId,
-                  target.optionId,
+                  payload,
                   submitTimeoutMs,
                 ).then(resolve);
               }, delayMs);
@@ -393,17 +501,10 @@ if (runSubmit && joinedClients.length > 0) {
       );
     } else {
       submitResults = await Promise.all(
-        joinedClients
-          .slice(0, n)
-          .map((c) =>
-            submitAnswer(
-              c.socket,
-              target.quizId,
-              target.questionId,
-              target.optionId,
-              submitTimeoutMs,
-            ),
-          ),
+        joinedClients.slice(0, n).map((c) => {
+          const payload = { optionIds: target.optionId ? [target.optionId] : [] };
+          return submitAnswer(c.socket, target.quizId, target.questionId, payload, submitTimeoutMs);
+        }),
       );
     }
     submitEndedAt = Date.now();
@@ -428,6 +529,112 @@ if (runSubmit && joinedClients.length > 0) {
       );
     }
   }
+}
+
+if (runWalkthrough && joinedClients.length > 0) {
+  let adminControlSocket = null;
+  if (walkthroughAutoAdvance) {
+    try {
+      adminControlSocket = await connectAdminControlSocket();
+      console.info("[socket-load] walkthrough auto-advance: admin control socket connected");
+    } catch (e) {
+      console.error(
+        `[socket-load] walkthrough auto-advance failed: ${e?.message || e}. Continuing without auto-advance.`,
+      );
+    }
+  }
+
+  console.info(
+    `[socket-load] walkthrough start voters=${joinedClients.length} timeout_ms=${walkthroughTimeoutMs} vote_window_ms=${walkthroughVoteWindowMs}`,
+  );
+  const answeredQuestionIds = new Set();
+  const walkthroughStart = Date.now();
+  let walkthroughSubmitOk = 0;
+  let walkthroughSubmitFail = 0;
+  const walkthroughFailReasons = new Map();
+
+  while (Date.now() - walkthroughStart < walkthroughTimeoutMs) {
+    let targetState = null;
+    let targetQuestion = null;
+    for (const c of joinedClients) {
+      const state = c.lastState;
+      const fromList = Array.isArray(state?.activeQuestions) ? state.activeQuestions : [];
+      for (const q of fromList) {
+        if (q?.id && !answeredQuestionIds.has(q.id)) {
+          targetState = state;
+          targetQuestion = q;
+          break;
+        }
+      }
+      if (!targetQuestion) {
+        const q = state?.activeQuestion;
+        if (q?.id && !answeredQuestionIds.has(q.id)) {
+          targetState = state;
+          targetQuestion = q;
+        }
+      }
+      if (targetQuestion) {
+        break;
+      }
+    }
+
+    if (!targetState || !targetQuestion?.id) {
+      await sleep(250);
+      continue;
+    }
+
+    const question = targetQuestion;
+    const quizId = targetState.id;
+    const questionId = question.id;
+    const subQuizId = targetState?.quizProgress?.subQuizId;
+    const answerPayload = buildAnswerPayloadFromStateQuestion(question);
+    const delays = joinedClients.map(() => sampleVoteDelayMs(walkthroughVoteWindowMs));
+    const round = await Promise.all(
+      joinedClients.map(
+        (c, idx) =>
+          new Promise((resolve) => {
+            const delayMs = delays[idx] ?? 0;
+            setTimeout(() => {
+              submitAnswer(c.socket, quizId, questionId, answerPayload, submitTimeoutMs).then(
+                resolve,
+              );
+            }, delayMs);
+          }),
+      ),
+    );
+
+    answeredQuestionIds.add(questionId);
+    for (const r of round) {
+      if (r.ok) walkthroughSubmitOk += 1;
+      else {
+        walkthroughSubmitFail += 1;
+        bumpReason(walkthroughFailReasons, r.err);
+      }
+    }
+    console.info(
+      `[socket-load] walkthrough question_done id=${questionId.slice(0, 8)}… type=${question.type} ok=${round.filter((r) => r.ok).length}/${round.length}`,
+    );
+
+    if (adminControlSocket && walkthroughAutoAdvance) {
+      try {
+        adminControlSocket.emit("question:close", { quizId, questionId });
+        await sleep(Math.floor(walkthroughStepPauseMs / 2));
+        adminControlSocket.emit("question:activate", { quizId, subQuizId });
+      } catch {
+        // keep walkthrough running even if control channel has intermittent issues
+      }
+    }
+
+    await sleep(walkthroughStepPauseMs);
+  }
+
+  console.info(
+    `[socket-load] walkthrough_done questions=${answeredQuestionIds.size} submit_ok=${walkthroughSubmitOk} submit_fail=${walkthroughSubmitFail}`,
+  );
+  if (walkthroughSubmitFail > 0) {
+    printTopReasons("[socket-load] walkthrough_fail_reasons", walkthroughFailReasons);
+  }
+  if (adminControlSocket) adminControlSocket.close();
 }
 
 if (runDashboard && observerSocket && submitEndedAt > 0) {

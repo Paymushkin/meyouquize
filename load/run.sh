@@ -49,6 +49,11 @@ VOTE_DISTRIBUTION="$(parse_json_default "${PROFILE_FILE}" vote_distribution norm
 SUBMIT_TIMEOUT_MS="$(parse_json_default "${PROFILE_FILE}" submit_timeout_ms 12000)"
 JOIN_RAMP_MS="$(parse_json_default "${PROFILE_FILE}" join_ramp_ms 0)"
 JOIN_ACK_TIMEOUT_MS="$(parse_json_default "${PROFILE_FILE}" join_ack_timeout_ms 15000)"
+RUN_WALKTHROUGH="$(parse_json_default "${PROFILE_FILE}" run_walkthrough false)"
+WALKTHROUGH_TIMEOUT_MS="$(parse_json_default "${PROFILE_FILE}" walkthrough_timeout_ms 180000)"
+WALKTHROUGH_VOTE_WINDOW_MS="$(parse_json_default "${PROFILE_FILE}" walkthrough_vote_window_ms 0)"
+RUN_WALKTHROUGH_AUTO_ADVANCE="$(parse_json_default "${PROFILE_FILE}" run_walkthrough_auto_advance false)"
+WALKTHROUGH_STEP_PAUSE_MS="$(parse_json_default "${PROFILE_FILE}" walkthrough_step_pause_ms 900)"
 
 echo "[load] profile=${PROFILE_NAME}"
 echo "[load] out=${out_dir}"
@@ -57,6 +62,9 @@ echo "[load] run_http=${RUN_HTTP}"
 echo "[load] hold_ms=${HOLD_MS}"
 echo "[load] join_ramp_ms=${JOIN_RAMP_MS} join_ack_timeout_ms=${JOIN_ACK_TIMEOUT_MS}"
 echo "[load] realistic_vote=${REALISTIC_VOTE} vote_window_ms=${VOTE_WINDOW_MS} vote_distribution=${VOTE_DISTRIBUTION} submit_timeout_ms=${SUBMIT_TIMEOUT_MS}"
+echo "[load] run_walkthrough=${RUN_WALKTHROUGH} walkthrough_timeout_ms=${WALKTHROUGH_TIMEOUT_MS}"
+echo "[load] walkthrough_vote_window_ms=${WALKTHROUGH_VOTE_WINDOW_MS}"
+echo "[load] run_walkthrough_auto_advance=${RUN_WALKTHROUGH_AUTO_ADVANCE} walkthrough_step_pause_ms=${WALKTHROUGH_STEP_PAUSE_MS}"
 
 set +e
 if [[ "${RUN_HTTP}" == "true" ]]; then
@@ -105,6 +113,11 @@ set +e
   SUBMIT_TIMEOUT_MS="${SUBMIT_TIMEOUT_MS}" \
   JOIN_RAMP_MS="${JOIN_RAMP_MS}" \
   JOIN_ACK_TIMEOUT_MS="${JOIN_ACK_TIMEOUT_MS}" \
+  RUN_WALKTHROUGH="${RUN_WALKTHROUGH}" \
+  WALKTHROUGH_TIMEOUT_MS="${WALKTHROUGH_TIMEOUT_MS}" \
+  WALKTHROUGH_VOTE_WINDOW_MS="${WALKTHROUGH_VOTE_WINDOW_MS}" \
+  RUN_WALKTHROUGH_AUTO_ADVANCE="${RUN_WALKTHROUGH_AUTO_ADVANCE}" \
+  WALKTHROUGH_STEP_PAUSE_MS="${WALKTHROUGH_STEP_PAUSE_MS}" \
   QUIZ_ID="${QUIZ_ID:-}" \
   QUESTION_ID="${QUESTION_ID:-}" \
   OPTION_ID="${OPTION_ID:-}" \
@@ -132,6 +145,11 @@ VOTE_DISTRIBUTION=${VOTE_DISTRIBUTION}
 SUBMIT_TIMEOUT_MS=${SUBMIT_TIMEOUT_MS}
 JOIN_RAMP_MS=${JOIN_RAMP_MS}
 JOIN_ACK_TIMEOUT_MS=${JOIN_ACK_TIMEOUT_MS}
+RUN_WALKTHROUGH=${RUN_WALKTHROUGH}
+WALKTHROUGH_TIMEOUT_MS=${WALKTHROUGH_TIMEOUT_MS}
+WALKTHROUGH_VOTE_WINDOW_MS=${WALKTHROUGH_VOTE_WINDOW_MS}
+RUN_WALKTHROUGH_AUTO_ADVANCE=${RUN_WALKTHROUGH_AUTO_ADVANCE}
+WALKTHROUGH_STEP_PAUSE_MS=${WALKTHROUGH_STEP_PAUSE_MS}
 QUIZ_ID=${QUIZ_ID:-}
 QUESTION_ID=${QUESTION_ID:-}
 OPTION_ID=${OPTION_ID:-}

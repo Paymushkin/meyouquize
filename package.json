@@ -28,6 +28,7 @@
     "load:nominal": "bash load/run.sh nominal",
     "load:nominal-ui": "bash load/run.sh nominal-ui",
     "load:nominal-admin": "bash load/run.sh nominal-admin",
+    "load:walkthrough": "bash load/run.sh walkthrough",
     "load:peak": "bash load/run.sh peak",
     "load:soak": "bash load/run.sh soak",
     "load:socket:artillery": "npx artillery run load/artillery-socket.yml"

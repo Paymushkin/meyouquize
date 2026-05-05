@@ -35,8 +35,11 @@ export function emitToQuizPlayersAndDashboard(
 }
 
 const pendingOnlineCountTimers = new Map<string, ReturnType<typeof setTimeout>>();
+const pendingOnlineDropConfirmTimers = new Map<string, ReturnType<typeof setTimeout>>();
+const lastEmittedOnlineCounts = new Map<string, number>();
+const ONLINE_DROP_CONFIRM_MS = 1800;
 
-async function refreshQuizOnlineCount(io: Server, quizId: string) {
+async function measureQuizOnlineCount(io: Server, quizId: string): Promise<number> {
   const sockets = await io.in(quizPlayerRoom(quizId)).fetchSockets();
   const participants = new Set<string>();
   for (const socket of sockets) {
@@ -46,7 +49,58 @@ async function refreshQuizOnlineCount(io: Server, quizId: string) {
       participants.add(participantId);
     }
   }
-  emitToQuizDashboard(io, quizId, "quiz:online:count", { count: participants.size });
+  return participants.size;
+}
+
+function emitQuizOnlineCountValue(io: Server, quizId: string, count: number): void {
+  lastEmittedOnlineCounts.set(quizId, count);
+  emitToQuizDashboard(io, quizId, "quiz:online:count", { count });
+}
+
+async function refreshQuizOnlineCount(io: Server, quizId: string) {
+  let measured: number;
+  try {
+    measured = await measureQuizOnlineCount(io, quizId);
+  } catch (error) {
+    console.warn("[socket] quiz online count refresh failed", {
+      quizId,
+      error: error instanceof Error ? error.message : String(error),
+    });
+    return;
+  }
+
+  const prev = lastEmittedOnlineCounts.get(quizId);
+  if (prev === undefined || measured >= prev) {
+    const dropTimer = pendingOnlineDropConfirmTimers.get(quizId);
+    if (dropTimer) {
+      clearTimeout(dropTimer);
+      pendingOnlineDropConfirmTimers.delete(quizId);
+    }
+    emitQuizOnlineCountValue(io, quizId, measured);
+    return;
+  }
+
+  // Защита от кратковременных «провалов» (обрыв/переподключение admin/projector/network jitter):
+  // подтверждаем снижение вторым замером через короткую паузу.
+  if (pendingOnlineDropConfirmTimers.has(quizId)) return;
+  const t = setTimeout(async () => {
+    pendingOnlineDropConfirmTimers.delete(quizId);
+    try {
+      const confirmed = await measureQuizOnlineCount(io, quizId);
+      const latestPrev = lastEmittedOnlineCounts.get(quizId) ?? prev;
+      if (confirmed >= latestPrev) {
+        emitQuizOnlineCountValue(io, quizId, confirmed);
+        return;
+      }
+      emitQuizOnlineCountValue(io, quizId, confirmed);
+    } catch (error) {
+      console.warn("[socket] quiz online count drop confirm failed", {
+        quizId,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }, ONLINE_DROP_CONFIRM_MS);
+  pendingOnlineDropConfirmTimers.set(quizId, t);
 }
 
 /** Количество онлайн-игроков (уникальные participantId, без админов). Дебаунс по `QUIZ_ONLINE_COUNT_DEBOUNCE_MS`. */
