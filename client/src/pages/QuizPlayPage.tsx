@@ -870,6 +870,7 @@ export function QuizPlayPage() {
             !shouldHideDismissedPopup && (
               <QuestionPopupCard
                 brandPrimaryColor={brandPrimaryColor}
+                playerVoteOptionTextColor={playerVoteOptionTextColor}
                 question={nonQuizActiveQuestion}
                 quizProgress={displayedQuizProgress}
                 displayedSelected={displayedSelected}

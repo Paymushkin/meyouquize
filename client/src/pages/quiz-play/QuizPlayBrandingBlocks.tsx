@@ -856,6 +856,7 @@ export function CompletionOverlay(props: CompletionOverlayProps) {
 
 type QuestionPopupCardProps = {
   brandPrimaryColor: string;
+  playerVoteOptionTextColor: string;
   question: ActiveQuestion;
   quizProgress: QuizState["quizProgress"];
   displayedSelected: string[];
@@ -877,6 +878,7 @@ type QuestionPopupCardProps = {
 export function QuestionPopupCard(props: QuestionPopupCardProps) {
   const {
     brandPrimaryColor,
+    playerVoteOptionTextColor,
     question,
     quizProgress,
     displayedSelected,
@@ -917,6 +919,7 @@ export function QuestionPopupCard(props: QuestionPopupCardProps) {
     ...(isSelected
       ? {
           bgcolor: brandPrimaryColor,
+          color: playerVoteOptionTextColor,
           "&:hover": { bgcolor: alpha(brandPrimaryColor, 0.88) },
         }
       : {}),
@@ -951,7 +954,7 @@ export function QuestionPopupCard(props: QuestionPopupCardProps) {
         variant="outlined"
         sx={{
           width: "100%",
-          maxWidth: 980,
+          maxWidth: 678,
           maxHeight: "92vh",
           overflowY: "auto",
           bgcolor: "rgba(38, 38, 38, 0.84)",
@@ -965,7 +968,7 @@ export function QuestionPopupCard(props: QuestionPopupCardProps) {
             {showAcceptedHint ? <Alert severity="success">Ответ принят</Alert> : null}
             <Stack direction="row" alignItems="center" justifyContent="space-between">
               <Stack direction="row" spacing={1} alignItems="center">
-                {quizProgress && quizProgress.total > 0 ? (
+                {question.scoringMode !== "poll" && quizProgress && quizProgress.total > 0 ? (
                   <Chip
                     label={`Вопрос ${quizProgress.index} / ${quizProgress.total}`}
                     size="small"
@@ -1200,6 +1203,7 @@ export function QuestionPopupCard(props: QuestionPopupCardProps) {
                   minHeight: 52,
                   fontSize: "1.05rem",
                   fontWeight: 700,
+                  color: playerVoteOptionTextColor,
                   bgcolor: brandPrimaryColor,
                   "&:hover": { bgcolor: alpha(brandPrimaryColor, 0.88) },
                 }}

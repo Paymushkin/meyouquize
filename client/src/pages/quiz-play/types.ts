@@ -2,6 +2,7 @@ export type ActiveQuestion = {
   id: string;
   text: string;
   type: "single" | "multi" | "tag_cloud" | "ranking";
+  scoringMode?: "poll" | "quiz";
   /** Для ranking: квиз с эталоном или жюри (без зачёта в лидерборде) */
   rankingKind?: "quiz" | "jury";
   /** Баллы за 1-е, 2-е, … место в ответе (длина = числу вариантов) */
