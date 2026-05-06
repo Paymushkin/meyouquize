@@ -30,6 +30,7 @@ import {
 import { alpha, type SxProps, type Theme } from "@mui/material/styles";
 import { useState, type Dispatch, type RefObject, type SetStateAction } from "react";
 import type { ActiveQuestion, QuizState, ReactionType } from "./types";
+import { BRAND_ACCENT } from "../../theme/brandTheme";
 import { resolveClientAssetUrl } from "../../utils/resolveClientAssetUrl";
 import { sanitizeClientAssetUrl, sanitizeExternalHttpUrl } from "../../utils/safeUrls";
 
@@ -521,11 +522,9 @@ export function PlayerTilesGrid(props: PlayerTilesGridProps) {
   );
 }
 
-type ConnectionChipState = {
-  label: string;
-  color: "success" | "warning" | "error";
-  variant: "filled" | "outlined";
-};
+type ConnectionChipState =
+  | { label: string; variant: "filled"; accentFill: true }
+  | { label: string; color: "warning" | "error"; variant: "filled" | "outlined" };
 
 type PlayerIdentityBarProps = {
   nickname: string;
@@ -565,14 +564,21 @@ export function PlayerIdentityBar(props: PlayerIdentityBarProps) {
         <Chip
           size="small"
           label={connectionChip.label}
-          color={connectionChip.color}
+          {...("accentFill" in connectionChip ? {} : { color: connectionChip.color })}
           variant={connectionChip.variant}
           sx={{
             alignItems: "center",
+            ...("accentFill" in connectionChip
+              ? {
+                  backgroundColor: BRAND_ACCENT,
+                  color: "#000000",
+                }
+              : {}),
             "& .MuiChip-label": {
               display: "flex",
               alignItems: "center",
               height: "100%",
+              ...("accentFill" in connectionChip ? { color: "#000000" } : {}),
             },
           }}
         />

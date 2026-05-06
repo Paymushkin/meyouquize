@@ -1,7 +1,7 @@
 import { createTheme } from "@mui/material";
 
 export const BRAND_BG = "#000000";
-export const BRAND_ACCENT = "#FDD32A";
+export const BRAND_ACCENT = "#F3F722";
 export const BRAND_TEXT = "#ffffff";
 export const BRAND_TEXT_MUTED = "rgba(255,255,255,0.72)";
 export const BRAND_SURFACE = "rgba(255,255,255,0.04)";
@@ -49,7 +49,7 @@ export const brandTheme = createTheme({
           color: "#000000",
           boxShadow: "none",
           "&:hover": {
-            boxShadow: "0 8px 24px rgba(253,211,42,0.35)",
+            boxShadow: "0 8px 24px rgba(243,247,34,0.35)",
           },
         },
         outlinedPrimary: {
@@ -57,7 +57,7 @@ export const brandTheme = createTheme({
           color: BRAND_ACCENT,
           "&:hover": {
             borderColor: BRAND_ACCENT,
-            background: "rgba(253,211,42,0.08)",
+            background: "rgba(243,247,34,0.08)",
           },
         },
       },

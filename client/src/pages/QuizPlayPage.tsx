@@ -72,7 +72,7 @@ function ruBallLabel(n: number): string {
 
 function buildConnectionChip(status: "online" | "reconnecting" | "offline") {
   if (status === "online") {
-    return { label: "Онлайн", color: "success" as const, variant: "filled" as const };
+    return { label: "Онлайн", variant: "filled" as const, accentFill: true as const };
   }
   if (status === "reconnecting") {
     return { label: "Переподключение", color: "warning" as const, variant: "outlined" as const };
@@ -644,7 +644,7 @@ export function QuizPlayPage() {
   const programTileVisible = quiz?.programTileVisible ?? false;
   const brandPrimaryColor = quiz?.brandPrimaryColor?.trim() || "#7c5acb";
   const playerVoteOptionTextColor = quiz?.playerVoteOptionTextColor?.trim() || "#ffffff";
-  const playerVoteProgressBarColor = quiz?.playerVoteProgressBarColor?.trim() || "#fdd32a";
+  const playerVoteProgressBarColor = quiz?.playerVoteProgressBarColor?.trim() || "#F3F722";
   const brandFontFamily = quiz?.brandFontFamily?.trim() || "Jost, Arial, sans-serif";
   const brandLogoUrl = resolveClientAssetUrl(quiz?.brandLogoUrl?.trim() ?? "");
   const brandPlayerBackgroundImageUrl = resolveClientAssetUrl(

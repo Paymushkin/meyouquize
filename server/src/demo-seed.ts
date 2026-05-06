@@ -13,7 +13,7 @@ import { ScoringMode, QuestionType } from "@prisma/client";
 import { publicViewJsonToState, saveStoredPublicView } from "./socket/public-view-store.js";
 
 const DEMO_SLUG = "demo";
-const DEMO_BRAND_PRIMARY = "#FDD32A";
+const DEMO_BRAND_PRIMARY = "#F3F722";
 const DEMO_BRAND_TEXT = "#FFFFFF";
 const DEMO_PROJECTOR_BG = "#000000";
 const DEMO_SPEAKER_TILE_TEXT = "#000000";

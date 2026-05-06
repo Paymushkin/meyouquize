@@ -305,7 +305,7 @@ export const DEFAULT_PUBLIC_VIEW_STATE: PublicViewState = {
   playerVisibleResultQuestionIds: [],
   playerVoteOptionTextColor: "#ffffff",
   playerVoteProgressTrackColor: "#6a5600",
-  playerVoteProgressBarColor: "#fdd32a",
+  playerVoteProgressBarColor: "#F3F722",
   projectorJoinQrVisible: DEFAULT_PROJECTOR_JOIN_QR_VISIBLE,
   projectorJoinQrText: DEFAULT_PROJECTOR_JOIN_QR_TEXT,
   projectorJoinQrTextColor: DEFAULT_PROJECTOR_JOIN_QR_TEXT_COLOR,

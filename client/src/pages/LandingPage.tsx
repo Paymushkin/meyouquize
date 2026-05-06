@@ -81,7 +81,7 @@ function HeroSection() {
           transform: "translateX(-50%)",
           width: { xs: "120vw", md: "70vw" },
           height: { xs: "120vw", md: "70vw" },
-          background: `radial-gradient(closest-side, rgba(253,211,42,0.18), rgba(253,211,42,0) 70%)`,
+          background: `radial-gradient(closest-side, rgba(243,247,34,0.18), rgba(243,247,34,0) 70%)`,
           pointerEvents: "none",
           zIndex: 0,
         }}
@@ -273,7 +273,7 @@ function CtaSection() {
             sx={{
               position: "absolute",
               inset: 0,
-              background: `radial-gradient(circle at 50% 0%, rgba(253,211,42,0.16), rgba(253,211,42,0) 60%)`,
+              background: `radial-gradient(circle at 50% 0%, rgba(243,247,34,0.16), rgba(243,247,34,0) 60%)`,
               pointerEvents: "none",
             }}
           />

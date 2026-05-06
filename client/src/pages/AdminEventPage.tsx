@@ -640,7 +640,7 @@ export function AdminEventPage() {
   const [voteProgressBarColor, setVoteProgressBarColor] = useState("#1976d2");
   const [playerVoteOptionTextColor, setPlayerVoteOptionTextColor] = useState("#ffffff");
   const [playerVoteProgressTrackColor, setPlayerVoteProgressTrackColor] = useState("#6a5600");
-  const [playerVoteProgressBarColor, setPlayerVoteProgressBarColor] = useState("#fdd32a");
+  const [playerVoteProgressBarColor, setPlayerVoteProgressBarColor] = useState("#F3F722");
   const {
     projectorJoinQrVisible,
     setProjectorJoinQrVisible,

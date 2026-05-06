@@ -38,7 +38,7 @@ export function ErrorMessage({ code, title, description, actions }: ErrorMessage
           transform: "translateX(-50%)",
           width: { xs: "120vw", md: "70vw" },
           height: { xs: "120vw", md: "70vw" },
-          background: `radial-gradient(closest-side, rgba(253,211,42,0.12), rgba(253,211,42,0) 70%)`,
+          background: `radial-gradient(closest-side, rgba(243,247,34,0.12), rgba(243,247,34,0) 70%)`,
           pointerEvents: "none",
           zIndex: 0,
         }}
@@ -53,7 +53,7 @@ export function ErrorMessage({ code, title, description, actions }: ErrorMessage
               fontSize: { xs: "5rem", sm: "7rem", md: "9rem" },
               lineHeight: 1,
               letterSpacing: "-0.04em",
-              textShadow: "0 0 60px rgba(253,211,42,0.35)",
+              textShadow: "0 0 60px rgba(243,247,34,0.35)",
             }}
           >
             {code}
