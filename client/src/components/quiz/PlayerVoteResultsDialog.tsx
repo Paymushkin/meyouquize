@@ -1,5 +1,6 @@
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import CloseIcon from "@mui/icons-material/Close";
+import AccountCircleIcon from "@mui/icons-material/AccountCircle";
 import {
   Box,
   Dialog,
@@ -20,13 +21,21 @@ import type { PlayerVisibleResultTile } from "../../pages/quiz-play/types";
 type Props = {
   open: boolean;
   tile: PlayerVisibleResultTile | null;
-  brandPrimaryColor: string;
+  playerVoteOptionTextColor: string;
+  playerVoteProgressBarColor: string;
   submittedAnswersByQuestionId: Record<string, string[]>;
   onClose: () => void;
 };
 
 export function PlayerVoteResultsDialog(props: Props) {
-  const { open, tile, brandPrimaryColor, submittedAnswersByQuestionId, onClose } = props;
+  const {
+    open,
+    tile,
+    playerVoteOptionTextColor,
+    playerVoteProgressBarColor,
+    submittedAnswersByQuestionId,
+    onClose,
+  } = props;
   const selectedIds = tile
     ? new Set(submittedAnswersByQuestionId[tile.questionId] ?? [])
     : new Set<string>();
@@ -92,11 +101,26 @@ export function PlayerVoteResultsDialog(props: Props) {
               return (
                 <Box key={`${tile.questionId}_${row.optionId}`}>
                   <Stack direction="row" spacing={1} alignItems="center">
-                    {isCorrectAnswer ? (
-                      <CheckCircleIcon
-                        sx={{ fontSize: 16, color: "#9cffac", mt: "1px", flexShrink: 0 }}
-                      />
-                    ) : null}
+                    <Stack
+                      spacing={0.35}
+                      sx={{
+                        minWidth: 16,
+                        alignItems: "center",
+                        justifyContent: "center",
+                        flexShrink: 0,
+                      }}
+                    >
+                      {isCorrectAnswer ? (
+                        <CheckCircleIcon
+                          sx={{ fontSize: 16, color: "#9cffac", mt: "1px", flexShrink: 0 }}
+                        />
+                      ) : null}
+                      {isUserAnswer && canShowUserAnswer ? (
+                        <AccountCircleIcon
+                          sx={{ fontSize: 16, color: "#ffd54f", mt: "1px", flexShrink: 0 }}
+                        />
+                      ) : null}
+                    </Stack>
                     <Box sx={{ position: "relative", flex: 1 }}>
                       <LinearProgress
                         color="primary"
@@ -109,9 +133,9 @@ export function PlayerVoteResultsDialog(props: Props) {
                           borderRadius: "5px",
                           pl: "0px",
                           pr: "0px",
-                          bgcolor: alpha(brandPrimaryColor, 0.35),
+                          bgcolor: alpha(playerVoteProgressBarColor, 0.35),
                           "& .MuiLinearProgress-bar": {
-                            backgroundColor: brandPrimaryColor,
+                            backgroundColor: playerVoteProgressBarColor,
                           },
                         }}
                       />
@@ -121,10 +145,9 @@ export function PlayerVoteResultsDialog(props: Props) {
                         sx={{
                           position: "relative",
                           display: "block",
-                          color: "#fff",
+                          color: playerVoteOptionTextColor,
                           fontWeight: 700,
                           fontSize: "1rem",
-                          textShadow: "0 1px 2px rgba(0,0,0,0.65)",
                           pointerEvents: "none",
                           px: 1.25,
                           py: 0.8,
@@ -134,11 +157,6 @@ export function PlayerVoteResultsDialog(props: Props) {
                         }}
                       >
                         {row.text}
-                        {isUserAnswer && canShowUserAnswer ? (
-                          <Box component="span" sx={{ ml: 0.8, color: "#ffd54f", fontWeight: 700 }}>
-                            (ваш ответ)
-                          </Box>
-                        ) : null}
                       </Typography>
                     </Box>
                     <Typography

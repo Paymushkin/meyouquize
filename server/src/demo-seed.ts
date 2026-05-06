@@ -10,9 +10,79 @@ import type { QuestionReplaceInput, RoomContentReplaceInput } from "./quiz-servi
 import { activateNextQuestion, createRoom, replaceRoomContent } from "./quiz-service.js";
 import { evaluateRankingAnswer } from "./scoring.js";
 import { ScoringMode, QuestionType } from "@prisma/client";
-import { saveStoredPublicView } from "./socket/public-view-store.js";
+import { publicViewJsonToState, saveStoredPublicView } from "./socket/public-view-store.js";
 
 const DEMO_SLUG = "demo";
+const DEMO_BRAND_PRIMARY = "#FDD32A";
+const DEMO_BRAND_TEXT = "#FFFFFF";
+const DEMO_PROJECTOR_BG = "#000000";
+const DEMO_SPEAKER_TILE_TEXT = "#000000";
+const DEMO_PROGRAM_TILE_BG = "#FFFFFF";
+const DEMO_PROGRAM_TILE_TEXT = "#000000";
+const DEMO_FONT_FAMILY = "Roboto, Arial, sans-serif";
+const DEMO_FONT_URL = "/fonts/roboto/Roboto-VariableFont_wdth,wght.ttf";
+const DEMO_LOGO_URL = "/logo.svg";
+const DEMO_PLAYER_BG_URL = "/event-bg.png";
+const DEMO_PROJECTOR_BG_URL = "/prj.png";
+
+function applyDemoBranding(view: PublicViewState): PublicViewState {
+  return {
+    ...view,
+    projectorBackground: DEMO_PROJECTOR_BG,
+    voteQuestionTextColor: DEMO_BRAND_TEXT,
+    voteOptionTextColor: DEMO_BRAND_TEXT,
+    voteProgressTrackColor: "#1A1A1A",
+    voteProgressBarColor: DEMO_BRAND_PRIMARY,
+    brandPrimaryColor: DEMO_BRAND_PRIMARY,
+    brandAccentColor: DEMO_BRAND_PRIMARY,
+    brandSurfaceColor: DEMO_PROJECTOR_BG,
+    brandTextColor: DEMO_BRAND_TEXT,
+    brandFontFamily: DEMO_FONT_FAMILY,
+    brandFontUrl: DEMO_FONT_URL,
+    brandLogoUrl: DEMO_LOGO_URL,
+    brandPlayerBackgroundImageUrl: DEMO_PLAYER_BG_URL,
+    brandProjectorBackgroundImageUrl: DEMO_PROJECTOR_BG_URL,
+    brandBodyBackgroundColor: DEMO_PROJECTOR_BG,
+    speakerTileBackgroundColor: DEMO_BRAND_PRIMARY,
+    speakerTileTextColor: DEMO_SPEAKER_TILE_TEXT,
+    programTileBackgroundColor: DEMO_PROGRAM_TILE_BG,
+    programTileTextColor: DEMO_PROGRAM_TILE_TEXT,
+  };
+}
+
+function extractBrandingPatch(view: PublicViewState): Partial<PublicViewState> {
+  return {
+    projectorBackground: view.projectorBackground,
+    cloudQuestionColor: view.cloudQuestionColor,
+    cloudTagColors: view.cloudTagColors,
+    cloudTopTagColor: view.cloudTopTagColor,
+    cloudCorrectTagColor: view.cloudCorrectTagColor,
+    cloudDensity: view.cloudDensity,
+    cloudTagPadding: view.cloudTagPadding,
+    cloudSpiral: view.cloudSpiral,
+    cloudAnimationStrength: view.cloudAnimationStrength,
+    voteQuestionTextColor: view.voteQuestionTextColor,
+    voteOptionTextColor: view.voteOptionTextColor,
+    voteProgressTrackColor: view.voteProgressTrackColor,
+    voteProgressBarColor: view.voteProgressBarColor,
+    brandPrimaryColor: view.brandPrimaryColor,
+    brandAccentColor: view.brandAccentColor,
+    brandSurfaceColor: view.brandSurfaceColor,
+    brandTextColor: view.brandTextColor,
+    brandFontFamily: view.brandFontFamily,
+    brandFontUrl: view.brandFontUrl,
+    brandLogoUrl: view.brandLogoUrl,
+    brandPlayerBackgroundImageUrl: view.brandPlayerBackgroundImageUrl,
+    brandProjectorBackgroundImageUrl: view.brandProjectorBackgroundImageUrl,
+    brandBodyBackgroundColor: view.brandBodyBackgroundColor,
+    playerVoteOptionTextColor: view.playerVoteOptionTextColor,
+    playerVoteProgressTrackColor: view.playerVoteProgressTrackColor,
+    playerVoteProgressBarColor: view.playerVoteProgressBarColor,
+    projectorJoinQrVisible: view.projectorJoinQrVisible,
+    projectorJoinQrText: view.projectorJoinQrText,
+    projectorJoinQrTextColor: view.projectorJoinQrTextColor,
+  };
+}
 
 function buildDemoRoomContent(): RoomContentReplaceInput {
   const subQuiz1: RoomContentReplaceInput["subQuizzes"][number] = {
@@ -429,7 +499,7 @@ function buildDemoPublicView(params: {
   reactionsWidgetStats: PublicReactionWidgetStats[];
 }): PublicViewState {
   const base = DEFAULT_PUBLIC_VIEW_STATE;
-  return {
+  const view: PublicViewState = {
     ...base,
     // Сервер при старте принудительно переводит проектор в `title`, поэтому держим дефолт в этом же режиме.
     mode: "title",
@@ -463,6 +533,7 @@ function buildDemoPublicView(params: {
     reactionsWidgets: params.reactionsWidgets,
     reactionsWidgetStats: params.reactionsWidgetStats,
   };
+  return applyDemoBranding(view);
 }
 
 async function upsertDemoQuizIfMissing() {
@@ -756,6 +827,13 @@ async function createDemoAnswersAndSpeakerQuestions(input: {
 
 export async function resetDemoQuizToDefault(): Promise<{ quizId: string }> {
   await upsertDemoQuizIfMissing();
+  const previousDemo = await prisma.quiz.findUnique({
+    where: { slug: DEMO_SLUG },
+    select: { publicView: true },
+  });
+  const preservedBrandingPatch = previousDemo?.publicView
+    ? extractBrandingPatch(publicViewJsonToState(previousDemo.publicView))
+    : null;
 
   const roomContent = buildDemoRoomContent();
   const seededRoom = await replaceRoomContent(DEMO_SLUG, roomContent);
@@ -826,13 +904,16 @@ export async function resetDemoQuizToDefault(): Promise<{ quizId: string }> {
   ];
   const randomizerCurrentWinners = ["Алиса", "София"];
 
-  const publicView: PublicViewState = buildDemoPublicView({
+  const seededPublicView: PublicViewState = buildDemoPublicView({
     randomizerCurrentWinners,
     randomizerHistory,
     reactionsOverlayText: overlayText,
     reactionsWidgets: widgets,
     reactionsWidgetStats: stats,
   });
+  const publicView: PublicViewState = preservedBrandingPatch
+    ? { ...seededPublicView, ...preservedBrandingPatch }
+    : seededPublicView;
 
   await saveStoredPublicView(quizId, publicView);
 
@@ -853,5 +934,8 @@ export async function ensureDemoQuizExists(): Promise<void> {
   });
   if (!existing || existing._count.questions === 0 || existing._count.participants < 15) {
     await resetDemoQuizToDefault();
+    return;
   }
+  const branded = applyDemoBranding(publicViewJsonToState(existing.publicView));
+  await saveStoredPublicView(existing.id, branded);
 }

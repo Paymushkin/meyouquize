@@ -1,0 +1,22 @@
+{
+  "run_http": false,
+  "http_vus": 5,
+  "http_duration": "30s",
+  "player_count": 1000,
+  "run_submit": true,
+  "submit_players": 1000,
+  "submit_on_join": true,
+  "submit_delay_min_ms": 1000,
+  "submit_delay_max_ms": 5000,
+  "run_dashboard": false,
+  "dashboard_wait_ms": 2500,
+  "hold_ms": 0,
+  "test_duration_ms": 30000,
+  "join_ramp_ms": 60000,
+  "join_distribution": "normal",
+  "join_ack_timeout_ms": 25000,
+  "realistic_vote": false,
+  "vote_window_ms": 0,
+  "vote_distribution": "normal",
+  "submit_timeout_ms": 20000
+}

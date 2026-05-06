@@ -23,7 +23,7 @@ export type ProjectorSessionAction =
 export const initialProjectorSessionState: ProjectorSessionState = {
   questions: [],
   leaders: [],
-  quizTitle: "Квиз",
+  quizTitle: "",
   view: DEFAULT_PUBLIC_VIEW_STATE,
   resultsAnimationTick: 0,
 };
@@ -41,9 +41,8 @@ export function projectorSessionReducer(
       };
     case "publicView": {
       const view = mergePublicViewState(state.view, action.payload);
-      const quizTitle = action.payload.title?.trim()
-        ? action.payload.title.trim()
-        : state.quizTitle;
+      const quizTitle =
+        typeof action.payload.title === "string" ? action.payload.title.trim() : state.quizTitle;
       return { ...state, view, quizTitle };
     }
     case "bumpLeaderboardAnim":

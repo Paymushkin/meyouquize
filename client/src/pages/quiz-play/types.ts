@@ -72,11 +72,16 @@ export type QuizState = {
   activePlayerBannerId?: string;
   speakerTileText?: string;
   speakerTileBackgroundColor?: string;
+  speakerTileTextColor?: string;
   speakerTileVisible?: boolean;
   programTileText?: string;
   programTileBackgroundColor?: string;
+  programTileTextColor?: string;
   programTileLinkUrl?: string;
   programTileVisible?: boolean;
+  playerVoteOptionTextColor?: string;
+  playerVoteProgressTrackColor?: string;
+  playerVoteProgressBarColor?: string;
   playerVisibleResults?: PlayerVisibleResultTile[];
   playerTilesOrder?: string[];
   brandPrimaryColor?: string;

@@ -1,0 +1,18 @@
+/* Локальные файлы: client/public/fonts/roboto/ (Apache 2.0). Веса 100–900, ширина wdth из variable font. */
+@font-face {
+  font-family: Roboto;
+  font-style: normal;
+  font-weight: 100 900;
+  font-stretch: 75% 100%;
+  font-display: swap;
+  src: url("/fonts/roboto/Roboto-VariableFont_wdth,wght.ttf") format("truetype");
+}
+
+@font-face {
+  font-family: Roboto;
+  font-style: italic;
+  font-weight: 100 900;
+  font-stretch: 75% 100%;
+  font-display: swap;
+  src: url("/fonts/roboto/Roboto-Italic-VariableFont_wdth,wght.ttf") format("truetype");
+}

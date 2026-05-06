@@ -8,8 +8,10 @@ import { prisma } from "../prisma.js";
 
 type ProgramTileExtras = {
   speakerTileVisible?: boolean;
+  speakerTileTextColor?: string;
   programTileText?: string;
   programTileBackgroundColor?: string;
+  programTileTextColor?: string;
   programTileLinkUrl?: string;
   programTileVisible?: boolean;
 };
@@ -20,11 +22,15 @@ function extractProgramTileExtras(value: unknown): ProgramTileExtras {
   return {
     speakerTileVisible:
       typeof row.speakerTileVisible === "boolean" ? row.speakerTileVisible : undefined,
+    speakerTileTextColor:
+      typeof row.speakerTileTextColor === "string" ? row.speakerTileTextColor : undefined,
     programTileText: typeof row.programTileText === "string" ? row.programTileText : undefined,
     programTileBackgroundColor:
       typeof row.programTileBackgroundColor === "string"
         ? row.programTileBackgroundColor
         : undefined,
+    programTileTextColor:
+      typeof row.programTileTextColor === "string" ? row.programTileTextColor : undefined,
     programTileLinkUrl:
       typeof row.programTileLinkUrl === "string" ? row.programTileLinkUrl : undefined,
     programTileVisible:
@@ -41,9 +47,15 @@ export function publicViewJsonToState(value: Prisma.JsonValue | null): PublicVie
       ...(extras.speakerTileVisible !== undefined
         ? { speakerTileVisible: extras.speakerTileVisible }
         : {}),
+      ...(extras.speakerTileTextColor !== undefined
+        ? { speakerTileTextColor: extras.speakerTileTextColor }
+        : {}),
       ...(extras.programTileText !== undefined ? { programTileText: extras.programTileText } : {}),
       ...(extras.programTileBackgroundColor !== undefined
         ? { programTileBackgroundColor: extras.programTileBackgroundColor }
+        : {}),
+      ...(extras.programTileTextColor !== undefined
+        ? { programTileTextColor: extras.programTileTextColor }
         : {}),
       ...(extras.programTileLinkUrl !== undefined
         ? { programTileLinkUrl: extras.programTileLinkUrl }
@@ -72,9 +84,15 @@ export async function saveStoredPublicView(quizId: string, view: PublicViewState
     ...(extras.speakerTileVisible !== undefined
       ? { speakerTileVisible: extras.speakerTileVisible }
       : {}),
+    ...(extras.speakerTileTextColor !== undefined
+      ? { speakerTileTextColor: extras.speakerTileTextColor }
+      : {}),
     ...(extras.programTileText !== undefined ? { programTileText: extras.programTileText } : {}),
     ...(extras.programTileBackgroundColor !== undefined
       ? { programTileBackgroundColor: extras.programTileBackgroundColor }
+      : {}),
+    ...(extras.programTileTextColor !== undefined
+      ? { programTileTextColor: extras.programTileTextColor }
       : {}),
     ...(extras.programTileLinkUrl !== undefined
       ? { programTileLinkUrl: extras.programTileLinkUrl }

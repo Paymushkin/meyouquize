@@ -1,0 +1,170 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>500 — Внутренняя ошибка · Meyouquize</title>
+    <link rel="icon" type="image/svg+xml" href="/logo.svg" />
+    <style>
+      @font-face {
+        font-family: Roboto;
+        font-style: normal;
+        font-weight: 100 900;
+        font-stretch: 75% 100%;
+        font-display: swap;
+        src: url("/fonts/roboto/Roboto-VariableFont_wdth,wght.ttf") format("truetype");
+      }
+      :root {
+        color-scheme: dark;
+        --bg: #000000;
+        --fg: #ffffff;
+        --muted: rgba(255, 255, 255, 0.72);
+        --accent: #fdd32a;
+        --border: rgba(255, 255, 255, 0.12);
+        --surface: rgba(255, 255, 255, 0.04);
+      }
+      * { box-sizing: border-box; }
+      html, body { height: 100%; }
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--fg);
+        font-family: Roboto, "Helvetica Neue", Arial, sans-serif;
+        font-weight: 400;
+        line-height: 1.5;
+        -webkit-font-smoothing: antialiased;
+        display: flex;
+        flex-direction: column;
+        min-height: 100vh;
+      }
+      header {
+        padding: 16px 24px;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+        background: rgba(0, 0, 0, 0.72);
+      }
+      header a {
+        display: inline-flex;
+        align-items: center;
+        gap: 12px;
+        color: var(--fg);
+        text-decoration: none;
+        font-weight: 700;
+        letter-spacing: -0.01em;
+      }
+      header img {
+        width: 36px;
+        height: 36px;
+        display: block;
+      }
+      main {
+        flex: 1;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 64px 24px;
+        position: relative;
+        overflow: hidden;
+      }
+      main::before {
+        content: "";
+        position: absolute;
+        top: -20%;
+        left: 50%;
+        transform: translateX(-50%);
+        width: min(120vw, 70vw);
+        height: min(120vw, 70vw);
+        background: radial-gradient(closest-side, rgba(253, 211, 42, 0.12), rgba(253, 211, 42, 0) 70%);
+        pointer-events: none;
+        z-index: 0;
+      }
+      .content {
+        position: relative;
+        z-index: 1;
+        text-align: center;
+        max-width: 560px;
+      }
+      .code {
+        color: var(--accent);
+        font-weight: 800;
+        font-size: clamp(5rem, 16vw, 9rem);
+        line-height: 1;
+        letter-spacing: -0.04em;
+        margin: 0;
+        text-shadow: 0 0 60px rgba(253, 211, 42, 0.35);
+      }
+      h1 {
+        font-size: clamp(1.6rem, 3.2vw, 2.2rem);
+        font-weight: 700;
+        margin: 16px 0 12px;
+      }
+      p {
+        color: var(--muted);
+        margin: 0 auto 24px;
+        max-width: 480px;
+      }
+      .actions {
+        display: flex;
+        gap: 12px;
+        justify-content: center;
+        flex-wrap: wrap;
+      }
+      .btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        padding: 12px 24px;
+        border-radius: 999px;
+        font-weight: 600;
+        text-decoration: none;
+        font-size: 16px;
+        transition: transform 200ms ease, box-shadow 200ms ease, background 200ms ease;
+        border: 1px solid transparent;
+      }
+      .btn-primary {
+        background: var(--accent);
+        color: #000;
+      }
+      .btn-primary:hover {
+        box-shadow: 0 8px 24px rgba(253, 211, 42, 0.35);
+      }
+      .btn-outline {
+        border-color: var(--accent);
+        color: var(--accent);
+        background: transparent;
+      }
+      .btn-outline:hover {
+        background: rgba(253, 211, 42, 0.08);
+      }
+      footer {
+        padding: 24px;
+        border-top: 1px solid var(--border);
+        color: var(--muted);
+        font-size: 14px;
+        text-align: center;
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <a href="/">
+        <img src="/logo.svg" alt="Meyouquize" />
+        <span>Meyouquize</span>
+      </a>
+    </header>
+    <main>
+      <div class="content">
+        <div class="code">500</div>
+        <h1>Что-то пошло не так</h1>
+        <p>
+          Сервер не смог обработать запрос. Мы уже разбираемся — попробуйте обновить страницу
+          через минуту или вернитесь на главную.
+        </p>
+        <div class="actions">
+          <a class="btn btn-primary" href="/">На главную</a>
+          <a class="btn btn-outline" href="javascript:location.reload()">Обновить</a>
+        </div>
+      </div>
+    </main>
+    <footer>© Meyouquize</footer>
+  </body>
+</html>

@@ -3,6 +3,8 @@ import { Card, CardContent, Stack, Typography } from "@mui/material";
 import type { PublicViewSetPatch } from "../../publicViewContract";
 import { BrandFontsSection } from "./branding/BrandFontsSection";
 import { BrandImagesSection } from "./branding/BrandImagesSection";
+import { BrandPlayerUiResultsSection } from "./branding/BrandPlayerUiResultsSection";
+import { BrandProjectorJoinQrSection } from "./branding/BrandProjectorJoinQrSection";
 import { BrandScreenColorsSection } from "./branding/BrandScreenColorsSection";
 import { BrandTagCloudSection } from "./branding/BrandTagCloudSection";
 
@@ -19,6 +21,18 @@ type Props = {
   setVoteProgressTrackColor: (value: string) => void;
   voteProgressBarColor: string;
   setVoteProgressBarColor: (value: string) => void;
+  playerVoteOptionTextColor: string;
+  setPlayerVoteOptionTextColor: (value: string) => void;
+  playerVoteProgressBarColor: string;
+  setPlayerVoteProgressBarColor: (value: string) => void;
+  qrSettingsProps: {
+    projectorJoinQrVisible: boolean;
+    setProjectorJoinQrVisible: (value: boolean) => void;
+    projectorJoinQrText: string;
+    setProjectorJoinQrText: (value: string) => void;
+    projectorJoinQrTextColor: string;
+    setProjectorJoinQrTextColor: (value: string) => void;
+  };
   cloudQuestionColor: string;
   setCloudQuestionColor: (value: string) => void;
   cloudTopTagColor: string;
@@ -77,6 +91,11 @@ export function AdminBrandingSection(props: Props) {
     setVoteProgressTrackColor,
     voteProgressBarColor,
     setVoteProgressBarColor,
+    playerVoteOptionTextColor,
+    setPlayerVoteOptionTextColor,
+    playerVoteProgressBarColor,
+    setPlayerVoteProgressBarColor,
+    qrSettingsProps,
     cloudQuestionColor,
     setCloudQuestionColor,
     cloudTopTagColor,
@@ -166,6 +185,15 @@ export function AdminBrandingSection(props: Props) {
             setCloudAnimationStrength={setCloudAnimationStrength}
             emitPatch={emitBrandingPatch}
           />
+          <BrandPlayerUiResultsSection
+            colorGridSx={colorGridSx}
+            playerVoteOptionTextColor={playerVoteOptionTextColor}
+            setPlayerVoteOptionTextColor={setPlayerVoteOptionTextColor}
+            playerVoteProgressBarColor={playerVoteProgressBarColor}
+            setPlayerVoteProgressBarColor={setPlayerVoteProgressBarColor}
+            emitPatch={emitBrandingPatch}
+          />
+          <BrandProjectorJoinQrSection {...qrSettingsProps} emitPatch={emitBrandingPatch} />
           <BrandFontsSection
             brandFontFamily={brandFontFamily}
             setBrandFontFamily={setBrandFontFamily}

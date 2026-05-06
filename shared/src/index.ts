@@ -132,12 +132,16 @@ export interface PublicViewState {
   speakerTileText: string;
   /** Фоновый цвет плитки "Вопросы спикерам" у пользователя */
   speakerTileBackgroundColor: string;
+  /** Цвет текста плитки "Вопросы спикерам" у пользователя */
+  speakerTileTextColor: string;
   /** Показывать плитку "Вопросы спикерам" у пользователя */
   speakerTileVisible: boolean;
   /** Текст кнопки "Программа" у пользователя */
   programTileText: string;
   /** Фоновый цвет кнопки "Программа" у пользователя */
   programTileBackgroundColor: string;
+  /** Цвет текста кнопки "Программа" у пользователя */
+  programTileTextColor: string;
   /** Внешняя ссылка кнопки "Программа" у пользователя */
   programTileLinkUrl: string;
   /** Показывать кнопку "Программа" у пользователя */
@@ -152,6 +156,17 @@ export interface PublicViewState {
   reactionsWidgetStats: PublicReactionWidgetStats[];
   /** Список questionId, для которых у пользователя показываются плитки результатов */
   playerVisibleResultQuestionIds: string[];
+  /** Интерфейс пользователя: цвет текста ответов в карточках результатов */
+  playerVoteOptionTextColor: string;
+  /** Интерфейс пользователя: цвет трека прогресс-бара в карточках результатов */
+  playerVoteProgressTrackColor: string;
+  /** Интерфейс пользователя: цвет заполнения прогресс-бара в карточках результатов */
+  playerVoteProgressBarColor: string;
+  /** Проектор: показывать QR-код входа в ивент */
+  projectorJoinQrVisible: boolean;
+  /** Проектор: подпись рядом с QR-кодом входа */
+  projectorJoinQrText: string;
+  projectorJoinQrTextColor: string;
   /** Рандомайзер: режим выбора (имена/числа) */
   randomizerMode: RandomizerMode;
   /** Рандомайзер: источник списка имён */
@@ -235,6 +250,11 @@ export type PublicViewPatch = Partial<PublicViewState> & {
   questionId?: string;
 };
 
+export const DEFAULT_PROJECTOR_JOIN_QR_VISIBLE = true;
+export const PROJECTOR_JOIN_QR_TEXT_MAX_LENGTH = 200;
+export const DEFAULT_PROJECTOR_JOIN_QR_TEXT = "Сканируйте QR-код, чтобы войти в ивент";
+export const DEFAULT_PROJECTOR_JOIN_QR_TEXT_COLOR = "#ffffff";
+
 export const DEFAULT_PUBLIC_VIEW_STATE: PublicViewState = {
   mode: "title",
   questionRevealStage: "options",
@@ -271,9 +291,11 @@ export const DEFAULT_PUBLIC_VIEW_STATE: PublicViewState = {
   activePlayerBannerId: undefined,
   speakerTileText: "Вопросы спикерам",
   speakerTileBackgroundColor: "#1976d2",
+  speakerTileTextColor: "#ffffff",
   speakerTileVisible: true,
   programTileText: "Программа",
   programTileBackgroundColor: "#6a1b9a",
+  programTileTextColor: "#ffffff",
   programTileLinkUrl: "",
   programTileVisible: false,
   playerTilesOrder: [SPEAKER_TILE_ID, PROGRAM_TILE_ID],
@@ -281,6 +303,12 @@ export const DEFAULT_PUBLIC_VIEW_STATE: PublicViewState = {
   reactionsWidgets: [],
   reactionsWidgetStats: [],
   playerVisibleResultQuestionIds: [],
+  playerVoteOptionTextColor: "#ffffff",
+  playerVoteProgressTrackColor: "#6a5600",
+  playerVoteProgressBarColor: "#fdd32a",
+  projectorJoinQrVisible: DEFAULT_PROJECTOR_JOIN_QR_VISIBLE,
+  projectorJoinQrText: DEFAULT_PROJECTOR_JOIN_QR_TEXT,
+  projectorJoinQrTextColor: DEFAULT_PROJECTOR_JOIN_QR_TEXT_COLOR,
   randomizerMode: "names",
   randomizerListMode: "free_list",
   randomizerTitle: "Рандомайзер",
@@ -646,6 +674,7 @@ export function normalizePublicViewState(
       value?.speakerTileBackgroundColor,
       base.speakerTileBackgroundColor,
     ),
+    speakerTileTextColor: sanitizeHex6(value?.speakerTileTextColor, base.speakerTileTextColor),
     speakerTileVisible:
       typeof value?.speakerTileVisible === "boolean"
         ? value.speakerTileVisible
@@ -658,6 +687,7 @@ export function normalizePublicViewState(
       value?.programTileBackgroundColor,
       base.programTileBackgroundColor,
     ),
+    programTileTextColor: sanitizeHex6(value?.programTileTextColor, base.programTileTextColor),
     programTileLinkUrl:
       typeof value?.programTileLinkUrl === "string"
         ? value.programTileLinkUrl.trim().slice(0, 1000)
@@ -680,6 +710,30 @@ export function normalizePublicViewState(
           .filter((item) => item.length > 0)
           .slice(0, 200)
       : [...base.playerVisibleResultQuestionIds],
+    playerVoteOptionTextColor: sanitizeHex6(
+      value?.playerVoteOptionTextColor,
+      base.playerVoteOptionTextColor,
+    ),
+    playerVoteProgressTrackColor: sanitizeHex6(
+      value?.playerVoteProgressTrackColor,
+      base.playerVoteProgressTrackColor,
+    ),
+    playerVoteProgressBarColor: sanitizeHex6(
+      value?.playerVoteProgressBarColor,
+      base.playerVoteProgressBarColor,
+    ),
+    projectorJoinQrVisible:
+      typeof value?.projectorJoinQrVisible === "boolean"
+        ? value.projectorJoinQrVisible
+        : base.projectorJoinQrVisible,
+    projectorJoinQrText:
+      typeof value?.projectorJoinQrText === "string"
+        ? value.projectorJoinQrText.trim().slice(0, PROJECTOR_JOIN_QR_TEXT_MAX_LENGTH)
+        : base.projectorJoinQrText,
+    projectorJoinQrTextColor: sanitizeHex6(
+      value?.projectorJoinQrTextColor,
+      base.projectorJoinQrTextColor,
+    ),
     randomizerMode: value?.randomizerMode === "numbers" ? "numbers" : base.randomizerMode,
     randomizerListMode:
       value?.randomizerListMode === "participants_only"

@@ -189,11 +189,8 @@ export function useAdminEventApi(params: Params) {
   const saveQuizTitle = useCallback(
     async (title: string, currentRoomTitle: string | undefined) => {
       const trimmed = title.trim();
-      if (!trimmed) {
-        setMessage("Название квиза не может быть пустым");
-        return;
-      }
-      if (trimmed === currentRoomTitle) return;
+      const currentTrimmed = (currentRoomTitle ?? "").trim();
+      if (trimmed === currentTrimmed) return;
       const response = await fetch(`${API_BASE}/api/admin/rooms/${eventName}`, {
         method: "PATCH",
         credentials: "include",

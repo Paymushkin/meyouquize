@@ -1,9 +1,10 @@
 /* eslint-disable react-refresh/only-export-components */
 import React from "react";
 import { createRoot } from "react-dom/client";
-import { BrowserRouter, Navigate, Outlet, Route, Routes } from "react-router-dom";
+import { BrowserRouter, Outlet, Route, Routes } from "react-router-dom";
 import { CssBaseline, ThemeProvider, createTheme } from "@mui/material";
 import "./styles/jost-local.css";
+import "./styles/roboto-local.css";
 import { QuizPlayPage } from "./pages/QuizPlayPage";
 import { ResultsPage } from "./pages/ResultsPage";
 import { AdminRoomsPage } from "./pages/AdminRoomsPage";
@@ -11,6 +12,9 @@ import { AdminEventPage } from "./pages/AdminEventPage";
 import { AdminVoteDetailPage } from "./pages/AdminVoteDetailPage";
 import { AdminSubQuizResultsPage } from "./pages/AdminSubQuizResultsPage";
 import { PublicReportPage } from "./pages/PublicReportPage";
+import { LandingPage } from "./pages/LandingPage";
+import { NotFoundPage } from "./pages/NotFoundPage";
+import { ForbiddenPage } from "./pages/ForbiddenPage";
 
 const theme = createTheme({
   palette: {
@@ -83,6 +87,14 @@ const theme = createTheme({
               content: "none",
               display: "none",
             },
+          "&.mq-brand-bg": {
+            backgroundColor: "#000000",
+            backgroundImage: "none",
+          },
+          "&.mq-brand-bg::before, &.mq-brand-bg::after": {
+            content: "none",
+            display: "none",
+          },
         },
         "#root": {
           position: "relative",
@@ -116,8 +128,10 @@ function App() {
             />
             <Route path=":eventName" element={<AdminEventPage />} />
           </Route>
-          <Route path="/" element={<Navigate to="/q/demo" replace />} />
-          <Route path="*" element={<Navigate to="/q/demo" replace />} />
+          <Route path="/" element={<LandingPage />} />
+          <Route path="/403" element={<ForbiddenPage />} />
+          <Route path="/404" element={<NotFoundPage />} />
+          <Route path="*" element={<NotFoundPage />} />
         </Routes>
       </BrowserRouter>
     </ThemeProvider>

@@ -7,8 +7,10 @@ export function buildOrderedTiles(
   banners: PublicBanner[],
   speakerTileText: string,
   speakerTileBackgroundColor: string,
+  speakerTileTextColor: string,
   programTileText: string,
   programTileBackgroundColor: string,
+  programTileTextColor: string,
   programTileLinkUrl: string,
 ): OrderedTile[] {
   return [...tilesOrder, ...banners.map((b) => b.id)]
@@ -20,6 +22,7 @@ export function buildOrderedTiles(
           label: "Плитка «Вопросы спикерам»",
           previewText: speakerTileText,
           backgroundColor: speakerTileBackgroundColor,
+          textColor: speakerTileTextColor,
         };
       }
       if (id === PROGRAM_TILE_ID) {
@@ -29,6 +32,7 @@ export function buildOrderedTiles(
           label: "Кнопка «Программа»",
           previewText: programTileText,
           backgroundColor: programTileBackgroundColor,
+          textColor: programTileTextColor,
           linkUrl: programTileLinkUrl,
         };
       }

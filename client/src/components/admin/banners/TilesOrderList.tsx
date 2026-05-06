@@ -14,6 +14,8 @@ import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
 import ArrowUpwardIcon from "@mui/icons-material/ArrowUpward";
 import ArrowDownwardIcon from "@mui/icons-material/ArrowDownward";
 import KeyboardArrowDownIcon from "@mui/icons-material/KeyboardArrowDown";
+import QuestionAnswerIcon from "@mui/icons-material/QuestionAnswer";
+import EventNoteIcon from "@mui/icons-material/EventNote";
 import type { BannerEditorState, BannerSize, OrderedTile } from "./types";
 
 type Props = {
@@ -93,12 +95,13 @@ export function TilesOrderList({
                           backgroundColor:
                             tile.backgroundColor ||
                             (tile.kind === "speaker" ? "#1976d2" : "#6a1b9a"),
-                          color: "#fff",
+                          color: tile.textColor || "#fff",
                           py: 1.5,
-                          px: 1.5,
+                          px: 2,
                           whiteSpace: "pre-line",
-                          fontWeight: 700,
+                          fontWeight: 400,
                           minHeight: 70,
+                          position: "relative",
                         }
                       : {
                           width: tile.size === "1x1" ? 100 : tile.size === "full" ? 320 : 200,
@@ -118,8 +121,48 @@ export function TilesOrderList({
                         }
                   }
                 >
-                  {tile.kind === "speaker" ? tile.previewText.trim() || "Вопросы спикерам" : null}
-                  {tile.kind === "program" ? tile.previewText.trim() || "Программа" : null}
+                  {tile.kind === "speaker" ? (
+                    <>
+                      <QuestionAnswerIcon
+                        sx={{
+                          position: "absolute",
+                          right: 8,
+                          bottom: 8,
+                          width: 18,
+                          height: 18,
+                          p: 0.8,
+                          borderRadius: "50%",
+                          bgcolor: "transparent",
+                          border: `1px solid ${tile.textColor || "#fff"}`,
+                          color: tile.textColor || "#fff",
+                          boxSizing: "content-box",
+                        }}
+                        aria-hidden
+                      />
+                      {tile.previewText.trim() || "Вопросы спикерам"}
+                    </>
+                  ) : null}
+                  {tile.kind === "program" ? (
+                    <>
+                      <EventNoteIcon
+                        sx={{
+                          position: "absolute",
+                          right: 8,
+                          bottom: 8,
+                          width: 18,
+                          height: 18,
+                          p: 0.8,
+                          borderRadius: "50%",
+                          bgcolor: "transparent",
+                          border: `1px solid ${tile.textColor || "#fff"}`,
+                          color: tile.textColor || "#fff",
+                          boxSizing: "content-box",
+                        }}
+                        aria-hidden
+                      />
+                      {tile.previewText.trim() || "Программа"}
+                    </>
+                  ) : null}
                 </Box>
                 <Stack spacing={0.5} sx={{ flex: 1, minWidth: 0 }}>
                   <Typography variant="body2">{tile.label}</Typography>

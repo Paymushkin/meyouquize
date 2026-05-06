@@ -96,6 +96,8 @@ import {
 } from "../features/tagCloudAdmin";
 import { useAdminEventSocket } from "../hooks/useAdminEventSocket";
 import { useAdminEventApi } from "../hooks/useAdminEventApi";
+import { useAdminBrandingProps } from "../hooks/useAdminBrandingProps";
+import { useProjectorJoinQrAdminSettings } from "../hooks/useProjectorJoinQrAdminSettings";
 import { usePublicViewEmitter } from "../hooks/usePublicViewEmitter";
 import { useSpeakerQuestionsAdminActions } from "../hooks/useSpeakerQuestionsAdminActions";
 import { socket } from "../socket";
@@ -219,6 +221,17 @@ function publicScreenModeLabel(mode: PublicViewMode): string {
   if (mode === "report") return "отчет";
   if (mode === "question") return "вопрос";
   return "название";
+}
+
+function getCurrentPublicScreenText(params: {
+  mode: PublicViewMode;
+  projectorJoinQrVisible: boolean;
+  eventTitle?: string;
+}): string {
+  const { mode, projectorJoinQrVisible, eventTitle } = params;
+  if (mode !== "title") return publicScreenModeLabel(mode);
+  if (projectorJoinQrVisible) return "qr";
+  return eventTitle?.trim() ? "название" : "фон";
 }
 
 function clampInt(value: number, min: number, max: number): number {
@@ -559,9 +572,11 @@ export function AdminEventPage() {
   const [playerBanners, setPlayerBanners] = useState<PublicBanner[]>([]);
   const [speakerTileText, setSpeakerTileText] = useState("Вопросы спикерам");
   const [speakerTileBackgroundColor, setSpeakerTileBackgroundColor] = useState("#1976d2");
+  const [speakerTileTextColor, setSpeakerTileTextColor] = useState("#ffffff");
   const [speakerTileVisible, setSpeakerTileVisible] = useState(true);
   const [programTileText, setProgramTileText] = useState("Программа");
   const [programTileBackgroundColor, setProgramTileBackgroundColor] = useState("#6a1b9a");
+  const [programTileTextColor, setProgramTileTextColor] = useState("#ffffff");
   const [programTileLinkUrl, setProgramTileLinkUrl] = useState("");
   const [programTileVisible, setProgramTileVisible] = useState(false);
   const [playerTilesOrder, setPlayerTilesOrder] = useState<string[]>([
@@ -623,6 +638,17 @@ export function AdminEventPage() {
   const [voteOptionTextColor, setVoteOptionTextColor] = useState("#1f1f1f");
   const [voteProgressTrackColor, setVoteProgressTrackColor] = useState("#e3e3e3");
   const [voteProgressBarColor, setVoteProgressBarColor] = useState("#1976d2");
+  const [playerVoteOptionTextColor, setPlayerVoteOptionTextColor] = useState("#ffffff");
+  const [playerVoteProgressTrackColor, setPlayerVoteProgressTrackColor] = useState("#6a5600");
+  const [playerVoteProgressBarColor, setPlayerVoteProgressBarColor] = useState("#fdd32a");
+  const {
+    projectorJoinQrVisible,
+    setProjectorJoinQrVisible,
+    projectorJoinQrText,
+    setProjectorJoinQrText,
+    projectorJoinQrTextColor,
+    setProjectorJoinQrTextColor,
+  } = useProjectorJoinQrAdminSettings();
   const [brandPrimaryColor, setBrandPrimaryColor] = useState("#7c5acb");
   const [brandAccentColor, setBrandAccentColor] = useState("#1976d2");
   const [brandSurfaceColor, setBrandSurfaceColor] = useState("#ffffff");
@@ -948,6 +974,12 @@ export function AdminEventPage() {
     setVoteOptionTextColor,
     setVoteProgressTrackColor,
     setVoteProgressBarColor,
+    setPlayerVoteOptionTextColor,
+    setPlayerVoteProgressTrackColor,
+    setPlayerVoteProgressBarColor,
+    setProjectorJoinQrVisible,
+    setProjectorJoinQrText,
+    setProjectorJoinQrTextColor,
     setBrandPrimaryColor,
     setBrandAccentColor,
     setBrandSurfaceColor,
@@ -1011,15 +1043,23 @@ export function AdminEventPage() {
     voteOptionTextColor,
     voteProgressTrackColor,
     voteProgressBarColor,
+    playerVoteOptionTextColor,
+    playerVoteProgressTrackColor,
+    playerVoteProgressBarColor,
+    projectorJoinQrVisible,
+    projectorJoinQrText,
+    projectorJoinQrTextColor,
     showFirstCorrectAnswerer,
     firstCorrectWinnersCount,
     showEventTitleOnPlayer,
     playerBanners,
     speakerTileText,
     speakerTileBackgroundColor,
+    speakerTileTextColor,
     speakerTileVisible,
     programTileText,
     programTileBackgroundColor,
+    programTileTextColor,
     programTileLinkUrl,
     programTileVisible,
     playerVisibleResultQuestionIds,
@@ -1192,6 +1232,9 @@ export function AdminEventPage() {
     setVoteOptionTextColor(b.voteOptionTextColor);
     setVoteProgressTrackColor(b.voteProgressTrackColor);
     setVoteProgressBarColor(b.voteProgressBarColor);
+    setPlayerVoteOptionTextColor(b.playerVoteOptionTextColor);
+    setPlayerVoteProgressTrackColor(b.playerVoteProgressTrackColor);
+    setPlayerVoteProgressBarColor(b.playerVoteProgressBarColor);
     setBrandPrimaryColor(b.brandPrimaryColor);
     setBrandAccentColor(b.brandAccentColor);
     setBrandSurfaceColor(b.brandSurfaceColor);
@@ -1226,6 +1269,9 @@ export function AdminEventPage() {
     if (typeof pv.speakerTileBackgroundColor === "string") {
       setSpeakerTileBackgroundColor(pv.speakerTileBackgroundColor);
     }
+    if (typeof pv.speakerTileTextColor === "string") {
+      setSpeakerTileTextColor(pv.speakerTileTextColor);
+    }
     if (typeof pv.speakerTileVisible === "boolean") {
       setSpeakerTileVisible(pv.speakerTileVisible);
     }
@@ -1234,6 +1280,9 @@ export function AdminEventPage() {
     }
     if (typeof pv.programTileBackgroundColor === "string") {
       setProgramTileBackgroundColor(pv.programTileBackgroundColor);
+    }
+    if (typeof pv.programTileTextColor === "string") {
+      setProgramTileTextColor(pv.programTileTextColor);
     }
     if (typeof pv.programTileLinkUrl === "string") {
       setProgramTileLinkUrl(pv.programTileLinkUrl);
@@ -1500,8 +1549,74 @@ export function AdminEventPage() {
   }, [message]);
 
   const currentPublicScreenText = useMemo(() => {
-    return publicScreenModeLabel(publicViewMode);
-  }, [publicViewMode]);
+    return getCurrentPublicScreenText({
+      mode: publicViewMode,
+      projectorJoinQrVisible,
+      eventTitle: room?.title,
+    });
+  }, [publicViewMode, projectorJoinQrVisible, room?.title]);
+  const brandingProps = useAdminBrandingProps({
+    projectorBackground,
+    setProjectorBackground,
+    brandBodyBackgroundColor,
+    setBrandBodyBackgroundColor,
+    voteQuestionTextColor,
+    setVoteQuestionTextColor,
+    voteOptionTextColor,
+    setVoteOptionTextColor,
+    voteProgressTrackColor,
+    setVoteProgressTrackColor,
+    voteProgressBarColor,
+    setVoteProgressBarColor,
+    playerVoteOptionTextColor,
+    setPlayerVoteOptionTextColor,
+    playerVoteProgressBarColor,
+    setPlayerVoteProgressBarColor,
+    projectorJoinQrVisible,
+    setProjectorJoinQrVisible,
+    projectorJoinQrText,
+    setProjectorJoinQrText,
+    projectorJoinQrTextColor,
+    setProjectorJoinQrTextColor,
+    cloudQuestionColor,
+    setCloudQuestionColor,
+    cloudTopTagColor,
+    setCloudTopTagColor,
+    cloudCorrectTagColor,
+    setCloudCorrectTagColor,
+    cloudTagColors,
+    setCloudTagColors,
+    cloudDensity,
+    setCloudDensity,
+    cloudTagPadding,
+    setCloudTagPadding,
+    cloudSpiral,
+    setCloudSpiral,
+    cloudAnimationStrength,
+    setCloudAnimationStrength,
+    brandPrimaryColor,
+    setBrandPrimaryColor,
+    brandAccentColor,
+    setBrandAccentColor,
+    brandSurfaceColor,
+    setBrandSurfaceColor,
+    brandTextColor,
+    setBrandTextColor,
+    brandFontFamily,
+    setBrandFontFamily,
+    setBrandFontUrl,
+    availableFonts,
+    onUploadFont: uploadCustomFont,
+    onUploadFontError: setMessage,
+    brandLogoUrl,
+    setBrandLogoUrl,
+    brandPlayerBackgroundImageUrl,
+    setBrandPlayerBackgroundImageUrl,
+    brandProjectorBackgroundImageUrl,
+    setBrandProjectorBackgroundImageUrl,
+    onUploadMedia: uploadBannerMedia,
+    emitBrandingPatch,
+  });
 
   function cloneQuestionForms(forms: QuestionForm[]): QuestionForm[] {
     return JSON.parse(JSON.stringify(forms)) as QuestionForm[];
@@ -2436,13 +2551,15 @@ export function AdminEventPage() {
     setMessage("Баннер обновлен");
   }
 
-  function saveSpeakerTile(text: string, backgroundColor: string) {
+  function saveSpeakerTile(text: string, backgroundColor: string, textColor: string) {
     if (!quizId) return;
     setSpeakerTileText(text || "Вопросы спикерам");
     setSpeakerTileBackgroundColor(backgroundColor || "#1976d2");
+    setSpeakerTileTextColor(textColor || "#ffffff");
     emitPublicViewSet({
       speakerTileText: text || "Вопросы спикерам",
       speakerTileBackgroundColor: backgroundColor || "#1976d2",
+      speakerTileTextColor: textColor || "#ffffff",
       speakerTileVisible: speakerTileVisible,
     });
     setMessage("Плитка «Вопросы спикерам» обновлена");
@@ -2450,17 +2567,20 @@ export function AdminEventPage() {
 
   function toggleSpeakerTileVisible(
     next: boolean,
-    payload: { text: string; backgroundColor: string },
+    payload: { text: string; backgroundColor: string; textColor: string },
   ) {
     if (!quizId) return;
     const nextText = payload.text.trim() || "Вопросы спикерам";
     const nextBg = payload.backgroundColor.trim() || "#1976d2";
+    const nextTextColor = payload.textColor.trim() || "#ffffff";
     setSpeakerTileText(nextText);
     setSpeakerTileBackgroundColor(nextBg);
+    setSpeakerTileTextColor(nextTextColor);
     setSpeakerTileVisible(next);
     emitPublicViewSet({
       speakerTileText: nextText,
       speakerTileBackgroundColor: nextBg,
+      speakerTileTextColor: nextTextColor,
       speakerTileVisible: next,
     });
     socket.emit("quiz:state:refresh", { quizId });
@@ -2471,14 +2591,21 @@ export function AdminEventPage() {
     );
   }
 
-  function saveProgramTile(text: string, backgroundColor: string, linkUrl: string) {
+  function saveProgramTile(
+    text: string,
+    backgroundColor: string,
+    textColor: string,
+    linkUrl: string,
+  ) {
     if (!quizId) return;
     setProgramTileText(text || "Программа");
     setProgramTileBackgroundColor(backgroundColor || "#6a1b9a");
+    setProgramTileTextColor(textColor || "#ffffff");
     setProgramTileLinkUrl(linkUrl || "");
     emitPublicViewSet({
       programTileText: text || "Программа",
       programTileBackgroundColor: backgroundColor || "#6a1b9a",
+      programTileTextColor: textColor || "#ffffff",
       programTileLinkUrl: linkUrl || "",
       programTileVisible: programTileVisible,
     });
@@ -2488,19 +2615,22 @@ export function AdminEventPage() {
 
   function toggleProgramTileVisible(
     next: boolean,
-    payload: { text: string; backgroundColor: string; linkUrl: string },
+    payload: { text: string; backgroundColor: string; textColor: string; linkUrl: string },
   ) {
     if (!quizId) return;
     const nextText = payload.text.trim() || "Программа";
     const nextBg = payload.backgroundColor.trim() || "#6a1b9a";
+    const nextTextColor = payload.textColor.trim() || "#ffffff";
     const nextLink = payload.linkUrl.trim();
     setProgramTileText(nextText);
     setProgramTileBackgroundColor(nextBg);
+    setProgramTileTextColor(nextTextColor);
     setProgramTileLinkUrl(nextLink);
     setProgramTileVisible(next);
     emitPublicViewSet({
       programTileText: nextText,
       programTileBackgroundColor: nextBg,
+      programTileTextColor: nextTextColor,
       programTileLinkUrl: nextLink,
       programTileVisible: next,
     });
@@ -3921,11 +4051,13 @@ export function AdminEventPage() {
                   onUpdate={updatePlayerBanner}
                   speakerTileText={speakerTileText}
                   speakerTileBackgroundColor={speakerTileBackgroundColor}
+                  speakerTileTextColor={speakerTileTextColor}
                   speakerTileVisible={speakerTileVisible}
                   onSaveSpeakerTile={saveSpeakerTile}
                   onToggleSpeakerTileVisible={toggleSpeakerTileVisible}
                   programTileText={programTileText}
                   programTileBackgroundColor={programTileBackgroundColor}
+                  programTileTextColor={programTileTextColor}
                   programTileLinkUrl={programTileLinkUrl}
                   programTileVisible={programTileVisible}
                   onSaveProgramTile={saveProgramTile}
@@ -3948,60 +4080,7 @@ export function AdminEventPage() {
                 />
               )}
 
-              {activeSection === "branding" && (
-                <AdminBrandingSection
-                  projectorBackground={projectorBackground}
-                  setProjectorBackground={setProjectorBackground}
-                  brandBodyBackgroundColor={brandBodyBackgroundColor}
-                  setBrandBodyBackgroundColor={setBrandBodyBackgroundColor}
-                  voteQuestionTextColor={voteQuestionTextColor}
-                  setVoteQuestionTextColor={setVoteQuestionTextColor}
-                  voteOptionTextColor={voteOptionTextColor}
-                  setVoteOptionTextColor={setVoteOptionTextColor}
-                  voteProgressTrackColor={voteProgressTrackColor}
-                  setVoteProgressTrackColor={setVoteProgressTrackColor}
-                  voteProgressBarColor={voteProgressBarColor}
-                  setVoteProgressBarColor={setVoteProgressBarColor}
-                  cloudQuestionColor={cloudQuestionColor}
-                  setCloudQuestionColor={setCloudQuestionColor}
-                  cloudTopTagColor={cloudTopTagColor}
-                  setCloudTopTagColor={setCloudTopTagColor}
-                  cloudCorrectTagColor={cloudCorrectTagColor}
-                  setCloudCorrectTagColor={setCloudCorrectTagColor}
-                  cloudTagColors={cloudTagColors}
-                  setCloudTagColors={setCloudTagColors}
-                  cloudDensity={cloudDensity}
-                  setCloudDensity={setCloudDensity}
-                  cloudTagPadding={cloudTagPadding}
-                  setCloudTagPadding={setCloudTagPadding}
-                  cloudSpiral={cloudSpiral}
-                  setCloudSpiral={setCloudSpiral}
-                  cloudAnimationStrength={cloudAnimationStrength}
-                  setCloudAnimationStrength={setCloudAnimationStrength}
-                  brandPrimaryColor={brandPrimaryColor}
-                  setBrandPrimaryColor={setBrandPrimaryColor}
-                  brandAccentColor={brandAccentColor}
-                  setBrandAccentColor={setBrandAccentColor}
-                  brandSurfaceColor={brandSurfaceColor}
-                  setBrandSurfaceColor={setBrandSurfaceColor}
-                  brandTextColor={brandTextColor}
-                  setBrandTextColor={setBrandTextColor}
-                  brandFontFamily={brandFontFamily}
-                  setBrandFontFamily={setBrandFontFamily}
-                  setBrandFontUrl={setBrandFontUrl}
-                  availableFonts={availableFonts}
-                  onUploadFont={uploadCustomFont}
-                  onUploadFontError={setMessage}
-                  brandLogoUrl={brandLogoUrl}
-                  setBrandLogoUrl={setBrandLogoUrl}
-                  brandPlayerBackgroundImageUrl={brandPlayerBackgroundImageUrl}
-                  setBrandPlayerBackgroundImageUrl={setBrandPlayerBackgroundImageUrl}
-                  brandProjectorBackgroundImageUrl={brandProjectorBackgroundImageUrl}
-                  setBrandProjectorBackgroundImageUrl={setBrandProjectorBackgroundImageUrl}
-                  onUploadMedia={uploadBannerMedia}
-                  emitBrandingPatch={emitBrandingPatch}
-                />
-              )}
+              {activeSection === "branding" && <AdminBrandingSection {...brandingProps} />}
 
               {activeSection === "results" && (
                 <AdminResultsSection

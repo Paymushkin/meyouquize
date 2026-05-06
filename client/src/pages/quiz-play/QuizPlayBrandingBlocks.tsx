@@ -20,6 +20,7 @@ import {
   Chip,
   CircularProgress,
   IconButton,
+  LinearProgress,
   OutlinedInput,
   Stack,
   TextField,
@@ -101,10 +102,12 @@ export function EventTitleBlock(props: EventTitleBlockProps) {
     titleText,
   } = props;
   const safeBrandLogoUrl = sanitizeClientAssetUrl(brandLogoUrl);
+  const normalizedTitleText = titleText.trim();
   if (
     (!joined && restoreJoinPending) ||
     (!joined && !shouldShowEventTitle) ||
-    (joined && !shouldShowEventTitle)
+    (joined && !shouldShowEventTitle) ||
+    (!safeBrandLogoUrl && normalizedTitleText.length < 1)
   ) {
     return null;
   }
@@ -136,22 +139,24 @@ export function EventTitleBlock(props: EventTitleBlockProps) {
             }}
           />
         ) : null}
-        <Typography
-          variant="h3"
-          gutterBottom
-          align="left"
-          sx={{
-            width: "100%",
-            fontWeight: 400,
-            fontStyle: "normal",
-            letterSpacing: 0.2,
-            fontSize: "clamp(1.6rem, 4.8vw, 2.8rem)",
-            whiteSpace: "pre-line",
-            mb: 4,
-          }}
-        >
-          {titleText}
-        </Typography>
+        {normalizedTitleText ? (
+          <Typography
+            variant="h3"
+            gutterBottom
+            align="left"
+            sx={{
+              width: "100%",
+              fontWeight: 400,
+              fontStyle: "normal",
+              letterSpacing: 0.2,
+              fontSize: "clamp(1.6rem, 4.8vw, 2.8rem)",
+              whiteSpace: "pre-line",
+              mb: 4,
+            }}
+          >
+            {titleText}
+          </Typography>
+        ) : null}
       </Stack>
     </Box>
   );
@@ -164,12 +169,18 @@ type PlayerTilesGridProps = {
   speakerTileVisible: boolean;
   onSpeakerOpen: () => void;
   speakerTileBackgroundColor: string;
+  speakerTileTextColor: string;
   brandPrimaryColor: string;
   speakerTileText: string;
   programTileText: string;
   programTileBackgroundColor: string;
+  programTileTextColor: string;
   programTileLinkUrl: string;
   programTileVisible: boolean;
+  playerVoteOptionTextColor: string;
+  playerVoteProgressBarColor: string;
+  visibleResultTiles: NonNullable<QuizState["playerVisibleResults"]>;
+  onSelectQuestion: (questionId: string) => void;
 };
 
 export function PlayerTilesGrid(props: PlayerTilesGridProps) {
@@ -180,12 +191,18 @@ export function PlayerTilesGrid(props: PlayerTilesGridProps) {
     speakerTileVisible,
     onSpeakerOpen,
     speakerTileBackgroundColor,
+    speakerTileTextColor,
     brandPrimaryColor,
     speakerTileText,
     programTileText,
     programTileBackgroundColor,
+    programTileTextColor,
     programTileLinkUrl,
     programTileVisible,
+    playerVoteOptionTextColor,
+    playerVoteProgressBarColor,
+    visibleResultTiles,
+    onSelectQuestion,
   } = props;
 
   return (
@@ -193,8 +210,12 @@ export function PlayerTilesGrid(props: PlayerTilesGridProps) {
       sx={{
         width: "100%",
         display: "grid",
-        /** Две колонки: 2x1/full — на всю ширину (span 2), 1x1 — одна колонка */
-        gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
+        /** Как у карточек результатов: 2 колонки на xs/sm и 3 на md+ */
+        gridTemplateColumns: {
+          xs: "repeat(2, minmax(0, 1fr))",
+          sm: "repeat(2, minmax(0, 1fr))",
+          md: "repeat(3, minmax(0, 1fr))",
+        },
         justifyContent: "stretch",
         gap: 1,
         mb: 2,
@@ -228,7 +249,7 @@ export function PlayerTilesGrid(props: PlayerTilesGridProps) {
                 textAlign: "left",
                 whiteSpace: "pre-line",
                 backgroundColor: speakerTileBackgroundColor || brandPrimaryColor,
-                color: "#fff",
+                color: speakerTileTextColor || "#fff",
                 boxShadow: 3,
                 transition: "background-color 120ms ease",
                 "&:hover": {
@@ -246,8 +267,8 @@ export function PlayerTilesGrid(props: PlayerTilesGridProps) {
                   p: 1,
                   borderRadius: "50%",
                   bgcolor: "transparent",
-                  border: "1px solid rgba(255,255,255,0.96)",
-                  color: "rgba(255,255,255,0.96)",
+                  border: `1px solid ${speakerTileTextColor || "#fff"}`,
+                  color: speakerTileTextColor || "#fff",
                   boxSizing: "content-box",
                 }}
                 aria-hidden
@@ -293,7 +314,7 @@ export function PlayerTilesGrid(props: PlayerTilesGridProps) {
                 textAlign: "left",
                 whiteSpace: "pre-line",
                 backgroundColor: programTileBackgroundColor || brandPrimaryColor,
-                color: "#fff",
+                color: programTileTextColor || "#fff",
                 boxShadow: 3,
                 textDecoration: "none",
                 transition: "background-color 120ms ease",
@@ -312,8 +333,8 @@ export function PlayerTilesGrid(props: PlayerTilesGridProps) {
                   p: 1,
                   borderRadius: "50%",
                   bgcolor: "transparent",
-                  border: "1px solid rgba(255,255,255,0.96)",
-                  color: "rgba(255,255,255,0.96)",
+                  border: `1px solid ${programTileTextColor || "#fff"}`,
+                  color: programTileTextColor || "#fff",
                   boxSizing: "content-box",
                 }}
                 aria-hidden
@@ -345,30 +366,155 @@ export function PlayerTilesGrid(props: PlayerTilesGridProps) {
             target="_blank"
             rel="noopener noreferrer"
             sx={{
-              gridColumn: {
-                xs: banner.size === "1x1" ? "span 1" : "span 2",
-              },
+              gridColumn:
+                banner.size === "1x1" ? "span 1" : banner.size === "full" ? "1 / -1" : "span 2",
               display: "block",
               width: "100%",
-              maxWidth: (theme) =>
-                banner.size === "1x1"
-                  ? "200px"
-                  : banner.size === "full"
-                    ? "100%"
-                    : `calc(400px + ${theme.spacing(1)})`,
-              justifySelf: banner.size === "1x1" ? "start" : "stretch",
+              justifySelf: "stretch",
               minWidth: 0,
               aspectRatio:
                 banner.size === "1x1" ? "1 / 1" : banner.size === "full" ? "4 / 1" : "2 / 1",
               borderRadius: 2,
               overflow: "hidden",
-              backgroundImage: `url("${resolveClientAssetUrl(safeBannerBackgroundUrl)}")`,
-              backgroundSize: "cover",
-              backgroundPosition: "center",
-              backgroundRepeat: "no-repeat",
               textDecoration: "none",
             }}
-          />
+          >
+            <Box
+              component="img"
+              src={resolveClientAssetUrl(safeBannerBackgroundUrl)}
+              alt=""
+              aria-hidden
+              sx={{
+                width: "100%",
+                height: "100%",
+                display: "block",
+                objectFit: "cover",
+                objectPosition: "center",
+              }}
+            />
+          </Box>
+        );
+      })}
+      {visibleResultTiles.map((tile) => {
+        const total = tile.optionStats.reduce((sum, row) => sum + row.count, 0);
+        return (
+          <Card
+            key={`player-result-${tile.questionId}`}
+            variant="outlined"
+            component="button"
+            type="button"
+            onClick={() => onSelectQuestion(tile.questionId)}
+            sx={{
+              gridColumn: "span 1",
+              width: "100%",
+              aspectRatio: "1 / 1",
+              textAlign: "left",
+              border: "1px solid",
+              borderColor: "divider",
+              bgcolor: "rgba(0,0,0,0.22)",
+              backdropFilter: "blur(3px)",
+              p: { xs: 1.75, sm: 2 },
+              cursor: "pointer",
+              overflow: "hidden",
+              position: "relative",
+              "&::after": {
+                content: '""',
+                position: "absolute",
+                left: 0,
+                right: 0,
+                bottom: 0,
+                height: { xs: 42, sm: 50 },
+                background:
+                  "linear-gradient(to bottom, rgba(8,12,24,0) 0%, rgba(8,12,24,0.85) 62%, rgba(8,12,24,0.98) 100%)",
+                pointerEvents: "none",
+                zIndex: 2,
+              },
+            }}
+          >
+            <CardContent
+              sx={{
+                p: 0,
+                "&:last-child": { pb: 0 },
+                position: "relative",
+                zIndex: 1,
+              }}
+            >
+              <Stack spacing={{ xs: 1.2, sm: 1.35 }} sx={{ height: "100%" }}>
+                <Typography
+                  variant="caption"
+                  sx={{
+                    fontWeight: 700,
+                    lineHeight: 1.2,
+                    fontSize: { xs: "1rem", sm: "1.1rem" },
+                    display: "-webkit-box",
+                    WebkitLineClamp: 2,
+                    WebkitBoxOrient: "vertical",
+                    overflow: "hidden",
+                  }}
+                  title={tile.text}
+                >
+                  {tile.text}
+                </Typography>
+                <Stack spacing={{ xs: 0.95, sm: 1.1 }} sx={{ mt: 0.85 }}>
+                  {tile.optionStats.slice(0, 3).map((row) => {
+                    const pct = total > 0 ? Math.round((row.count / total) * 100) : 0;
+                    return (
+                      <Box key={`${tile.questionId}_${row.optionId}`} sx={{ p: 0 }}>
+                        <Box sx={{ position: "relative", borderRadius: "5px", overflow: "hidden" }}>
+                          <LinearProgress
+                            color="primary"
+                            variant="determinate"
+                            value={pct}
+                            sx={{
+                              position: "absolute",
+                              inset: 0,
+                              height: "100%",
+                              bgcolor: alpha(playerVoteProgressBarColor, 0.35),
+                              "& .MuiLinearProgress-bar": {
+                                backgroundColor: playerVoteProgressBarColor,
+                              },
+                            }}
+                          />
+                          <Typography
+                            variant="caption"
+                            component="div"
+                            title={row.text}
+                            sx={{
+                              position: "relative",
+                              color: playerVoteOptionTextColor,
+                              fontWeight: 400,
+                              fontSize: { xs: "0.9rem", sm: "0.98rem" },
+                              pointerEvents: "none",
+                              px: { xs: 1.75, sm: 2 },
+                              py: { xs: 0.95, sm: 1.1 },
+                              maxWidth: "100%",
+                            }}
+                          >
+                            <Box
+                              component="span"
+                              sx={{
+                                display: "-webkit-box",
+                                lineHeight: 1.15,
+                                WebkitLineClamp: 2,
+                                WebkitBoxOrient: "vertical",
+                                overflow: "hidden",
+                                textOverflow: "ellipsis",
+                                wordBreak: "break-word",
+                                overflowWrap: "anywhere",
+                                maxHeight: "2.3em",
+                              }}
+                            >
+                              {row.text}
+                            </Box>
+                          </Typography>
+                        </Box>
+                      </Box>
+                    );
+                  })}
+                </Stack>
+              </Stack>
+            </CardContent>
+          </Card>
         );
       })}
     </Box>

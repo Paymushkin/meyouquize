@@ -18,20 +18,27 @@ type Props = {
   onUploadMedia: (file: File) => Promise<string>;
   speakerTileText: string;
   speakerTileBackgroundColor: string;
+  speakerTileTextColor: string;
   speakerTileVisible: boolean;
-  onSaveSpeakerTile: (text: string, backgroundColor: string) => void;
+  onSaveSpeakerTile: (text: string, backgroundColor: string, textColor: string) => void;
   onToggleSpeakerTileVisible: (
     next: boolean,
-    payload: { text: string; backgroundColor: string },
+    payload: { text: string; backgroundColor: string; textColor: string },
   ) => void;
   programTileText: string;
   programTileBackgroundColor: string;
+  programTileTextColor: string;
   programTileLinkUrl: string;
   programTileVisible: boolean;
-  onSaveProgramTile: (text: string, backgroundColor: string, linkUrl: string) => void;
+  onSaveProgramTile: (
+    text: string,
+    backgroundColor: string,
+    textColor: string,
+    linkUrl: string,
+  ) => void;
   onToggleProgramTileVisible: (
     next: boolean,
-    payload: { text: string; backgroundColor: string; linkUrl: string },
+    payload: { text: string; backgroundColor: string; textColor: string; linkUrl: string },
   ) => void;
   tilesOrder: string[];
   onMoveTileUp: (id: string) => void;
@@ -47,11 +54,13 @@ export function AdminBannersSection({
   onUploadMedia,
   speakerTileText,
   speakerTileBackgroundColor,
+  speakerTileTextColor,
   speakerTileVisible,
   onSaveSpeakerTile,
   onToggleSpeakerTileVisible,
   programTileText,
   programTileBackgroundColor,
+  programTileTextColor,
   programTileLinkUrl,
   programTileVisible,
   onSaveProgramTile,
@@ -67,8 +76,10 @@ export function AdminBannersSection({
     tilesOrder,
     speakerTileText,
     speakerTileBackgroundColor,
+    speakerTileTextColor,
     programTileText,
     programTileBackgroundColor,
+    programTileTextColor,
     programTileLinkUrl,
     onCreate,
     onUpdate,
@@ -107,9 +118,11 @@ export function AdminBannersSection({
               <SpeakerTileTab
                 text={state.speakerTextDraft}
                 backgroundColor={state.speakerBgColorDraft}
+                textColor={state.speakerTextColorDraft}
                 visible={speakerTileVisible}
                 onChangeText={state.setSpeakerTextDraft}
                 onChangeBackgroundColor={state.setSpeakerBgColorDraft}
+                onChangeTextColor={state.setSpeakerTextColorDraft}
                 onSave={state.handleSaveSpeakerTile}
                 onToggleVisible={onToggleSpeakerTileVisible}
               />
@@ -117,10 +130,12 @@ export function AdminBannersSection({
               <ProgramTileTab
                 text={state.programTextDraft}
                 backgroundColor={state.programBgColorDraft}
+                textColor={state.programTextColorDraft}
                 linkUrl={state.programLinkUrlDraft}
                 visible={programTileVisible}
                 onChangeText={state.setProgramTextDraft}
                 onChangeBackgroundColor={state.setProgramBgColorDraft}
+                onChangeTextColor={state.setProgramTextColorDraft}
                 onChangeLinkUrl={state.setProgramLinkUrlDraft}
                 onSave={state.handleSaveProgramTile}
                 onToggleVisible={onToggleProgramTileVisible}

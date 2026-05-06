@@ -49,15 +49,20 @@ type UsePublicViewEmitterParams = {
   playerBanners: PublicBanner[];
   speakerTileText: string;
   speakerTileBackgroundColor: string;
+  speakerTileTextColor: string;
   speakerTileVisible: boolean;
   programTileText: string;
   programTileBackgroundColor: string;
+  programTileTextColor: string;
   programTileLinkUrl: string;
   programTileVisible: boolean;
   playerTilesOrder: string[];
   reactionsOverlayText: string;
   reactionsWidgets: ReactionWidget[];
   playerVisibleResultQuestionIds: string[];
+  playerVoteOptionTextColor: string;
+  playerVoteProgressTrackColor: string;
+  playerVoteProgressBarColor: string;
   randomizerMode: RandomizerMode;
   randomizerListMode: RandomizerListMode;
   randomizerTitle: string;
@@ -98,6 +103,9 @@ type UsePublicViewEmitterParams = {
   brandPlayerBackgroundImageUrl: string;
   brandProjectorBackgroundImageUrl: string;
   brandBodyBackgroundColor: string;
+  projectorJoinQrVisible: boolean;
+  projectorJoinQrText: string;
+  projectorJoinQrTextColor: string;
 };
 
 export function usePublicViewEmitter(params: UsePublicViewEmitterParams) {
@@ -127,15 +135,20 @@ export function usePublicViewEmitter(params: UsePublicViewEmitterParams) {
     playerBanners,
     speakerTileText,
     speakerTileBackgroundColor,
+    speakerTileTextColor,
     speakerTileVisible,
     programTileText,
     programTileBackgroundColor,
+    programTileTextColor,
     programTileLinkUrl,
     programTileVisible,
     playerTilesOrder,
     reactionsOverlayText,
     reactionsWidgets,
     playerVisibleResultQuestionIds,
+    playerVoteOptionTextColor,
+    playerVoteProgressTrackColor,
+    playerVoteProgressBarColor,
     randomizerMode,
     randomizerListMode,
     randomizerTitle,
@@ -168,6 +181,9 @@ export function usePublicViewEmitter(params: UsePublicViewEmitterParams) {
     brandPlayerBackgroundImageUrl,
     brandProjectorBackgroundImageUrl,
     brandBodyBackgroundColor,
+    projectorJoinQrVisible,
+    projectorJoinQrText,
+    projectorJoinQrTextColor,
   } = params;
 
   const getQuestionViewState = useCallback(
@@ -223,9 +239,11 @@ export function usePublicViewEmitter(params: UsePublicViewEmitterParams) {
         playerBanners: patch.playerBanners ?? playerBanners,
         speakerTileText: patch.speakerTileText ?? speakerTileText,
         speakerTileBackgroundColor: patch.speakerTileBackgroundColor ?? speakerTileBackgroundColor,
+        speakerTileTextColor: patch.speakerTileTextColor ?? speakerTileTextColor,
         speakerTileVisible: patch.speakerTileVisible ?? speakerTileVisible,
         programTileText: patch.programTileText ?? programTileText,
         programTileBackgroundColor: patch.programTileBackgroundColor ?? programTileBackgroundColor,
+        programTileTextColor: patch.programTileTextColor ?? programTileTextColor,
         programTileLinkUrl: patch.programTileLinkUrl ?? programTileLinkUrl,
         programTileVisible: patch.programTileVisible ?? programTileVisible,
         playerTilesOrder: patch.playerTilesOrder ?? playerTilesOrder,
@@ -233,6 +251,10 @@ export function usePublicViewEmitter(params: UsePublicViewEmitterParams) {
         reactionsWidgets: patch.reactionsWidgets ?? reactionsWidgets,
         playerVisibleResultQuestionIds:
           patch.playerVisibleResultQuestionIds ?? playerVisibleResultQuestionIds,
+        playerVoteOptionTextColor: patch.playerVoteOptionTextColor ?? playerVoteOptionTextColor,
+        playerVoteProgressTrackColor:
+          patch.playerVoteProgressTrackColor ?? playerVoteProgressTrackColor,
+        playerVoteProgressBarColor: patch.playerVoteProgressBarColor ?? playerVoteProgressBarColor,
         randomizerMode: patch.randomizerMode ?? randomizerMode,
         randomizerListMode: patch.randomizerListMode ?? randomizerListMode,
         randomizerTitle: patch.randomizerTitle ?? randomizerTitle,
@@ -268,6 +290,9 @@ export function usePublicViewEmitter(params: UsePublicViewEmitterParams) {
         brandProjectorBackgroundImageUrl:
           patch.brandProjectorBackgroundImageUrl ?? brandProjectorBackgroundImageUrl,
         brandBodyBackgroundColor: patch.brandBodyBackgroundColor ?? brandBodyBackgroundColor,
+        projectorJoinQrVisible: patch.projectorJoinQrVisible ?? projectorJoinQrVisible,
+        projectorJoinQrText: patch.projectorJoinQrText ?? projectorJoinQrText,
+        projectorJoinQrTextColor: patch.projectorJoinQrTextColor ?? projectorJoinQrTextColor,
       };
       socket.emit("admin:results:view:set", nextPayload);
     },
@@ -297,15 +322,20 @@ export function usePublicViewEmitter(params: UsePublicViewEmitterParams) {
       playerBanners,
       speakerTileText,
       speakerTileBackgroundColor,
+      speakerTileTextColor,
       speakerTileVisible,
       programTileText,
       programTileBackgroundColor,
+      programTileTextColor,
       programTileLinkUrl,
       programTileVisible,
       playerTilesOrder,
       reactionsOverlayText,
       reactionsWidgets,
       playerVisibleResultQuestionIds,
+      playerVoteOptionTextColor,
+      playerVoteProgressTrackColor,
+      playerVoteProgressBarColor,
       randomizerMode,
       randomizerListMode,
       randomizerTitle,
@@ -338,6 +368,9 @@ export function usePublicViewEmitter(params: UsePublicViewEmitterParams) {
       brandPlayerBackgroundImageUrl,
       brandProjectorBackgroundImageUrl,
       brandBodyBackgroundColor,
+      projectorJoinQrVisible,
+      projectorJoinQrText,
+      projectorJoinQrTextColor,
     ],
   );
 

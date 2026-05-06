@@ -28,4 +28,15 @@
     try_files {path} /index.html
     file_server
   }
+
+  # Кастомные страницы для серверных ошибок: 500 — реальная ошибка backend,
+  # 502/503/504 — backend недоступен (например, во время деплоя/рестарта).
+  handle_errors {
+    root * /opt/meyouquize/current/client/dist
+    @err500 expression `{err.status_code} == 500`
+    rewrite @err500 /errors/500.html
+    @err502 expression `{err.status_code} in [502, 503, 504]`
+    rewrite @err502 /errors/502.html
+    file_server
+  }
 }

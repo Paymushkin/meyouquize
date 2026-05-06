@@ -3,9 +3,11 @@ import { alpha } from "@mui/material/styles";
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
 import { ProjectorLeaderboardTable } from "../components/projector/ProjectorLeaderboardTable";
+import { ProjectorJoinQrBlock } from "../components/projector/ProjectorJoinQrBlock";
 import { ProjectorQuestionSection } from "../components/projector/ProjectorQuestionSection";
 import { ProjectorRandomizerSection } from "../components/projector/ProjectorRandomizerSection";
 import { useResultsProjectorSession } from "../hooks/useResultsProjectorSession";
+import { useProjectorJoinQr } from "../hooks/useProjectorJoinQr";
 import { buildBrandBackground } from "../features/branding/brandVisual";
 import { useBrandFont } from "../hooks/useBrandFont";
 import { useEventFavicon } from "../hooks/useEventFavicon";
@@ -163,6 +165,11 @@ export function ResultsPage() {
   const screenSpeakerQuestions = (speakerQuestions?.items ?? [])
     .filter((item) => item.isOnScreen)
     .slice(0, 10);
+  const { showJoinQrBlock, joinQrDataUrl } = useProjectorJoinQr({
+    slug,
+    showEventTitleScreen,
+    projectorJoinQrVisible: view.projectorJoinQrVisible,
+  });
 
   if (!hasInitialPublicView) {
     return (
@@ -269,17 +276,19 @@ export function ResultsPage() {
             px: 2,
           }}
         >
-          <Typography
-            variant="h2"
-            sx={{
-              fontWeight: 800,
-              lineHeight: 1.05,
-              color: "#fff",
-              textShadow: "0 4px 20px rgba(0,0,0,0.28)",
-            }}
-          >
-            {quizTitle}
-          </Typography>
+          {!showJoinQrBlock && (
+            <Typography
+              variant="h2"
+              sx={{
+                fontWeight: 800,
+                lineHeight: 1.05,
+                color: "#fff",
+                textShadow: "0 4px 20px rgba(0,0,0,0.28)",
+              }}
+            >
+              {quizTitle}
+            </Typography>
+          )}
           {view.mode !== "title" && (
             <Typography
               variant="h6"
@@ -291,6 +300,13 @@ export function ResultsPage() {
             >
               Ожидание данных для экрана
             </Typography>
+          )}
+          {showJoinQrBlock && joinQrDataUrl && (
+            <ProjectorJoinQrBlock
+              text={view.projectorJoinQrText}
+              textColor={view.projectorJoinQrTextColor}
+              qrDataUrl={joinQrDataUrl}
+            />
           )}
         </Stack>
       )}

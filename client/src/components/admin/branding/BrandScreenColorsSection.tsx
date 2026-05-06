@@ -65,19 +65,19 @@ export function BrandScreenColorsSection(props: Props) {
             onBlur={() => emitPatch({ voteQuestionTextColor })}
           />
           <CompactColorField
-            label="Текст ответов и %"
+            label="Текст ответов и % (проектор)"
             value={voteOptionTextColor}
             onChange={setVoteOptionTextColor}
             onBlur={() => emitPatch({ voteOptionTextColor })}
           />
           <CompactColorField
-            label="Трек столбика"
+            label="Трек столбика (проектор)"
             value={voteProgressTrackColor}
             onChange={setVoteProgressTrackColor}
             onBlur={() => emitPatch({ voteProgressTrackColor })}
           />
           <CompactColorField
-            label="Заполнение столбика"
+            label="Заполнение столбика (проектор)"
             value={voteProgressBarColor}
             onChange={setVoteProgressBarColor}
             onBlur={() => emitPatch({ voteProgressBarColor })}

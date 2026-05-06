@@ -21,7 +21,6 @@ import KeyboardArrowDownIcon from "@mui/icons-material/KeyboardArrowDown";
 import KeyboardArrowUpIcon from "@mui/icons-material/KeyboardArrowUp";
 import { API_BASE } from "../config";
 import { SpeakerQuestionsDialog } from "../components/quiz/SpeakerQuestionsDialog";
-import { PlayerVisibleResultTiles } from "../components/quiz/PlayerVisibleResultTiles";
 import { PlayerVoteResultsDialog } from "../components/quiz/PlayerVoteResultsDialog";
 import { useQuizPlayCompletion } from "../hooks/useQuizPlayCompletion";
 import { useQuizPlayScrollLock } from "../hooks/useQuizPlayScrollLock";
@@ -624,7 +623,7 @@ export function QuizPlayPage() {
       total: Math.max(quiz.quizProgress.total, activeList.length),
     };
   }, [quiz?.quizProgress, quiz?.activeQuestions, nonQuizActiveQuestion?.id]);
-  const titleText = quiz?.title?.trim() || quizTitle.trim() || "Квиз";
+  const titleText = quiz?.title?.trim() || quizTitle.trim();
   const shouldShowEventTitle = quiz?.showEventTitleOnPlayer ?? true;
   const visiblePlayerBanners = useMemo(
     () => getVisiblePlayerBanners(quiz?.playerBanners),
@@ -636,12 +635,16 @@ export function QuizPlayPage() {
   );
   const speakerTileText = quiz?.speakerTileText?.trim() || "Вопросы спикерам";
   const speakerTileBackgroundColor = quiz?.speakerTileBackgroundColor?.trim() || "#1976d2";
+  const speakerTileTextColor = quiz?.speakerTileTextColor?.trim() || "#ffffff";
   const speakerTileVisible = quiz?.speakerTileVisible ?? true;
   const programTileText = quiz?.programTileText?.trim() || "Программа";
   const programTileBackgroundColor = quiz?.programTileBackgroundColor?.trim() || "#6a1b9a";
+  const programTileTextColor = quiz?.programTileTextColor?.trim() || "#ffffff";
   const programTileLinkUrl = quiz?.programTileLinkUrl?.trim() || "";
   const programTileVisible = quiz?.programTileVisible ?? false;
   const brandPrimaryColor = quiz?.brandPrimaryColor?.trim() || "#7c5acb";
+  const playerVoteOptionTextColor = quiz?.playerVoteOptionTextColor?.trim() || "#ffffff";
+  const playerVoteProgressBarColor = quiz?.playerVoteProgressBarColor?.trim() || "#fdd32a";
   const brandFontFamily = quiz?.brandFontFamily?.trim() || "Jost, Arial, sans-serif";
   const brandLogoUrl = resolveClientAssetUrl(quiz?.brandLogoUrl?.trim() ?? "");
   const brandPlayerBackgroundImageUrl = resolveClientAssetUrl(
@@ -827,18 +830,17 @@ export function QuizPlayPage() {
               speakerTileVisible={speakerTileVisible}
               onSpeakerOpen={() => setSpeakerDialogOpen(true)}
               speakerTileBackgroundColor={speakerTileBackgroundColor}
+              speakerTileTextColor={speakerTileTextColor}
               brandPrimaryColor={brandPrimaryColor}
               speakerTileText={speakerTileText}
               programTileText={programTileText}
               programTileBackgroundColor={programTileBackgroundColor}
+              programTileTextColor={programTileTextColor}
               programTileLinkUrl={programTileLinkUrl}
               programTileVisible={programTileVisible}
-            />
-          ) : null}
-          {joined && visibleResultTiles.length > 0 ? (
-            <PlayerVisibleResultTiles
-              tiles={visibleResultTiles}
-              brandPrimaryColor={brandPrimaryColor}
+              playerVoteOptionTextColor={playerVoteOptionTextColor}
+              playerVoteProgressBarColor={playerVoteProgressBarColor}
+              visibleResultTiles={visibleResultTiles}
               onSelectQuestion={setResultsDialogQuestionId}
             />
           ) : null}
@@ -855,7 +857,8 @@ export function QuizPlayPage() {
           <PlayerVoteResultsDialog
             open={Boolean(selectedResultTile)}
             tile={selectedResultTile}
-            brandPrimaryColor={brandPrimaryColor}
+            playerVoteOptionTextColor={playerVoteOptionTextColor}
+            playerVoteProgressBarColor={playerVoteProgressBarColor}
             submittedAnswersByQuestionId={submittedAnswers}
             onClose={() => setResultsDialogQuestionId(null)}
           />

@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { PROJECTOR_JOIN_QR_TEXT_MAX_LENGTH } from "@meyouquize/shared";
 
 function isHttpUrl(value: string): boolean {
   try {
@@ -132,7 +133,7 @@ export const createRoomSchema = z.object({
 });
 
 export const updateRoomSchema = z.object({
-  title: z.string().min(1).max(120),
+  title: z.string().max(120),
 });
 
 export const replaceRoomContentSchema = z.object({
@@ -307,9 +308,17 @@ export const setPublicViewSchema = z.object({
     .string()
     .regex(/^#([0-9a-fA-F]{6})$/)
     .optional(),
+  speakerTileTextColor: z
+    .string()
+    .regex(/^#([0-9a-fA-F]{6})$/)
+    .optional(),
   speakerTileVisible: z.boolean().optional(),
   programTileText: z.string().trim().max(120).optional(),
   programTileBackgroundColor: z
+    .string()
+    .regex(/^#([0-9a-fA-F]{6})$/)
+    .optional(),
+  programTileTextColor: z
     .string()
     .regex(/^#([0-9a-fA-F]{6})$/)
     .optional(),
@@ -328,6 +337,24 @@ export const setPublicViewSchema = z.object({
     .max(100)
     .optional(),
   playerVisibleResultQuestionIds: z.array(z.string().trim().min(1).max(80)).max(200).optional(),
+  playerVoteOptionTextColor: z
+    .string()
+    .regex(/^#([0-9a-fA-F]{6})$/)
+    .optional(),
+  playerVoteProgressTrackColor: z
+    .string()
+    .regex(/^#([0-9a-fA-F]{6})$/)
+    .optional(),
+  playerVoteProgressBarColor: z
+    .string()
+    .regex(/^#([0-9a-fA-F]{6})$/)
+    .optional(),
+  projectorJoinQrVisible: z.boolean().optional(),
+  projectorJoinQrText: z.string().trim().max(PROJECTOR_JOIN_QR_TEXT_MAX_LENGTH).optional(),
+  projectorJoinQrTextColor: z
+    .string()
+    .regex(/^#([0-9a-fA-F]{6})$/)
+    .optional(),
   randomizerMode: z.enum(["names", "numbers"]).optional(),
   randomizerListMode: z.enum(["participants_only", "free_list"]).optional(),
   randomizerTitle: z.string().trim().max(120).optional(),

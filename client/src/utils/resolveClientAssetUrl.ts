@@ -11,8 +11,18 @@ export function resolveClientAssetUrl(rawUrl: string): string {
   if (typeof window === "undefined") return value;
   try {
     const parsed = new URL(value, window.location.origin);
+    const viteDev = window.location.protocol === "http:" && window.location.port === "5173";
+    // В vite dev относительный /media/* должен идти на backend :4000.
+    if (
+      viteDev &&
+      parsed.hostname === window.location.hostname &&
+      (parsed.port === window.location.port || !parsed.port) &&
+      parsed.pathname.startsWith("/media/")
+    ) {
+      parsed.port = "4000";
+      return parsed.toString();
+    }
     if (parsed.hostname === "localhost" || parsed.hostname === "127.0.0.1") {
-      const viteDev = window.location.protocol === "http:" && window.location.port === "5173";
       if (viteDev) {
         parsed.hostname = window.location.hostname || parsed.hostname;
         if (!parsed.port) parsed.port = "4000";
@@ -27,7 +37,8 @@ export function resolveClientAssetUrl(rawUrl: string): string {
     if (
       parsed.port === "4000" &&
       parsed.hostname === window.location.hostname &&
-      window.location.port !== "4000"
+      window.location.port !== "4000" &&
+      !viteDev
     ) {
       return new URL(
         `${parsed.pathname}${parsed.search}${parsed.hash}`,

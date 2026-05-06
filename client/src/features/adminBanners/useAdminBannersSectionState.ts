@@ -7,8 +7,10 @@ type Params = {
   tilesOrder: string[];
   speakerTileText: string;
   speakerTileBackgroundColor: string;
+  speakerTileTextColor: string;
   programTileText: string;
   programTileBackgroundColor: string;
+  programTileTextColor: string;
   programTileLinkUrl: string;
   onCreate: (linkUrl: string, backgroundUrl: string, size: "2x1" | "1x1" | "full") => void;
   onUpdate: (
@@ -18,8 +20,13 @@ type Params = {
     size: "2x1" | "1x1" | "full",
   ) => void;
   onUploadMedia: (file: File) => Promise<string>;
-  onSaveSpeakerTile: (text: string, backgroundColor: string) => void;
-  onSaveProgramTile: (text: string, backgroundColor: string, linkUrl: string) => void;
+  onSaveSpeakerTile: (text: string, backgroundColor: string, textColor: string) => void;
+  onSaveProgramTile: (
+    text: string,
+    backgroundColor: string,
+    textColor: string,
+    linkUrl: string,
+  ) => void;
 };
 
 export function useAdminBannersSectionState(params: Params) {
@@ -28,8 +35,10 @@ export function useAdminBannersSectionState(params: Params) {
     tilesOrder,
     speakerTileText,
     speakerTileBackgroundColor,
+    speakerTileTextColor,
     programTileText,
     programTileBackgroundColor,
+    programTileTextColor,
     programTileLinkUrl,
     onCreate,
     onUpdate,
@@ -47,8 +56,10 @@ export function useAdminBannersSectionState(params: Params) {
   const [editSize, setEditSize] = useState<"2x1" | "1x1" | "full">("2x1");
   const [speakerTextDraft, setSpeakerTextDraft] = useState(speakerTileText);
   const [speakerBgColorDraft, setSpeakerBgColorDraft] = useState(speakerTileBackgroundColor);
+  const [speakerTextColorDraft, setSpeakerTextColorDraft] = useState(speakerTileTextColor);
   const [programTextDraft, setProgramTextDraft] = useState(programTileText);
   const [programBgColorDraft, setProgramBgColorDraft] = useState(programTileBackgroundColor);
+  const [programTextColorDraft, setProgramTextColorDraft] = useState(programTileTextColor);
   const [programLinkUrlDraft, setProgramLinkUrlDraft] = useState(programTileLinkUrl);
   const [editorTab, setEditorTab] = useState<"banner" | "speaker" | "program">("banner");
 
@@ -59,11 +70,17 @@ export function useAdminBannersSectionState(params: Params) {
     setSpeakerBgColorDraft(speakerTileBackgroundColor);
   }, [speakerTileBackgroundColor]);
   useEffect(() => {
+    setSpeakerTextColorDraft(speakerTileTextColor);
+  }, [speakerTileTextColor]);
+  useEffect(() => {
     setProgramTextDraft(programTileText);
   }, [programTileText]);
   useEffect(() => {
     setProgramBgColorDraft(programTileBackgroundColor);
   }, [programTileBackgroundColor]);
+  useEffect(() => {
+    setProgramTextColorDraft(programTileTextColor);
+  }, [programTileTextColor]);
   useEffect(() => {
     setProgramLinkUrlDraft(programTileLinkUrl);
   }, [programTileLinkUrl]);
@@ -75,8 +92,10 @@ export function useAdminBannersSectionState(params: Params) {
         banners,
         speakerTileText,
         speakerTileBackgroundColor,
+        speakerTileTextColor,
         programTileText,
         programTileBackgroundColor,
+        programTileTextColor,
         programTileLinkUrl,
       ),
     [
@@ -84,8 +103,10 @@ export function useAdminBannersSectionState(params: Params) {
       banners,
       speakerTileText,
       speakerTileBackgroundColor,
+      speakerTileTextColor,
       programTileText,
       programTileBackgroundColor,
+      programTileTextColor,
       programTileLinkUrl,
     ],
   );
@@ -111,15 +132,26 @@ export function useAdminBannersSectionState(params: Params) {
   }, [onCreate, linkUrl, backgroundUrl, size]);
 
   const handleSaveSpeakerTile = useCallback(() => {
-    onSaveSpeakerTile(speakerTextDraft.trim(), speakerBgColorDraft.trim());
-  }, [onSaveSpeakerTile, speakerTextDraft, speakerBgColorDraft]);
+    onSaveSpeakerTile(
+      speakerTextDraft.trim(),
+      speakerBgColorDraft.trim(),
+      speakerTextColorDraft.trim(),
+    );
+  }, [onSaveSpeakerTile, speakerTextDraft, speakerBgColorDraft, speakerTextColorDraft]);
   const handleSaveProgramTile = useCallback(() => {
     onSaveProgramTile(
       programTextDraft.trim(),
       programBgColorDraft.trim(),
+      programTextColorDraft.trim(),
       programLinkUrlDraft.trim(),
     );
-  }, [onSaveProgramTile, programBgColorDraft, programLinkUrlDraft, programTextDraft]);
+  }, [
+    onSaveProgramTile,
+    programBgColorDraft,
+    programLinkUrlDraft,
+    programTextColorDraft,
+    programTextDraft,
+  ]);
 
   const startEdit = useCallback((banner: PublicBanner) => {
     setEditingId(banner.id);
@@ -147,13 +179,17 @@ export function useAdminBannersSectionState(params: Params) {
     setSize,
     speakerTextDraft,
     speakerBgColorDraft,
+    speakerTextColorDraft,
     setSpeakerTextDraft,
     setSpeakerBgColorDraft,
+    setSpeakerTextColorDraft,
     programTextDraft,
     programBgColorDraft,
+    programTextColorDraft,
     programLinkUrlDraft,
     setProgramTextDraft,
     setProgramBgColorDraft,
+    setProgramTextColorDraft,
     setProgramLinkUrlDraft,
     editorTab,
     setEditorTab,

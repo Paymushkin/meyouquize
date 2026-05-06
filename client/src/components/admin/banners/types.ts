@@ -9,6 +9,7 @@ export type OrderedTile =
       label: string;
       previewText: string;
       backgroundColor: string;
+      textColor: string;
     }
   | {
       id: string;
@@ -16,6 +17,7 @@ export type OrderedTile =
       label: string;
       previewText: string;
       backgroundColor: string;
+      textColor: string;
       linkUrl: string;
     }
   | {

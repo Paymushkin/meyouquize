@@ -1,4 +1,8 @@
 import {
+  DEFAULT_PROJECTOR_JOIN_QR_TEXT,
+  DEFAULT_PROJECTOR_JOIN_QR_TEXT_COLOR,
+  DEFAULT_PROJECTOR_JOIN_QR_VISIBLE,
+  PROJECTOR_JOIN_QR_TEXT_MAX_LENGTH,
   normalizePublicViewState,
   SPEAKER_TILE_ID,
   type CloudWordCount,
@@ -33,9 +37,16 @@ type BrandingKeys =
   | "brandLogoUrl"
   | "brandPlayerBackgroundImageUrl"
   | "brandProjectorBackgroundImageUrl"
-  | "brandBodyBackgroundColor";
+  | "brandBodyBackgroundColor"
+  | "projectorJoinQrVisible"
+  | "projectorJoinQrText"
+  | "projectorJoinQrTextColor";
+type PlayerUiResultKeys =
+  | "playerVoteOptionTextColor"
+  | "playerVoteProgressTrackColor"
+  | "playerVoteProgressBarColor";
 
-export type BrandingState = Pick<SharedPublicViewPayload, BrandingKeys>;
+export type BrandingState = Pick<SharedPublicViewPayload, BrandingKeys | PlayerUiResultKeys>;
 
 export type CloudManualStateByQuestion = Record<
   string,
@@ -83,7 +94,14 @@ export type {
   PublicViewMode,
   ReportModuleId,
 };
-export { normalizePublicViewState, SPEAKER_TILE_ID };
+export {
+  DEFAULT_PROJECTOR_JOIN_QR_TEXT,
+  DEFAULT_PROJECTOR_JOIN_QR_TEXT_COLOR,
+  DEFAULT_PROJECTOR_JOIN_QR_VISIBLE,
+  PROJECTOR_JOIN_QR_TEXT_MAX_LENGTH,
+  normalizePublicViewState,
+  SPEAKER_TILE_ID,
+};
 
 export function toBrandingState(payload: Partial<PublicViewPayload>): BrandingState {
   const view = normalizePublicViewState(payload);
@@ -111,6 +129,12 @@ export function toBrandingState(payload: Partial<PublicViewPayload>): BrandingSt
     brandPlayerBackgroundImageUrl: view.brandPlayerBackgroundImageUrl,
     brandProjectorBackgroundImageUrl: view.brandProjectorBackgroundImageUrl,
     brandBodyBackgroundColor: view.brandBodyBackgroundColor,
+    projectorJoinQrVisible: view.projectorJoinQrVisible,
+    projectorJoinQrText: view.projectorJoinQrText,
+    projectorJoinQrTextColor: view.projectorJoinQrTextColor,
+    playerVoteOptionTextColor: view.playerVoteOptionTextColor,
+    playerVoteProgressTrackColor: view.playerVoteProgressTrackColor,
+    playerVoteProgressBarColor: view.playerVoteProgressBarColor,
   };
 }
 

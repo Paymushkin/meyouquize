@@ -24,8 +24,10 @@ describe("buildOrderedTiles", () => {
       [bannerA, bannerB],
       "Вопросы спикерам",
       "#1976d2",
+      "#ffffff",
       "Программа",
       "#6a1b9a",
+      "#ffffff",
       "https://example.com/program",
     );
     expect(rows.map((x) => x.id)).toEqual([bannerB.id, SPEAKER_TILE_ID, bannerA.id]);
@@ -37,8 +39,10 @@ describe("buildOrderedTiles", () => {
       [bannerA, bannerB],
       "",
       "#1976d2",
+      "#ffffff",
       "Программа",
       "#6a1b9a",
+      "#ffffff",
       "",
     );
     expect(rows.map((x) => x.id)).toEqual([SPEAKER_TILE_ID, bannerA.id, bannerB.id]);

@@ -67,6 +67,12 @@ type Params = {
   setBrandPlayerBackgroundImageUrl: (value: string) => void;
   setBrandProjectorBackgroundImageUrl: (value: string) => void;
   setBrandBodyBackgroundColor: (value: string) => void;
+  setPlayerVoteOptionTextColor: (value: string) => void;
+  setPlayerVoteProgressTrackColor: (value: string) => void;
+  setPlayerVoteProgressBarColor: (value: string) => void;
+  setProjectorJoinQrVisible: (value: boolean) => void;
+  setProjectorJoinQrText: (value: string) => void;
+  setProjectorJoinQrTextColor: (value: string) => void;
   setShowFirstCorrectAnswerer: (value: boolean) => void;
   setFirstCorrectWinnersCount: (value: number) => void;
   setSpeakerQuestionsPayload: (value: SpeakerQuestionsPayload | null) => void;
@@ -116,6 +122,12 @@ export function useAdminEventSocket<TQuestion extends QuestionFormPatchable>(
     setBrandPlayerBackgroundImageUrl,
     setBrandProjectorBackgroundImageUrl,
     setBrandBodyBackgroundColor,
+    setPlayerVoteOptionTextColor,
+    setPlayerVoteProgressTrackColor,
+    setPlayerVoteProgressBarColor,
+    setProjectorJoinQrVisible,
+    setProjectorJoinQrText,
+    setProjectorJoinQrTextColor,
     setShowFirstCorrectAnswerer,
     setFirstCorrectWinnersCount,
     setSpeakerQuestionsPayload,
@@ -161,6 +173,12 @@ export function useAdminEventSocket<TQuestion extends QuestionFormPatchable>(
       setBrandPlayerBackgroundImageUrl(nextBranding.brandPlayerBackgroundImageUrl);
       setBrandProjectorBackgroundImageUrl(nextBranding.brandProjectorBackgroundImageUrl);
       setBrandBodyBackgroundColor(nextBranding.brandBodyBackgroundColor);
+      setPlayerVoteOptionTextColor(nextBranding.playerVoteOptionTextColor);
+      setPlayerVoteProgressTrackColor(nextBranding.playerVoteProgressTrackColor);
+      setPlayerVoteProgressBarColor(nextBranding.playerVoteProgressBarColor);
+      setProjectorJoinQrVisible(nextBranding.projectorJoinQrVisible);
+      setProjectorJoinQrText(nextBranding.projectorJoinQrText);
+      setProjectorJoinQrTextColor(nextBranding.projectorJoinQrTextColor);
     },
     [
       setProjectorBackground,
@@ -186,6 +204,12 @@ export function useAdminEventSocket<TQuestion extends QuestionFormPatchable>(
       setBrandPlayerBackgroundImageUrl,
       setBrandProjectorBackgroundImageUrl,
       setBrandBodyBackgroundColor,
+      setPlayerVoteOptionTextColor,
+      setPlayerVoteProgressTrackColor,
+      setPlayerVoteProgressBarColor,
+      setProjectorJoinQrVisible,
+      setProjectorJoinQrText,
+      setProjectorJoinQrTextColor,
     ],
   );
 

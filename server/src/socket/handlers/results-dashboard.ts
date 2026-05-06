@@ -50,11 +50,17 @@ export function registerResultsDashboardHandlers(socket: EnrichedSocket, io: Ser
         ...(typeof payload.speakerTileVisible === "boolean"
           ? { speakerTileVisible: payload.speakerTileVisible }
           : {}),
+        ...(typeof payload.speakerTileTextColor === "string"
+          ? { speakerTileTextColor: payload.speakerTileTextColor }
+          : {}),
         ...(typeof payload.programTileText === "string"
           ? { programTileText: payload.programTileText }
           : {}),
         ...(typeof payload.programTileBackgroundColor === "string"
           ? { programTileBackgroundColor: payload.programTileBackgroundColor }
+          : {}),
+        ...(typeof payload.programTileTextColor === "string"
+          ? { programTileTextColor: payload.programTileTextColor }
           : {}),
         ...(typeof payload.programTileLinkUrl === "string"
           ? { programTileLinkUrl: payload.programTileLinkUrl }

@@ -404,16 +404,19 @@ export async function listParticipantNicknamesByEventName(eventName: string): Pr
 export async function updateRoomTitle(eventName: string, title: string) {
   const room = await prisma.quiz.findUnique({ where: { slug: eventName } });
   if (!room) throw new Error("Room not found");
-  const titleKey = title.trim().toLowerCase();
+  const normalizedTitle = title.trim();
+  const titleKey = normalizedTitle.toLowerCase();
   const allRooms = await prisma.quiz.findMany({
     where: { NOT: { id: room.id } },
     select: { title: true },
   });
-  const hasDuplicateTitle = allRooms.some((item) => item.title.trim().toLowerCase() === titleKey);
-  if (hasDuplicateTitle) throw new Error("Room title already exists");
+  if (titleKey) {
+    const hasDuplicateTitle = allRooms.some((item) => item.title.trim().toLowerCase() === titleKey);
+    if (hasDuplicateTitle) throw new Error("Room title already exists");
+  }
   return prisma.quiz.update({
     where: { id: room.id },
-    data: { title },
+    data: { title: normalizedTitle },
   });
 }
 
@@ -700,11 +703,16 @@ export async function getQuizPublicState(quizId: string) {
     activePlayerBannerId: view.activePlayerBannerId,
     speakerTileText: view.speakerTileText,
     speakerTileBackgroundColor: view.speakerTileBackgroundColor,
+    speakerTileTextColor: view.speakerTileTextColor,
     speakerTileVisible: view.speakerTileVisible,
     programTileText: view.programTileText,
     programTileBackgroundColor: view.programTileBackgroundColor,
+    programTileTextColor: view.programTileTextColor,
     programTileLinkUrl: view.programTileLinkUrl,
     programTileVisible: view.programTileVisible,
+    playerVoteOptionTextColor: view.playerVoteOptionTextColor,
+    playerVoteProgressTrackColor: view.playerVoteProgressTrackColor,
+    playerVoteProgressBarColor: view.playerVoteProgressBarColor,
     playerVisibleResults,
     playerTilesOrder: view.playerTilesOrder,
     brandPrimaryColor: view.brandPrimaryColor,
