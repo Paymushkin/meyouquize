@@ -39,22 +39,12 @@ export function BrandHeader({ showDemoButton = true, showAdminButton = true }: B
               alt="Meyouquize"
               sx={{ width: 40, height: 40, display: "block" }}
             />
-            <Box
-              component="span"
-              sx={{
-                fontWeight: 700,
-                fontSize: { xs: "1rem", sm: "1.15rem" },
-                letterSpacing: "-0.01em",
-              }}
-            >
-              Meyouquize
-            </Box>
           </Stack>
           <Stack direction="row" spacing={1.5} alignItems="center">
             {showDemoButton ? (
               <Button
-                component={RouterLink}
-                to="/q/demo"
+                component="a"
+                href="#demo"
                 variant="text"
                 color="inherit"
                 sx={{ display: { xs: "none", sm: "inline-flex" } }}
@@ -63,8 +53,8 @@ export function BrandHeader({ showDemoButton = true, showAdminButton = true }: B
               </Button>
             ) : null}
             {showAdminButton ? (
-              <Button component={RouterLink} to="/admin" variant="contained" color="primary">
-                Войти в админку
+              <Button component="a" href="#request" variant="contained" color="primary">
+                Оставить заявку
               </Button>
             ) : null}
           </Stack>

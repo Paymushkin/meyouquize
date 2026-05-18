@@ -12,6 +12,11 @@ type Params = {
   programTileBackgroundColor: string;
   programTileTextColor: string;
   programTileLinkUrl: string;
+  playerQuizResultsTileText: string;
+  playerQuizResultsSubQuizIds: string[];
+  subQuizzesForReport: Array<{ id: string; title: string }>;
+  brandPrimaryColor: string;
+  playerVoteOptionTextColor: string;
   onCreate: (linkUrl: string, backgroundUrl: string, size: "2x1" | "1x1" | "full") => void;
   onUpdate: (
     id: string,
@@ -40,6 +45,11 @@ export function useAdminBannersSectionState(params: Params) {
     programTileBackgroundColor,
     programTileTextColor,
     programTileLinkUrl,
+    playerQuizResultsTileText,
+    playerQuizResultsSubQuizIds,
+    subQuizzesForReport,
+    brandPrimaryColor,
+    playerVoteOptionTextColor,
     onCreate,
     onUpdate,
     onUploadMedia,
@@ -97,6 +107,11 @@ export function useAdminBannersSectionState(params: Params) {
         programTileBackgroundColor,
         programTileTextColor,
         programTileLinkUrl,
+        playerQuizResultsTileText,
+        playerQuizResultsSubQuizIds,
+        subQuizzesForReport,
+        brandPrimaryColor,
+        playerVoteOptionTextColor,
       ),
     [
       tilesOrder,
@@ -108,6 +123,11 @@ export function useAdminBannersSectionState(params: Params) {
       programTileBackgroundColor,
       programTileTextColor,
       programTileLinkUrl,
+      playerQuizResultsTileText,
+      playerQuizResultsSubQuizIds,
+      subQuizzesForReport,
+      brandPrimaryColor,
+      playerVoteOptionTextColor,
     ],
   );
 

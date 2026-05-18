@@ -109,6 +109,30 @@ function parseRankingPointsFromApi(raw: unknown): number[] | null {
   return nums.length > 0 ? nums : null;
 }
 
+/** Баллы за эталонный тег по индексу строки (в UI по умолчанию 1). */
+export function tagCloudPointsForOption(q: QuestionForm, optionIndex: number): number {
+  const v = q.rankingPointsByRank?.[optionIndex];
+  if (v == null || !Number.isFinite(v)) return 1;
+  return Math.max(0, Math.min(10_000, Math.trunc(v)));
+}
+
+/** Приводит массив баллов к числу тегов (дозаполняет единицами). */
+export function normalizeTagCloudQuestionPoints(q: QuestionForm): QuestionForm {
+  if (q.type !== "tag_cloud" || !isEditorQuizMode(q)) return q;
+  const n = q.options.length;
+  return {
+    ...q,
+    rankingPointsByRank: Array.from({ length: n }, (_, i) => tagCloudPointsForOption(q, i)),
+  };
+}
+
+function tagCloudRankingPointsForSave(q: QuestionForm): number[] {
+  return q.options
+    .map((o, i) => ({ o, i }))
+    .filter(({ o }) => o.text.trim())
+    .map(({ i }) => tagCloudPointsForOption(q, i));
+}
+
 function projectMetricFromApi(raw: unknown): "avg_rank" | "avg_score" | "total_score" {
   if (raw === "AVG_SCORE") return "avg_score";
   if (raw === "TOTAL_SCORE") return "total_score";
@@ -175,9 +199,8 @@ export function toQuestionReplaceInput(q: QuestionForm) {
       ? []
       : q.type === "tag_cloud" && isEditorQuizMode(q)
         ? q.options
-            .map((o) => o.text.trim())
-            .filter(Boolean)
-            .map((text) => ({ text, isCorrect: true }))
+            .filter((o) => o.text.trim())
+            .map((o) => ({ text: o.text.trim(), isCorrect: o.isCorrect }))
         : q.type === "ranking"
           ? q.options.map((o) => ({ text: o.text.trim(), isCorrect: false }))
           : q.options.map((o) => ({ text: o.text, isCorrect: o.isCorrect }));
@@ -203,7 +226,11 @@ export function toQuestionReplaceInput(q: QuestionForm) {
           rankingKind: q.rankingKind ?? "jury",
           rankingPlayerHint: q.rankingPlayerHint?.trim() || null,
         }
-      : {}),
+      : q.type === "tag_cloud" && isEditorQuizMode(q)
+        ? {
+            rankingPointsByRank: tagCloudRankingPointsForSave(q),
+          }
+        : {}),
     options,
   };
 }
@@ -384,7 +411,7 @@ export function mapLoadedRoomQuestions(
 ): QuestionForm[] {
   return questions.map((q) => {
     const kind = rankingKindFromApi(q.rankingKind);
-    return {
+    const form: QuestionForm = {
       id: q.id,
       subQuizId,
       text: q.text,
@@ -421,6 +448,7 @@ export function mapLoadedRoomQuestions(
         q.options.map((o) => ({ text: o.text, isCorrect: Boolean(o.isCorrect) })),
       ),
     };
+    return form.type === "tag_cloud" ? normalizeTagCloudQuestionPoints(form) : form;
   });
 }
 
@@ -431,7 +459,7 @@ export function mergeServerQuestionsIntoForms(
 ): QuestionForm[] {
   return serverQuestions.map((q) => {
     const kind = rankingKindFromApi(q.rankingKind);
-    return {
+    const form: QuestionForm = {
       id: q.id,
       subQuizId,
       text: q.text,
@@ -468,6 +496,7 @@ export function mergeServerQuestionsIntoForms(
         q.options.map((o) => ({ text: o.text, isCorrect: Boolean(o.isCorrect) })),
       ),
     };
+    return form.type === "tag_cloud" ? normalizeTagCloudQuestionPoints(form) : form;
   });
 }
 

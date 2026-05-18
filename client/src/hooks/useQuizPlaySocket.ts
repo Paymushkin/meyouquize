@@ -77,10 +77,39 @@ export function useQuizPlaySocket({
       const prevQuestionType = activeQuestionTypeRef.current;
       const nextQuestionId = state.activeQuestion?.id ?? null;
       const nextQuestionType = state.activeQuestion?.type ?? null;
-      setQuiz(state);
+      setQuiz((prev) => {
+        let merged: QuizState = state;
+        if (
+          typeof state.myTotalScore !== "number" &&
+          prev &&
+          typeof prev.myTotalScore === "number"
+        ) {
+          merged = { ...merged, myTotalScore: prev.myTotalScore };
+        }
+        if (state.mySubQuizScores == null && prev?.mySubQuizScores) {
+          merged = { ...merged, mySubQuizScores: prev.mySubQuizScores };
+        }
+        return merged;
+      });
       if (prevQuestionId !== nextQuestionId || prevQuestionType !== nextQuestionType) {
         clearAllInputs();
       }
+    };
+    const onPlayerQuizScore = (payload: {
+      myTotalScore?: number;
+      mySubQuizScores?: Record<string, number>;
+    }) => {
+      if (typeof payload?.myTotalScore !== "number" && payload?.mySubQuizScores == null) return;
+      setQuiz((prev) => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          ...(typeof payload.myTotalScore === "number"
+            ? { myTotalScore: payload.myTotalScore }
+            : {}),
+          ...(payload.mySubQuizScores != null ? { mySubQuizScores: payload.mySubQuizScores } : {}),
+        };
+      });
     };
     const onError = (evt: unknown) => {
       const message = parseSocketErrorMessage(evt);
@@ -163,6 +192,7 @@ export function useQuizPlaySocket({
       }
     };
     socket.on("state:quiz", onState);
+    socket.on("player:quiz-score", onPlayerQuizScore);
     socket.on("error:message", onError);
     socket.on("connect_error", onConnectError);
     socket.on("connect", onConnect);
@@ -175,6 +205,7 @@ export function useQuizPlaySocket({
     socket.on("speaker:questions:update", onSpeakerQuestions);
     return () => {
       socket.off("state:quiz", onState);
+      socket.off("player:quiz-score", onPlayerQuizScore);
       socket.off("error:message", onError);
       socket.off("connect_error", onConnectError);
       socket.off("connect", onConnect);

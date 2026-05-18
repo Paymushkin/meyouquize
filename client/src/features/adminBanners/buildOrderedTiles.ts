@@ -1,6 +1,13 @@
+import {
+  isQuizResultsTileId,
+  parseQuizResultsSubQuizIdFromTileId,
+  PROGRAM_TILE_ID,
+  QUIZ_RESULTS_TILE_ID,
+  SPEAKER_TILE_ID,
+} from "../../publicViewContract";
 import type { PublicBanner } from "../../publicViewContract";
-import { PROGRAM_TILE_ID, SPEAKER_TILE_ID } from "../../publicViewContract";
 import type { OrderedTile } from "../../components/admin/banners/types";
+import { resolveQuizResultsTileTitle } from "../quizPlay/playerQuizResults";
 
 export function buildOrderedTiles(
   tilesOrder: string[],
@@ -12,7 +19,15 @@ export function buildOrderedTiles(
   programTileBackgroundColor: string,
   programTileTextColor: string,
   programTileLinkUrl: string,
+  quizResultsCaption: string,
+  playerQuizResultsSubQuizIds: string[],
+  subQuizzesForReport: Array<{ id: string; title: string }>,
+  brandPrimaryColor: string,
+  playerVoteOptionTextColor: string,
 ): OrderedTile[] {
+  const legacyEffectiveId =
+    playerQuizResultsSubQuizIds[0]?.trim() || subQuizzesForReport[0]?.id || "";
+
   return [...tilesOrder, ...banners.map((b) => b.id)]
     .map((id) => {
       if (id === SPEAKER_TILE_ID) {
@@ -34,6 +49,18 @@ export function buildOrderedTiles(
           backgroundColor: programTileBackgroundColor,
           textColor: programTileTextColor,
           linkUrl: programTileLinkUrl,
+        };
+      }
+      if (isQuizResultsTileId(id)) {
+        const sqId = parseQuizResultsSubQuizIdFromTileId(id) ?? legacyEffectiveId;
+        const sqTitle = subQuizzesForReport.find((s) => s.id === sqId)?.title?.trim();
+        return {
+          id,
+          kind: "quiz_results" as const,
+          label: sqTitle ? `Отчёт: ${sqTitle}` : "Плитка «Мой квиз» (1×1)",
+          title: resolveQuizResultsTileTitle(quizResultsCaption, subQuizzesForReport, sqId),
+          brandPrimaryColor,
+          brandTextColor: playerVoteOptionTextColor,
         };
       }
       const banner = banners.find((x) => x.id === id);

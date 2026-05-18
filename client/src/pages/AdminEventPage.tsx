@@ -76,7 +76,11 @@ import {
 } from "../features/speakerQuestionsAdmin/adminSpeakerQuestionsSettings";
 import {
   PROGRAM_TILE_ID,
+  QUIZ_RESULTS_TILE_ID,
   SPEAKER_TILE_ID,
+  isQuizResultsTileId,
+  quizResultsTileIdForSubQuiz,
+  withQuizResultsTileLast,
   normalizePublicViewState,
   toBrandingState,
   type CloudManualStateByQuestion,
@@ -107,6 +111,7 @@ import {
   computeFirstIncompleteSubQuizId,
   createEmptyQuestion,
   isEditorQuizMode,
+  normalizeTagCloudQuestionPoints,
   validateQuestionFormEntry,
   validateQuestionsForm,
   validateSheetsHaveSubQuizId,
@@ -186,16 +191,22 @@ function normalizeReportModulesForAdmin(value: unknown): ReportModuleId[] {
 
 function buildEffectiveTilesOrder(order: string[], banners: PublicBanner[]): string[] {
   const deduped: string[] = [];
+  const quizTiles: string[] = [];
   for (const id of order) {
     if (typeof id !== "string" || !id.trim()) continue;
-    if (!deduped.includes(id)) deduped.push(id);
+    const t = id.trim();
+    if (isQuizResultsTileId(t)) {
+      if (!quizTiles.includes(t)) quizTiles.push(t);
+      continue;
+    }
+    if (!deduped.includes(t)) deduped.push(t);
   }
   for (const banner of banners) {
     if (!deduped.includes(banner.id)) deduped.push(banner.id);
   }
   if (!deduped.includes(SPEAKER_TILE_ID)) deduped.push(SPEAKER_TILE_ID);
   if (!deduped.includes(PROGRAM_TILE_ID)) deduped.push(PROGRAM_TILE_ID);
-  return deduped;
+  return withQuizResultsTileLast([...deduped, ...quizTiles]);
 }
 
 const ADMIN_NAV: {
@@ -381,6 +392,14 @@ export function AdminEventPage() {
   const [quizId, setQuizId] = useState("");
   const [questionId, setQuestionId] = useState("");
   const [subQuizSheets, setSubQuizSheets] = useState<SubQuizSheet[]>([]);
+  const subQuizzesForReport = useMemo(
+    () =>
+      subQuizSheets.map((s) => ({
+        id: s.id,
+        title: s.title.trim() || "Без названия",
+      })),
+    [subQuizSheets],
+  );
   const [roomQuestionsTab, setRoomQuestionsTab] = useState<
     "quizzes" | "votes" | "reactions" | "randomizer"
   >("quizzes");
@@ -579,6 +598,13 @@ export function AdminEventPage() {
   const [programTileTextColor, setProgramTileTextColor] = useState("#ffffff");
   const [programTileLinkUrl, setProgramTileLinkUrl] = useState("");
   const [programTileVisible, setProgramTileVisible] = useState(false);
+  const [playerQuizResultsTileText, setPlayerQuizResultsTileText] = useState("Мой квиз");
+  const [playerQuizResultsTileBackgroundColor, setPlayerQuizResultsTileBackgroundColor] =
+    useState("#2e7d32");
+  const [playerQuizResultsTileTextColor, setPlayerQuizResultsTileTextColor] = useState("#ffffff");
+  const [playerQuizResultsSubQuizId, setPlayerQuizResultsSubQuizId] = useState("");
+  const [playerQuizResultsSubQuizIds, setPlayerQuizResultsSubQuizIds] = useState<string[]>([]);
+  const [playerQuizResultsTileVisible, setPlayerQuizResultsTileVisible] = useState(false);
   const [playerTilesOrder, setPlayerTilesOrder] = useState<string[]>([
     SPEAKER_TILE_ID,
     PROGRAM_TILE_ID,
@@ -1062,6 +1088,12 @@ export function AdminEventPage() {
     programTileTextColor,
     programTileLinkUrl,
     programTileVisible,
+    playerQuizResultsTileVisible,
+    playerQuizResultsTileText,
+    playerQuizResultsTileBackgroundColor,
+    playerQuizResultsTileTextColor,
+    playerQuizResultsSubQuizId,
+    playerQuizResultsSubQuizIds,
     playerVisibleResultQuestionIds,
     playerTilesOrder,
     reactionsOverlayText,
@@ -1289,6 +1321,32 @@ export function AdminEventPage() {
     }
     if (typeof pv.programTileVisible === "boolean") {
       setProgramTileVisible(pv.programTileVisible);
+    }
+    if (typeof pv.playerQuizResultsTileText === "string") {
+      setPlayerQuizResultsTileText(pv.playerQuizResultsTileText);
+    }
+    if (typeof pv.playerQuizResultsTileBackgroundColor === "string") {
+      setPlayerQuizResultsTileBackgroundColor(pv.playerQuizResultsTileBackgroundColor);
+    }
+    if (typeof pv.playerQuizResultsTileTextColor === "string") {
+      setPlayerQuizResultsTileTextColor(pv.playerQuizResultsTileTextColor);
+    }
+    if (typeof pv.playerQuizResultsSubQuizId === "string") {
+      setPlayerQuizResultsSubQuizId(pv.playerQuizResultsSubQuizId);
+    }
+    if (Array.isArray(pv.playerQuizResultsSubQuizIds)) {
+      setPlayerQuizResultsSubQuizIds(
+        pv.playerQuizResultsSubQuizIds.filter((x): x is string => typeof x === "string"),
+      );
+    } else if (pv.playerQuizResultsTileVisible) {
+      const legacy =
+        typeof pv.playerQuizResultsSubQuizId === "string"
+          ? pv.playerQuizResultsSubQuizId.trim()
+          : "";
+      if (legacy) setPlayerQuizResultsSubQuizIds([legacy]);
+    }
+    if (typeof pv.playerQuizResultsTileVisible === "boolean") {
+      setPlayerQuizResultsTileVisible(pv.playerQuizResultsTileVisible);
     }
     if (Array.isArray(pv.playerVisibleResultQuestionIds)) {
       setPlayerVisibleResultQuestionIds(
@@ -1788,6 +1846,12 @@ export function AdminEventPage() {
           } else if (!next.options.some((o) => o.isCorrect)) {
             next.options = next.options.map((o, idx) => ({ ...o, isCorrect: idx === 0 }));
           }
+          if (isEditorQuizMode(next)) {
+            const n = next.options.length;
+            if (!next.rankingPointsByRank || next.rankingPointsByRank.length !== n) {
+              next.rankingPointsByRank = Array.from({ length: n }, () => 1);
+            }
+          }
         } else if (patch.type === "ranking") {
           next.editorQuizMode = true;
           next.rankingKind = next.rankingKind ?? "jury";
@@ -1840,6 +1904,12 @@ export function AdminEventPage() {
       prev.map((q, i) => {
         if (i !== questionIndex) return q;
         const nextOpts = [...q.options, { text: "", isCorrect: false }];
+        if (q.type === "tag_cloud" && isEditorQuizMode(q)) {
+          const n = nextOpts.length;
+          const base = [...(q.rankingPointsByRank ?? []), 1];
+          while (base.length < n) base.push(1);
+          return { ...q, options: nextOpts, rankingPointsByRank: base.slice(0, n) };
+        }
         if (q.type !== "ranking") return { ...q, options: nextOpts };
         const n = nextOpts.length;
         return {
@@ -1862,6 +1932,10 @@ export function AdminEventPage() {
           q.type === "tag_cloud" && isEditorQuizMode(q) ? 1 : q.type === "ranking" ? 3 : 2;
         if (q.options.length <= minOpts) return q;
         const nextOpts = q.options.filter((_, oi) => oi !== optionIndex);
+        if (q.type === "tag_cloud" && isEditorQuizMode(q)) {
+          const base = (q.rankingPointsByRank ?? []).filter((_, oi) => oi !== optionIndex);
+          return { ...q, options: nextOpts, rankingPointsByRank: base };
+        }
         if (q.type !== "ranking") return { ...q, options: nextOpts };
         const n = nextOpts.length;
         return {
@@ -1885,6 +1959,21 @@ export function AdminEventPage() {
           ...q,
           rankingPointsByRank: Array.from({ length: n }, (_, j) => Math.max(1, n - j)),
         };
+      }),
+    );
+  }
+
+  function setTagCloudTagPointsAt(questionIndex: number, tagIdx: number, raw: string) {
+    setQuestionForms((prev) =>
+      prev.map((q, i) => {
+        if (i !== questionIndex || q.type !== "tag_cloud" || !isEditorQuizMode(q)) return q;
+        const n = q.options.length;
+        const base = [...(q.rankingPointsByRank ?? Array.from({ length: n }, () => 1))];
+        while (base.length < n) base.push(1);
+        const v =
+          raw.trim() === "" ? 1 : Math.min(10_000, Math.max(0, Math.trunc(Number(raw)) || 0));
+        base[tagIdx] = v;
+        return { ...q, rankingPointsByRank: base };
       }),
     );
   }
@@ -2003,11 +2092,13 @@ export function AdminEventPage() {
     });
     if (enabled) {
       setQuestionId(question.id);
+      const group = question.subQuizId ?? null;
       setQuestionForms((prev) =>
-        prev.map((q, idx) => ({
-          ...q,
-          isActive: idx === questionIndex ? true : q.isActive,
-        })),
+        prev.map((q, idx) => {
+          const qGroup = q.subQuizId ?? null;
+          if (qGroup !== group) return q;
+          return { ...q, isActive: idx === questionIndex };
+        }),
       );
     } else {
       setQuestionForms((prev) =>
@@ -2383,11 +2474,12 @@ export function AdminEventPage() {
       },
     ];
     const baseOrder = buildEffectiveTilesOrder(playerTilesOrder, playerBanners);
-    const nextOrder = [
+    const nextOrderRaw = [
       ...baseOrder.filter((x) => x !== SPEAKER_TILE_ID),
       next[next.length - 1]!.id,
       SPEAKER_TILE_ID,
     ];
+    const nextOrder = withQuizResultsTileLast(nextOrderRaw);
     setPlayerBanners(next);
     setPlayerTilesOrder(nextOrder);
     emitPublicViewSet({ playerBanners: next, playerTilesOrder: nextOrder });
@@ -2525,7 +2617,7 @@ export function AdminEventPage() {
   function deletePlayerBanner(bannerId: string) {
     if (!quizId) return;
     const next = playerBanners.filter((item) => item.id !== bannerId);
-    const nextOrder = buildEffectiveTilesOrder(playerTilesOrder, playerBanners).filter(
+    const nextOrder = buildEffectiveTilesOrder(playerTilesOrder, next).filter(
       (id) => id !== bannerId,
     );
     setPlayerBanners(next);
@@ -2642,6 +2734,41 @@ export function AdminEventPage() {
     );
   }
 
+  function togglePlayerQuizReportForSubQuiz(subQuizId: string, next: boolean, caption: string) {
+    if (!quizId || !subQuizId.trim()) return;
+    const sqId = subQuizId.trim();
+    const tileId = quizResultsTileIdForSubQuiz(sqId);
+    const nextText = caption.trim() || "Мой квиз";
+
+    let nextIds = [...playerQuizResultsSubQuizIds];
+    const nextOrder = playerTilesOrder.filter((id) => id !== QUIZ_RESULTS_TILE_ID && id !== tileId);
+
+    if (next) {
+      if (!nextIds.includes(sqId)) nextIds.push(sqId);
+      if (!nextOrder.includes(tileId)) nextOrder.push(tileId);
+    } else {
+      nextIds = nextIds.filter((id) => id !== sqId);
+    }
+
+    const normalizedOrder = buildEffectiveTilesOrder(nextOrder, playerBanners);
+    setPlayerQuizResultsTileText(nextText);
+    setPlayerQuizResultsSubQuizIds(nextIds);
+    setPlayerQuizResultsSubQuizId(nextIds[0] ?? "");
+    setPlayerQuizResultsTileVisible(nextIds.length > 0);
+    setPlayerTilesOrder(normalizedOrder);
+
+    emitPublicViewSet({
+      playerQuizResultsTileText: nextText,
+      playerQuizResultsSubQuizIds: nextIds,
+      playerQuizResultsSubQuizId: nextIds[0] ?? "",
+      playerQuizResultsTileVisible: nextIds.length > 0,
+      playerTilesOrder: normalizedOrder,
+    });
+    socket.emit("quiz:state:refresh", { quizId });
+    const sqTitle = subQuizzesForReport.find((s) => s.id === sqId)?.title?.trim() || "квиз";
+    setMessage(next ? `Отчёт «${sqTitle}» выведен игрокам` : `Отчёт «${sqTitle}» скрыт у игроков`);
+  }
+
   function moveTile(id: string, direction: -1 | 1) {
     if (!quizId) return;
     const current = buildEffectiveTilesOrder(playerTilesOrder, playerBanners);
@@ -2651,8 +2778,9 @@ export function AdminEventPage() {
     if (nextIndex < 0 || nextIndex >= current.length) return;
     const next = [...current];
     [next[index], next[nextIndex]] = [next[nextIndex]!, next[index]!];
-    setPlayerTilesOrder(next);
-    emitPublicViewSet({ playerTilesOrder: next });
+    const normalized = withQuizResultsTileLast(next);
+    setPlayerTilesOrder(normalized);
+    emitPublicViewSet({ playerTilesOrder: normalized });
     socket.emit("quiz:state:refresh", { quizId });
   }
 
@@ -2688,13 +2816,6 @@ export function AdminEventPage() {
     speakerSettings: speakerQuestionsAdminSettings,
     setMessage,
   });
-
-  const saveSpeakerSettingsAndOpenProjector = useCallback(() => {
-    saveSpeakerSettings();
-    if (speakerQuestionsEnabled) {
-      setPublicResultsView("speaker_questions");
-    }
-  }, [saveSpeakerSettings, speakerQuestionsEnabled, setPublicResultsView]);
 
   const setSpeakerQuestionOnScreenAndOpenProjector = useCallback(
     (id: string, next: boolean) => {
@@ -3079,7 +3200,13 @@ export function AdminEventPage() {
 
   function openQuestionDialog(index: number) {
     setQuestionDialogError("");
-    questionDialogSnapshotRef.current = cloneQuestionForms(questionForms);
+    setQuestionForms((prev) => {
+      const next = prev.map((item, i) =>
+        i === index && item.type === "tag_cloud" ? normalizeTagCloudQuestionPoints(item) : item,
+      );
+      questionDialogSnapshotRef.current = cloneQuestionForms(next);
+      return next;
+    });
     const q = questionForms[index];
     const sid = q?.subQuizId;
     questionDialogTargetSubQuizIdRef.current =
@@ -3105,13 +3232,20 @@ export function AdminEventPage() {
   async function saveQuestionDialogAndClose() {
     const idx = selectedQuestionIndex;
     const current = questionForms[idx];
-    const err = current ? validateQuestionFormEntry(current, idx) : "Вопрос не выбран.";
+    const formsForSave = questionForms.map((q, i) =>
+      i === idx && q.type === "tag_cloud" ? normalizeTagCloudQuestionPoints(q) : q,
+    );
+    const prepared = formsForSave[idx];
+    const err = prepared ? validateQuestionFormEntry(prepared, idx) : "Вопрос не выбран.";
     if (err) {
       setQuestionDialogError(err);
       return;
     }
+    if (prepared?.type === "tag_cloud") {
+      setQuestionForms(formsForSave);
+    }
     questionDialogSnapshotRef.current = null;
-    const merged = await persistQuestions(questionForms, subQuizSheets, {
+    const merged = await persistQuestions(formsForSave, subQuizSheets, {
       suppressToast: true,
       validateOnlyIndex: idx,
     });
@@ -3153,6 +3287,12 @@ export function AdminEventPage() {
       prev.map((question, index) => {
         if (index !== selectedQuestionIndex) return question;
         const nextOpts = [...question.options, { text: value, isCorrect: false }];
+        if (question.type === "tag_cloud" && isEditorQuizMode(question)) {
+          const n = nextOpts.length;
+          const base = [...(question.rankingPointsByRank ?? []), 1];
+          while (base.length < n) base.push(1);
+          return { ...question, options: nextOpts, rankingPointsByRank: base.slice(0, n) };
+        }
         if (question.type !== "ranking") return { ...question, options: nextOpts };
         const n = nextOpts.length;
         return {
@@ -3464,6 +3604,8 @@ export function AdminEventPage() {
                                 const activeLocalIndex = quizQuestions.findIndex((q) =>
                                   Boolean(q?.isActive),
                                 );
+                                const playerQuizReportActiveForThisSubQuiz =
+                                  playerQuizResultsSubQuizIds.includes(sq.id);
                                 return (
                                   <Accordion
                                     key={sq.id}
@@ -3685,6 +3827,20 @@ export function AdminEventPage() {
                                               setHighlightedLeadersCount(next)
                                             }
                                             onCommitResultsUsers={updateHighlightedLeaders}
+                                            playerQuizReportActive={
+                                              playerQuizReportActiveForThisSubQuiz
+                                            }
+                                            onTogglePlayerQuizReport={() => {
+                                              if (!quizId) return;
+                                              const active = playerQuizResultsSubQuizIds.includes(
+                                                sq.id,
+                                              );
+                                              togglePlayerQuizReportForSubQuiz(
+                                                sq.id,
+                                                !active,
+                                                sq.title.trim() || playerQuizResultsTileText,
+                                              );
+                                            }}
                                           />
                                         </Stack>
                                       ) : (
@@ -4032,7 +4188,7 @@ export function AdminEventPage() {
                     onToggleShowRecipientOnScreen: setSpeakerQuestionsShowRecipientOnScreen,
                     onToggleShowReactionsOnScreen: setSpeakerQuestionsShowReactionsOnScreen,
                     onSpeakersTextChange: setSpeakerListText,
-                    onSaveSettings: saveSpeakerSettingsAndOpenProjector,
+                    onSaveSettings: saveSpeakerSettings,
                   }}
                   questions={speakerQuestionsPayload?.items ?? []}
                   onHide={hideSpeakerQuestion}
@@ -4062,6 +4218,11 @@ export function AdminEventPage() {
                   programTileVisible={programTileVisible}
                   onSaveProgramTile={saveProgramTile}
                   onToggleProgramTileVisible={toggleProgramTileVisible}
+                  playerQuizResultsTileText={playerQuizResultsTileText}
+                  playerQuizResultsSubQuizIds={playerQuizResultsSubQuizIds}
+                  subQuizzesForReport={subQuizzesForReport}
+                  brandPrimaryColor={brandPrimaryColor}
+                  playerVoteOptionTextColor={playerVoteOptionTextColor}
                   tilesOrder={playerTilesOrder}
                   onMoveTileUp={(id) => moveTile(id, -1)}
                   onMoveTileDown={(id) => moveTile(id, 1)}
@@ -4223,6 +4384,12 @@ export function AdminEventPage() {
                           : "Варианты (для жюри эталон не используется)"
                         : "Варианты ответов"}
                   </Typography>
+                  {questionForms[selectedQuestionIndex].type === "tag_cloud" &&
+                  isEditorQuizMode(questionForms[selectedQuestionIndex]) ? (
+                    <Typography variant="body2" color="text.secondary" sx={{ mt: -0.5 }}>
+                      Синонимы в одном теге — через точку с запятой, например: «Синий; Голубой».
+                    </Typography>
+                  ) : null}
                   <Stack spacing={1.25}>
                     {questionForms[selectedQuestionIndex].options.map((option, oIndex) => (
                       <Stack
@@ -4242,12 +4409,44 @@ export function AdminEventPage() {
                           onChange={(e) =>
                             updateOption(selectedQuestionIndex, oIndex, { text: e.target.value })
                           }
+                          placeholder={
+                            questionForms[selectedQuestionIndex].type === "tag_cloud"
+                              ? "Синий; Голубой"
+                              : undefined
+                          }
                           size="small"
                           multiline
                           minRows={1}
                           maxRows={8}
                           sx={{ flex: 1, minWidth: 0 }}
                         />
+                        {questionForms[selectedQuestionIndex].type === "tag_cloud" &&
+                          isEditorQuizMode(questionForms[selectedQuestionIndex]) && (
+                            <TextField
+                              type="number"
+                              size="small"
+                              label="Баллы"
+                              inputProps={{
+                                min: 0,
+                                max: 10_000,
+                                "aria-label": `Баллы за тег ${oIndex + 1}`,
+                              }}
+                              value={
+                                questionForms[selectedQuestionIndex].rankingPointsByRank?.[
+                                  oIndex
+                                ] ?? 1
+                              }
+                              onChange={(e) =>
+                                setTagCloudTagPointsAt(
+                                  selectedQuestionIndex,
+                                  oIndex,
+                                  e.target.value,
+                                )
+                              }
+                              sx={{ width: 88, flexShrink: 0 }}
+                              slotProps={{ inputLabel: { shrink: true } }}
+                            />
+                          )}
                         {questionForms[selectedQuestionIndex].type === "ranking" && (
                           <TextField
                             type="number"
@@ -4356,7 +4555,13 @@ export function AdminEventPage() {
                 </>
               )}
               <Divider />
-              <Stack direction={{ xs: "column", md: "row" }} spacing={1.5}>
+              <Stack
+                direction="row"
+                flexWrap="wrap"
+                spacing={1.5}
+                useFlexGap
+                sx={{ alignItems: "flex-start", width: "100%" }}
+              >
                 <TextField
                   select
                   label="Тип ответа"
@@ -4385,7 +4590,12 @@ export function AdminEventPage() {
                     });
                   }}
                   size="small"
-                  sx={{ minWidth: 220 }}
+                  slotProps={{ inputLabel: { shrink: true } }}
+                  sx={{
+                    flex: "1 1 220px",
+                    minWidth: { xs: "100%", sm: 220 },
+                    maxWidth: "100%",
+                  }}
                 >
                   <MenuItem value="poll">Обычное голосование</MenuItem>
                   <MenuItem value="single">Один правильный</MenuItem>
@@ -4404,7 +4614,12 @@ export function AdminEventPage() {
                       })
                     }
                     size="small"
-                    sx={{ minWidth: 140 }}
+                    slotProps={{ inputLabel: { shrink: true } }}
+                    sx={{
+                      flex: "0 1 140px",
+                      width: { xs: "100%", sm: 140 },
+                      maxWidth: "100%",
+                    }}
                     helperText="От 1 до 5"
                   />
                 ) : null}
@@ -4413,29 +4628,44 @@ export function AdminEventPage() {
                     ? questionForms[selectedQuestionIndex].subQuizId != null &&
                       questionForms[selectedQuestionIndex].rankingKind !== "jury"
                     : questionForms[selectedQuestionIndex].subQuizId != null) && (
-                    <Stack
-                      direction="row"
-                      spacing={0.75}
-                      alignItems="center"
-                      sx={{ width: { xs: "100%", md: "50%" }, minWidth: 220 }}
-                    >
-                      <TextField
-                        type="number"
-                        label={
-                          questionForms[selectedQuestionIndex].type === "ranking"
-                            ? "Баллы за полный ответ"
-                            : "Баллы"
-                        }
-                        value={questionForms[selectedQuestionIndex].points}
-                        onChange={(e) =>
-                          updateQuestion(selectedQuestionIndex, {
-                            points: Number(e.target.value) || 1,
-                          })
-                        }
-                        size="small"
-                        sx={{ flex: 1, minWidth: 0 }}
-                      />
-                    </Stack>
+                    <TextField
+                      type="number"
+                      label={
+                        questionForms[selectedQuestionIndex].type === "ranking" ||
+                        questionForms[selectedQuestionIndex].type === "tag_cloud"
+                          ? "Баллы за полный ответ"
+                          : "Баллы"
+                      }
+                      value={questionForms[selectedQuestionIndex].points}
+                      onChange={(e) =>
+                        updateQuestion(selectedQuestionIndex, {
+                          points: Number(e.target.value) || 1,
+                        })
+                      }
+                      size="small"
+                      slotProps={{ inputLabel: { shrink: true } }}
+                      helperText={
+                        questionForms[selectedQuestionIndex].type === "tag_cloud"
+                          ? `Если участник дал ${questionForms[selectedQuestionIndex].maxAnswers} верных ответов — эта сумма. Иначе — баллы за каждый верный тег.`
+                          : undefined
+                      }
+                      sx={{
+                        flex:
+                          questionForms[selectedQuestionIndex].type === "ranking" ||
+                          questionForms[selectedQuestionIndex].type === "tag_cloud"
+                            ? "1 1 200px"
+                            : "0 1 100px",
+                        width: {
+                          xs: "100%",
+                          sm:
+                            questionForms[selectedQuestionIndex].type === "ranking" ||
+                            questionForms[selectedQuestionIndex].type === "tag_cloud"
+                              ? 200
+                              : 100,
+                        },
+                        maxWidth: "100%",
+                      }}
+                    />
                   )}
               </Stack>
               {questionForms[selectedQuestionIndex].type === "ranking" && (

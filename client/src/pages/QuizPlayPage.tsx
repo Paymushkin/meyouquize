@@ -15,13 +15,18 @@ import {
   TextField,
   Typography,
 } from "@mui/material";
-import { SPEAKER_TILE_ID } from "@meyouquize/shared";
+import { ruBallLabel, SPEAKER_TILE_ID } from "@meyouquize/shared";
+import {
+  buildPlayerQuizResultsTilesForPlayer,
+  resolveEnabledQuizReportSubQuizIds,
+} from "../features/quizPlay/playerQuizResults";
 import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
 import KeyboardArrowDownIcon from "@mui/icons-material/KeyboardArrowDown";
 import KeyboardArrowUpIcon from "@mui/icons-material/KeyboardArrowUp";
 import { API_BASE } from "../config";
 import { SpeakerQuestionsDialog } from "../components/quiz/SpeakerQuestionsDialog";
 import { PlayerVoteResultsDialog } from "../components/quiz/PlayerVoteResultsDialog";
+import { PlayerQuizReportDialog } from "../components/quiz/PlayerQuizReportDialog";
 import { useQuizPlayCompletion } from "../hooks/useQuizPlayCompletion";
 import { useQuizPlayScrollLock } from "../hooks/useQuizPlayScrollLock";
 import { useQuizPlaySocket } from "../hooks/useQuizPlaySocket";
@@ -58,16 +63,6 @@ function getRoomNickKey(slug: string) {
 
 function wasRoomJoined(slug: string): boolean {
   return localStorage.getItem(getRoomJoinKey(slug)) === "1";
-}
-
-function ruBallLabel(n: number): string {
-  const v = Math.abs(Math.trunc(n));
-  const mod100 = v % 100;
-  if (mod100 >= 11 && mod100 <= 14) return `${n} баллов`;
-  const mod10 = v % 10;
-  if (mod10 === 1) return `${n} балл`;
-  if (mod10 >= 2 && mod10 <= 4) return `${n} балла`;
-  return `${n} баллов`;
 }
 
 function buildConnectionChip(status: "online" | "reconnecting" | "offline") {
@@ -140,6 +135,8 @@ export function QuizPlayPage() {
   const [speakerName, setSpeakerName] = useState("Все спикеры");
   const [speakerQuestionText, setSpeakerQuestionText] = useState("");
   const [resultsDialogQuestionId, setResultsDialogQuestionId] = useState<string | null>(null);
+  const [quizReportOpen, setQuizReportOpen] = useState(false);
+  const [quizReportSubQuizId, setQuizReportSubQuizId] = useState("");
   const [bootLoading, setBootLoading] = useState(true);
   const nicknameInputRef = useRef<HTMLInputElement | null>(null);
   const activeQuestionIdRef = useRef<string | null>(null);
@@ -642,6 +639,36 @@ export function QuizPlayPage() {
   const programTileTextColor = quiz?.programTileTextColor?.trim() || "#ffffff";
   const programTileLinkUrl = quiz?.programTileLinkUrl?.trim() || "";
   const programTileVisible = quiz?.programTileVisible ?? false;
+  const enabledQuizReportSubQuizIds = useMemo(
+    () =>
+      resolveEnabledQuizReportSubQuizIds({
+        subQuizIds: quiz?.playerQuizResultsSubQuizIds,
+        legacyVisible: quiz?.playerQuizResultsTileVisible,
+        legacySubQuizId: quiz?.playerQuizResultsSubQuizId,
+        subQuizzes: quiz?.playerSubQuizzes,
+      }),
+    [
+      quiz?.playerQuizResultsSubQuizIds,
+      quiz?.playerQuizResultsTileVisible,
+      quiz?.playerQuizResultsSubQuizId,
+      quiz?.playerSubQuizzes,
+    ],
+  );
+  const playerQuizResultsTilesBySubQuizId = useMemo(() => {
+    const caption = quiz?.playerQuizResultsTileText?.trim() || "Мой квиз";
+    const tiles = buildPlayerQuizResultsTilesForPlayer({
+      enabledSubQuizIds: enabledQuizReportSubQuizIds,
+      caption,
+      subQuizzes: quiz?.playerSubQuizzes,
+      scoresBySubQuiz: quiz?.mySubQuizScores,
+    });
+    return new Map(tiles.map((t) => [t.tileId, t]));
+  }, [
+    enabledQuizReportSubQuizIds,
+    quiz?.playerQuizResultsTileText,
+    quiz?.playerSubQuizzes,
+    quiz?.mySubQuizScores,
+  ]);
   const brandPrimaryColor = quiz?.brandPrimaryColor?.trim() || "#7c5acb";
   const playerVoteOptionTextColor = quiz?.playerVoteOptionTextColor?.trim() || "#ffffff";
   const playerVoteProgressBarColor = quiz?.playerVoteProgressBarColor?.trim() || "#F3F722";
@@ -662,6 +689,10 @@ export function QuizPlayPage() {
     [quiz?.playerTilesOrder, visiblePlayerBanners],
   );
   const connectionChip = buildConnectionChip(connectionStatus);
+  const completionScoreLine =
+    typeof quiz?.myTotalScore === "number"
+      ? `Ваш результат: ${ruBallLabel(quiz.myTotalScore)}`
+      : undefined;
   const reactionMeta = useMemo(() => {
     const source = quiz?.reactionSession?.reactions;
     const fallback = ["👍", "👏", "🔥", "🤔"];
@@ -675,7 +706,8 @@ export function QuizPlayPage() {
   const hasPlayerTiles =
     (Boolean(speakerQuestions?.settings.enabled) && speakerTileVisible) ||
     visiblePlayerBanners.length > 0 ||
-    (programTileVisible && programTileLinkUrl.length > 0);
+    (programTileVisible && programTileLinkUrl.length > 0) ||
+    enabledQuizReportSubQuizIds.length > 0;
   const visibleResultTiles = useMemo(
     () => quiz?.playerVisibleResults ?? [],
     [quiz?.playerVisibleResults],
@@ -716,14 +748,6 @@ export function QuizPlayPage() {
     }, 2200);
     return () => window.clearTimeout(timer);
   }, [acceptedQuestionId]);
-
-  useEffect(() => {
-    if (!showSubQuizCompleteCard && !showFinishedCompletionCard) return;
-    const timer = window.setTimeout(() => {
-      setFinalCompletionDismissed(true);
-    }, 3000);
-    return () => window.clearTimeout(timer);
-  }, [setFinalCompletionDismissed, showFinishedCompletionCard, showSubQuizCompleteCard]);
 
   useEffect(() => {
     const activeQuestionId = nonQuizActiveQuestion?.id;
@@ -838,6 +862,11 @@ export function QuizPlayPage() {
               programTileTextColor={programTileTextColor}
               programTileLinkUrl={programTileLinkUrl}
               programTileVisible={programTileVisible}
+              playerQuizResultsTilesBySubQuizId={playerQuizResultsTilesBySubQuizId}
+              onOpenQuizReport={(subQuizId) => {
+                setQuizReportSubQuizId(subQuizId);
+                setQuizReportOpen(true);
+              }}
               playerVoteOptionTextColor={playerVoteOptionTextColor}
               playerVoteProgressBarColor={playerVoteProgressBarColor}
               visibleResultTiles={visibleResultTiles}
@@ -862,6 +891,18 @@ export function QuizPlayPage() {
             submittedAnswersByQuestionId={submittedAnswers}
             onClose={() => setResultsDialogQuestionId(null)}
           />
+          {quiz?.id && quizReportSubQuizId ? (
+            <PlayerQuizReportDialog
+              open={quizReportOpen}
+              quizId={quiz.id}
+              subQuizId={quizReportSubQuizId}
+              brandPrimaryColor={brandPrimaryColor}
+              onClose={() => {
+                setQuizReportOpen(false);
+                setQuizReportSubQuizId("");
+              }}
+            />
+          ) : null}
           {joined &&
             nonQuizActiveQuestion &&
             !showSubQuizCompleteCard &&
@@ -892,7 +933,7 @@ export function QuizPlayPage() {
           {joined && showSubQuizCompleteCard && (
             <CompletionOverlay
               brandPrimaryColor={brandPrimaryColor}
-              message="Вы прошли все вопросы. Спасибо за участие!"
+              scoreLine={completionScoreLine}
               compact
               onClose={() => setFinalCompletionDismissed(true)}
             />
@@ -901,6 +942,7 @@ export function QuizPlayPage() {
             <CompletionOverlay
               brandPrimaryColor={brandPrimaryColor}
               message="Спасибо за участие!"
+              scoreLine={completionScoreLine}
               onClose={() => setFinalCompletionDismissed(true)}
             />
           )}

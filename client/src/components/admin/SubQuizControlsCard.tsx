@@ -1,6 +1,7 @@
 import ChevronLeftIcon from "@mui/icons-material/ChevronLeft";
 import ChevronRightIcon from "@mui/icons-material/ChevronRight";
 import DoneAllIcon from "@mui/icons-material/DoneAll";
+import FactCheckIcon from "@mui/icons-material/FactCheck";
 import LeaderboardIcon from "@mui/icons-material/Leaderboard";
 import {
   Button,
@@ -27,6 +28,9 @@ type Props = {
   onNext: () => void;
   onFinish: () => void;
   onToggleResults: () => void;
+  /** Плитка «Мой квиз» у игроков для этого сабквиза включена */
+  playerQuizReportActive: boolean;
+  onTogglePlayerQuizReport: () => void;
   onChangeLeadersTop: (next: number) => void;
   onCommitLeadersTop: (next: number) => void;
   onChangeResultsUsers: (next: number) => void;
@@ -48,6 +52,8 @@ export function SubQuizControlsCard(props: Props) {
     onNext,
     onFinish,
     onToggleResults,
+    playerQuizReportActive,
+    onTogglePlayerQuizReport,
     onChangeLeadersTop,
     onCommitLeadersTop,
     onChangeResultsUsers,
@@ -123,6 +129,21 @@ export function SubQuizControlsCard(props: Props) {
           >
             Результаты
           </Button>
+          <Tooltip title="Показать или скрыть у участников плитку личного отчёта по этому квизу (ответы, эталон и баллы по вопросам).">
+            <span>
+              <Button
+                variant={playerQuizReportActive ? "contained" : "outlined"}
+                size="small"
+                color={playerQuizReportActive ? "success" : "primary"}
+                startIcon={<FactCheckIcon />}
+                onClick={onTogglePlayerQuizReport}
+                disabled={!quizId || quizIndexMap.length === 0}
+                sx={{ textTransform: "none" }}
+              >
+                Отчёт игрокам
+              </Button>
+            </span>
+          </Tooltip>
         </Stack>
         <Divider flexItem sx={{ my: 1.25 }} />
         <Stack

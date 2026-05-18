@@ -1,13 +1,16 @@
 import { prisma } from "./prisma.js";
 import {
   DEFAULT_PUBLIC_VIEW_STATE,
-  normalizeTagComparable,
+  PROGRAM_TILE_ID,
+  SPEAKER_TILE_ID,
+  type PublicBanner,
   type PublicReactionWidget,
   type PublicReactionWidgetStats,
   type PublicViewState,
 } from "@meyouquize/shared";
 import type { QuestionReplaceInput, RoomContentReplaceInput } from "./quiz-service.js";
 import { activateNextQuestion, createRoom, replaceRoomContent } from "./quiz-service.js";
+import { buildDemoTagCloudAnswer } from "./demo-tag-cloud-answers.js";
 import { evaluateRankingAnswer } from "./scoring.js";
 import { ScoringMode, QuestionType } from "@prisma/client";
 import { publicViewJsonToState, saveStoredPublicView } from "./socket/public-view-store.js";
@@ -19,13 +22,29 @@ const DEMO_PROJECTOR_BG = "#000000";
 const DEMO_SPEAKER_TILE_TEXT = "#000000";
 const DEMO_PROGRAM_TILE_BG = "#FFFFFF";
 const DEMO_PROGRAM_TILE_TEXT = "#000000";
+const DEMO_PROGRAM_TILE_LINK_URL = "https://ya.ru";
 const DEMO_FONT_FAMILY = "Roboto, Arial, sans-serif";
 const DEMO_FONT_URL = "/fonts/roboto/Roboto-VariableFont_wdth,wght.ttf";
 const DEMO_LOGO_URL = "/logo.svg";
 const DEMO_PLAYER_BG_URL = "/event-bg.png";
 const DEMO_PROJECTOR_BG_URL = "/prj.png";
+const DEMO_DEFAULT_BANNER_IMAGE_URL = "/1778695311505-7c9vii0m.png";
+const DEMO_DEFAULT_BANNER_ID = "demo_banner_1";
+const DEMO_DEFAULT_BANNER: PublicBanner = {
+  id: DEMO_DEFAULT_BANNER_ID,
+  linkUrl: DEMO_PROGRAM_TILE_LINK_URL,
+  backgroundUrl: DEMO_DEFAULT_BANNER_IMAGE_URL,
+  size: "1x1",
+  isVisible: true,
+};
+const DEMO_DEFAULT_PLAYER_TILES_ORDER = [
+  SPEAKER_TILE_ID,
+  PROGRAM_TILE_ID,
+  DEMO_DEFAULT_BANNER_ID,
+] as const;
 
 function applyDemoBranding(view: PublicViewState): PublicViewState {
+  const hasBanners = (view.playerBanners?.length ?? 0) > 0;
   return {
     ...view,
     projectorBackground: DEMO_PROJECTOR_BG,
@@ -47,6 +66,10 @@ function applyDemoBranding(view: PublicViewState): PublicViewState {
     speakerTileTextColor: DEMO_SPEAKER_TILE_TEXT,
     programTileBackgroundColor: DEMO_PROGRAM_TILE_BG,
     programTileTextColor: DEMO_PROGRAM_TILE_TEXT,
+    programTileLinkUrl: DEMO_PROGRAM_TILE_LINK_URL,
+    programTileVisible: true,
+    playerBanners: hasBanners ? view.playerBanners : [DEMO_DEFAULT_BANNER],
+    playerTilesOrder: hasBanners ? view.playerTilesOrder : [...DEMO_DEFAULT_PLAYER_TILES_ORDER],
   };
 }
 
@@ -146,31 +169,29 @@ function buildDemoRoomContent(): RoomContentReplaceInput {
       // TAG_CLOUD
       {
         type: "tag_cloud",
-        text: "Перечислите все цвета флага Германии (ровно 3)",
+        text: "Перечислите все цвета флага Германии",
         points: 5,
         scoringMode: "quiz",
         maxAnswers: 3,
+        rankingPointsByRank: [2, 2, 2],
         options: [
-          { text: "Чёрный", isCorrect: true },
+          { text: "Чёрный; Черный", isCorrect: true },
           { text: "Красный", isCorrect: true },
-          { text: "Жёлтый", isCorrect: true },
-          { text: "Синий", isCorrect: false },
-          { text: "Зелёный", isCorrect: false },
+          { text: "Жёлтый; Желтый; Золотой", isCorrect: true },
         ],
       } satisfies QuestionReplaceInput,
       // TAG_CLOUD
       {
         type: "tag_cloud",
-        text: "Назовите все первичные цвета RGB (ровно 3)",
+        text: "Назовите все первичные цвета RGB",
         points: 10,
         scoringMode: "quiz",
         maxAnswers: 3,
+        rankingPointsByRank: [2, 2, 2],
         options: [
           { text: "Красный", isCorrect: true },
           { text: "Зелёный", isCorrect: true },
-          { text: "Синий", isCorrect: true },
-          { text: "Белый", isCorrect: false },
-          { text: "Чёрный", isCorrect: false },
+          { text: "Синий; Голубой", isCorrect: true },
         ],
       } satisfies QuestionReplaceInput,
 
@@ -193,7 +214,7 @@ function buildDemoRoomContent(): RoomContentReplaceInput {
       // RANKING (quiz)
       {
         type: "ranking",
-        text: "Расположите материки по размеру (попробуйте угадай порядок):",
+        text: "Расположите материки по размеру:",
         points: 5,
         scoringMode: "quiz",
         rankingKind: "quiz",
@@ -264,30 +285,28 @@ function buildDemoRoomContent(): RoomContentReplaceInput {
 
       {
         type: "tag_cloud",
-        text: "Перечислите все состояния воды (ровно 3)",
+        text: "Перечислите все состояния воды",
         points: 5,
         scoringMode: "quiz",
         maxAnswers: 3,
+        rankingPointsByRank: [2, 2, 2],
         options: [
-          { text: "Твёрдое", isCorrect: true },
-          { text: "Жидкое", isCorrect: true },
-          { text: "Газообразное", isCorrect: true },
-          { text: "Плазма", isCorrect: false },
-          { text: "Кристалл", isCorrect: false },
+          { text: "Твёрдое; Лёд", isCorrect: true },
+          { text: "Жидкое; Вода", isCorrect: true },
+          { text: "Газообразное; Пар; Газ", isCorrect: true },
         ],
       } satisfies QuestionReplaceInput,
       {
         type: "tag_cloud",
-        text: "Перечислите все цвета флага России (ровно 3)",
+        text: "Перечислите все цвета флага России",
         points: 10,
         scoringMode: "quiz",
         maxAnswers: 3,
+        rankingPointsByRank: [2, 2, 2],
         options: [
           { text: "Белый", isCorrect: true },
-          { text: "Синий", isCorrect: true },
+          { text: "Синий; Голубой", isCorrect: true },
           { text: "Красный", isCorrect: true },
-          { text: "Зелёный", isCorrect: false },
-          { text: "Чёрный", isCorrect: false },
         ],
       } satisfies QuestionReplaceInput,
 
@@ -381,7 +400,7 @@ function buildDemoRoomContent(): RoomContentReplaceInput {
     // TAG_CLOUD (poll)
     {
       type: "tag_cloud",
-      text: "Перечислите все цвета флага Франции (ровно 3)",
+      text: "Перечислите все цвета флага Франции",
       points: 5,
       scoringMode: "poll",
       maxAnswers: 3,
@@ -396,10 +415,11 @@ function buildDemoRoomContent(): RoomContentReplaceInput {
     // TAG_CLOUD (quiz)
     {
       type: "tag_cloud",
-      text: "Назовите все базовые стороны света (ровно 4)",
+      text: "Назовите все базовые стороны света",
       points: 10,
       scoringMode: "quiz",
       maxAnswers: 4,
+      rankingPointsByRank: [2, 2, 2, 2, 0],
       options: [
         { text: "Север", isCorrect: true },
         { text: "Юг", isCorrect: true },
@@ -553,6 +573,7 @@ async function createDemoAnswersAndSpeakerQuestions(input: {
     scoringMode: ScoringMode;
     points: number;
     maxAnswers?: number | null;
+    rankingPointsByRank?: unknown;
     rankingKind?: "QUIZ" | "JURY";
     options: Array<{ id: string; text: string; isCorrect: boolean }>;
     subQuizId: string | null;
@@ -590,6 +611,7 @@ async function createDemoAnswersAndSpeakerQuestions(input: {
 
         let selectedOptionIds: string[] = [];
         let isCorrect = false;
+        let scoreAwarded = 0;
 
         if (q.type === QuestionType.SINGLE) {
           const correctIds = q.options.filter((o) => o.isCorrect).map((o) => o.id);
@@ -599,6 +621,7 @@ async function createDemoAnswersAndSpeakerQuestions(input: {
 
           selectedOptionIds = [chooseCorrect ? correctId! : wrongId!];
           isCorrect = correctIds.length > 0 ? selectedOptionIds[0] === correctId : false;
+          scoreAwarded = q.scoringMode === ScoringMode.QUIZ && isCorrect ? q.points : 0;
         } else if (q.type === QuestionType.MULTI) {
           const correctIds = q.options.filter((o) => o.isCorrect).map((o) => o.id);
           const wrongIds = q.options.filter((o) => !o.isCorrect).map((o) => o.id);
@@ -619,49 +642,22 @@ async function createDemoAnswersAndSpeakerQuestions(input: {
           isCorrect =
             correctSorted.length === selectedSorted.length &&
             correctSorted.every((id, i) => id === selectedSorted[i]);
+          scoreAwarded = q.scoringMode === ScoringMode.QUIZ && isCorrect ? q.points : 0;
         } else if (q.type === QuestionType.TAG_CLOUD) {
-          const correctTags = q.options.filter((o) => o.isCorrect).map((o) => o.text);
-          const correctTagsComparable = correctTags.map(normalizeTagComparable);
-          const correctSet = new Set(correctTagsComparable);
-
-          const maxAnswers = Math.max(1, Math.trunc(q.maxAnswers ?? 3));
-
-          // Tags to use for "wrong" submissions (must not overlap with correct set).
-          const extraWrongPool = [
-            "кофе",
-            "пицца",
-            "корабль",
-            "пингвин",
-            "карта",
-            "фильм",
-            "река",
-            "гора",
-            "планета",
-          ].filter((t) => !correctSet.has(normalizeTagComparable(t)));
-          const wrongPool = extraWrongPool;
-
-          const tagPick = (pool: string[], count: number) => {
-            const unique: string[] = [];
-            for (const t of pool) {
-              const norm = normalizeTagComparable(t);
-              if (!norm || unique.includes(norm)) continue;
-              unique.push(norm);
-              if (unique.length >= count) break;
-            }
-            return unique;
-          };
-
-          if (correctTagsComparable.length > 0) {
-            if (chooseCorrect) {
-              const firstCorrect = correctTagsComparable[0]!;
-              const additional = maxAnswers > 1 ? tagPick(wrongPool, 1) : [];
-              selectedOptionIds = [firstCorrect, ...additional].slice(0, maxAnswers);
-            } else {
-              selectedOptionIds = tagPick(wrongPool, Math.min(2, maxAnswers));
-            }
-            const selectedSet = new Set(selectedOptionIds);
-            isCorrect = Array.from(selectedSet).some((t) => correctSet.has(t));
-          }
+          const tagCloud = buildDemoTagCloudAnswer(
+            {
+              options: q.options,
+              maxAnswers: q.maxAnswers,
+              points: q.points,
+              rankingPointsByRank: q.rankingPointsByRank,
+              scoringMode: q.scoringMode,
+            },
+            chooseCorrect,
+            pIndex * 1000 + qIndex,
+          );
+          selectedOptionIds = tagCloud.selectedTags;
+          isCorrect = tagCloud.isCorrect;
+          scoreAwarded = tagCloud.scoreAwarded;
         } else if (q.type === QuestionType.RANKING) {
           const expected = q.options.map((o) => o.id);
           if (q.rankingKind === "JURY") {
@@ -674,10 +670,9 @@ async function createDemoAnswersAndSpeakerQuestions(input: {
             const submittedIsCorrect = evaluateRankingAnswer(expected, submitted);
             isCorrect = q.scoringMode === ScoringMode.QUIZ && submittedIsCorrect;
             selectedOptionIds = submitted;
+            scoreAwarded = q.scoringMode === ScoringMode.QUIZ && isCorrect ? q.points : 0;
           }
         }
-
-        const scoreAwarded = q.scoringMode === ScoringMode.QUIZ && isCorrect ? q.points : 0;
 
         if (selectedOptionIds.length < 1) continue;
 
@@ -872,6 +867,7 @@ export async function resetDemoQuizToDefault(): Promise<{ quizId: string }> {
     scoringMode: q.scoringMode,
     points: q.points,
     maxAnswers: q.maxAnswers,
+    rankingPointsByRank: q.rankingPointsByRank,
     rankingKind: q.type === QuestionType.RANKING ? (q.rankingKind as "QUIZ" | "JURY") : undefined,
     subQuizId: q.subQuizId,
     options: [...q.options]

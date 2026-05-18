@@ -13,6 +13,11 @@ import {
 } from "@mui/material";
 import CloseIcon from "@mui/icons-material/Close";
 import type { SpeakerQuestionsPayload } from "../../types/speakerQuestions";
+import {
+  PLAYER_DIALOG_CONTENT_SX,
+  PLAYER_DIALOG_PAPER_SX,
+  PLAYER_DIALOG_TITLE_SX,
+} from "./playerDialogStyles";
 
 const DEFAULT_SPEAKER_REACTIONS = ["👍", "🔥", "👏", "❤️"];
 
@@ -21,12 +26,6 @@ function speakerQuestionLabel(speakerName: string): string {
     ? "Вопрос ко всем спикерам"
     : `Вопрос к спикеру: ${speakerName}`;
 }
-
-const DIALOG_PAPER_SX = {
-  bgcolor: "rgba(0, 0, 0, 0.9)",
-  color: "#fff",
-  backdropFilter: "blur(4px)",
-} as const;
 
 type Props = {
   open: boolean;
@@ -62,25 +61,16 @@ export function SpeakerQuestionsDialog({
       fullWidth
       maxWidth="sm"
       PaperProps={{
-        sx: DIALOG_PAPER_SX,
+        sx: PLAYER_DIALOG_PAPER_SX,
       }}
     >
-      <DialogTitle
-        sx={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          pr: 0.5,
-          pb: 1,
-          color: "#fff",
-        }}
-      >
+      <DialogTitle sx={PLAYER_DIALOG_TITLE_SX}>
         Вопросы спикерам
         <IconButton aria-label="Закрыть" onClick={onClose} size="small">
           <CloseIcon fontSize="small" />
         </IconButton>
       </DialogTitle>
-      <DialogContent sx={{ pt: 0.5, pb: 1.5, color: "#fff" }}>
+      <DialogContent sx={PLAYER_DIALOG_CONTENT_SX}>
         <Stack spacing={1} sx={{ pt: 0.5 }}>
           <TextField
             select

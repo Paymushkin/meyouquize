@@ -65,6 +65,17 @@ const questionSchema = z
             path: ["options"],
           });
         }
+        if (
+          value.rankingPointsByRank != null &&
+          value.rankingPointsByRank !== undefined &&
+          value.rankingPointsByRank.length !== value.options.length
+        ) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: "Число баллов по тегам должно совпадать с числом вариантов",
+            path: ["rankingPointsByRank"],
+          });
+        }
       }
       return;
     }
@@ -189,6 +200,11 @@ export const submitAnswerSchema = z.object({
   /** Полный порядок id вариантов (лучше → хуже) для типа RANKING */
   rankedOptionIds: z.array(z.string().min(1)).optional(),
   tagAnswers: z.array(z.string().min(1).max(80)).max(5).optional(),
+});
+
+export const playerSubQuizReportRequestSchema = z.object({
+  quizId: z.string().trim().min(1).max(80),
+  subQuizId: z.string().trim().min(1).max(80).optional(),
 });
 
 export const resetAnswersSchema = z.object({
@@ -324,7 +340,19 @@ export const setPublicViewSchema = z.object({
     .optional(),
   programTileLinkUrl: optionalExternalHttpUrlSchema,
   programTileVisible: z.boolean().optional(),
-  playerTilesOrder: z.array(z.string().trim().min(1).max(80)).max(100).optional(),
+  playerQuizResultsTileVisible: z.boolean().optional(),
+  playerQuizResultsTileText: z.string().trim().max(120).optional(),
+  playerQuizResultsTileBackgroundColor: z
+    .string()
+    .regex(/^#([0-9a-fA-F]{6})$/)
+    .optional(),
+  playerQuizResultsTileTextColor: z
+    .string()
+    .regex(/^#([0-9a-fA-F]{6})$/)
+    .optional(),
+  playerQuizResultsSubQuizId: z.string().trim().max(80).optional(),
+  playerQuizResultsSubQuizIds: z.array(z.string().trim().min(1).max(80)).max(20).optional(),
+  playerTilesOrder: z.array(z.string().trim().min(1).max(120)).max(100).optional(),
   reactionsOverlayText: z.string().trim().max(120).optional(),
   reactionsWidgets: z
     .array(

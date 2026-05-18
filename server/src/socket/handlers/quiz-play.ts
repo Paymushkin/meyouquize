@@ -1,6 +1,7 @@
 import type { Server } from "socket.io";
 import {
   joinQuizSchema,
+  playerSubQuizReportRequestSchema,
   resetAnswersSchema,
   submitAnswerSchema,
   toggleReactionSchema,
@@ -8,6 +9,9 @@ import {
 } from "../../schemas.js";
 import {
   getParticipantAnswersMap,
+  getParticipantPersonalSubQuizReport,
+  getParticipantScoresBySubQuiz,
+  getParticipantTotalScoreForQuiz,
   getQuizPublicState,
   joinQuiz,
   resetParticipantAnswers,
@@ -18,11 +22,7 @@ import {
   broadcastDashboardResultsNow,
   scheduleDashboardResultsBroadcast,
 } from "../dashboard-results.js";
-import {
-  emitQuizOnlineCount,
-  emitToQuizPlayersAndDashboard,
-  quizPlayerRoom,
-} from "../quiz-rooms.js";
+import { broadcastQuizPublicState, emitQuizOnlineCount, quizPlayerRoom } from "../quiz-rooms.js";
 import { allowAnswerSubmit } from "../submit-rate-limit.js";
 import type { EnrichedSocket } from "../handler-common.js";
 import { fail } from "../handler-common.js";
@@ -52,13 +52,18 @@ export function registerQuizPlayHandlers(socket: EnrichedSocket, io: Server) {
       const payload = joinQuizSchema.parse(raw);
       const joined = await joinQuiz(payload);
       const state = await getQuizPublicState(joined.quizId);
-      const answersMap = await getParticipantAnswersMap(joined.quizId, joined.participantId);
+      if (!state) throw new Error("Quiz not found");
+      const [myTotalScore, mySubQuizScores, answersMap] = await Promise.all([
+        getParticipantTotalScoreForQuiz(joined.quizId, joined.participantId),
+        getParticipantScoresBySubQuiz(joined.quizId, joined.participantId),
+        getParticipantAnswersMap(joined.quizId, joined.participantId),
+      ]);
       socket.data.participantId = joined.participantId;
       socket.data.quizId = joined.quizId;
       await socket.join(quizPlayerRoom(joined.quizId));
       socket.emit("quiz:joined", { ok: true });
       socket.emit("player:answers", answersMap);
-      socket.emit("state:quiz", state);
+      socket.emit("state:quiz", { ...state, myTotalScore, mySubQuizScores });
       emitQuizOnlineCount(io, joined.quizId);
     } catch (error) {
       fail(socket, error instanceof Error ? error.message : "Join failed");
@@ -75,6 +80,11 @@ export function registerQuizPlayHandlers(socket: EnrichedSocket, io: Server) {
       if (!socket.data.participantId) throw new Error("Not joined");
       await submitAnswer({ ...payload, participantId: socket.data.participantId });
       socket.emit("answer:submitted", { ok: true });
+      const [myTotalScore, mySubQuizScores] = await Promise.all([
+        getParticipantTotalScoreForQuiz(payload.quizId, socket.data.participantId),
+        getParticipantScoresBySubQuiz(payload.quizId, socket.data.participantId),
+      ]);
+      socket.emit("player:quiz-score", { myTotalScore, mySubQuizScores });
       scheduleDashboardResultsBroadcast(io, payload.quizId);
     } catch (error) {
       fail(socket, error instanceof Error ? error.message : "Submit failed");
@@ -87,6 +97,7 @@ export function registerQuizPlayHandlers(socket: EnrichedSocket, io: Server) {
       if (!socket.data.participantId) throw new Error("Not joined");
       await resetParticipantAnswers(payload.quizId, socket.data.participantId);
       socket.emit("answers:reset:done", { ok: true });
+      socket.emit("player:quiz-score", { myTotalScore: 0, mySubQuizScores: {} });
       await broadcastDashboardResultsNow(io, payload.quizId);
     } catch (error) {
       fail(socket, error instanceof Error ? error.message : "Reset failed");
@@ -105,7 +116,8 @@ export function registerQuizPlayHandlers(socket: EnrichedSocket, io: Server) {
       });
       socket.emit("quiz:nickname:updated", { nickname: updated.nickname });
       const state = await getQuizPublicState(payload.quizId);
-      emitToQuizPlayersAndDashboard(io, payload.quizId, "state:quiz", state);
+      if (!state) throw new Error("Quiz not found");
+      await broadcastQuizPublicState(io, payload.quizId, state);
     } catch (error) {
       fail(socket, error instanceof Error ? error.message : "Update nickname failed");
     }
@@ -129,9 +141,30 @@ export function registerQuizPlayHandlers(socket: EnrichedSocket, io: Server) {
         );
       }
       const state = await getQuizPublicState(payload.quizId);
-      emitToQuizPlayersAndDashboard(io, payload.quizId, "state:quiz", state);
+      if (!state) throw new Error("Quiz not found");
+      await broadcastQuizPublicState(io, payload.quizId, state);
     } catch (error) {
       fail(socket, error instanceof Error ? error.message : "Toggle reaction failed");
+    }
+  });
+
+  socket.on("player:sub-quiz-report:request", async (raw: unknown) => {
+    try {
+      const payload = playerSubQuizReportRequestSchema.parse(raw);
+      if (!socket.data.participantId) throw new Error("Not joined");
+      if (socket.data.quizId !== payload.quizId) throw new Error("Not joined");
+      const report = await getParticipantPersonalSubQuizReport(
+        payload.quizId,
+        socket.data.participantId,
+        payload.subQuizId,
+      );
+      if (!report) {
+        fail(socket, "Квиз для отчёта не найден");
+        return;
+      }
+      socket.emit("player:sub-quiz-report", { report });
+    } catch (error) {
+      fail(socket, error instanceof Error ? error.message : "Report failed");
     }
   });
 }

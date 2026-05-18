@@ -4,7 +4,12 @@ import {
   DEFAULT_PROJECTOR_JOIN_QR_VISIBLE,
   PROJECTOR_JOIN_QR_TEXT_MAX_LENGTH,
   normalizePublicViewState,
+  QUIZ_RESULTS_TILE_ID,
   SPEAKER_TILE_ID,
+  withQuizResultsTileLast,
+  isQuizResultsTileId,
+  parseQuizResultsSubQuizIdFromTileId,
+  quizResultsTileIdForSubQuiz,
   type CloudWordCount,
   type PublicBanner,
   type PublicReactionWidgetStats,
@@ -100,7 +105,12 @@ export {
   DEFAULT_PROJECTOR_JOIN_QR_VISIBLE,
   PROJECTOR_JOIN_QR_TEXT_MAX_LENGTH,
   normalizePublicViewState,
+  QUIZ_RESULTS_TILE_ID,
   SPEAKER_TILE_ID,
+  withQuizResultsTileLast,
+  isQuizResultsTileId,
+  parseQuizResultsSubQuizIdFromTileId,
+  quizResultsTileIdForSubQuiz,
 };
 
 export function toBrandingState(payload: Partial<PublicViewPayload>): BrandingState {

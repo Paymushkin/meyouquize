@@ -14,7 +14,6 @@ import {
   LinearProgress,
   List,
   ListItemButton,
-  ListItemText,
   MenuItem,
   Stack,
   TextField,
@@ -210,39 +209,6 @@ export function AdminQuestionsSection(props: Props) {
                   sx={{ display: "block", listStyle: "none" }}
                 >
                   <Box sx={{ position: "relative" }}>
-                    <Tooltip title={questionTypeLabel(question.type)} enterTouchDelay={400}>
-                      <Box
-                        component="span"
-                        aria-hidden
-                        onClick={(e) => e.stopPropagation()}
-                        sx={{
-                          position: "absolute",
-                          top: 0,
-                          left: 0,
-                          zIndex: 2,
-                          display: "flex",
-                          alignItems: "flex-start",
-                          justifyContent: "flex-start",
-                          cursor: "help",
-                          m: 0,
-                          p: 0,
-                          lineHeight: 0,
-                        }}
-                      >
-                        {question.type === "tag_cloud" ? (
-                          <CloudQueueIcon
-                            sx={{ fontSize: 18, display: "block", color: "common.white" }}
-                          />
-                        ) : question.type === "ranking" ? (
-                          <FormatListNumberedIcon
-                            sx={{ fontSize: 18, display: "block" }}
-                            color="action"
-                          />
-                        ) : (
-                          <HowToVoteIcon sx={{ fontSize: 18, display: "block" }} color="action" />
-                        )}
-                      </Box>
-                    </Tooltip>
                     <ListItemButton
                       disableGutters
                       selected={false}
@@ -250,12 +216,13 @@ export function AdminQuestionsSection(props: Props) {
                       aria-label={`${questionTypeLabel(question.type)}: ${question.text.trim() || "Без текста"}`}
                       aria-selected={selectedListIndex === qIndex}
                       sx={{
+                        display: "flex",
+                        flexDirection: "row",
                         alignItems: "center",
+                        justifyContent: "space-between",
                         gap: 1,
                         py: 0,
                         px: 0,
-                        pl: 2.5,
-                        pr: 0,
                         minHeight: 0,
                         borderRadius: 0,
                         bgcolor: "transparent",
@@ -264,17 +231,58 @@ export function AdminQuestionsSection(props: Props) {
                         },
                       }}
                     >
-                      <ListItemText
-                        primary={question.text.trim() || "Без текста"}
-                        slotProps={{
-                          primary: {
-                            variant: "body2",
-                            noWrap: true,
-                            title: question.text.trim() || undefined,
-                          },
+                      <Box
+                        sx={{
+                          flex: 1,
+                          minWidth: 0,
+                          display: "flex",
+                          justifyContent: "flex-start",
+                          alignItems: "center",
+                          gap: 1.25,
+                          py: 0.5,
                         }}
-                        sx={{ flex: "1 1 auto", minWidth: 0, my: 0 }}
-                      />
+                      >
+                        <Tooltip title={questionTypeLabel(question.type)} enterTouchDelay={400}>
+                          <Box
+                            component="span"
+                            aria-hidden
+                            onClick={(e) => e.stopPropagation()}
+                            sx={{
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                              flexShrink: 0,
+                              cursor: "help",
+                              lineHeight: 0,
+                            }}
+                          >
+                            {question.type === "tag_cloud" ? (
+                              <CloudQueueIcon
+                                sx={{ fontSize: 16, display: "block", color: "common.white" }}
+                              />
+                            ) : question.type === "ranking" ? (
+                              <FormatListNumberedIcon
+                                sx={{ fontSize: 16, display: "block" }}
+                                color="action"
+                              />
+                            ) : (
+                              <HowToVoteIcon
+                                sx={{ fontSize: 16, display: "block" }}
+                                color="action"
+                              />
+                            )}
+                          </Box>
+                        </Tooltip>
+                        <Typography
+                          component="span"
+                          variant="body2"
+                          noWrap
+                          title={question.text.trim() || undefined}
+                          sx={{ minWidth: 0, textAlign: "left" }}
+                        >
+                          {question.text.trim() || "Без текста"}
+                        </Typography>
+                      </Box>
                       <QuestionRowQuickActions
                         questionType={question.type}
                         questionOnProjector={isOnProjector}

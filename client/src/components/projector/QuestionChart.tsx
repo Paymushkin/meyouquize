@@ -4,7 +4,7 @@ import { Box, Fade, LinearProgress, Paper, Stack, Typography } from "@mui/materi
 import { useTheme } from "@mui/material/styles";
 import { animated, to, useTransition } from "@react-spring/web";
 import cloud from "d3-cloud";
-import { normalizeTagComparable } from "@meyouquize/shared";
+import { collectTagCloudCorrectAliases, normalizeTagComparable } from "@meyouquize/shared";
 import { buildCloudWordsForDisplay } from "../../features/tagCloudMerge";
 import { colorByWord } from "../../features/projectorChart/colorByWord";
 import type { ProjectorLayoutWord, ProjectorQuestionResult } from "../../types/projectorDashboard";
@@ -13,6 +13,10 @@ import { resolveMuiFontFamily } from "../../utils/muiFontFamily";
 const MIN_BAR_DISPLAY_PERCENT = 1.75;
 const CORRECT_OPTION_COLOR = "#4caf50";
 const DEFAULT_OUTLINE_COLOR = "rgba(255,255,255,0.35)";
+
+/** Стабильные ссылки: иначе дефолт `= []` в параметрах даёт новый массив на каждый рендер и бесконечно перезапускает layout облака. */
+const EMPTY_HIDDEN_TAGS: string[] = [];
+const EMPTY_CLOUD_INJECT: Array<{ text: string; count: number }> = [];
 
 function buildOptionLabelSx(voteOptionTextColor: string) {
   return {
@@ -44,11 +48,13 @@ export type QuestionChartProps = {
   cloudTagPadding?: number;
   cloudSpiral?: "archimedean" | "rectangular";
   cloudAnimationStrength?: number;
+  /** При пересчёте layout (d3-cloud) существующие теги прыгают на место без spring; анимация остаётся у новых (enter). */
+  tagCloudSnapRelayout?: boolean;
   voteOptionTextColor?: string;
   voteProgressTrackColor?: string;
   voteProgressBarColor?: string;
   brandPrimaryColor?: string;
-  /** Заголовок вопроса внутри блока облака (вместо отдельной строки над Paper) */
+  /** Заголовок вопроса внутри блока облака (вместо отдельной строки над областью чарта) */
   cloudHeader?: ReactNode;
 };
 
@@ -59,9 +65,9 @@ export function QuestionChart(props: QuestionChartProps) {
     showCorrectOption = false,
     questionRevealStage = "results",
     fillHeight = false,
-    hiddenTagTexts = [],
-    injectedTagWords = [],
-    tagCountOverrides = [],
+    hiddenTagTexts = EMPTY_HIDDEN_TAGS,
+    injectedTagWords = EMPTY_CLOUD_INJECT,
+    tagCountOverrides = EMPTY_CLOUD_INJECT,
     cloudTagColors = ["#1f1f1f", "#1976d2", "#2e7d32", "#ef6c00", "#6a1b9a"],
     cloudTopTagColor = "#d32f2f",
     cloudCorrectTagColor = "#2e7d32",
@@ -69,6 +75,7 @@ export function QuestionChart(props: QuestionChartProps) {
     cloudTagPadding = 5,
     cloudSpiral = "archimedean",
     cloudAnimationStrength = 30,
+    tagCloudSnapRelayout = false,
     voteOptionTextColor = "#1f1f1f",
     voteProgressTrackColor = "#e3e3e3",
     voteProgressBarColor = "#1976d2",
@@ -80,6 +87,9 @@ export function QuestionChart(props: QuestionChartProps) {
   const [layoutWords, setLayoutWords] = useState<ProjectorLayoutWord[]>([]);
   const [cloudSize, setCloudSize] = useState({ width: 920, height: 440 });
   const cloudContainerRef = useRef<HTMLDivElement | null>(null);
+  const cloudSizeRafRef = useRef(0);
+  /** Последние применённые размеры — без этого ResizeObserver + пересчёт облака могут «дрожать» на 1px и зациклить layout. */
+  const appliedCloudSizeRef = useRef({ width: 0, height: 0 });
 
   const isTagCloud = question.type === "tag_cloud";
   const sourceWords = useMemo(
@@ -99,14 +109,10 @@ export function QuestionChart(props: QuestionChartProps) {
   );
   const referenceComparableSet = useMemo(() => {
     if (question.type !== "tag_cloud") return null;
-    const set = new Set<string>();
-    for (const o of question.optionStats) {
-      if (o.isCorrect) {
-        const k = normalizeTagComparable(o.text);
-        if (k) set.add(k);
-      }
-    }
-    return set.size > 0 ? set : null;
+    const aliases = collectTagCloudCorrectAliases(
+      question.optionStats.map((o) => ({ text: o.text, isCorrect: o.isCorrect })),
+    );
+    return aliases.length > 0 ? new Set(aliases) : null;
   }, [question.type, question.optionStats]);
   const hasBarData = question.optionStats.length > 0;
   const hasRankingAnswers = question.type === "ranking" && hasBarData;
@@ -140,6 +146,7 @@ export function QuestionChart(props: QuestionChartProps) {
       scale: 1,
       opacity: 1,
       size: item.size,
+      ...(tagCloudSnapRelayout ? { immediate: true as const } : {}),
     }),
     leave: {
       scale: 0.5,
@@ -156,18 +163,54 @@ export function QuestionChart(props: QuestionChartProps) {
     if (!isTagCloud) return;
     const node = cloudContainerRef.current;
     if (!node) return;
-    const update = () => {
+
+    const readSize = () => {
       const rect = node.getBoundingClientRect();
-      setCloudSize({
-        width: Math.max(360, Math.floor(rect.width)),
-        height: Math.max(300, Math.floor(rect.height)),
-      });
+      const rawW = Math.round(rect.width);
+      const rawH = Math.round(rect.height);
+      return {
+        width: Math.max(360, rawW),
+        height: rawH <= 12 ? 0 : Math.max(300, rawH),
+      };
     };
-    update();
-    const observer = new ResizeObserver(update);
+
+    const flush = () => {
+      cloudSizeRafRef.current = 0;
+      const next = readSize();
+      const prev = appliedCloudSizeRef.current;
+      const isFirst = prev.width === 0 && prev.height === 0;
+      if (!isFirst && prev.width === next.width && prev.height === next.height) {
+        return;
+      }
+      if (
+        !isFirst &&
+        Math.abs(prev.width - next.width) < 2 &&
+        Math.abs(prev.height - next.height) < 2
+      ) {
+        return;
+      }
+      appliedCloudSizeRef.current = next;
+      setCloudSize(next);
+    };
+
+    const schedule = () => {
+      if (cloudSizeRafRef.current !== 0) {
+        cancelAnimationFrame(cloudSizeRafRef.current);
+      }
+      cloudSizeRafRef.current = requestAnimationFrame(flush);
+    };
+
+    flush();
+    const observer = new ResizeObserver(schedule);
     observer.observe(node);
-    return () => observer.disconnect();
-  }, [isTagCloud, fillHeight]);
+    return () => {
+      observer.disconnect();
+      if (cloudSizeRafRef.current !== 0) {
+        cancelAnimationFrame(cloudSizeRafRef.current);
+        cloudSizeRafRef.current = 0;
+      }
+    };
+  }, [isTagCloud, fillHeight, questionRevealStage]);
 
   useEffect(() => {
     if (!isTagCloud || !hasTagWords || questionRevealStage === "options") {
@@ -177,11 +220,11 @@ export function QuestionChart(props: QuestionChartProps) {
     const min = Math.min(...sourceWords.map((item) => item.count));
     const max = Math.max(...sourceWords.map((item) => item.count));
     const wordCount = sourceWords.length;
-    const sparseBoost = Math.max(1, Math.min(1.75, 1.75 - wordCount * 0.06));
+    const sparseBoost = Math.max(1, Math.min(1.55, 1.55 - wordCount * 0.055));
     const fontSize = (count: number, text: string) => {
       const tLinear = max === min ? 1 : (count - min) / (max - min);
       const t = Math.pow(Math.max(0, Math.min(1, tLinear)), 0.72);
-      const base = max === min ? 60 : 24 + t * 44;
+      const base = max === min ? 44 : 16 + t * 30;
       const lengthPenalty = Math.max(0.68, 1 - Math.max(0, text.length - 10) * 0.018);
       return Math.round(base * sparseBoost * lengthPenalty);
     };
@@ -209,15 +252,21 @@ export function QuestionChart(props: QuestionChartProps) {
       .fontWeight("700")
       .fontSize((word) => word.size)
       .spiral(cloudSpiral)
-      .on("end", (words: ProjectorLayoutWord[]) => setLayoutWords(words));
+      .on("end", (words: ProjectorLayoutWord[]) => {
+        setLayoutWords(
+          words.map((w) => ({
+            ...w,
+            x: Math.round(w.x ?? 0),
+            y: Math.round(w.y ?? 0),
+          })),
+        );
+      });
 
     layout.start();
     return () => {
       layout.stop();
     };
   }, [
-    cloudAnimationStrength,
-    cloudDensity,
     cloudSize.height,
     cloudSize.width,
     cloudFontFamily,
@@ -391,6 +440,8 @@ export function QuestionChart(props: QuestionChartProps) {
   if (isTagCloud) {
     const safeDensity = Math.max(0, Math.min(100, cloudDensity));
     const spreadFactor = 1.3 - (safeDensity / 100) * 0.55;
+    const tagCloudOptionsOnly = questionRevealStage === "options";
+    const paperFillHeight = fillHeight && !tagCloudOptionsOnly;
 
     return (
       <Paper
@@ -402,19 +453,33 @@ export function QuestionChart(props: QuestionChartProps) {
           background: "transparent",
           backgroundImage: "none",
           "--Paper-overlay": "none",
-          height: fillHeight ? "100%" : 440,
-          minHeight: fillHeight ? 0 : 300,
+          width: "100%",
+          height: paperFillHeight ? "100%" : fillHeight ? "auto" : 440,
+          minHeight: paperFillHeight ? 0 : fillHeight ? 0 : 300,
           display: "flex",
           flexDirection: "column",
         }}
       >
-        {cloudHeader ? <Box sx={{ flexShrink: 0, width: "100%" }}>{cloudHeader}</Box> : null}
+        {cloudHeader ? (
+          <Box
+            sx={{
+              flexShrink: 0,
+              width: "100%",
+              display: "flex",
+              justifyContent: "center",
+              alignItems: "center",
+            }}
+          >
+            {cloudHeader}
+          </Box>
+        ) : null}
         <Box
           ref={cloudContainerRef}
           sx={{
             position: "relative",
-            flex: 1,
-            minHeight: 0,
+            flex: tagCloudOptionsOnly ? "0 0 0px" : 1,
+            minHeight: tagCloudOptionsOnly ? 0 : 0,
+            height: tagCloudOptionsOnly ? 0 : undefined,
             width: "100%",
             overflow: "hidden",
             px: 1,

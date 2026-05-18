@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { SPEAKER_TILE_ID } from "@meyouquize/shared";
+import { SPEAKER_TILE_ID, quizResultsTileIdForSubQuiz } from "@meyouquize/shared";
 import { buildOrderedTiles } from "./buildOrderedTiles";
 
 describe("buildOrderedTiles", () => {
@@ -29,6 +29,11 @@ describe("buildOrderedTiles", () => {
       "#6a1b9a",
       "#ffffff",
       "https://example.com/program",
+      "Мой квиз",
+      [],
+      [],
+      "#7c5acb",
+      "#ffffff",
     );
     expect(rows.map((x) => x.id)).toEqual([bannerB.id, SPEAKER_TILE_ID, bannerA.id]);
   });
@@ -44,7 +49,37 @@ describe("buildOrderedTiles", () => {
       "#6a1b9a",
       "#ffffff",
       "",
+      "Мой квиз",
+      ["sq1"],
+      [{ id: "sq1", title: "Квиз 1" }],
+      "#7c5acb",
+      "#ffffff",
     );
     expect(rows.map((x) => x.id)).toEqual([SPEAKER_TILE_ID, bannerA.id, bannerB.id]);
+  });
+
+  it("renders quiz report tile entries by sub-quiz id", () => {
+    const tileId = quizResultsTileIdForSubQuiz("sq2");
+    const rows = buildOrderedTiles(
+      [tileId],
+      [],
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "Мой квиз",
+      ["sq2"],
+      [{ id: "sq2", title: "География" }],
+      "#7c5acb",
+      "#ffffff",
+    );
+    const report = rows.find((x) => x.kind === "quiz_results");
+    expect(report?.kind).toBe("quiz_results");
+    if (report?.kind === "quiz_results") {
+      expect(report.title).toBe("География");
+    }
   });
 });

@@ -11,7 +11,13 @@ import {
 import { prisma } from "./prisma.js";
 import { publicViewJsonToState } from "./socket/public-view-store.js";
 import { parseSelectedIds, randomSlug, randomToken } from "./utils.js";
-import { evaluateAnswer, evaluateRankingAnswer } from "./scoring.js";
+import {
+  buildTagCloudReferenceTags,
+  evaluateAnswer,
+  evaluateRankingAnswer,
+  evaluateTagCloudSubmission,
+  parseTagCloudTierPoints,
+} from "./scoring.js";
 import { containsProfanity } from "./profanity.js";
 import { getReactionSessionPublic } from "./reactions-service.js";
 
@@ -23,20 +29,6 @@ function normalizeTag(value: string) {
     .replace(/[^\p{L}\p{N}\s]+/gu, " ")
     .trim()
     .replace(/\s+/g, " ");
-}
-
-/** Совпадение хотя бы с одним эталонным тегом (после normalizeTagComparable). */
-function evaluateTagCloudQuizAnswer(
-  question: QuestionWithOptions,
-  userTagsComparable: string[],
-): boolean {
-  const reference = question.options
-    .filter((o) => o.isCorrect)
-    .map((o) => normalizeTagComparable(o.text))
-    .filter(Boolean);
-  if (reference.length === 0) return false;
-  const userSet = new Set(userTagsComparable);
-  return reference.some((r) => userSet.has(r));
 }
 
 function parseTagAnswers(raw: string) {
@@ -237,7 +229,7 @@ function prismaTypeToApi(t: QuestionType): "single" | "multi" | "tag_cloud" | "r
 }
 
 function pointsForReplaceQuestion(q: QuestionReplaceInput): number {
-  return q.type === "tag_cloud" ? 1 : q.points;
+  return Math.max(1, Math.min(10_000, Math.trunc(q.points) || 1));
 }
 
 function maxAnswersForReplaceQuestion(q: QuestionReplaceInput): number {
@@ -276,6 +268,18 @@ function rankingQuestionCreateData(q: QuestionReplaceInput) {
       q.rankingPlayerHint != null && q.rankingPlayerHint.trim() !== ""
         ? q.rankingPlayerHint.trim()
         : null,
+  };
+}
+
+/** Баллы за каждый эталонный тег (массив parallel options); поле `points` — за полный набор верных ответов. */
+function tagCloudQuestionCreateData(q: QuestionReplaceInput) {
+  if (q.type !== "tag_cloud" || q.scoringMode !== "quiz") return {};
+  const tiers =
+    q.rankingPointsByRank != null && q.rankingPointsByRank.length === q.options.length
+      ? q.rankingPointsByRank.map((p) => Math.max(0, Math.min(10_000, Math.trunc(p))))
+      : null;
+  return {
+    rankingPointsByRank: tiers === null ? Prisma.DbNull : tiers,
   };
 }
 
@@ -496,6 +500,7 @@ export async function replaceRoomContent(eventName: string, content: RoomContent
           Math.min(20, Math.trunc(q.projectorFirstCorrectWinnersCount ?? 1)),
         ),
         ...rankingQuestionCreateData(q),
+        ...tagCloudQuestionCreateData(q),
       };
       let targetQuestionId: string;
       if (q.id && existingQuestionIds.has(q.id)) {
@@ -663,6 +668,11 @@ export async function getQuizPublicState(quizId: string) {
     },
   });
   if (!quiz) return null;
+  const subQuizzesForPlayer = await prisma.subQuiz.findMany({
+    where: { quizId: quiz.id },
+    orderBy: { sortOrder: "asc" },
+    select: { id: true, title: true },
+  });
   const activeQuestions = sortActiveQuestionsByActivation(quiz.questions.filter((q) => q.isActive));
   const activeQuestion = activeQuestions[0];
   let quizProgress: QuizProgressPayload | null = null;
@@ -710,6 +720,16 @@ export async function getQuizPublicState(quizId: string) {
     programTileTextColor: view.programTileTextColor,
     programTileLinkUrl: view.programTileLinkUrl,
     programTileVisible: view.programTileVisible,
+    playerQuizResultsTileVisible: view.playerQuizResultsTileVisible,
+    playerQuizResultsTileText: view.playerQuizResultsTileText,
+    playerQuizResultsTileBackgroundColor: view.playerQuizResultsTileBackgroundColor,
+    playerQuizResultsTileTextColor: view.playerQuizResultsTileTextColor,
+    playerQuizResultsSubQuizId: view.playerQuizResultsSubQuizId,
+    playerQuizResultsSubQuizIds: view.playerQuizResultsSubQuizIds,
+    playerSubQuizzes: subQuizzesForPlayer.map((sq) => ({
+      id: sq.id,
+      title: sq.title?.trim() ? sq.title.trim() : "Квиз",
+    })),
     playerVoteOptionTextColor: view.playerVoteOptionTextColor,
     playerVoteProgressTrackColor: view.playerVoteProgressTrackColor,
     playerVoteProgressBarColor: view.playerVoteProgressBarColor,
@@ -864,7 +884,11 @@ function mapPerQuestion(questions: QuestionDashboardRow[]) {
 
     if (q.type === QuestionType.RANKING) {
       const n = sortedOpts.length;
-      const expectedIds = sortedOpts.map((o) => o.id);
+      const expectedIds = rankingExpectedIdsFromQuestion(
+        sortedOpts,
+        q.rankingKind,
+        q.rankingPointsByRank,
+      );
       const isJury = q.rankingKind === RankingKind.JURY;
       const tiers = parseRankingTiersJson(q.rankingPointsByRank);
       const useTiers = isJury && tiers != null && tiers.length === n;
@@ -895,6 +919,14 @@ function mapPerQuestion(questions: QuestionDashboardRow[]) {
               sumsTotalScore[id] += pts;
             }
           }
+        } else if (!isJury) {
+          for (let i = 0; i < n; i++) {
+            const id = ranked[i]!;
+            if (ranked[i] === expectedIds[i] && id in sumsAvgScore) {
+              sumsAvgScore[id] += 1;
+              sumsTotalScore[id] += 1;
+            }
+          }
         }
       }
       optionStats = sortedOpts.map((o) => ({
@@ -903,8 +935,9 @@ function mapPerQuestion(questions: QuestionDashboardRow[]) {
         count: answerCount,
         isCorrect: o.isCorrect,
         avgRank: answerCount > 0 ? sumsRank[o.id]! / answerCount : 0,
-        avgScore: useTiers && answerCount > 0 ? sumsAvgScore[o.id]! / answerCount : undefined,
-        totalScore: useTiers ? sumsTotalScore[o.id]! : undefined,
+        avgScore:
+          answerCount > 0 && (useTiers || !isJury) ? sumsAvgScore[o.id]! / answerCount : undefined,
+        totalScore: useTiers || !isJury ? sumsTotalScore[o.id]! : undefined,
       }));
     } else {
       const optionCounts: Record<string, number> = {};
@@ -1288,6 +1321,230 @@ export async function getParticipantAnswersMap(quizId: string, participantId: st
   }, {});
 }
 
+/** Сумма начисленных баллов участника по всему квизу (для экрана игрока). */
+export async function getParticipantTotalScoreForQuiz(
+  quizId: string,
+  participantId: string,
+): Promise<number> {
+  const agg = await prisma.answer.aggregate({
+    where: { quizId, participantId },
+    _sum: { scoreAwarded: true },
+  });
+  return Number(agg._sum.scoreAwarded ?? 0);
+}
+
+/** Суммы баллов участника по каждому сабквизу (для плитки «Мой квиз»). */
+export async function getParticipantScoresBySubQuiz(
+  quizId: string,
+  participantId: string,
+): Promise<Record<string, number>> {
+  const rows = await prisma.answer.findMany({
+    where: { quizId, participantId, question: { subQuizId: { not: null } } },
+    select: { scoreAwarded: true, question: { select: { subQuizId: true } } },
+  });
+  const out: Record<string, number> = {};
+  for (const row of rows) {
+    const subQuizId = row.question.subQuizId;
+    if (!subQuizId) continue;
+    out[subQuizId] = (out[subQuizId] ?? 0) + (row.scoreAwarded ?? 0);
+  }
+  return out;
+}
+
+/** Суммы баллов по сабквизам для всех участников квиза (рассылка state:quiz). */
+export async function getParticipantScoresBySubQuizForQuiz(
+  quizId: string,
+): Promise<Map<string, Record<string, number>>> {
+  const rows = await prisma.answer.findMany({
+    where: { quizId, question: { subQuizId: { not: null } } },
+    select: {
+      participantId: true,
+      scoreAwarded: true,
+      question: { select: { subQuizId: true } },
+    },
+  });
+  const out = new Map<string, Record<string, number>>();
+  for (const row of rows) {
+    const subQuizId = row.question.subQuizId;
+    if (!subQuizId) continue;
+    const bucket = out.get(row.participantId) ?? {};
+    bucket[subQuizId] = (bucket[subQuizId] ?? 0) + (row.scoreAwarded ?? 0);
+    out.set(row.participantId, bucket);
+  }
+  return out;
+}
+
+/** Суммы баллов по участникам (один запрос на рассылку state:quiz). */
+export async function getParticipantScoreTotalsByQuiz(
+  quizId: string,
+): Promise<Map<string, number>> {
+  const rows = await prisma.answer.groupBy({
+    by: ["participantId"],
+    where: { quizId },
+    _sum: { scoreAwarded: true },
+  });
+  return new Map(
+    rows.map((row) => [row.participantId, Number(row._sum.scoreAwarded ?? 0)] as const),
+  );
+}
+
+export type PlayerSubQuizReportQuestionRow = {
+  questionId: string;
+  order: number;
+  text: string;
+  type: "single" | "multi" | "tag_cloud" | "ranking";
+  scoringMode: "poll" | "quiz";
+  points: number;
+  scoreAwarded: number | null;
+  userAnswerText: string;
+  correctAnswerText: string;
+};
+
+export type PlayerSubQuizReportPayload = {
+  subQuizId: string;
+  title: string;
+  totalScore: number;
+  questions: PlayerSubQuizReportQuestionRow[];
+  leaderboardPlace: number | null;
+  leaderboardTotal: number;
+};
+
+function formatOptionLabelsInOrder(
+  ids: string[],
+  options: Array<{ id: string; text: string }>,
+): string {
+  const labels = ids
+    .map((id) => options.find((o) => o.id === id)?.text?.trim() || id)
+    .filter(Boolean);
+  return labels.length > 0 ? labels.join(", ") : "—";
+}
+
+/** Личный отчёт участника по вопросам сабквиза (для плитки «Мой квиз»). */
+export async function getParticipantPersonalSubQuizReport(
+  quizId: string,
+  participantId: string,
+  preferredSubQuizId: string | null | undefined,
+): Promise<PlayerSubQuizReportPayload | null> {
+  const trimmed = preferredSubQuizId?.trim();
+  let sub =
+    trimmed && trimmed.length > 0
+      ? await prisma.subQuiz.findFirst({
+          where: { id: trimmed, quizId },
+          select: { id: true, title: true },
+        })
+      : null;
+  if (!sub) {
+    sub = await prisma.subQuiz.findFirst({
+      where: { quizId },
+      orderBy: { sortOrder: "asc" },
+      select: { id: true, title: true },
+    });
+  }
+  if (!sub) return null;
+
+  const questions = await prisma.question.findMany({
+    where: { subQuizId: sub.id },
+    orderBy: { order: "asc" },
+    include: {
+      options: { orderBy: { sortOrder: "asc" }, select: { id: true, text: true, isCorrect: true } },
+    },
+  });
+  if (questions.length === 0) {
+    const [lbChunk] = await aggregateLeaderboardsBySubQuizForQuiz(quizId, [
+      { id: sub.id, title: sub.title.trim() || "Квиз" },
+    ]);
+    const sortedRows = lbChunk?.rows ?? [];
+    const idx = sortedRows.findIndex((r) => r.participantId === participantId);
+    return {
+      subQuizId: sub.id,
+      title: sub.title,
+      totalScore: 0,
+      questions: [],
+      leaderboardPlace: idx >= 0 ? idx + 1 : null,
+      leaderboardTotal: sortedRows.length,
+    };
+  }
+
+  const answers = await prisma.answer.findMany({
+    where: { quizId, participantId, questionId: { in: questions.map((q) => q.id) } },
+    select: { questionId: true, selectedOptionIds: true, scoreAwarded: true },
+  });
+  const answerByQ = new Map(answers.map((a) => [a.questionId, a]));
+
+  const rows: PlayerSubQuizReportQuestionRow[] = [];
+  let totalScore = 0;
+
+  for (const q of questions) {
+    const opts = q.options.map((o) => ({ id: o.id, text: o.text }));
+    const ans = answerByQ.get(q.id);
+    const scoreAwarded = ans != null ? ans.scoreAwarded : null;
+    if (typeof scoreAwarded === "number") totalScore += scoreAwarded;
+
+    let userAnswerText = "Нет ответа";
+    let correctAnswerText = "—";
+
+    if (q.type === QuestionType.SINGLE || q.type === QuestionType.MULTI) {
+      const sel = ans ? parseSelectedIds(ans.selectedOptionIds) : [];
+      userAnswerText = sel.length > 0 ? formatOptionLabelsInOrder(sel, opts) : "Нет ответа";
+      const corrIds = q.options.filter((o) => o.isCorrect).map((o) => o.id);
+      correctAnswerText = corrIds.length > 0 ? formatOptionLabelsInOrder(corrIds, opts) : "—";
+    } else if (q.type === QuestionType.TAG_CLOUD) {
+      const tags = ans ? parseTagAnswers(ans.selectedOptionIds) : [];
+      userAnswerText = tags.length > 0 ? tags.join(", ") : "Нет ответа";
+      const refTexts = q.options
+        .filter((o) => o.isCorrect)
+        .map((o) => o.text.trim())
+        .filter(Boolean);
+      correctAnswerText = refTexts.length > 0 ? refTexts.join(", ") : "—";
+    } else if (q.type === QuestionType.RANKING) {
+      const ranked = ans ? parseSelectedIds(ans.selectedOptionIds) : [];
+      userAnswerText = ranked.length > 0 ? formatOptionLabelsInOrder(ranked, opts) : "Нет ответа";
+      if (q.rankingKind === RankingKind.JURY) {
+        correctAnswerText = "Без эталона (жюри)";
+      } else {
+        const expected = rankingExpectedIdsFromQuestion(
+          q.options,
+          q.rankingKind,
+          q.rankingPointsByRank,
+        );
+        correctAnswerText =
+          expected.length > 0
+            ? expected
+                .map((id, i) => `${i + 1}. ${opts.find((o) => o.id === id)?.text ?? id}`)
+                .join(" · ")
+            : "—";
+      }
+    }
+
+    rows.push({
+      questionId: q.id,
+      order: q.order,
+      text: q.text,
+      type: prismaTypeToApi(q.type),
+      scoringMode: q.scoringMode === ScoringMode.POLL ? "poll" : "quiz",
+      points: q.points,
+      scoreAwarded,
+      userAnswerText,
+      correctAnswerText,
+    });
+  }
+
+  const [lbChunk] = await aggregateLeaderboardsBySubQuizForQuiz(quizId, [
+    { id: sub.id, title: sub.title.trim() || "Квиз" },
+  ]);
+  const sortedRows = lbChunk?.rows ?? [];
+  const placeIdx = sortedRows.findIndex((r) => r.participantId === participantId);
+
+  return {
+    subQuizId: sub.id,
+    title: sub.title,
+    totalScore,
+    questions: rows,
+    leaderboardPlace: placeIdx >= 0 ? placeIdx + 1 : null,
+    leaderboardTotal: sortedRows.length,
+  };
+}
+
 export async function getQuizByAccess(slug: string, accessToken: string) {
   return prisma.quiz.findFirst({
     where: { slug, accessToken },
@@ -1655,7 +1912,16 @@ export async function setQuestionEnabled(quizId: string, questionId: string, ena
   if (!question) throw new Error("Question not found");
 
   if (enabled) {
+    const subKey = question.subQuizId ?? null;
     await prisma.$transaction([
+      prisma.question.updateMany({
+        where: {
+          quizId,
+          subQuizId: subKey,
+          id: { not: questionId },
+        },
+        data: { isActive: false },
+      }),
       prisma.question.update({
         where: { id: questionId },
         data: { isActive: true, isClosed: false, activatedAt: new Date() },
@@ -1948,14 +2214,26 @@ export async function submitAnswer(payload: {
   } else if (selected.length < 1) {
     throw new Error("At least one option is required");
   }
-  const isCorrect =
-    question.type === QuestionType.TAG_CLOUD
-      ? tagCloudQuiz || tagCloudPollWithReference
-        ? evaluateTagCloudQuizAnswer(question as QuestionWithOptions, normalizedTags)
-        : false
-      : evaluateAnswer(question as QuestionWithOptions, selected);
-  const quizScoring = question.scoringMode === ScoringMode.QUIZ;
-  const scoreAwarded = quizScoring && isCorrect ? question.points : 0;
+  let isCorrect = false;
+  let scoreAwarded = 0;
+  if (question.type === QuestionType.TAG_CLOUD && (tagCloudQuiz || tagCloudPollWithReference)) {
+    const referenceTags = buildTagCloudReferenceTags(
+      question.options,
+      parseTagCloudTierPoints(question.rankingPointsByRank),
+    );
+    const evaluated = evaluateTagCloudSubmission({
+      referenceTags,
+      userTagsComparable: normalizedTags,
+      maxAnswers: Math.max(1, question.maxAnswers),
+      fullCreditPoints: question.points,
+      scoringMode: tagCloudQuiz ? "quiz" : "poll",
+    });
+    isCorrect = evaluated.isCorrect;
+    scoreAwarded = evaluated.scoreAwarded;
+  } else if (question.type !== QuestionType.TAG_CLOUD) {
+    isCorrect = evaluateAnswer(question as QuestionWithOptions, selected);
+    scoreAwarded = question.scoringMode === ScoringMode.QUIZ && isCorrect ? question.points : 0;
+  }
 
   await prisma.answer.create({
     data: {
@@ -2061,7 +2339,11 @@ export async function getStandaloneVoteAdminDetail(
   let optionStats: StandaloneVoteAdminDetail["optionStats"];
   if (q.type === QuestionType.RANKING) {
     const n = sortedOpts.length;
-    const expectedIds = sortedOpts.map((o) => o.id);
+    const expectedIds = rankingExpectedIdsFromQuestion(
+      sortedOpts,
+      q.rankingKind,
+      q.rankingPointsByRank,
+    );
     const isJury = q.rankingKind === RankingKind.JURY;
     const tiers = parseRankingTiersJson(q.rankingPointsByRank);
     const useTiers = isJury && tiers != null && tiers.length === n;
@@ -2091,6 +2373,14 @@ export async function getStandaloneVoteAdminDetail(
             sumsTotalScore[id] += pts;
           }
         }
+      } else if (!isJury) {
+        for (let i = 0; i < n; i++) {
+          const id = ranked[i]!;
+          if (ranked[i] === expectedIds[i] && id in sumsAvgScore) {
+            sumsAvgScore[id] += 1;
+            sumsTotalScore[id] += 1;
+          }
+        }
       }
     }
     optionStats = sortedOpts.map((o) => ({
@@ -2099,8 +2389,9 @@ export async function getStandaloneVoteAdminDetail(
       count: answerCount,
       isCorrect: o.isCorrect,
       avgRank: answerCount > 0 ? sumsRank[o.id]! / answerCount : 0,
-      avgScore: useTiers && answerCount > 0 ? sumsAvgScore[o.id]! / answerCount : undefined,
-      totalScore: useTiers ? sumsTotalScore[o.id]! : undefined,
+      avgScore:
+        answerCount > 0 && (useTiers || !isJury) ? sumsAvgScore[o.id]! / answerCount : undefined,
+      totalScore: useTiers || !isJury ? sumsTotalScore[o.id]! : undefined,
     }));
   } else {
     const optionCounts: Record<string, number> = {};

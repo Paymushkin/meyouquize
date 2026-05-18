@@ -58,8 +58,10 @@ export function ProjectorQuestionSection(props: ProjectorQuestionSectionProps) {
           },
           color: view.voteQuestionTextColor,
           fontFamily: view.brandFontFamily,
-          width: "100%",
-          maxWidth: 1280,
+          textAlign: "center",
+          width: "fit-content",
+          maxWidth: "min(1280px, 100%)",
+          mx: "auto",
           px: fullScreenCloud ? 2 : 0,
           pt: fullScreenCloud ? 1 : 0,
           pb: fullScreenCloud ? 1 : 1.5,
@@ -84,7 +86,14 @@ export function ProjectorQuestionSection(props: ProjectorQuestionSectionProps) {
       spacing={showProjectorWinnersHero ? 2 : fullScreenCloud ? 2 : isTagCloudQuestion ? 0 : 5}
       sx={{
         width: "100%",
-        ...(fullScreenCloud ? { height: "100%" } : {}),
+        ...(fullScreenCloud &&
+        isTagCloudQuestion &&
+        view.questionRevealStage === "options" &&
+        !showProjectorWinnersHero
+          ? { height: "auto", flex: "none", justifyContent: "center" }
+          : fullScreenCloud
+            ? { height: "100%", flex: 1, minHeight: 0 }
+            : {}),
         ...(showProjectorWinnersHero
           ? {
               flex: 1,
@@ -165,14 +174,20 @@ export function ProjectorQuestionSection(props: ProjectorQuestionSectionProps) {
           )}
           <Fade
             in
-            key={`question-${selectedQuestion.questionId}-${view.questionRevealStage}`}
-            timeout={350}
+            key={
+              isTagCloudQuestion
+                ? `question-${selectedQuestion.questionId}`
+                : `question-${selectedQuestion.questionId}-${view.questionRevealStage}`
+            }
+            timeout={isTagCloudQuestion ? 0 : 350}
           >
             <Stack
               sx={
-                fullScreenCloud
+                fullScreenCloud && view.questionRevealStage === "results"
                   ? { width: "100%", flex: 1, minHeight: 0, pb: 1 }
-                  : { width: "100%" }
+                  : fullScreenCloud
+                    ? { width: "100%", flex: "none" }
+                    : { width: "100%" }
               }
             >
               <QuestionChart

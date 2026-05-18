@@ -40,6 +40,12 @@ type Props = {
     next: boolean,
     payload: { text: string; backgroundColor: string; textColor: string; linkUrl: string },
   ) => void;
+  /** Только для превью плитки в списке порядка (настройка — в блоке квиза) */
+  playerQuizResultsTileText: string;
+  playerQuizResultsSubQuizIds: string[];
+  subQuizzesForReport: Array<{ id: string; title: string }>;
+  brandPrimaryColor: string;
+  playerVoteOptionTextColor: string;
   tilesOrder: string[];
   onMoveTileUp: (id: string) => void;
   onMoveTileDown: (id: string) => void;
@@ -65,6 +71,11 @@ export function AdminBannersSection({
   programTileVisible,
   onSaveProgramTile,
   onToggleProgramTileVisible,
+  playerQuizResultsTileText,
+  playerQuizResultsSubQuizIds,
+  subQuizzesForReport,
+  brandPrimaryColor,
+  playerVoteOptionTextColor,
   tilesOrder,
   onMoveTileUp,
   onMoveTileDown,
@@ -81,6 +92,11 @@ export function AdminBannersSection({
     programTileBackgroundColor,
     programTileTextColor,
     programTileLinkUrl,
+    playerQuizResultsTileText,
+    playerQuizResultsSubQuizIds,
+    subQuizzesForReport,
+    brandPrimaryColor,
+    playerVoteOptionTextColor,
     onCreate,
     onUpdate,
     onUploadMedia,

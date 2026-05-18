@@ -229,6 +229,8 @@ export function ResultsPage() {
                 overflow: "hidden",
                 maxWidth: "none",
                 mx: 0,
+                display: "flex",
+                flexDirection: "column",
               }
             : isFullScreenWidgetMode
               ? {
@@ -310,26 +312,59 @@ export function ResultsPage() {
           )}
         </Stack>
       )}
-      {view.mode === "question" && selectedQuestion && (
-        <ProjectorQuestionSection
-          selectedQuestion={selectedQuestion}
-          view={view}
-          showProjectorWinnersHero={showProjectorWinnersHero}
-          fullScreenCloud={fullScreenCloud}
-          isTagCloudQuestion={isTagCloudQuestion}
-          firstCorrectWinnersShown={firstCorrectWinnersShown}
-        />
-      )}
+      {view.mode === "question" &&
+        selectedQuestion &&
+        (fullScreenCloud && isTagCloudQuestion ? (
+          <Box
+            sx={{
+              flex: 1,
+              minHeight: 0,
+              width: "100%",
+              display: "flex",
+              flexDirection: "column",
+              boxSizing: "border-box",
+              justifyContent: view.questionRevealStage === "options" ? "center" : "flex-start",
+            }}
+          >
+            <ProjectorQuestionSection
+              selectedQuestion={selectedQuestion}
+              view={view}
+              showProjectorWinnersHero={showProjectorWinnersHero}
+              fullScreenCloud={fullScreenCloud}
+              isTagCloudQuestion={isTagCloudQuestion}
+              firstCorrectWinnersShown={firstCorrectWinnersShown}
+            />
+          </Box>
+        ) : (
+          <ProjectorQuestionSection
+            selectedQuestion={selectedQuestion}
+            view={view}
+            showProjectorWinnersHero={showProjectorWinnersHero}
+            fullScreenCloud={fullScreenCloud}
+            isTagCloudQuestion={isTagCloudQuestion}
+            firstCorrectWinnersShown={firstCorrectWinnersShown}
+          />
+        ))}
       {view.mode === "speaker_questions" && (
         <Stack
           spacing={0}
-          sx={{ py: 4, width: "100%", minHeight: "100dvh", justifyContent: "center" }}
+          sx={{
+            py: 4,
+            width: "100%",
+            minHeight: "100dvh",
+            justifyContent: "center",
+            alignItems: "center",
+            px: { xs: 2, sm: 3 },
+            boxSizing: "border-box",
+          }}
         >
           {screenSpeakerQuestions.map((item, idx, arr) => (
             <Fragment key={item.id}>
               <Card
                 variant="outlined"
                 sx={() => ({
+                  width: "100%",
+                  maxWidth: 1040,
                   bgcolor: "transparent",
                   backgroundImage: "none",
                   borderColor: "transparent",

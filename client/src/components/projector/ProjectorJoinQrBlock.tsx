@@ -16,6 +16,7 @@ export function ProjectorJoinQrBlock(props: Props) {
         mt: 2,
         width: "100%",
         maxWidth: { xs: "100%", sm: 1100 },
+        mx: "auto",
         alignItems: "center",
         justifyContent: "space-between",
       }}

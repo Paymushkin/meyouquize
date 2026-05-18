@@ -24,7 +24,7 @@ import {
 import { startReactionSession, stopReactionSession } from "../../reactions-service.js";
 import { persistReactionWidgetCounts } from "../../reaction-widget-stats.js";
 import { broadcastDashboardResultsNow } from "../dashboard-results.js";
-import { emitToQuizPlayersAndDashboard } from "../quiz-rooms.js";
+import { broadcastQuizPublicState } from "../quiz-rooms.js";
 import type { EnrichedSocket } from "../handler-common.js";
 import { assertAdmin, fail } from "../handler-common.js";
 
@@ -66,7 +66,7 @@ export function registerQuizAdminHandlers(socket: EnrichedSocket, io: Server) {
       if (shouldSkipDuplicateCommand(socket.id, "question:activate", raw)) return;
       const payload = activateQuestionSchema.parse(raw);
       const state = await activateNextQuestion(payload.quizId, payload.subQuizId);
-      emitToQuizPlayersAndDashboard(io, payload.quizId, "state:quiz", state);
+      await broadcastQuizPublicState(io, payload.quizId, state);
     } catch (error) {
       fail(socket, error instanceof Error ? error.message : "Activate failed");
     }
@@ -89,7 +89,7 @@ export function registerQuizAdminHandlers(socket: EnrichedSocket, io: Server) {
       await assertAdmin(socket);
       const payload = toggleQuestionSchema.parse(raw);
       const state = await setQuestionEnabled(payload.quizId, payload.questionId, payload.enabled);
-      emitToQuizPlayersAndDashboard(io, payload.quizId, "state:quiz", state);
+      await broadcastQuizPublicState(io, payload.quizId, state);
     } catch (error) {
       fail(socket, error instanceof Error ? error.message : "Toggle failed");
     }
@@ -101,7 +101,7 @@ export function registerQuizAdminHandlers(socket: EnrichedSocket, io: Server) {
       if (shouldSkipDuplicateCommand(socket.id, "quiz:finish", raw)) return;
       const payload = finishQuizSchema.parse(raw);
       const state = await finishQuiz(payload.quizId);
-      emitToQuizPlayersAndDashboard(io, payload.quizId, "state:quiz", state);
+      await broadcastQuizPublicState(io, payload.quizId, state);
     } catch (error) {
       fail(socket, error instanceof Error ? error.message : "Finish failed");
     }
@@ -112,8 +112,8 @@ export function registerQuizAdminHandlers(socket: EnrichedSocket, io: Server) {
       await assertAdmin(socket);
       const payload = refreshQuizStateSchema.parse(raw);
       const state = await getQuizPublicState(payload.quizId);
-      emitToQuizPlayersAndDashboard(io, payload.quizId, "state:quiz", state);
-      await broadcastDashboardResultsNow(io, payload.quizId);
+      if (!state) throw new Error("Quiz not found");
+      await broadcastQuizPublicState(io, payload.quizId, state);
     } catch (error) {
       fail(socket, error instanceof Error ? error.message : "Refresh state failed");
     }
@@ -132,14 +132,14 @@ export function registerQuizAdminHandlers(socket: EnrichedSocket, io: Server) {
         try {
           stopReactionSession(payload.quizId);
           const autoState = await getQuizPublicState(payload.quizId);
-          emitToQuizPlayersAndDashboard(io, payload.quizId, "state:quiz", autoState);
+          await broadcastQuizPublicState(io, payload.quizId, autoState);
         } catch {
           // ignore timer errors
         }
       }, payload.durationSec * 1000);
       reactionStopTimers.set(payload.quizId, timer);
       const state = await getQuizPublicState(payload.quizId);
-      emitToQuizPlayersAndDashboard(io, payload.quizId, "state:quiz", state);
+      await broadcastQuizPublicState(io, payload.quizId, state);
     } catch (error) {
       fail(socket, error instanceof Error ? error.message : "Start reactions failed");
     }
@@ -156,7 +156,7 @@ export function registerQuizAdminHandlers(socket: EnrichedSocket, io: Server) {
         reactionStopTimers.delete(payload.quizId);
       }
       const state = await getQuizPublicState(payload.quizId);
-      emitToQuizPlayersAndDashboard(io, payload.quizId, "state:quiz", state);
+      await broadcastQuizPublicState(io, payload.quizId, state);
     } catch (error) {
       fail(socket, error instanceof Error ? error.message : "Stop reactions failed");
     }
@@ -168,7 +168,7 @@ export function registerQuizAdminHandlers(socket: EnrichedSocket, io: Server) {
       if (shouldSkipDuplicateCommand(socket.id, "sub-quiz:close", raw)) return;
       const payload = closeSubQuizSchema.parse(raw);
       const state = await closeSubQuiz(payload.quizId, payload.subQuizId);
-      emitToQuizPlayersAndDashboard(io, payload.quizId, "state:quiz", state);
+      await broadcastQuizPublicState(io, payload.quizId, state);
       await broadcastDashboardResultsNow(io, payload.quizId);
     } catch (error) {
       fail(socket, error instanceof Error ? error.message : "Close sub-quiz failed");
@@ -181,7 +181,7 @@ export function registerQuizAdminHandlers(socket: EnrichedSocket, io: Server) {
       if (shouldSkipDuplicateCommand(socket.id, "sub-quiz:start-auto", raw)) return;
       const payload = startSubQuizAutoSchema.parse(raw);
       const state = await startSubQuizAuto(payload.quizId, payload.subQuizId);
-      emitToQuizPlayersAndDashboard(io, payload.quizId, "state:quiz", state);
+      await broadcastQuizPublicState(io, payload.quizId, state);
     } catch (error) {
       fail(socket, error instanceof Error ? error.message : "Start auto sub-quiz failed");
     }

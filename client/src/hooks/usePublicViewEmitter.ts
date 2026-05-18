@@ -56,6 +56,12 @@ type UsePublicViewEmitterParams = {
   programTileTextColor: string;
   programTileLinkUrl: string;
   programTileVisible: boolean;
+  playerQuizResultsTileVisible: boolean;
+  playerQuizResultsTileText: string;
+  playerQuizResultsTileBackgroundColor: string;
+  playerQuizResultsTileTextColor: string;
+  playerQuizResultsSubQuizId: string;
+  playerQuizResultsSubQuizIds: string[];
   playerTilesOrder: string[];
   reactionsOverlayText: string;
   reactionsWidgets: ReactionWidget[];
@@ -142,6 +148,12 @@ export function usePublicViewEmitter(params: UsePublicViewEmitterParams) {
     programTileTextColor,
     programTileLinkUrl,
     programTileVisible,
+    playerQuizResultsTileVisible,
+    playerQuizResultsTileText,
+    playerQuizResultsTileBackgroundColor,
+    playerQuizResultsTileTextColor,
+    playerQuizResultsSubQuizId,
+    playerQuizResultsSubQuizIds,
     playerTilesOrder,
     reactionsOverlayText,
     reactionsWidgets,
@@ -246,6 +258,16 @@ export function usePublicViewEmitter(params: UsePublicViewEmitterParams) {
         programTileTextColor: patch.programTileTextColor ?? programTileTextColor,
         programTileLinkUrl: patch.programTileLinkUrl ?? programTileLinkUrl,
         programTileVisible: patch.programTileVisible ?? programTileVisible,
+        playerQuizResultsTileVisible:
+          patch.playerQuizResultsTileVisible ?? playerQuizResultsTileVisible,
+        playerQuizResultsTileText: patch.playerQuizResultsTileText ?? playerQuizResultsTileText,
+        playerQuizResultsTileBackgroundColor:
+          patch.playerQuizResultsTileBackgroundColor ?? playerQuizResultsTileBackgroundColor,
+        playerQuizResultsTileTextColor:
+          patch.playerQuizResultsTileTextColor ?? playerQuizResultsTileTextColor,
+        playerQuizResultsSubQuizId: patch.playerQuizResultsSubQuizId ?? playerQuizResultsSubQuizId,
+        playerQuizResultsSubQuizIds:
+          patch.playerQuizResultsSubQuizIds ?? playerQuizResultsSubQuizIds,
         playerTilesOrder: patch.playerTilesOrder ?? playerTilesOrder,
         reactionsOverlayText: patch.reactionsOverlayText ?? reactionsOverlayText,
         reactionsWidgets: patch.reactionsWidgets ?? reactionsWidgets,
@@ -329,6 +351,11 @@ export function usePublicViewEmitter(params: UsePublicViewEmitterParams) {
       programTileTextColor,
       programTileLinkUrl,
       programTileVisible,
+      playerQuizResultsTileVisible,
+      playerQuizResultsTileText,
+      playerQuizResultsTileBackgroundColor,
+      playerQuizResultsTileTextColor,
+      playerQuizResultsSubQuizId,
       playerTilesOrder,
       reactionsOverlayText,
       reactionsWidgets,

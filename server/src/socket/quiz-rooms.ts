@@ -1,5 +1,12 @@
 import type { Server } from "socket.io";
 import { env } from "../env.js";
+import {
+  getParticipantScoreTotalsByQuiz,
+  getParticipantScoresBySubQuizForQuiz,
+  type getQuizPublicState,
+} from "../quiz-service.js";
+
+type QuizPublicPayload = NonNullable<Awaited<ReturnType<typeof getQuizPublicState>>>;
 
 /** Игроки: состояние квиза, очистка ответов (лёгкие события). */
 export function quizPlayerRoom(quizId: string) {
@@ -32,6 +39,29 @@ export function emitToQuizPlayersAndDashboard(
 ) {
   emitToQuizPlayers(io, quizId, event, payload);
   emitToQuizDashboard(io, quizId, event, payload);
+}
+
+/** Дашборд/проектор — общий payload; каждому игроку добавляется `myTotalScore`. */
+export async function broadcastQuizPublicState(
+  io: Server,
+  quizId: string,
+  state: QuizPublicPayload | null,
+): Promise<void> {
+  if (!state) return;
+  emitToQuizDashboard(io, quizId, "state:quiz", state);
+  const [totals, subQuizTotals] = await Promise.all([
+    getParticipantScoreTotalsByQuiz(quizId),
+    getParticipantScoresBySubQuizForQuiz(quizId),
+  ]);
+  const sockets = await io.in(quizPlayerRoom(quizId)).fetchSockets();
+  for (const sk of sockets) {
+    const pid = sk.data?.participantId;
+    const myTotalScore =
+      typeof pid === "string" && pid.trim().length > 0 ? (totals.get(pid) ?? 0) : 0;
+    const mySubQuizScores =
+      typeof pid === "string" && pid.trim().length > 0 ? (subQuizTotals.get(pid) ?? {}) : {};
+    sk.emit("state:quiz", { ...state, myTotalScore, mySubQuizScores });
+  }
 }
 
 const pendingOnlineCountTimers = new Map<string, ReturnType<typeof setTimeout>>();

@@ -16,6 +16,8 @@ import ArrowDownwardIcon from "@mui/icons-material/ArrowDownward";
 import KeyboardArrowDownIcon from "@mui/icons-material/KeyboardArrowDown";
 import QuestionAnswerIcon from "@mui/icons-material/QuestionAnswer";
 import EventNoteIcon from "@mui/icons-material/EventNote";
+import { isQuizResultsTileId } from "../../../publicViewContract";
+import { PlayerQuizResultsTile } from "../../quiz/PlayerQuizResultsTile";
 import type { BannerEditorState, BannerSize, OrderedTile } from "./types";
 
 type Props = {
@@ -103,22 +105,24 @@ export function TilesOrderList({
                           minHeight: 70,
                           position: "relative",
                         }
-                      : {
-                          width: tile.size === "1x1" ? 100 : tile.size === "full" ? 320 : 200,
-                          aspectRatio:
-                            tile.size === "1x1"
-                              ? "1 / 1"
-                              : tile.size === "full"
-                                ? "4 / 1"
-                                : "2 / 1",
-                          borderRadius: 1,
-                          border: "1px solid",
-                          borderColor: "divider",
-                          backgroundImage: `url("${tile.previewUrl}")`,
-                          backgroundSize: "cover",
-                          backgroundPosition: "center",
-                          backgroundRepeat: "no-repeat",
-                        }
+                      : tile.kind === "quiz_results"
+                        ? { flexShrink: 0 }
+                        : {
+                            width: tile.size === "1x1" ? 100 : tile.size === "full" ? 320 : 200,
+                            aspectRatio:
+                              tile.size === "1x1"
+                                ? "1 / 1"
+                                : tile.size === "full"
+                                  ? "4 / 1"
+                                  : "2 / 1",
+                            borderRadius: 1,
+                            border: "1px solid",
+                            borderColor: "divider",
+                            backgroundImage: `url("${tile.previewUrl}")`,
+                            backgroundSize: "cover",
+                            backgroundPosition: "center",
+                            backgroundRepeat: "no-repeat",
+                          }
                   }
                 >
                   {tile.kind === "speaker" ? (
@@ -163,6 +167,16 @@ export function TilesOrderList({
                       {tile.previewText.trim() || "Программа"}
                     </>
                   ) : null}
+                  {tile.kind === "quiz_results" ? (
+                    <PlayerQuizResultsTile
+                      preview
+                      previewWidth={100}
+                      title={tile.title}
+                      score={10}
+                      brandPrimaryColor={tile.brandPrimaryColor}
+                      textColor={tile.brandTextColor}
+                    />
+                  ) : null}
                 </Box>
                 <Stack spacing={0.5} sx={{ flex: 1, minWidth: 0 }}>
                   <Typography variant="body2">{tile.label}</Typography>
@@ -198,6 +212,11 @@ export function TilesOrderList({
                       >
                         {tile.linkUrl || "ссылка не задана"}
                       </Link>
+                    </Typography>
+                  ) : null}
+                  {tile.kind === "quiz_results" ? (
+                    <Typography variant="caption" color="text.secondary">
+                      Плитка 1×1: вкл/выкл в блоке управления квизом («Отчёт игрокам»)
                     </Typography>
                   ) : null}
                   {tile.kind === "banner" && editor.editingId === tile.banner.id ? (
@@ -244,12 +263,16 @@ export function TilesOrderList({
                     </Stack>
                   ) : null}
                   <Stack direction="row" spacing={1}>
-                    <IconButton size="small" disabled={idx === 0} onClick={() => onMoveUp(tile.id)}>
+                    <IconButton
+                      size="small"
+                      disabled={idx === 0 || isQuizResultsTileId(tile.id)}
+                      onClick={() => onMoveUp(tile.id)}
+                    >
                       <ArrowUpwardIcon fontSize="small" />
                     </IconButton>
                     <IconButton
                       size="small"
-                      disabled={idx >= tiles.length - 1}
+                      disabled={idx >= tiles.length - 1 || isQuizResultsTileId(tile.id)}
                       onClick={() => onMoveDown(tile.id)}
                     >
                       <ArrowDownwardIcon fontSize="small" />

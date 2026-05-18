@@ -5,9 +5,9 @@ import { getDashboardResults, getQuizBySlug, getQuizPublicState } from "../../qu
 import { prisma } from "../../prisma.js";
 import { getStoredPublicView, saveStoredPublicView } from "../public-view-store.js";
 import {
+  broadcastQuizPublicState,
   emitQuizOnlineCount,
   emitToQuizDashboard,
-  emitToQuizPlayersAndDashboard,
   quizDashboardRoom,
 } from "../quiz-rooms.js";
 import type { EnrichedSocket } from "../handler-common.js";
@@ -89,7 +89,7 @@ export function registerResultsDashboardHandlers(socket: EnrichedSocket, io: Ser
         toPublicViewPayload(nextView, quiz.title),
       );
       const updatedQuizState = await getQuizPublicState(payload.quizId);
-      emitToQuizPlayersAndDashboard(io, payload.quizId, "state:quiz", updatedQuizState);
+      await broadcastQuizPublicState(io, payload.quizId, updatedQuizState);
     } catch (error) {
       fail(socket, error instanceof Error ? error.message : "Set public view failed");
     }

@@ -2,6 +2,50 @@ export type QuestionType = "single" | "multi" | "tag_cloud" | "ranking";
 export type QuizStatus = "draft" | "live" | "finished";
 export const SPEAKER_TILE_ID = "speaker_tile";
 export const PROGRAM_TILE_ID = "program_tile";
+/** Плитка 1×1 «Мой квиз» с личным отчётом по сабквизу в интерфейсе игрока */
+export const QUIZ_RESULTS_TILE_ID = "quiz_results_tile";
+
+/** Id плитки отчёта для конкретного сабквиза: `quiz_results_tile:<subQuizId>`. */
+export function quizResultsTileIdForSubQuiz(subQuizId: string): string {
+  return `${QUIZ_RESULTS_TILE_ID}:${subQuizId.trim()}`;
+}
+
+export function isQuizResultsTileId(tileId: string): boolean {
+  return tileId === QUIZ_RESULTS_TILE_ID || tileId.startsWith(`${QUIZ_RESULTS_TILE_ID}:`);
+}
+
+/** `null` для устаревшей единственной плитки `quiz_results_tile` без суффикса. */
+export function parseQuizResultsSubQuizIdFromTileId(tileId: string): string | null {
+  if (tileId === QUIZ_RESULTS_TILE_ID) return null;
+  const prefix = `${QUIZ_RESULTS_TILE_ID}:`;
+  if (!tileId.startsWith(prefix)) return null;
+  const id = tileId.slice(prefix.length).trim();
+  return id.length > 0 ? id.slice(0, 80) : null;
+}
+
+function sanitizeSubQuizIdList(raw: unknown, maxItems: number): string[] {
+  if (!Array.isArray(raw)) return [];
+  const out: string[] = [];
+  for (const item of raw) {
+    if (typeof item !== "string") continue;
+    const id = item.trim().slice(0, 80);
+    if (!id || out.includes(id)) continue;
+    out.push(id);
+    if (out.length >= maxItems) break;
+  }
+  return out;
+}
+
+/** Убирает плитки отчёта из середины списка и ставит их в конец (порядок сохраняется). */
+export function withQuizResultsTileLast(tileIds: string[]): string[] {
+  const rest = tileIds.filter((id) => !isQuizResultsTileId(id));
+  const quizTiles: string[] = [];
+  for (const id of tileIds) {
+    if (!isQuizResultsTileId(id)) continue;
+    if (!quizTiles.includes(id)) quizTiles.push(id);
+  }
+  return [...rest, ...quizTiles];
+}
 
 export interface OptionInput {
   text: string;
@@ -146,6 +190,15 @@ export interface PublicViewState {
   programTileLinkUrl: string;
   /** Показывать кнопку "Программа" у пользователя */
   programTileVisible: boolean;
+  /** Плитка 1×1 с личным отчётом по квизу (сабквиз) */
+  playerQuizResultsTileVisible: boolean;
+  playerQuizResultsTileText: string;
+  playerQuizResultsTileBackgroundColor: string;
+  playerQuizResultsTileTextColor: string;
+  /** Пусто = первый сабквиз по sortOrder; иначе id сабквиза для отчёта (legacy) */
+  playerQuizResultsSubQuizId: string;
+  /** Сабквизы, для которых у игрока показана плитка личного отчёта */
+  playerQuizResultsSubQuizIds: string[];
   /** Порядок плиток в пользовательском интерфейсе (баннеры + speaker_tile + program_tile) */
   playerTilesOrder: string[];
   /** Крупный текст в режиме реакций на проекторе (по центру экрана) */
@@ -298,6 +351,12 @@ export const DEFAULT_PUBLIC_VIEW_STATE: PublicViewState = {
   programTileTextColor: "#ffffff",
   programTileLinkUrl: "",
   programTileVisible: false,
+  playerQuizResultsTileVisible: false,
+  playerQuizResultsTileText: "Мой квиз",
+  playerQuizResultsTileBackgroundColor: "#2e7d32",
+  playerQuizResultsTileTextColor: "#ffffff",
+  playerQuizResultsSubQuizId: "",
+  playerQuizResultsSubQuizIds: [],
   playerTilesOrder: [SPEAKER_TILE_ID, PROGRAM_TILE_ID],
   reactionsOverlayText: "Реакции аудитории",
   reactionsWidgets: [],
@@ -361,6 +420,53 @@ export function normalizeTagComparable(value: string): string {
   let s = value.normalize("NFKC").trim().toLowerCase().replace(/\s+/g, " ").trim();
   s = s.replace(/\.+$/u, "").trim();
   return s;
+}
+
+/** Синонимы в одной строке эталона: «синий; голубой» → два сравнимых варианта. */
+export function parseTagCloudReferenceAliases(optionText: string): string[] {
+  const out: string[] = [];
+  const seen = new Set<string>();
+  for (const part of optionText.split(/[;|]/u)) {
+    const norm = normalizeTagComparable(part);
+    if (!norm || seen.has(norm)) continue;
+    seen.add(norm);
+    out.push(norm);
+  }
+  return out;
+}
+
+export function tagMatchesReferenceAliases(userComparable: string, optionText: string): boolean {
+  if (!userComparable) return false;
+  return parseTagCloudReferenceAliases(optionText).includes(userComparable);
+}
+
+/** Все нормализованные синонимы эталонных тегов вопроса. */
+export function collectTagCloudCorrectAliases(
+  options: Array<{ text: string; isCorrect: boolean }>,
+): string[] {
+  const out: string[] = [];
+  const seen = new Set<string>();
+  for (const o of options) {
+    if (!o.isCorrect) continue;
+    for (const alias of parseTagCloudReferenceAliases(o.text)) {
+      if (!seen.has(alias)) {
+        seen.add(alias);
+        out.push(alias);
+      }
+    }
+  }
+  return out;
+}
+
+/** Подпись баллов с правильным склонением («1 балл», «2 балла», «5 баллов»). */
+export function ruBallLabel(n: number): string {
+  const v = Math.abs(Math.trunc(n));
+  const mod100 = v % 100;
+  if (mod100 >= 11 && mod100 <= 14) return `${n} баллов`;
+  const mod10 = v % 10;
+  if (mod10 === 1) return `${n} балл`;
+  if (mod10 >= 2 && mod10 <= 4) return `${n} балла`;
+  return `${n} баллов`;
 }
 
 function sanitizeCloudWords(
@@ -553,19 +659,25 @@ export function normalizePublicViewState(
     requestedActiveBannerId && playerBanners.some((item) => item.id === requestedActiveBannerId)
       ? requestedActiveBannerId
       : undefined;
-  const validTileIds = new Set<string>([
-    SPEAKER_TILE_ID,
-    PROGRAM_TILE_ID,
-    ...playerBanners.map((x) => x.id),
-  ]);
+  const isAllowedTileId = (id: string) =>
+    id === SPEAKER_TILE_ID ||
+    id === PROGRAM_TILE_ID ||
+    id === QUIZ_RESULTS_TILE_ID ||
+    isQuizResultsTileId(id) ||
+    playerBanners.some((x) => x.id === id);
   const ordered = Array.isArray(value?.playerTilesOrder)
     ? value.playerTilesOrder
         .filter((x): x is string => typeof x === "string")
         .map((x) => x.trim())
-        .filter((x) => x.length > 0 && validTileIds.has(x))
+        .filter((x) => x.length > 0 && x.length <= 120 && isAllowedTileId(x))
     : [];
   const deduped: string[] = [];
+  const quizResultTiles: string[] = [];
   for (const id of ordered) {
+    if (isQuizResultsTileId(id)) {
+      if (!quizResultTiles.includes(id)) quizResultTiles.push(id);
+      continue;
+    }
     if (!deduped.includes(id)) deduped.push(id);
   }
   for (const banner of playerBanners) {
@@ -573,6 +685,31 @@ export function normalizePublicViewState(
   }
   if (!deduped.includes(SPEAKER_TILE_ID)) deduped.push(SPEAKER_TILE_ID);
   if (!deduped.includes(PROGRAM_TILE_ID)) deduped.push(PROGRAM_TILE_ID);
+  let playerQuizResultsSubQuizIds = sanitizeSubQuizIdList(value?.playerQuizResultsSubQuizIds, 20);
+  const legacyReportVisible =
+    typeof value?.playerQuizResultsTileVisible === "boolean"
+      ? value.playerQuizResultsTileVisible
+      : base.playerQuizResultsTileVisible;
+  if (playerQuizResultsSubQuizIds.length === 0 && legacyReportVisible) {
+    const legacyId =
+      typeof value?.playerQuizResultsSubQuizId === "string"
+        ? value.playerQuizResultsSubQuizId.trim().slice(0, 80)
+        : base.playerQuizResultsSubQuizId.trim();
+    if (legacyId) playerQuizResultsSubQuizIds = [legacyId];
+  }
+  if (quizResultTiles.length === 0 && playerQuizResultsSubQuizIds.length > 0) {
+    for (const sqId of playerQuizResultsSubQuizIds) {
+      const tileId = quizResultsTileIdForSubQuiz(sqId);
+      if (!quizResultTiles.includes(tileId)) quizResultTiles.push(tileId);
+    }
+  } else if (
+    quizResultTiles.length === 1 &&
+    quizResultTiles[0] === QUIZ_RESULTS_TILE_ID &&
+    playerQuizResultsSubQuizIds.length === 1
+  ) {
+    quizResultTiles[0] = quizResultsTileIdForSubQuiz(playerQuizResultsSubQuizIds[0]!);
+  }
+  const dedupedTilesOrder = withQuizResultsTileLast([...deduped, ...quizResultTiles]);
   return {
     mode,
     questionId,
@@ -696,7 +833,30 @@ export function normalizePublicViewState(
       typeof value?.programTileVisible === "boolean"
         ? value.programTileVisible
         : base.programTileVisible,
-    playerTilesOrder: deduped,
+    playerQuizResultsTileText:
+      typeof value?.playerQuizResultsTileText === "string"
+        ? value.playerQuizResultsTileText.trim().slice(0, 120)
+        : base.playerQuizResultsTileText,
+    playerQuizResultsTileBackgroundColor: sanitizeHex6(
+      value?.playerQuizResultsTileBackgroundColor,
+      base.playerQuizResultsTileBackgroundColor,
+    ),
+    playerQuizResultsTileTextColor: sanitizeHex6(
+      value?.playerQuizResultsTileTextColor,
+      base.playerQuizResultsTileTextColor,
+    ),
+    playerQuizResultsSubQuizIds,
+    playerQuizResultsSubQuizId:
+      playerQuizResultsSubQuizIds[0] ??
+      (typeof value?.playerQuizResultsSubQuizId === "string"
+        ? value.playerQuizResultsSubQuizId.trim().slice(0, 80)
+        : base.playerQuizResultsSubQuizId),
+    playerQuizResultsTileVisible:
+      playerQuizResultsSubQuizIds.length > 0 ||
+      (typeof value?.playerQuizResultsTileVisible === "boolean"
+        ? value.playerQuizResultsTileVisible
+        : base.playerQuizResultsTileVisible),
+    playerTilesOrder: dedupedTilesOrder,
     reactionsOverlayText:
       typeof value?.reactionsOverlayText === "string"
         ? value.reactionsOverlayText.trim().slice(0, 120)

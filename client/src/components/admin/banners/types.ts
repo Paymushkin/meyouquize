@@ -22,6 +22,14 @@ export type OrderedTile =
     }
   | {
       id: string;
+      kind: "quiz_results";
+      label: string;
+      title: string;
+      brandPrimaryColor: string;
+      brandTextColor: string;
+    }
+  | {
+      id: string;
       kind: "banner";
       label: string;
       previewUrl: string;

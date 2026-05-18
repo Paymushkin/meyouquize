@@ -1,4 +1,9 @@
-import { PROGRAM_TILE_ID, SPEAKER_TILE_ID } from "../../publicViewContract";
+import {
+  isQuizResultsTileId,
+  PROGRAM_TILE_ID,
+  SPEAKER_TILE_ID,
+  withQuizResultsTileLast,
+} from "../../publicViewContract";
 
 type BannerItem = {
   id: string;
@@ -19,7 +24,12 @@ export function buildPlayerTilesOrder(
 ): string[] {
   const baseOrder = Array.isArray(order) ? order : [];
   const deduped: string[] = [];
+  const quizTiles: string[] = [];
   for (const id of baseOrder) {
+    if (isQuizResultsTileId(id)) {
+      if (!quizTiles.includes(id)) quizTiles.push(id);
+      continue;
+    }
     if (!deduped.includes(id)) deduped.push(id);
   }
   for (const b of banners) {
@@ -27,5 +37,5 @@ export function buildPlayerTilesOrder(
   }
   if (!deduped.includes(SPEAKER_TILE_ID)) deduped.push(SPEAKER_TILE_ID);
   if (!deduped.includes(PROGRAM_TILE_ID)) deduped.push(PROGRAM_TILE_ID);
-  return deduped;
+  return withQuizResultsTileLast([...deduped, ...quizTiles]);
 }

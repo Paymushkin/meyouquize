@@ -1,5 +1,8 @@
 /* eslint-disable react-refresh/only-export-components */
-import { PROGRAM_TILE_ID, SPEAKER_TILE_ID } from "../../publicViewContract";
+import { ruBallLabel } from "@meyouquize/shared";
+import { PlayerQuizResultsTile } from "../../components/quiz/PlayerQuizResultsTile";
+import { isQuizResultsTileId, PROGRAM_TILE_ID, SPEAKER_TILE_ID } from "../../publicViewContract";
+import type { PlayerQuizResultsTileModel } from "../../features/quizPlay/playerQuizResults";
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import CloseIcon from "@mui/icons-material/Close";
 import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
@@ -178,6 +181,8 @@ type PlayerTilesGridProps = {
   programTileTextColor: string;
   programTileLinkUrl: string;
   programTileVisible: boolean;
+  playerQuizResultsTilesBySubQuizId: Map<string, PlayerQuizResultsTileModel>;
+  onOpenQuizReport: (subQuizId: string) => void;
   playerVoteOptionTextColor: string;
   playerVoteProgressBarColor: string;
   visibleResultTiles: NonNullable<QuizState["playerVisibleResults"]>;
@@ -200,6 +205,8 @@ export function PlayerTilesGrid(props: PlayerTilesGridProps) {
     programTileTextColor,
     programTileLinkUrl,
     programTileVisible,
+    playerQuizResultsTilesBySubQuizId,
+    onOpenQuizReport,
     playerVoteOptionTextColor,
     playerVoteProgressBarColor,
     visibleResultTiles,
@@ -352,6 +359,20 @@ export function PlayerTilesGrid(props: PlayerTilesGridProps) {
                 {programTileText}
               </Typography>
             </Box>
+          );
+        }
+        if (isQuizResultsTileId(tileId)) {
+          const reportTile = playerQuizResultsTilesBySubQuizId.get(tileId);
+          if (!reportTile) return null;
+          return (
+            <PlayerQuizResultsTile
+              key={tileId}
+              title={reportTile.title}
+              score={reportTile.score}
+              brandPrimaryColor={brandPrimaryColor}
+              textColor={playerVoteOptionTextColor || "#000"}
+              onClick={() => onOpenQuizReport(reportTile.subQuizId)}
+            />
           );
         }
         const banner = visibleBannerById.get(tileId);
@@ -540,18 +561,25 @@ export function PlayerIdentityBar(props: PlayerIdentityBarProps) {
         <Stack direction="row" spacing={0.75} alignItems="center">
           <Chip
             size="small"
-            icon={<PersonOutlineIcon />}
+            icon={<PersonOutlineIcon sx={{ fontSize: "small" }} />}
             label={nickname.trim() || "без ника"}
             variant="outlined"
             onClick={onNicknameClick}
             sx={{
               alignItems: "center",
               cursor: "pointer",
+              color: "#111",
+              borderColor: "rgba(0,0,0,0.35)",
+              bgcolor: "rgba(255,255,255,0.92)",
+              "& .MuiChip-icon": {
+                color: "rgba(0,0,0,0.72)",
+              },
               "& .MuiChip-label": {
                 display: "flex",
                 alignItems: "center",
                 height: "100%",
                 fontWeight: 600,
+                color: "#111",
               },
             }}
           />
@@ -571,14 +599,17 @@ export function PlayerIdentityBar(props: PlayerIdentityBarProps) {
             ...("accentFill" in connectionChip
               ? {
                   backgroundColor: BRAND_ACCENT,
-                  color: "#000000",
+                  color: "#111",
                 }
               : {}),
             "& .MuiChip-label": {
               display: "flex",
               alignItems: "center",
               height: "100%",
-              ...("accentFill" in connectionChip ? { color: "#000000" } : {}),
+              ...("accentFill" in connectionChip ? { color: "#111" } : {}),
+            },
+            "& .MuiChip-icon": {
+              ...("accentFill" in connectionChip ? { color: "rgba(0,0,0,0.72)" } : {}),
             },
           }}
         />
@@ -812,13 +843,17 @@ export function RestoreJoinPendingBlock() {
 
 type CompletionOverlayProps = {
   brandPrimaryColor: string;
-  message: string;
+  /** Подзаголовок под «Квиз завершён»; если пусто — блок не показывается. */
+  message?: string;
+  /** Доп. строка, например «Ваш результат: N баллов». */
+  scoreLine?: string;
   onClose: () => void;
   compact?: boolean;
 };
 
 export function CompletionOverlay(props: CompletionOverlayProps) {
-  const { brandPrimaryColor, message, onClose, compact = false } = props;
+  const { brandPrimaryColor, message, scoreLine, onClose, compact = false } = props;
+  const messageTrimmed = message?.trim() ?? "";
   return (
     <Box
       sx={{
@@ -850,9 +885,20 @@ export function CompletionOverlay(props: CompletionOverlayProps) {
             <Typography variant="h5" component="p" sx={{ fontWeight: 700 }}>
               Квиз завершён
             </Typography>
-            <Typography variant="body1" color="text.secondary">
-              {message}
-            </Typography>
+            {messageTrimmed ? (
+              <Typography variant="body1" color="text.secondary">
+                {messageTrimmed}
+              </Typography>
+            ) : null}
+            {scoreLine ? (
+              <Typography
+                variant="h6"
+                component="p"
+                sx={{ fontWeight: 700, color: brandPrimaryColor }}
+              >
+                {scoreLine}
+              </Typography>
+            ) : null}
           </Stack>
         </CardContent>
       </Card>
@@ -914,12 +960,13 @@ export function QuestionPopupCard(props: QuestionPopupCardProps) {
   const mobileQuestionFontRem = Math.max(1.05, desktopQuestionFontRem - 0.35);
   const metaChipSx = {
     height: 24,
-    color: "#fff",
+    color: "inherit",
     bgcolor: "transparent",
     border: "none",
     borderRadius: 0,
     borderBottom: `2px solid ${brandPrimaryColor}`,
-    "& .MuiChip-label": { px: 1, fontSize: "0.72rem", fontWeight: 600 },
+    "& .MuiChip-label": { px: 1, fontSize: "0.72rem", fontWeight: 600, color: "inherit" },
+    "& .MuiChip-icon": { color: "inherit" },
   } as const;
   const optionButtonSx = (isSelected: boolean) => ({
     ...(isSelected

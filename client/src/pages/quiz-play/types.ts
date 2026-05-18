@@ -59,6 +59,27 @@ export type PlayerVisibleResultTile = {
   optionStats: PlayerVisibleResultOptionStat[];
 };
 
+export type PlayerSubQuizReportQuestionRow = {
+  questionId: string;
+  order: number;
+  text: string;
+  type: "single" | "multi" | "tag_cloud" | "ranking";
+  scoringMode: "poll" | "quiz";
+  points: number;
+  scoreAwarded: number | null;
+  userAnswerText: string;
+  correctAnswerText: string;
+};
+
+export type PlayerSubQuizReportPayload = {
+  subQuizId: string;
+  title: string;
+  totalScore: number;
+  questions: PlayerSubQuizReportQuestionRow[];
+  leaderboardPlace: number | null;
+  leaderboardTotal: number;
+};
+
 export type QuizState = {
   id: string;
   title: string;
@@ -80,6 +101,14 @@ export type QuizState = {
   programTileTextColor?: string;
   programTileLinkUrl?: string;
   programTileVisible?: boolean;
+  playerQuizResultsTileVisible?: boolean;
+  playerQuizResultsTileText?: string;
+  playerQuizResultsTileBackgroundColor?: string;
+  playerQuizResultsTileTextColor?: string;
+  playerQuizResultsSubQuizId?: string;
+  playerQuizResultsSubQuizIds?: string[];
+  /** Сабквизы с названиями — для подписи плитки «Мой квиз» у игрока */
+  playerSubQuizzes?: Array<{ id: string; title: string }>;
   playerVoteOptionTextColor?: string;
   playerVoteProgressTrackColor?: string;
   playerVoteProgressBarColor?: string;
@@ -97,6 +126,10 @@ export type QuizState = {
   brandBodyBackgroundColor?: string;
   reactionSession?: ReactionSession | null;
   status: string;
+  /** Сумма начисленных баллов по квизу (только в payload для игрока по сокету). */
+  myTotalScore?: number;
+  /** Суммы баллов по сабквизам (для плитки «Мой квиз»). */
+  mySubQuizScores?: Record<string, number>;
   quizProgress: {
     subQuizId: string;
     questionFlowMode?: "manual" | "auto";
