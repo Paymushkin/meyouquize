@@ -46,6 +46,7 @@ import {
   DEMO_TAB_TAG_CLOUD,
 } from "./landingDemo/demoTabIndices";
 import { LandingDemoScenarioShell } from "./landingDemo/LandingDemoScenarioShell";
+import { DEMO_LANDING_PHONE_BANNER_SRC } from "./landingDemo/demoAssets";
 import { useDemoScenarioWheel } from "./landingDemo/useDemoScenarioWheel";
 import { QuestionChart } from "../components/projector/QuestionChart";
 import { ProjectorLeaderboardTable } from "../components/projector/ProjectorLeaderboardTable";
@@ -1008,7 +1009,7 @@ function DemoQuizPhoneColumn(props: { sceneIndex: number; screenOverlay?: ReactN
                   >
                     <Box
                       component="img"
-                      src="http://192.168.1.8:4000/media/1778092132919-0pz8s4ll.png"
+                      src={DEMO_LANDING_PHONE_BANNER_SRC}
                       alt=""
                       aria-hidden="true"
                       draggable={false}

@@ -6,10 +6,14 @@ import {
   type MutableRefObject,
   type RefObject,
 } from "react";
-import WheelGestures, { type WheelEventState } from "wheel-gestures";
 
 /** После последней сцены: один тик колеса поглощается без смены кадра, дальше скролл уходит на страницу */
 export const DEMO_END_WHEEL_SLACK = 1;
+
+/** Пауза между сериями wheel — новый жест пользователя */
+const WHEEL_GESTURE_BREAK_MS = 120;
+/** События ближе этого интервала после первого считаем инерцией тачпада */
+const WHEEL_MOMENTUM_MAX_MS = 40;
 
 export type UseDemoScenarioWheelParams = {
   sectionRef: RefObject<HTMLElement | null>;
@@ -70,14 +74,9 @@ export function useDemoScenarioWheel(params: UseDemoScenarioWheelParams) {
       setSceneIndex((s) => (s > 0 ? s - 1 : s));
     };
 
-    const wheelGestures = WheelGestures({
-      /** Сами решаем, когда глушить скролл страницы (как в прежней логике на window). */
-      preventWheelAction: false,
-      /** Иначе по умолчанию библиотека инвертирует X/Y — направление сцен не совпадает с привычным скроллом. */
-      reverseSign: false,
-    });
+    let lastWheelAt = 0;
 
-    const onWheel = (state: WheelEventState) => {
+    const onWheel = (ev: WheelEvent) => {
       if (demoTabRef.current !== activeDemoTabIndex) {
         return;
       }
@@ -86,7 +85,7 @@ export function useDemoScenarioWheel(params: UseDemoScenarioWheelParams) {
         return;
       }
 
-      const dy = state.axisDelta[1];
+      const dy = ev.deltaY;
       if (Math.abs(dy) < 1e-6) {
         return;
       }
@@ -102,24 +101,24 @@ export function useDemoScenarioWheel(params: UseDemoScenarioWheelParams) {
         return;
       }
 
-      const ev = state.event;
-      if (typeof ev.preventDefault === "function") {
-        ev.preventDefault();
-      }
+      const now = performance.now();
+      const gap = lastWheelAt === 0 ? Number.POSITIVE_INFINITY : now - lastWheelAt;
+      lastWheelAt = now;
+      const isStart = gap > WHEEL_GESTURE_BREAK_MS;
+      const isMomentum = !isStart && gap < WHEEL_MOMENTUM_MAX_MS;
+
+      ev.preventDefault();
 
       /** Один шаг на пользовательский жест: первое событие серии, без фазы инерции тачпада. */
-      if (state.isStart && !state.isMomentum) {
+      if (isStart && !isMomentum) {
         applyWheelStep(tentativeDir);
       }
     };
 
-    const offWheel = wheelGestures.on("wheel", onWheel);
-    const unobserveWindow = wheelGestures.observe(window);
+    window.addEventListener("wheel", onWheel, { passive: false });
 
     return () => {
-      offWheel();
-      unobserveWindow();
-      wheelGestures.disconnect();
+      window.removeEventListener("wheel", onWheel);
     };
   }, [sectionRef, demoTabRef, activeDemoTabIndex, maxSceneIndex]);
 

@@ -27,8 +27,7 @@
     "react-dom": "^19.1.0",
     "react-router-dom": "^7.5.0",
     "react-wordcloud": "^1.2.7",
-    "socket.io-client": "^4.8.1",
-    "wheel-gestures": "^2.2.48"
+    "socket.io-client": "^4.8.1"
   },
   "devDependencies": {
     "@testing-library/react": "^16.3.2",
