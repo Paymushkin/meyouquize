@@ -14,13 +14,14 @@ import {
 } from "../../schemas.js";
 import { prisma } from "../../prisma.js";
 import { containsProfanity } from "../../profanity.js";
-import { getQuizBySlug } from "../../quiz-service.js";
+import { getQuizBySlug, getQuizPublicState } from "../../quiz-service.js";
 import type { EnrichedSocket } from "../handler-common.js";
 import { assertAdmin, fail } from "../handler-common.js";
 import { getStoredPublicView } from "../public-view-store.js";
 import { saveStoredPublicView } from "../public-view-store.js";
 import { toPublicViewPayload } from "../public-view-helpers.js";
 import {
+  broadcastQuizPublicState,
   emitToQuizDashboard,
   emitToQuizPlayers,
   quizDashboardRoom,
@@ -108,9 +109,10 @@ async function buildSpeakerQuestionsPayload(
       myReactions: myReactionsByQuestion.get(row.id) ?? [],
       createdAt: row.createdAt.toISOString(),
     }));
+  const speakerFeatureEnabled = view.speakerQuestionsEnabled || view.speakerTileVisible;
   return {
     settings: {
-      enabled: view.speakerQuestionsEnabled,
+      enabled: speakerFeatureEnabled,
       speakers: view.speakerQuestionsSpeakers,
       reactions: availableReactions,
       showAuthorOnScreen: view.speakerQuestionsShowAuthorOnScreen,
@@ -121,7 +123,11 @@ async function buildSpeakerQuestionsPayload(
   };
 }
 
-async function broadcastSpeakerQuestions(io: Server, quizId: string, excludeSocketId?: string) {
+export async function broadcastSpeakerQuestions(
+  io: Server,
+  quizId: string,
+  excludeSocketId?: string,
+) {
   const playerSockets = await io.in(quizPlayerRoom(quizId)).fetchSockets();
   const dashboardSockets = await io.in(quizDashboardRoom(quizId)).fetchSockets();
 
@@ -196,6 +202,7 @@ export function registerSpeakerQuestionsHandlers(socket: EnrichedSocket, io: Ser
       const prev = await getStoredPublicView(payload.quizId);
       const next = mergePublicViewState(prev, {
         speakerQuestionsEnabled: payload.enabled,
+        speakerTileVisible: payload.enabled,
         speakerQuestionsSpeakers: payload.speakers,
         speakerQuestionsReactions: payload.reactions,
         speakerQuestionsShowAuthorOnScreen: payload.showAuthorOnScreen,
@@ -217,6 +224,10 @@ export function registerSpeakerQuestionsHandlers(socket: EnrichedSocket, io: Ser
         "results:public:view",
         toPublicViewPayload(next, quiz?.title ?? "Квиз"),
       );
+      const updatedQuizState = await getQuizPublicState(payload.quizId);
+      if (updatedQuizState) {
+        await broadcastQuizPublicState(io, payload.quizId, updatedQuizState);
+      }
       await broadcastSpeakerQuestions(io, payload.quizId, socket.id);
     } catch (error) {
       fail(socket, error instanceof Error ? error.message : "Update speaker settings failed");
@@ -228,7 +239,9 @@ export function registerSpeakerQuestionsHandlers(socket: EnrichedSocket, io: Ser
       const payload = createSpeakerQuestionSchema.parse(raw);
       if (!socket.data.participantId) throw new Error("Not joined");
       const view = await getStoredPublicView(payload.quizId);
-      if (!view.speakerQuestionsEnabled) throw new Error("Функция выключена администратором");
+      if (!view.speakerQuestionsEnabled && !view.speakerTileVisible) {
+        throw new Error("Функция выключена администратором");
+      }
       if (
         payload.speakerName !== "Все спикеры" &&
         view.speakerQuestionsSpeakers.length > 0 &&

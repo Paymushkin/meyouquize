@@ -51,6 +51,7 @@ type UsePublicViewEmitterParams = {
   speakerTileBackgroundColor: string;
   speakerTileTextColor: string;
   speakerTileVisible: boolean;
+  speakerQuestionsEnabled: boolean;
   programTileText: string;
   programTileBackgroundColor: string;
   programTileTextColor: string;
@@ -143,6 +144,7 @@ export function usePublicViewEmitter(params: UsePublicViewEmitterParams) {
     speakerTileBackgroundColor,
     speakerTileTextColor,
     speakerTileVisible,
+    speakerQuestionsEnabled,
     programTileText,
     programTileBackgroundColor,
     programTileTextColor,
@@ -253,6 +255,7 @@ export function usePublicViewEmitter(params: UsePublicViewEmitterParams) {
         speakerTileBackgroundColor: patch.speakerTileBackgroundColor ?? speakerTileBackgroundColor,
         speakerTileTextColor: patch.speakerTileTextColor ?? speakerTileTextColor,
         speakerTileVisible: patch.speakerTileVisible ?? speakerTileVisible,
+        speakerQuestionsEnabled: patch.speakerQuestionsEnabled ?? speakerQuestionsEnabled,
         programTileText: patch.programTileText ?? programTileText,
         programTileBackgroundColor: patch.programTileBackgroundColor ?? programTileBackgroundColor,
         programTileTextColor: patch.programTileTextColor ?? programTileTextColor,
@@ -346,6 +349,7 @@ export function usePublicViewEmitter(params: UsePublicViewEmitterParams) {
       speakerTileBackgroundColor,
       speakerTileTextColor,
       speakerTileVisible,
+      speakerQuestionsEnabled,
       programTileText,
       programTileBackgroundColor,
       programTileTextColor,

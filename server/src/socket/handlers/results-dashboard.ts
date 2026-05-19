@@ -13,6 +13,7 @@ import {
 import type { EnrichedSocket } from "../handler-common.js";
 import { assertAdmin, fail } from "../handler-common.js";
 import { toPublicViewPayload } from "../public-view-helpers.js";
+import { broadcastSpeakerQuestions } from "./speaker-questions.js";
 
 export function registerResultsDashboardHandlers(socket: EnrichedSocket, io: Server) {
   socket.on("results:subscribe", async (raw: unknown) => {
@@ -45,10 +46,24 @@ export function registerResultsDashboardHandlers(socket: EnrichedSocket, io: Ser
       const quiz = await getQuizPublicState(payload.quizId);
       if (!quiz) throw new Error("Quiz not found");
       const prevView = await getStoredPublicView(payload.quizId);
+      const speakerFeatureVisibilityChanged =
+        (typeof payload.speakerQuestionsEnabled === "boolean" &&
+          payload.speakerQuestionsEnabled !== prevView.speakerQuestionsEnabled) ||
+        (typeof payload.speakerTileVisible === "boolean" &&
+          payload.speakerTileVisible !== prevView.speakerTileVisible);
       const nextView = {
         ...mergePublicViewState(prevView, payload as PublicViewPatch),
         ...(typeof payload.speakerTileVisible === "boolean"
-          ? { speakerTileVisible: payload.speakerTileVisible }
+          ? {
+              speakerTileVisible: payload.speakerTileVisible,
+              speakerQuestionsEnabled: payload.speakerTileVisible,
+            }
+          : {}),
+        ...(typeof payload.speakerQuestionsEnabled === "boolean"
+          ? {
+              speakerQuestionsEnabled: payload.speakerQuestionsEnabled,
+              speakerTileVisible: payload.speakerQuestionsEnabled,
+            }
           : {}),
         ...(typeof payload.speakerTileTextColor === "string"
           ? { speakerTileTextColor: payload.speakerTileTextColor }
@@ -90,6 +105,9 @@ export function registerResultsDashboardHandlers(socket: EnrichedSocket, io: Ser
       );
       const updatedQuizState = await getQuizPublicState(payload.quizId);
       await broadcastQuizPublicState(io, payload.quizId, updatedQuizState);
+      if (speakerFeatureVisibilityChanged) {
+        await broadcastSpeakerQuestions(io, payload.quizId, socket.id);
+      }
     } catch (error) {
       fail(socket, error instanceof Error ? error.message : "Set public view failed");
     }

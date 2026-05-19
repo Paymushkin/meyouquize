@@ -1083,6 +1083,7 @@ export function AdminEventPage() {
     speakerTileBackgroundColor,
     speakerTileTextColor,
     speakerTileVisible,
+    speakerQuestionsEnabled,
     programTileText,
     programTileBackgroundColor,
     programTileTextColor,
@@ -2648,11 +2649,15 @@ export function AdminEventPage() {
     setSpeakerTileText(text || "Вопросы спикерам");
     setSpeakerTileBackgroundColor(backgroundColor || "#1976d2");
     setSpeakerTileTextColor(textColor || "#ffffff");
+    if (speakerTileVisible) {
+      setSpeakerQuestionsEnabled(true);
+    }
     emitPublicViewSet({
       speakerTileText: text || "Вопросы спикерам",
       speakerTileBackgroundColor: backgroundColor || "#1976d2",
       speakerTileTextColor: textColor || "#ffffff",
       speakerTileVisible: speakerTileVisible,
+      ...(speakerTileVisible ? { speakerQuestionsEnabled: true } : {}),
     });
     setMessage("Плитка «Вопросы спикерам» обновлена");
   }
@@ -2669,11 +2674,13 @@ export function AdminEventPage() {
     setSpeakerTileBackgroundColor(nextBg);
     setSpeakerTileTextColor(nextTextColor);
     setSpeakerTileVisible(next);
+    setSpeakerQuestionsEnabled(next);
     emitPublicViewSet({
       speakerTileText: nextText,
       speakerTileBackgroundColor: nextBg,
       speakerTileTextColor: nextTextColor,
       speakerTileVisible: next,
+      speakerQuestionsEnabled: next,
     });
     socket.emit("quiz:state:refresh", { quizId });
     setMessage(

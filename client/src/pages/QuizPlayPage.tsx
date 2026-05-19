@@ -704,7 +704,7 @@ export function QuizPlayPage() {
     }));
   }, [quiz?.reactionSession?.reactions]);
   const hasPlayerTiles =
-    (Boolean(speakerQuestions?.settings.enabled) && speakerTileVisible) ||
+    speakerTileVisible ||
     visiblePlayerBanners.length > 0 ||
     (programTileVisible && programTileLinkUrl.length > 0) ||
     enabledQuizReportSubQuizIds.length > 0;
@@ -850,7 +850,6 @@ export function QuizPlayPage() {
             <PlayerTilesGrid
               tileOrder={tileOrder}
               visibleBannerById={visibleBannerById}
-              speakerEnabled={Boolean(speakerQuestions?.settings.enabled)}
               speakerTileVisible={speakerTileVisible}
               onSpeakerOpen={() => setSpeakerDialogOpen(true)}
               speakerTileBackgroundColor={speakerTileBackgroundColor}

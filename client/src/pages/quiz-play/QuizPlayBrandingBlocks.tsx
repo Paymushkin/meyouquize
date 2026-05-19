@@ -169,7 +169,6 @@ export function EventTitleBlock(props: EventTitleBlockProps) {
 type PlayerTilesGridProps = {
   tileOrder: string[];
   visibleBannerById: Map<string, BannerTile>;
-  speakerEnabled: boolean;
   speakerTileVisible: boolean;
   onSpeakerOpen: () => void;
   speakerTileBackgroundColor: string;
@@ -193,7 +192,6 @@ export function PlayerTilesGrid(props: PlayerTilesGridProps) {
   const {
     tileOrder,
     visibleBannerById,
-    speakerEnabled,
     speakerTileVisible,
     onSpeakerOpen,
     speakerTileBackgroundColor,
@@ -233,7 +231,7 @@ export function PlayerTilesGrid(props: PlayerTilesGridProps) {
     >
       {tileOrder.map((tileId) => {
         if (tileId === SPEAKER_TILE_ID) {
-          if (!speakerEnabled || !speakerTileVisible) return null;
+          if (!speakerTileVisible) return null;
           return (
             <Box
               key={SPEAKER_TILE_ID}
