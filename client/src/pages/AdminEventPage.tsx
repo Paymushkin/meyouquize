@@ -1835,8 +1835,9 @@ export function AdminEventPage() {
             ];
           }
           if (isEditorQuizMode(next)) {
-            next = normalizeTagCloudQuestionPoints(next);
-          } else if (!next.options.some((o) => o.isCorrect)) {
+            return normalizeTagCloudQuestionPoints(next);
+          }
+          if (!next.options.some((o) => o.isCorrect)) {
             next.options = next.options.map((o, idx) => ({ ...o, isCorrect: idx === 0 }));
           }
         } else if (patch.type === "ranking") {
