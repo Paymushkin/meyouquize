@@ -16,13 +16,13 @@ import {
 import ContentCopyIcon from "@mui/icons-material/ContentCopy";
 import QrCode2Icon from "@mui/icons-material/QrCode2";
 import QRCode from "qrcode";
+import { buildPlayerJoinUrl, buildProjectorScreenUrl } from "../../publicAppOrigin";
 
 type Props = {
   editableTitle: string;
   setEditableTitle: (value: string) => void;
   saveQuizTitle: () => void;
-  joinUrl: string;
-  screenUrl: string;
+  eventSlug: string;
   showEventTitleOnPlayer: boolean;
   onToggleShowEventTitleOnPlayer: (next: boolean) => void;
 };
@@ -32,13 +32,15 @@ export function AdminGeneralSection(props: Props) {
     editableTitle,
     setEditableTitle,
     saveQuizTitle,
-    joinUrl,
-    screenUrl,
+    eventSlug,
     showEventTitleOnPlayer,
     onToggleShowEventTitleOnPlayer,
   } = props;
+  const joinUrl = buildPlayerJoinUrl(eventSlug);
+  const screenUrl = buildProjectorScreenUrl(eventSlug);
   const [qrOpen, setQrOpen] = useState(false);
   const [qrLabel, setQrLabel] = useState("");
+  const [qrTargetUrl, setQrTargetUrl] = useState("");
   const [qrDataUrl, setQrDataUrl] = useState("");
 
   async function copyToClipboard(value: string) {
@@ -54,6 +56,7 @@ export function AdminGeneralSection(props: Props) {
     if (!value) return;
     const nextQrData = await QRCode.toDataURL(value, { margin: 1, width: 320 });
     setQrLabel(label);
+    setQrTargetUrl(value);
     setQrDataUrl(nextQrData);
     setQrOpen(true);
   }
@@ -76,8 +79,12 @@ export function AdminGeneralSection(props: Props) {
           />
           <Stack spacing={0.5} sx={{ mb: 2 }}>
             <Stack direction="row" alignItems="center" spacing={0.5}>
-              <Typography color="text.secondary" sx={{ flex: 1, minWidth: 0 }}>
-                Ссылка на ивент
+              <Typography
+                color="text.secondary"
+                sx={{ flex: 1, minWidth: 0 }}
+                title={joinUrl || undefined}
+              >
+                {joinUrl ? `Ивент: ${joinUrl}` : "Ссылка на ивент"}
               </Typography>
               <Tooltip title="Скопировать ссылку">
                 <span>
@@ -94,8 +101,8 @@ export function AdminGeneralSection(props: Props) {
                 <span>
                   <IconButton
                     size="small"
-                    onClick={() => void openQr("Ссылка на ивент", joinUrl)}
-                    disabled={!joinUrl}
+                    onClick={() => void openQr("Ссылка на ивент", buildPlayerJoinUrl(eventSlug))}
+                    disabled={!eventSlug}
                   >
                     <QrCode2Icon fontSize="small" />
                   </IconButton>
@@ -103,9 +110,18 @@ export function AdminGeneralSection(props: Props) {
               </Tooltip>
             </Stack>
             <Stack direction="row" alignItems="center" spacing={0.5}>
-              <Typography color="text.secondary" sx={{ flex: 1, minWidth: 0 }}>
-                Ссылка на проектор
-              </Typography>
+              <Stack sx={{ flex: 1, minWidth: 0 }}>
+                <Typography color="text.secondary">Ссылка на проектор</Typography>
+                {screenUrl ? (
+                  <Typography
+                    variant="caption"
+                    color="text.secondary"
+                    sx={{ wordBreak: "break-all" }}
+                  >
+                    {screenUrl}
+                  </Typography>
+                ) : null}
+              </Stack>
               <Tooltip title="Скопировать ссылку">
                 <span>
                   <IconButton
@@ -121,8 +137,10 @@ export function AdminGeneralSection(props: Props) {
                 <span>
                   <IconButton
                     size="small"
-                    onClick={() => void openQr("Ссылка на проектор", screenUrl)}
-                    disabled={!screenUrl}
+                    onClick={() =>
+                      void openQr("Ссылка на проектор", buildProjectorScreenUrl(eventSlug))
+                    }
+                    disabled={!eventSlug}
                   >
                     <QrCode2Icon fontSize="small" />
                   </IconButton>
@@ -144,11 +162,22 @@ export function AdminGeneralSection(props: Props) {
       </Card>
       <Dialog open={qrOpen} onClose={() => setQrOpen(false)}>
         <DialogTitle>{qrLabel}</DialogTitle>
-        <DialogContent sx={{ display: "flex", justifyContent: "center", pb: 3 }}>
+        <DialogContent
+          sx={{ display: "flex", flexDirection: "column", alignItems: "center", pb: 3 }}
+        >
+          {qrTargetUrl ? (
+            <Typography
+              variant="caption"
+              color="text.secondary"
+              sx={{ mb: 1.5, textAlign: "center", wordBreak: "break-all" }}
+            >
+              {qrTargetUrl}
+            </Typography>
+          ) : null}
           {qrDataUrl ? (
             <img
               src={qrDataUrl}
-              alt="qr-code"
+              alt="QR-код входа в ивент"
               style={{ width: 320, height: 320, maxWidth: "75vw", maxHeight: "75vw" }}
             />
           ) : null}

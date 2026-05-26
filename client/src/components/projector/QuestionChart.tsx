@@ -4,7 +4,7 @@ import { Box, Fade, LinearProgress, Paper, Stack, Typography } from "@mui/materi
 import { useTheme } from "@mui/material/styles";
 import { animated, to, useTransition } from "@react-spring/web";
 import cloud from "d3-cloud";
-import { collectTagCloudCorrectAliases, normalizeTagComparable } from "@meyouquize/shared";
+import { collectTagCloudQuizReferenceAliases, normalizeTagComparable } from "@meyouquize/shared";
 import { buildCloudWordsForDisplay } from "../../features/tagCloudMerge";
 import { colorByWord } from "../../features/projectorChart/colorByWord";
 import type { ProjectorLayoutWord, ProjectorQuestionResult } from "../../types/projectorDashboard";
@@ -109,11 +109,12 @@ export function QuestionChart(props: QuestionChartProps) {
   );
   const referenceComparableSet = useMemo(() => {
     if (question.type !== "tag_cloud") return null;
-    const aliases = collectTagCloudCorrectAliases(
-      question.optionStats.map((o) => ({ text: o.text, isCorrect: o.isCorrect })),
-    );
+    const aliases =
+      question.tagCloudReferenceAliases && question.tagCloudReferenceAliases.length > 0
+        ? question.tagCloudReferenceAliases
+        : collectTagCloudQuizReferenceAliases(question.optionStats.map((o) => ({ text: o.text })));
     return aliases.length > 0 ? new Set(aliases) : null;
-  }, [question.type, question.optionStats]);
+  }, [question.type, question.optionStats, question.tagCloudReferenceAliases]);
   const hasBarData = question.optionStats.length > 0;
   const hasRankingAnswers = question.type === "ranking" && hasBarData;
   /** На стадии options облако слов скрыто — только заголовок (cloudHeader); на results — при наличии тегов. */

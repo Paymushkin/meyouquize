@@ -165,7 +165,11 @@ export function buildApp() {
   });
 
   app.get("/healthz", (_req, res) => {
-    return res.status(200).json({ ok: true });
+    return res.status(200).json({
+      ok: true,
+      /** Проверка деплоя: на VPS должно быть `quiz-all`, иначе зачёт облака тегов только по первому эталону. */
+      tagCloudReferenceScope: "quiz-all",
+    });
   });
 
   app.get("/readyz", async (_req, res) => {

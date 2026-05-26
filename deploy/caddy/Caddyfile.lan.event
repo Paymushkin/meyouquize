@@ -1,0 +1,38 @@
+# Локальное мероприятие: статика + API/WebSocket на одном origin (:80).
+# Запуск: MQ_ROOT=/path/to/repo caddy run --config deploy/caddy/Caddyfile.lan.event
+# (скрипт event:start выставляет MQ_ROOT автоматически)
+
+:80 {
+  encode zstd gzip
+
+  @health {
+    path /healthz /readyz
+  }
+  handle @health {
+    reverse_proxy 127.0.0.1:4000 {
+      flush_interval -1
+    }
+  }
+
+  @api path /api/* /socket.io* /media*
+  handle @api {
+    reverse_proxy 127.0.0.1:4000 {
+      flush_interval -1
+    }
+  }
+
+  handle {
+    root * {$MQ_ROOT}/client/dist
+    try_files {path} /index.html
+    file_server
+  }
+
+  handle_errors {
+    root * {$MQ_ROOT}/client/dist
+    @err500 expression `{err.status_code} == 500`
+    rewrite @err500 /errors/500.html
+    @err502 expression `{err.status_code} in [502, 503, 504]`
+    rewrite @err502 /errors/502.html
+    file_server
+  }
+}

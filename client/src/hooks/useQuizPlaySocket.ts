@@ -1,5 +1,6 @@
 import { useEffect } from "react";
 import type { Dispatch, MutableRefObject, SetStateAction } from "react";
+import { expandTagCloudSubmitLines } from "@meyouquize/shared";
 import { socket } from "../socket";
 import type { QuizState } from "../pages/quiz-play/types";
 import type { SpeakerQuestionsPayload } from "../types/speakerQuestions";
@@ -52,7 +53,9 @@ export function useQuizPlaySocket({
     if (!socket.connected) socket.connect();
     const getCurrentSelection = () => {
       if (activeQuestionTypeRef.current === "tag_cloud") {
-        return tagAnswersRef.current.map((value) => value.trim()).filter(Boolean);
+        return expandTagCloudSubmitLines(
+          tagAnswersRef.current.map((value) => value.trim()).filter(Boolean),
+        );
       }
       if (activeQuestionTypeRef.current === "ranking") {
         return rankOrderRef.current;

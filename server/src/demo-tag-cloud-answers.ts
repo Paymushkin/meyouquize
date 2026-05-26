@@ -1,5 +1,6 @@
 import {
   collectTagCloudCorrectAliases,
+  collectTagCloudQuizReferenceAliases,
   normalizeTagComparable,
   parseTagCloudReferenceAliases,
 } from "@meyouquize/shared";
@@ -53,8 +54,16 @@ export function buildDemoTagCloudAnswer(
   chooseCorrect: boolean,
   seed: number,
 ): { selectedTags: string[]; isCorrect: boolean; scoreAwarded: number } {
-  const correctOptions = q.options.filter((o) => o.isCorrect);
-  const correctAliasSet = new Set(collectTagCloudCorrectAliases(q.options));
+  const referenceOptions =
+    q.scoringMode === "QUIZ"
+      ? q.options.filter((o) => o.text.trim())
+      : q.options.filter((o) => o.isCorrect);
+  const correctAliasSet = new Set(
+    q.scoringMode === "QUIZ"
+      ? collectTagCloudQuizReferenceAliases(q.options)
+      : collectTagCloudCorrectAliases(q.options),
+  );
+  const correctOptions = referenceOptions;
   const maxAnswers = Math.max(1, Math.trunc(q.maxAnswers ?? 3));
   const wrongPool = DEMO_WRONG_TAG_POOL.filter(
     (t) => !correctAliasSet.has(normalizeTagComparable(t)),
@@ -83,6 +92,7 @@ export function buildDemoTagCloudAnswer(
     const referenceTags = buildTagCloudReferenceTags(
       q.options,
       parseTagCloudTierPoints(q.rankingPointsByRank),
+      "quiz-all",
     );
     const evaluated = evaluateTagCloudSubmission({
       referenceTags,

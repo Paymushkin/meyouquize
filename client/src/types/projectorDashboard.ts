@@ -37,6 +37,8 @@ export type ProjectorQuestionResult = {
   rankingKind?: "quiz" | "jury";
   optionStats: ProjectorOptionStat[];
   tagCloud?: ProjectorTagCloudWord[];
+  /** Все синонимы эталонов (квиз); для подсветки облака на проекторе */
+  tagCloudReferenceAliases?: string[];
   firstCorrectNicknames?: string[];
 };
 

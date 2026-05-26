@@ -32,8 +32,8 @@ const questionSchema = z
     id: z.string().min(1).optional(),
     text: z.string().min(1),
     type: z.enum(["single", "multi", "tag_cloud", "ranking"]),
-    points: z.number().int().min(1).max(10_000).default(1),
-    maxAnswers: z.number().int().min(1).max(5).optional(),
+    points: z.coerce.number().int().min(1).max(10_000).default(1),
+    maxAnswers: z.coerce.number().int().min(1).max(5).optional(),
     scoringMode: z.enum(["poll", "quiz"]).optional(),
     projectorShowFirstCorrect: z.boolean().optional(),
     projectorFirstCorrectWinnersCount: z.number().int().min(1).max(20).optional(),
@@ -58,21 +58,16 @@ const questionSchema = z
             message: "В режиме квиза для облака тегов нужен хотя бы один эталонный тег",
             path: ["options"],
           });
-        } else if (!value.options.some((o) => o.isCorrect)) {
-          ctx.addIssue({
-            code: z.ZodIssueCode.custom,
-            message: "Отметьте хотя бы один правильный эталонный тег",
-            path: ["options"],
-          });
         }
         if (
           value.rankingPointsByRank != null &&
           value.rankingPointsByRank !== undefined &&
+          value.rankingPointsByRank.length > 0 &&
           value.rankingPointsByRank.length !== value.options.length
         ) {
           ctx.addIssue({
             code: z.ZodIssueCode.custom,
-            message: "Число баллов по тегам должно совпадать с числом вариантов",
+            message: "Число баллов по тегам должно совпадать с числом эталонных тегов",
             path: ["rankingPointsByRank"],
           });
         }

@@ -56,13 +56,29 @@ export function parseTagCloudTierPoints(raw: unknown): number[] | null {
   return out.length > 0 ? out : null;
 }
 
+/** Режим зачёта облака тегов: в подквизе всегда квиз (даже если в БД остался legacy POLL). */
+export function resolveTagCloudScoringContext(question: {
+  isTagCloud: boolean;
+  scoringModeQuiz: boolean;
+  inSubQuiz: boolean;
+}): { scoringMode: "quiz" | "poll"; referenceScope: "quiz-all" | "correct-flag" } {
+  const isQuiz = question.isTagCloud && (question.scoringModeQuiz || question.inSubQuiz);
+  if (!isQuiz) {
+    return { scoringMode: "poll", referenceScope: "correct-flag" };
+  }
+  return { scoringMode: "quiz", referenceScope: "quiz-all" };
+}
+
 export function buildTagCloudReferenceTags(
   options: Array<{ text: string; isCorrect: boolean }>,
   tiers: number[] | null | undefined,
+  /** В квизе каждый непустой вариант — эталон; в опросе — только с isCorrect. */
+  referenceScope: "quiz-all" | "correct-flag" = "correct-flag",
 ): TagCloudReferenceTag[] {
   const referenceTags: TagCloudReferenceTag[] = [];
   options.forEach((o, idx) => {
-    if (!o.isCorrect) return;
+    if (referenceScope === "correct-flag" && !o.isCorrect) return;
+    if (!o.text.trim()) return;
     const comparables = parseTagCloudReferenceAliases(o.text);
     if (comparables.length === 0) return;
     referenceTags.push({
@@ -95,9 +111,10 @@ export function evaluateTagCloudSubmission(input: {
 }
 
 /**
- * Облако тегов (квиз): за каждый верный эталонный тег — баллы из настроек;
- * синонимы в одной строке («синий; голубой») засчитываются как один эталон;
- * если участник заполнил все слоты (maxAnswers) и все ответы верные — поле `points` вопроса.
+ * Облако тегов (квиз): синонимы в одной строке эталона («а; б») — одна группа.
+ * Частично: баллы за каждую впервые закрытую группу (повтор синонима той же группы не суммируется).
+ * Полный ответ (`points` вопроса): ровно maxAnswers слотов, каждый тег верный и из своей группы,
+ * причём все maxAnswers групп разные (нельзя «вольная» + «вольная борьба» + «дзюдо» при max=3).
  */
 export function scoreTagCloudQuizAnswer(
   referenceTags: TagCloudReferenceTag[],
@@ -105,34 +122,39 @@ export function scoreTagCloudQuizAnswer(
   maxAnswers: number,
   fullCreditPoints: number,
 ): { scoreAwarded: number; isCorrect: boolean } {
-  const uniqueUser = [...new Set(userTagsComparable.filter(Boolean))];
-  if (uniqueUser.length === 0) {
+  const userTags = userTagsComparable.map((t) => t.trim()).filter(Boolean);
+  if (userTags.length === 0) {
     return { scoreAwarded: 0, isCorrect: false };
+  }
+
+  const maxSlots = Math.max(1, Math.trunc(maxAnswers));
+  const groupIndexBySlot: number[] = [];
+
+  for (const tag of userTags) {
+    let groupIdx = -1;
+    for (let i = 0; i < referenceTags.length; i += 1) {
+      if (referenceTags[i]!.comparables.includes(tag)) {
+        groupIdx = i;
+        break;
+      }
+    }
+    groupIndexBySlot.push(groupIdx);
   }
 
   const satisfiedGroups = new Set<number>();
   let partialSum = 0;
-  let matchedUserTags = 0;
-
-  for (const tag of uniqueUser) {
-    let matched = false;
-    for (let i = 0; i < referenceTags.length; i += 1) {
-      if (satisfiedGroups.has(i)) continue;
-      const ref = referenceTags[i]!;
-      if (ref.comparables.includes(tag)) {
-        satisfiedGroups.add(i);
-        partialSum += Math.max(0, ref.points);
-        matchedUserTags += 1;
-        matched = true;
-        break;
-      }
-    }
+  for (let slot = 0; slot < userTags.length; slot += 1) {
+    const groupIdx = groupIndexBySlot[slot]!;
+    if (groupIdx < 0) continue;
+    if (satisfiedGroups.has(groupIdx)) continue;
+    satisfiedGroups.add(groupIdx);
+    partialSum += Math.max(0, referenceTags[groupIdx]!.points);
   }
 
-  const maxSlots = Math.max(1, Math.trunc(maxAnswers));
-  const allSubmittedAreCorrect = matchedUserTags === uniqueUser.length;
+  const allSlotsMatchReference = groupIndexBySlot.every((g) => g >= 0);
+  const distinctGroupsUsed = new Set(groupIndexBySlot.filter((g) => g >= 0));
   const fullCredit =
-    allSubmittedAreCorrect && uniqueUser.length === maxSlots && satisfiedGroups.size === maxSlots;
+    userTags.length === maxSlots && allSlotsMatchReference && distinctGroupsUsed.size === maxSlots;
 
   if (fullCredit) {
     return { scoreAwarded: Math.max(0, fullCreditPoints), isCorrect: true };

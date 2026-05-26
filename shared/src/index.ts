@@ -422,11 +422,11 @@ export function normalizeTagComparable(value: string): string {
   return s;
 }
 
-/** Синонимы в одной строке эталона: «синий; голубой» → два сравнимых варианта. */
+/** Синонимы в одной строке эталона: «синий; голубой» или «синий, голубой». */
 export function parseTagCloudReferenceAliases(optionText: string): string[] {
   const out: string[] = [];
   const seen = new Set<string>();
-  for (const part of optionText.split(/[;|]/u)) {
+  for (const part of optionText.split(/[;|,]/u)) {
     const norm = normalizeTagComparable(part);
     if (!norm || seen.has(norm)) continue;
     seen.add(norm);
@@ -440,7 +440,59 @@ export function tagMatchesReferenceAliases(userComparable: string, optionText: s
   return parseTagCloudReferenceAliases(optionText).includes(userComparable);
 }
 
-/** Все нормализованные синонимы эталонных тегов вопроса. */
+/** Разбивает ввод участника (одно поле может содержать «а; б, в»). */
+export function splitTagCloudUserInput(raw: string): string[] {
+  const out: string[] = [];
+  const seen = new Set<string>();
+  for (const part of raw.split(/[;|,]/u)) {
+    const norm = normalizeTagComparable(part);
+    if (!norm || seen.has(norm)) continue;
+    seen.add(norm);
+    out.push(norm);
+  }
+  return out;
+}
+
+/** Несколько полей ответа → плоский список нормализованных тегов. */
+export function expandTagCloudSubmitLines(lines: string[]): string[] {
+  const out: string[] = [];
+  const seen = new Set<string>();
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (!trimmed) continue;
+    const parts = splitTagCloudUserInput(trimmed);
+    const tags = parts.length > 0 ? parts : [normalizeTagComparable(trimmed)].filter(Boolean);
+    for (const tag of tags) {
+      if (seen.has(tag)) continue;
+      seen.add(tag);
+      out.push(tag);
+    }
+  }
+  return out;
+}
+
+/** JSON из `answer.selectedOptionIds` для облака тегов. */
+export function parseStoredTagAnswersJson(raw: string): string[] {
+  try {
+    const parsed = JSON.parse(raw) as unknown;
+    if (!Array.isArray(parsed)) return [];
+    const out: string[] = [];
+    const seen = new Set<string>();
+    for (const item of parsed) {
+      if (typeof item !== "string") continue;
+      for (const tag of splitTagCloudUserInput(item)) {
+        if (!tag || seen.has(tag)) continue;
+        seen.add(tag);
+        out.push(tag);
+      }
+    }
+    return out;
+  } catch {
+    return [];
+  }
+}
+
+/** Все нормализованные синонимы эталонных тегов вопроса (только `isCorrect`). */
 export function collectTagCloudCorrectAliases(
   options: Array<{ text: string; isCorrect: boolean }>,
 ): string[] {
@@ -456,6 +508,40 @@ export function collectTagCloudCorrectAliases(
     }
   }
   return out;
+}
+
+/** Все эталонные строки квиза: каждый непустой вариант — отдельный эталон. */
+export function collectTagCloudQuizReferenceAliases(options: Array<{ text: string }>): string[] {
+  const out: string[] = [];
+  const seen = new Set<string>();
+  for (const o of options) {
+    if (!o.text.trim()) continue;
+    for (const alias of parseTagCloudReferenceAliases(o.text)) {
+      if (!seen.has(alias)) {
+        seen.add(alias);
+        out.push(alias);
+      }
+    }
+  }
+  return out;
+}
+
+/** Текст «верного ответа» для отчёта участника. */
+export function formatTagCloudReferenceAnswer(
+  options: Array<{ text: string; isCorrect: boolean }>,
+  mode: "quiz" | "poll",
+): string {
+  const reference =
+    mode === "quiz"
+      ? options.filter((o) => o.text.trim())
+      : options.filter((o) => o.isCorrect && o.text.trim());
+  if (reference.length === 0) return "—";
+  return reference
+    .map((o) => {
+      const aliases = parseTagCloudReferenceAliases(o.text);
+      return aliases.length > 0 ? aliases.join(" / ") : o.text.trim();
+    })
+    .join(" · ");
 }
 
 /** Подпись баллов с правильным склонением («1 балл», «2 балла», «5 баллов»). */

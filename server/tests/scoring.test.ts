@@ -5,6 +5,7 @@ import {
   evaluateAnswer,
   evaluateRankingAnswer,
   evaluateTagCloudSubmission,
+  resolveTagCloudScoringContext,
   scoreRankingByPositionMatch,
   scoreTagCloudQuizAnswer,
 } from "../src/scoring.js";
@@ -57,6 +58,28 @@ describe("evaluateRankingAnswer", () => {
   });
 });
 
+describe("resolveTagCloudScoringContext", () => {
+  it("treats tag cloud in sub-quiz as quiz even when scoringMode in DB is poll (legacy)", () => {
+    expect(
+      resolveTagCloudScoringContext({
+        isTagCloud: true,
+        scoringModeQuiz: false,
+        inSubQuiz: true,
+      }),
+    ).toEqual({ scoringMode: "quiz", referenceScope: "quiz-all" });
+  });
+
+  it("room poll tag cloud stays correct-flag", () => {
+    expect(
+      resolveTagCloudScoringContext({
+        isTagCloud: true,
+        scoringModeQuiz: false,
+        inSubQuiz: false,
+      }),
+    ).toEqual({ scoringMode: "poll", referenceScope: "correct-flag" });
+  });
+});
+
 describe("buildTagCloudReferenceTags", () => {
   it("expands synonym groups and per-option tiers", () => {
     const refs = buildTagCloudReferenceTags(
@@ -71,6 +94,21 @@ describe("buildTagCloudReferenceTags", () => {
       { comparables: ["красный"], points: 2 },
       { comparables: ["синий", "голубой"], points: 3 },
     ]);
+  });
+
+  it("quiz-all includes every non-empty option regardless of isCorrect flag", () => {
+    const refs = buildTagCloudReferenceTags(
+      [
+        { text: "вольная; вольная борьба", isCorrect: true },
+        { text: "самбо", isCorrect: false },
+        { text: "дзюдо", isCorrect: false },
+        { text: "сумо", isCorrect: false },
+      ],
+      [1, 1, 1, 1],
+      "quiz-all",
+    );
+    expect(refs).toHaveLength(4);
+    expect(refs[1]?.comparables).toEqual(["самбо"]);
   });
 });
 
@@ -137,6 +175,35 @@ describe("scoreTagCloudQuizAnswer", () => {
   it("does not grant full credit when a wrong tag is included", () => {
     expect(scoreTagCloudQuizAnswer(refs, ["a", "b", "c", "x"], 3, 10)).toEqual({
       scoreAwarded: 7,
+      isCorrect: false,
+    });
+  });
+
+  it("scores wrestling-style tag groups (max 3 of 4 эталонов)", () => {
+    const refs = buildTagCloudReferenceTags(
+      [
+        { text: "вольная; вольная борьба", isCorrect: true },
+        { text: "самбо", isCorrect: false },
+        { text: "дзюдо; дзю-до", isCorrect: false },
+        { text: "сумо", isCorrect: false },
+      ],
+      [1, 1, 1, 1],
+      "quiz-all",
+    );
+    expect(scoreTagCloudQuizAnswer(refs, ["самбо", "дзюдо"], 3, 5)).toEqual({
+      scoreAwarded: 2,
+      isCorrect: false,
+    });
+    expect(scoreTagCloudQuizAnswer(refs, ["самбо", "дзюдо", "сумо"], 3, 5)).toEqual({
+      scoreAwarded: 5,
+      isCorrect: true,
+    });
+    expect(scoreTagCloudQuizAnswer(refs, ["самбо", "дзюдо", "керлинг"], 3, 5)).toEqual({
+      scoreAwarded: 2,
+      isCorrect: false,
+    });
+    expect(scoreTagCloudQuizAnswer(refs, ["вольная", "вольная борьба", "дзюдо"], 3, 5)).toEqual({
+      scoreAwarded: 2,
       isCorrect: false,
     });
   });

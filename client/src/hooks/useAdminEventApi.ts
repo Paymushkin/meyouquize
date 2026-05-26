@@ -1,10 +1,16 @@
-import { useCallback, type Dispatch, type MutableRefObject, type SetStateAction } from "react";
+import {
+  useCallback,
+  useRef,
+  type Dispatch,
+  type MutableRefObject,
+  type SetStateAction,
+} from "react";
 import {
   buildRoomContentPayload,
   flattenQuestionsFromRoom,
   mergeRoomReloadIntoState,
+  normalizeTagCloudQuestionPoints,
   serializeRoomContent,
-  validateQuestionFormEntry,
   validateQuestionsForm,
   validateSheetsHaveSubQuizId,
   type AdminEventRoom,
@@ -44,6 +50,8 @@ export function useAdminEventApi(params: Params) {
     setSelectedQuestionIndex,
     setMessage,
   } = params;
+
+  const lastPersistQuestionsErrorRef = useRef<string | null>(null);
 
   const checkSession = useCallback(async () => {
     const response = await fetch(`${API_BASE}/api/admin/me`, { credentials: "include" });
@@ -87,28 +95,30 @@ export function useAdminEventApi(params: Params) {
     async (
       questions: QuestionForm[],
       sheets: SubQuizSheet[],
-      options?: { suppressToast?: boolean; validateOnlyIndex?: number },
+      options?: { suppressToast?: boolean },
     ): Promise<false | { sheets: SubQuizSheet[]; questions: QuestionForm[] }> => {
       const suppressToast = options?.suppressToast ?? false;
-      const onlyIdx = options?.validateOnlyIndex;
-      const sheetErr = validateSheetsHaveSubQuizId(sheets, questions);
+      const normalizedQuestions = questions.map((q) =>
+        q.type === "tag_cloud" ? normalizeTagCloudQuestionPoints(q) : q,
+      );
+      const sheetErr = validateSheetsHaveSubQuizId(sheets, normalizedQuestions);
       if (sheetErr) {
+        lastPersistQuestionsErrorRef.current = sheetErr;
         if (!suppressToast) setMessage(sheetErr);
         return false;
       }
-      const validationError =
-        onlyIdx !== undefined && onlyIdx >= 0 && onlyIdx < questions.length
-          ? validateQuestionFormEntry(questions[onlyIdx], onlyIdx)
-          : validateQuestionsForm(questions);
+      const validationError = validateQuestionsForm(normalizedQuestions);
       if (validationError) {
+        lastPersistQuestionsErrorRef.current = validationError;
         if (!suppressToast) setMessage(validationError);
         return false;
       }
-      const snapshot = serializeRoomContent(sheets, questions);
+      const snapshot = serializeRoomContent(sheets, normalizedQuestions);
       if (snapshot === lastSavedSnapshotRef.current) {
-        return { sheets, questions };
+        lastPersistQuestionsErrorRef.current = null;
+        return { sheets, questions: normalizedQuestions };
       }
-      const payload = buildRoomContentPayload(sheets, questions);
+      const payload = buildRoomContentPayload(sheets, normalizedQuestions);
       const response = await fetch(`${API_BASE}/api/admin/rooms/${eventName}/questions`, {
         method: "PUT",
         credentials: "include",
@@ -123,12 +133,18 @@ export function useAdminEventApi(params: Params) {
         } catch {
           // ignore json parse issues and keep fallback message
         }
+        lastPersistQuestionsErrorRef.current = errorMessage;
         if (!suppressToast) setMessage(errorMessage);
         return false;
       }
+      lastPersistQuestionsErrorRef.current = null;
       const updatedRoom = (await response.json()) as AdminEventRoom;
       const cloudManual = readCloudManualFromStorage(cloudManualStorageKey);
-      const merged = mergeRoomReloadIntoState(updatedRoom, { sheets, questions }, cloudManual);
+      const merged = mergeRoomReloadIntoState(
+        updatedRoom,
+        { sheets, questions: normalizedQuestions },
+        cloudManual,
+      );
       setSubQuizSheets(merged.sheets);
       setQuestionForms(merged.questions);
       setRoom(updatedRoom);
@@ -211,6 +227,7 @@ export function useAdminEventApi(params: Params) {
     checkSession,
     loadRoom,
     persistQuestions,
+    lastPersistQuestionsErrorRef,
     patchQuestionProjectorSettings,
     saveQuizTitle,
   };

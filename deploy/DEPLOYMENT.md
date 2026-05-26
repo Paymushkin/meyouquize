@@ -49,7 +49,9 @@ sudo systemctl enable --now pgbouncer
 
 ```bash
 cd /opt/meyouquize/current
-npm ci
+# Важно: не делайте `source deploy/env/.env.runtime` до npm ci — там NODE_ENV=production,
+# и npm не поставит devDependencies (@types/*, typescript), сборка упадёт.
+npm ci --include=dev
 npm run build
 npm run prisma:migrate:deploy
 ```
@@ -89,6 +91,8 @@ npm run deploy:lan
 
 - Set LAN origins in `CLIENT_ORIGIN`.
 - Keep `APP_NETWORK_MODE=lan`.
+
+**Мероприятие на одном Mac (200–300 участников, Wi‑Fi без интернета):** [LAN_EVENT.md](./LAN_EVENT.md) — `npm run event:init` и `npm run event:start` (Redis, `CLUSTER_WORKERS=auto`, Caddy).
 
 Use Caddy config:
 
@@ -142,7 +146,7 @@ Also verify from browser:
 ```bash
 cd /opt/meyouquize/current
 git pull
-npm ci
+npm ci --include=dev
 npm run build
 npm run prisma:migrate:deploy
 sudo systemctl restart meyouquize

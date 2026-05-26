@@ -63,7 +63,7 @@ export function PlayerQuizResultsTile({
         py: "clamp(0.65rem, 2.5vw, 1rem)",
         cursor: isInteractive ? "pointer" : "default",
         textAlign: "left",
-        overflow: "visible",
+        overflow: "hidden",
         backgroundColor: brandPrimaryColor,
         color: textColor,
         boxShadow: preview ? 1 : 3,

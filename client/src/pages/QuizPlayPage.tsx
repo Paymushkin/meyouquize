@@ -15,7 +15,7 @@ import {
   TextField,
   Typography,
 } from "@mui/material";
-import { ruBallLabel, SPEAKER_TILE_ID } from "@meyouquize/shared";
+import { expandTagCloudSubmitLines, ruBallLabel, SPEAKER_TILE_ID } from "@meyouquize/shared";
 import {
   buildPlayerQuizResultsTilesForPlayer,
   resolveEnabledQuizReportSubQuizIds,
@@ -523,7 +523,9 @@ export function QuizPlayPage() {
       const payload = {
         quizId: quiz.id,
         questionId: nonQuizActiveQuestion.id,
-        tagAnswers: tagAnswers.map((value) => value.trim()).filter(Boolean),
+        tagAnswers: expandTagCloudSubmitLines(
+          tagAnswers.map((value) => value.trim()).filter(Boolean),
+        ),
       };
       pendingSubmitPayloadRef.current = payload;
       socket.emit("answer:submit", payload);

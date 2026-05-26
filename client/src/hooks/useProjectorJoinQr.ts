@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import QRCode from "qrcode";
+import { buildPlayerJoinUrl } from "../publicAppOrigin";
 
 type Params = {
   slug: string;
@@ -11,9 +12,7 @@ export function useProjectorJoinQr(params: Params) {
   const { slug, showEventTitleScreen, projectorJoinQrVisible } = params;
   const [joinQrDataUrl, setJoinQrDataUrl] = useState("");
   const showJoinQrBlock = showEventTitleScreen && projectorJoinQrVisible;
-  const joinUrl = slug
-    ? `${typeof window !== "undefined" ? window.location.origin : ""}/q/${slug}`
-    : "";
+  const joinUrl = buildPlayerJoinUrl(slug);
 
   useEffect(() => {
     if (!showJoinQrBlock || !joinUrl) {

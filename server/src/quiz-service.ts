@@ -1,4 +1,11 @@
-import { normalizeTagComparable, type PublicViewState } from "@meyouquize/shared";
+import {
+  collectTagCloudQuizReferenceAliases,
+  expandTagCloudSubmitLines,
+  formatTagCloudReferenceAnswer,
+  normalizeTagComparable,
+  parseStoredTagAnswersJson,
+  type PublicViewState,
+} from "@meyouquize/shared";
 import {
   Prisma,
   QuestionType,
@@ -17,6 +24,7 @@ import {
   evaluateRankingAnswer,
   evaluateTagCloudSubmission,
   parseTagCloudTierPoints,
+  resolveTagCloudScoringContext,
 } from "./scoring.js";
 import { containsProfanity } from "./profanity.js";
 import { getReactionSessionPublic } from "./reactions-service.js";
@@ -31,14 +39,10 @@ function normalizeTag(value: string) {
     .replace(/\s+/g, " ");
 }
 
-function parseTagAnswers(raw: string) {
-  try {
-    const parsed = JSON.parse(raw) as string[];
-    if (!Array.isArray(parsed)) return [];
-    return parsed.map(normalizeTag).filter(Boolean);
-  } catch {
-    return [];
-  }
+function parseTagAnswers(raw: string, comparable: boolean) {
+  const tags = parseStoredTagAnswersJson(raw);
+  if (!comparable) return tags.map(normalizeTag).filter(Boolean);
+  return tags;
 }
 
 function sortActiveQuestionsByActivation<T extends { activatedAt: Date | null; order: number }>(
@@ -57,7 +61,7 @@ function isStoredAnswerValidForQuestion(
   rawSelectedOptionIds: string,
 ): boolean {
   if (question.type === QuestionType.TAG_CLOUD) {
-    return parseTagAnswers(rawSelectedOptionIds).length > 0;
+    return parseTagAnswers(rawSelectedOptionIds, false).length > 0;
   }
   const selected = parseSelectedIds(rawSelectedOptionIds);
   if (selected.length < 1) return false;
@@ -247,11 +251,23 @@ function optionsCreateRows(questionId: string, options: QuestionReplaceInput["op
   }));
 }
 
-function toScoringMode(q: QuestionReplaceInput): ScoringMode {
+function toScoringMode(q: QuestionReplaceInput, subQuizId: string | null = null): ScoringMode {
   if (q.type === "tag_cloud") {
+    if (subQuizId != null) return ScoringMode.QUIZ;
     return q.scoringMode === "quiz" ? ScoringMode.QUIZ : ScoringMode.POLL;
   }
   return q.scoringMode === "poll" ? ScoringMode.POLL : ScoringMode.QUIZ;
+}
+
+function optionsForReplaceQuestion(
+  q: QuestionReplaceInput,
+  subQuizId: string | null,
+): QuestionReplaceInput["options"] {
+  if (q.type !== "tag_cloud") return q.options;
+  if (toScoringMode(q, subQuizId) !== ScoringMode.QUIZ) return q.options;
+  return q.options
+    .filter((o) => o.text.trim())
+    .map((o) => ({ text: o.text.trim(), isCorrect: true }));
 }
 
 function rankingQuestionCreateData(q: QuestionReplaceInput) {
@@ -484,7 +500,8 @@ export async function replaceRoomContent(eventName: string, content: RoomContent
         }
       }
 
-      const mode = toScoringMode(q);
+      const mode = toScoringMode(q, subQuizId);
+      const optionsToSync = optionsForReplaceQuestion(q, subQuizId);
       const questionData = {
         quizId: roomId,
         subQuizId,
@@ -514,7 +531,13 @@ export async function replaceRoomContent(eventName: string, content: RoomContent
         targetQuestionId = createdQ.id;
       }
       keptQuestionIds.add(targetQuestionId);
-      await syncOptionsForQuestion(targetQuestionId, q.options);
+      await syncOptionsForQuestion(targetQuestionId, optionsToSync);
+      if (q.type === "tag_cloud" && subQuizId != null && mode === ScoringMode.QUIZ) {
+        await tx.option.updateMany({
+          where: { questionId: targetQuestionId },
+          data: { isCorrect: true },
+        });
+      }
     }
 
     const subRows: { id: string; sortOrder: number }[] = [];
@@ -856,11 +879,12 @@ async function getPlayerVisibleResultsForQuiz(
 function mapPerQuestion(questions: QuestionDashboardRow[]) {
   return questions.map((q) => {
     const sortedOpts = [...q.options].sort((a, b) => a.sortOrder - b.sortOrder);
+    const isQuizTagCloud = q.type === QuestionType.TAG_CLOUD && q.subQuizId != null;
     let tagCloud: Array<{ text: string; count: number }> = [];
     if (q.type === QuestionType.TAG_CLOUD) {
       tagCloud = Object.entries(
         q.answers.reduce<Record<string, number>>((acc, answer) => {
-          const tags = parseTagAnswers(answer.selectedOptionIds);
+          const tags = parseTagAnswers(answer.selectedOptionIds, false);
           tags.forEach((tag) => {
             acc[tag] = (acc[tag] ?? 0) + 1;
           });
@@ -956,9 +980,14 @@ function mapPerQuestion(questions: QuestionDashboardRow[]) {
         optionId: o.id,
         text: o.text,
         count: optionCounts[o.id] ?? 0,
-        isCorrect: o.isCorrect,
+        isCorrect: isQuizTagCloud ? Boolean(o.text.trim()) : o.isCorrect,
       }));
     }
+
+    const tagCloudReferenceAliases =
+      isQuizTagCloud && sortedOpts.length > 0
+        ? collectTagCloudQuizReferenceAliases(sortedOpts.map((o) => ({ text: o.text })))
+        : undefined;
 
     return {
       questionId: q.id,
@@ -972,6 +1001,7 @@ function mapPerQuestion(questions: QuestionDashboardRow[]) {
       rankingKind: q.type === QuestionType.RANKING ? rankingKindToApi(q.rankingKind) : undefined,
       optionStats,
       tagCloud,
+      ...(tagCloudReferenceAliases ? { tagCloudReferenceAliases } : {}),
       firstCorrectNicknames: [] as string[],
     };
   });
@@ -1489,13 +1519,17 @@ export async function getParticipantPersonalSubQuizReport(
       const corrIds = q.options.filter((o) => o.isCorrect).map((o) => o.id);
       correctAnswerText = corrIds.length > 0 ? formatOptionLabelsInOrder(corrIds, opts) : "—";
     } else if (q.type === QuestionType.TAG_CLOUD) {
-      const tags = ans ? parseTagAnswers(ans.selectedOptionIds) : [];
+      const tags = ans ? parseTagAnswers(ans.selectedOptionIds, false) : [];
       userAnswerText = tags.length > 0 ? tags.join(", ") : "Нет ответа";
-      const refTexts = q.options
-        .filter((o) => o.isCorrect)
-        .map((o) => o.text.trim())
-        .filter(Boolean);
-      correctAnswerText = refTexts.length > 0 ? refTexts.join(", ") : "—";
+      const refMode = resolveTagCloudScoringContext({
+        isTagCloud: true,
+        scoringModeQuiz: q.scoringMode === ScoringMode.QUIZ,
+        inSubQuiz: q.subQuizId != null,
+      }).scoringMode;
+      correctAnswerText = formatTagCloudReferenceAnswer(
+        q.options.map((o) => ({ text: o.text, isCorrect: o.isCorrect })),
+        refMode,
+      );
     } else if (q.type === QuestionType.RANKING) {
       const ranked = ans ? parseSelectedIds(ans.selectedOptionIds) : [];
       userAnswerText = ranked.length > 0 ? formatOptionLabelsInOrder(ranked, opts) : "Нет ответа";
@@ -2192,16 +2226,24 @@ export async function submitAnswer(payload: {
   const tagAnswersForScore = rawTagAnswers.filter((t) => !containsProfanity(t));
 
   const selected = [...new Set(payload.optionIds ?? [])].sort();
-  const tagCloudQuiz =
-    question.type === QuestionType.TAG_CLOUD && question.scoringMode === ScoringMode.QUIZ;
+  const tagCloudCtx =
+    question.type === QuestionType.TAG_CLOUD
+      ? resolveTagCloudScoringContext({
+          isTagCloud: true,
+          scoringModeQuiz: question.scoringMode === ScoringMode.QUIZ,
+          inSubQuiz: question.subQuizId != null,
+        })
+      : null;
+  const tagCloudQuiz = tagCloudCtx?.scoringMode === "quiz";
   const tagCloudPollWithReference =
     question.type === QuestionType.TAG_CLOUD &&
-    question.scoringMode === ScoringMode.POLL &&
+    tagCloudCtx?.scoringMode === "poll" &&
     question.options.some((o) => o.isCorrect);
   const useComparableTagCloud = tagCloudQuiz || tagCloudPollWithReference;
-  const normalizedTags = tagAnswersForScore
-    .map(useComparableTagCloud ? normalizeTagComparable : normalizeTag)
-    .filter(Boolean);
+  const expandedTagLines = expandTagCloudSubmitLines(tagAnswersForScore);
+  const normalizedTags = (
+    useComparableTagCloud ? expandedTagLines : expandedTagLines.map(normalizeTag).filter(Boolean)
+  ).filter(Boolean);
   if (question.type === QuestionType.TAG_CLOUD) {
     if (normalizedTags.length < 1) {
       if (rawTagAnswers.length < 1) {
@@ -2220,13 +2262,14 @@ export async function submitAnswer(payload: {
     const referenceTags = buildTagCloudReferenceTags(
       question.options,
       parseTagCloudTierPoints(question.rankingPointsByRank),
+      tagCloudCtx!.referenceScope,
     );
     const evaluated = evaluateTagCloudSubmission({
       referenceTags,
       userTagsComparable: normalizedTags,
       maxAnswers: Math.max(1, question.maxAnswers),
       fullCreditPoints: question.points,
-      scoringMode: tagCloudQuiz ? "quiz" : "poll",
+      scoringMode: tagCloudCtx!.scoringMode,
     });
     isCorrect = evaluated.isCorrect;
     scoreAwarded = evaluated.scoreAwarded;
@@ -2415,7 +2458,7 @@ export async function getStandaloneVoteAdminDetail(
     q.type === QuestionType.TAG_CLOUD
       ? Object.entries(
           answers.reduce<Record<string, number>>((acc, answer) => {
-            parseTagAnswers(answer.selectedOptionIds).forEach((tag) => {
+            parseTagAnswers(answer.selectedOptionIds, false).forEach((tag) => {
               acc[tag] = (acc[tag] ?? 0) + 1;
             });
             return acc;
@@ -2429,7 +2472,7 @@ export async function getStandaloneVoteAdminDetail(
     const ids = parseSelectedIds(a.selectedOptionIds);
     const labels =
       q.type === QuestionType.TAG_CLOUD
-        ? parseTagAnswers(a.selectedOptionIds)
+        ? parseTagAnswers(a.selectedOptionIds, false)
         : ids.map((id) => optionById[id] ?? id);
     return {
       participantId: a.participant.id,

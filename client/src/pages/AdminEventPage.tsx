@@ -70,6 +70,8 @@ import { AdminSpeakersSection } from "../components/admin/AdminSpeakersSection";
 import { AdminBannersSection } from "../components/admin/AdminBannersSection";
 import { SubQuizControlsCard } from "../components/admin/SubQuizControlsCard";
 import { API_BASE, APP_ORIGIN } from "../config";
+import { randomUuid } from "../utils/randomUuid";
+import { buildPlayerJoinUrl, buildProjectorScreenUrl } from "../publicAppOrigin";
 import {
   applySpeakerQuestionsAdminFieldsFromPublicView,
   applySpeakerQuestionsScreenVisibilityFromView,
@@ -744,6 +746,7 @@ export function AdminEventPage() {
     checkSession,
     loadRoom,
     persistQuestions,
+    lastPersistQuestionsErrorRef,
     patchQuestionProjectorSettings,
     saveQuizTitle: saveQuizTitleApi,
   } = useAdminEventApi({
@@ -785,12 +788,12 @@ export function AdminEventPage() {
 
   const joinUrl = useMemo(() => {
     if (!room) return "";
-    return `${APP_ORIGIN}/q/${room.slug}`;
+    return buildPlayerJoinUrl(room.slug);
   }, [room]);
 
   const screenUrl = useMemo(() => {
     if (!room) return "";
-    return `${APP_ORIGIN}/p/${room.slug}`;
+    return buildProjectorScreenUrl(room.slug);
   }, [room]);
 
   const votesIndexMap = useMemo(
@@ -1563,24 +1566,10 @@ export function AdminEventPage() {
       }
       if (q.subQuizId == null) return prev;
       if (q.type === "tag_cloud") {
-        if (q.editorQuizMode && q.options.length >= 2) return prev;
-        const hasCorrect = q.options.some((o) => o.isCorrect);
         return prev.map((qq, i) =>
           i !== selectedQuestionIndex
             ? qq
-            : {
-                ...qq,
-                editorQuizMode: true,
-                options:
-                  qq.options.length >= 2
-                    ? hasCorrect
-                      ? qq.options
-                      : qq.options.map((o, oi) => ({ ...o, isCorrect: oi === 0 }))
-                    : [
-                        { text: "", isCorrect: true },
-                        { text: "", isCorrect: false },
-                      ],
-              },
+            : normalizeTagCloudQuestionPoints({ ...qq, editorQuizMode: true }),
         );
       }
       if (q.editorQuizMode) return prev;
@@ -1682,7 +1671,7 @@ export function AdminEventPage() {
   }
 
   function addSubQuizSheet() {
-    const id = `new-${crypto.randomUUID()}`;
+    const id = `new-${randomUuid()}`;
     setSubQuizSheets((prev) => {
       const next = [...prev, { id, title: "Новый квиз", questionFlowMode: "manual" as const }];
       syncedSubQuizIdsKeyRef.current = [...next]
@@ -1844,14 +1833,11 @@ export function AdminEventPage() {
               { text: "", isCorrect: true },
               { text: "", isCorrect: false },
             ];
-          } else if (!next.options.some((o) => o.isCorrect)) {
-            next.options = next.options.map((o, idx) => ({ ...o, isCorrect: idx === 0 }));
           }
           if (isEditorQuizMode(next)) {
-            const n = next.options.length;
-            if (!next.rankingPointsByRank || next.rankingPointsByRank.length !== n) {
-              next.rankingPointsByRank = Array.from({ length: n }, () => 1);
-            }
+            next = normalizeTagCloudQuestionPoints(next);
+          } else if (!next.options.some((o) => o.isCorrect)) {
+            next.options = next.options.map((o, idx) => ({ ...o, isCorrect: idx === 0 }));
           }
         } else if (patch.type === "ranking") {
           next.editorQuizMode = true;
@@ -1904,7 +1890,10 @@ export function AdminEventPage() {
     setQuestionForms((prev) =>
       prev.map((q, i) => {
         if (i !== questionIndex) return q;
-        const nextOpts = [...q.options, { text: "", isCorrect: false }];
+        const nextOpts = [
+          ...q.options,
+          { text: "", isCorrect: q.type === "tag_cloud" && isEditorQuizMode(q) },
+        ];
         if (q.type === "tag_cloud" && isEditorQuizMode(q)) {
           const n = nextOpts.length;
           const base = [...(q.rankingPointsByRank ?? []), 1];
@@ -2019,6 +2008,14 @@ export function AdminEventPage() {
           return {
             ...q,
             options: nextOptions.map((o, oi) => ({ ...o, isCorrect: oi === optionIndex })),
+          };
+        }
+        if (q.type === "tag_cloud" && isEditorQuizMode(q)) {
+          return {
+            ...q,
+            options: nextOptions.map((o) =>
+              o.text.trim() ? { ...o, isCorrect: true } : { ...o, isCorrect: false },
+            ),
           };
         }
         return { ...q, options: nextOptions };
@@ -3239,26 +3236,25 @@ export function AdminEventPage() {
   async function saveQuestionDialogAndClose() {
     const idx = selectedQuestionIndex;
     const current = questionForms[idx];
-    const formsForSave = questionForms.map((q, i) =>
-      i === idx && q.type === "tag_cloud" ? normalizeTagCloudQuestionPoints(q) : q,
+    const formsForSave = questionForms.map((q) =>
+      q.type === "tag_cloud" ? normalizeTagCloudQuestionPoints(q) : q,
     );
-    const prepared = formsForSave[idx];
-    const err = prepared ? validateQuestionFormEntry(prepared, idx) : "Вопрос не выбран.";
-    if (err) {
-      setQuestionDialogError(err);
+    const listErr = validateQuestionsForm(formsForSave);
+    if (listErr) {
+      setQuestionDialogError(listErr);
       return;
     }
-    if (prepared?.type === "tag_cloud") {
+    if (formsForSave.some((q, i) => q !== questionForms[i])) {
       setQuestionForms(formsForSave);
     }
     questionDialogSnapshotRef.current = null;
     const merged = await persistQuestions(formsForSave, subQuizSheets, {
       suppressToast: true,
-      validateOnlyIndex: idx,
     });
     if (merged === false) {
       setQuestionDialogError(
-        "Не удалось сохранить вопросы. Проверьте соединение и попробуйте ещё раз.",
+        lastPersistQuestionsErrorRef.current ??
+          "Не удалось сохранить вопросы. Проверьте соединение и попробуйте ещё раз.",
       );
       return;
     }
@@ -3293,7 +3289,13 @@ export function AdminEventPage() {
     setQuestionForms((prev) =>
       prev.map((question, index) => {
         if (index !== selectedQuestionIndex) return question;
-        const nextOpts = [...question.options, { text: value, isCorrect: false }];
+        const nextOpts = [
+          ...question.options,
+          {
+            text: value,
+            isCorrect: question.type === "tag_cloud" && isEditorQuizMode(question),
+          },
+        ];
         if (question.type === "tag_cloud" && isEditorQuizMode(question)) {
           const n = nextOpts.length;
           const base = [...(question.rankingPointsByRank ?? []), 1];
@@ -3488,8 +3490,7 @@ export function AdminEventPage() {
                     editableTitle={editableTitle}
                     setEditableTitle={setEditableTitle}
                     saveQuizTitle={saveQuizTitle}
-                    joinUrl={joinUrl}
-                    screenUrl={screenUrl}
+                    eventSlug={room?.slug ?? ""}
                     showEventTitleOnPlayer={showEventTitleOnPlayer}
                     onToggleShowEventTitleOnPlayer={(next) => {
                       setShowEventTitleOnPlayer(next);
@@ -4076,7 +4077,7 @@ export function AdminEventPage() {
                               const nextWidgets = [
                                 ...prev,
                                 {
-                                  id: `reaction_widget_${crypto.randomUUID()}`,
+                                  id: `reaction_widget_${randomUuid()}`,
                                   title: title.trim() || `Виджет ${prev.length + 1}`,
                                   reactions,
                                 },
@@ -4394,7 +4395,7 @@ export function AdminEventPage() {
                   {questionForms[selectedQuestionIndex].type === "tag_cloud" &&
                   isEditorQuizMode(questionForms[selectedQuestionIndex]) ? (
                     <Typography variant="body2" color="text.secondary" sx={{ mt: -0.5 }}>
-                      Синонимы в одном теге — через точку с запятой, например: «Синий; Голубой».
+                      Синонимы в одном теге — через «;» или «,», например: «Синий; Голубой».
                     </Typography>
                   ) : null}
                   <Stack spacing={1.25}>
@@ -4653,7 +4654,7 @@ export function AdminEventPage() {
                       slotProps={{ inputLabel: { shrink: true } }}
                       helperText={
                         questionForms[selectedQuestionIndex].type === "tag_cloud"
-                          ? `Если участник дал ${questionForms[selectedQuestionIndex].maxAnswers} верных ответов — эта сумма. Иначе — баллы за каждый верный тег.`
+                          ? `Полный балл: ${questionForms[selectedQuestionIndex].maxAnswers} ответа из разных эталонных тегов (синонимы в одной строке — один тег). Иначе — сумма баллов за каждый новый эталон.`
                           : undefined
                       }
                       sx={{

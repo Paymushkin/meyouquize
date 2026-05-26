@@ -12,8 +12,10 @@ import {
 const currentFile = fileURLToPath(import.meta.url);
 const serverSrcDir = path.dirname(currentFile);
 const projectRootEnv = path.resolve(serverSrcDir, "../../.env");
+const runtimeEnvPath = path.resolve(serverSrcDir, "../../deploy/env/.env.runtime");
 
 dotenv.config({ path: projectRootEnv });
+dotenv.config({ path: runtimeEnvPath, override: true });
 dotenv.config();
 
 /**

@@ -122,6 +122,7 @@ export function normalizeTagCloudQuestionPoints(q: QuestionForm): QuestionForm {
   const n = q.options.length;
   return {
     ...q,
+    options: q.options.map((o) => (o.text.trim() ? { ...o, isCorrect: true } : o)),
     rankingPointsByRank: Array.from({ length: n }, (_, i) => tagCloudPointsForOption(q, i)),
   };
 }
@@ -183,6 +184,19 @@ export function createEmptyQuestion(subQuizId: string | null = null): QuestionFo
   };
 }
 
+function coerceQuestionPoints(raw: unknown): number {
+  const n = typeof raw === "number" ? raw : Number(raw);
+  if (!Number.isFinite(n)) return 1;
+  return Math.max(1, Math.min(10_000, Math.trunc(n)));
+}
+
+function coerceMaxAnswers(raw: unknown): number | undefined {
+  if (raw === undefined || raw === null) return undefined;
+  const n = typeof raw === "number" ? raw : Number(raw);
+  if (!Number.isFinite(n)) return undefined;
+  return Math.max(1, Math.min(5, Math.trunc(n)));
+}
+
 export function toQuestionReplaceInput(q: QuestionForm) {
   const scoringMode: "poll" | "quiz" =
     q.type === "ranking" && q.rankingKind === "jury"
@@ -200,16 +214,16 @@ export function toQuestionReplaceInput(q: QuestionForm) {
       : q.type === "tag_cloud" && isEditorQuizMode(q)
         ? q.options
             .filter((o) => o.text.trim())
-            .map((o) => ({ text: o.text.trim(), isCorrect: o.isCorrect }))
+            .map((o) => ({ text: o.text.trim(), isCorrect: true }))
         : q.type === "ranking"
           ? q.options.map((o) => ({ text: o.text.trim(), isCorrect: false }))
           : q.options.map((o) => ({ text: o.text, isCorrect: o.isCorrect }));
   return {
     id: q.id,
-    text: q.text,
+    text: q.text.trim(),
     type: q.type,
-    points: q.points,
-    maxAnswers: q.maxAnswers,
+    points: coerceQuestionPoints(q.points),
+    maxAnswers: coerceMaxAnswers(q.maxAnswers),
     scoringMode,
     projectorShowFirstCorrect: q.projectorShowFirstCorrect ?? true,
     projectorFirstCorrectWinnersCount: Math.max(
@@ -304,6 +318,12 @@ export function validateQuestionFormEntry(q: QuestionForm, index: number): strin
     const max = Number(q.maxAnswers);
     if (!Number.isFinite(max) || max < 1 || max > 5) {
       return `Вопрос ${label}: для облака тегов укажите «макс. ответов» от 1 до 5.`;
+    }
+    if (isEditorQuizMode(q)) {
+      const referenceTags = q.options.filter((o) => o.text.trim());
+      if (referenceTags.length < 1) {
+        return `Вопрос ${label}: добавьте хотя бы один эталонный тег.`;
+      }
     }
     return null;
   }
@@ -424,8 +444,8 @@ export function mapLoadedRoomQuestions(
               ? "ranking"
               : "tag_cloud",
       editorQuizMode: q.scoringMode === undefined || q.scoringMode === "QUIZ",
-      points: q.points,
-      maxAnswers: q.maxAnswers ?? 3,
+      points: coerceQuestionPoints(q.points),
+      maxAnswers: coerceMaxAnswers(q.maxAnswers) ?? 3,
       isActive: q.isActive,
       showVoteCount: false,
       showQuestionTitle: true,
@@ -472,8 +492,8 @@ export function mergeServerQuestionsIntoForms(
               ? "ranking"
               : "tag_cloud",
       editorQuizMode: q.scoringMode === undefined || q.scoringMode === "QUIZ",
-      points: q.points,
-      maxAnswers: q.maxAnswers ?? 3,
+      points: coerceQuestionPoints(q.points),
+      maxAnswers: coerceMaxAnswers(q.maxAnswers) ?? 3,
       isActive: q.isActive,
       showVoteCount: mergeFrom.find((item) => item.id === q.id)?.showVoteCount ?? false,
       showQuestionTitle: mergeFrom.find((item) => item.id === q.id)?.showQuestionTitle ?? true,

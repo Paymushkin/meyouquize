@@ -41,7 +41,7 @@ sudo -u meyouquize git clone <YOUR_REPO_URL> /opt/meyouquize/current
 7.
 
 ```bash
-cd /opt/meyouquize/current && sudo -u meyouquize npm ci && sudo -u meyouquize npm run build
+cd /opt/meyouquize/current && sudo -u meyouquize npm ci --include=dev && sudo -u meyouquize npm run build
 ```
 
 8.
