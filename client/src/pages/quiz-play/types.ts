@@ -135,6 +135,7 @@ export type QuizState = {
     questionFlowMode?: "manual" | "auto";
     index: number;
     total: number;
+    orderedQuestionIds?: string[];
   } | null;
   activeQuestions?: ActiveQuestion[];
   activeQuestion: ActiveQuestion | null;

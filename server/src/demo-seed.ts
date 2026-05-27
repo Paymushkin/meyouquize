@@ -1,6 +1,7 @@
 import { prisma } from "./prisma.js";
 import {
   DEFAULT_PUBLIC_VIEW_STATE,
+  getBrandThemeVisualPatch,
   PROGRAM_TILE_ID,
   SPEAKER_TILE_ID,
   type PublicBanner,
@@ -16,18 +17,7 @@ import { ScoringMode, QuestionType } from "@prisma/client";
 import { publicViewJsonToState, saveStoredPublicView } from "./socket/public-view-store.js";
 
 const DEMO_SLUG = "demo";
-const DEMO_BRAND_PRIMARY = "#F3F722";
-const DEMO_BRAND_TEXT = "#FFFFFF";
-const DEMO_PROJECTOR_BG = "#000000";
-const DEMO_SPEAKER_TILE_TEXT = "#000000";
-const DEMO_PROGRAM_TILE_BG = "#FFFFFF";
-const DEMO_PROGRAM_TILE_TEXT = "#000000";
 const DEMO_PROGRAM_TILE_LINK_URL = "https://ya.ru";
-const DEMO_FONT_FAMILY = "Roboto, Arial, sans-serif";
-const DEMO_FONT_URL = "/fonts/roboto/Roboto-VariableFont_wdth,wght.ttf";
-const DEMO_LOGO_URL = "/logo.svg";
-const DEMO_PLAYER_BG_URL = "/event-bg.png";
-const DEMO_PROJECTOR_BG_URL = "/prj.png";
 const DEMO_DEFAULT_BANNER_IMAGE_URL = "/1778695311505-7c9vii0m.png";
 const DEMO_DEFAULT_BANNER_ID = "demo_banner_1";
 const DEMO_DEFAULT_BANNER: PublicBanner = {
@@ -47,25 +37,7 @@ function applyDemoBranding(view: PublicViewState): PublicViewState {
   const hasBanners = (view.playerBanners?.length ?? 0) > 0;
   return {
     ...view,
-    projectorBackground: DEMO_PROJECTOR_BG,
-    voteQuestionTextColor: DEMO_BRAND_TEXT,
-    voteOptionTextColor: DEMO_BRAND_TEXT,
-    voteProgressTrackColor: "#1A1A1A",
-    voteProgressBarColor: DEMO_BRAND_PRIMARY,
-    brandPrimaryColor: DEMO_BRAND_PRIMARY,
-    brandAccentColor: DEMO_BRAND_PRIMARY,
-    brandSurfaceColor: DEMO_PROJECTOR_BG,
-    brandTextColor: DEMO_BRAND_TEXT,
-    brandFontFamily: DEMO_FONT_FAMILY,
-    brandFontUrl: DEMO_FONT_URL,
-    brandLogoUrl: DEMO_LOGO_URL,
-    brandPlayerBackgroundImageUrl: DEMO_PLAYER_BG_URL,
-    brandProjectorBackgroundImageUrl: DEMO_PROJECTOR_BG_URL,
-    brandBodyBackgroundColor: DEMO_PROJECTOR_BG,
-    speakerTileBackgroundColor: DEMO_BRAND_PRIMARY,
-    speakerTileTextColor: DEMO_SPEAKER_TILE_TEXT,
-    programTileBackgroundColor: DEMO_PROGRAM_TILE_BG,
-    programTileTextColor: DEMO_PROGRAM_TILE_TEXT,
+    ...getBrandThemeVisualPatch("meyou"),
     programTileLinkUrl: DEMO_PROGRAM_TILE_LINK_URL,
     programTileVisible: true,
     playerBanners: hasBanners ? view.playerBanners : [DEMO_DEFAULT_BANNER],

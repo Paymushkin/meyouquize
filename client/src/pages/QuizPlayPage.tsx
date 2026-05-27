@@ -612,10 +612,32 @@ export function QuizPlayPage() {
     const isAuto =
       quiz.quizProgress.questionFlowMode === "auto" ||
       (Array.isArray(quiz.activeQuestions) && quiz.activeQuestions.length > 1);
-    if (!isAuto) return quiz.quizProgress;
+    const resolveIndexFromOrder = () => {
+      const order = quiz.quizProgress?.orderedQuestionIds;
+      if (!order?.length) return null;
+      const pos = order.indexOf(nonQuizActiveQuestion.id);
+      return pos >= 0 ? pos + 1 : null;
+    };
+    if (!isAuto) {
+      const fromOrder = resolveIndexFromOrder();
+      if (fromOrder != null) {
+        return {
+          ...quiz.quizProgress,
+          index: fromOrder,
+          total: quiz.quizProgress.orderedQuestionIds?.length ?? quiz.quizProgress.total,
+        };
+      }
+      return quiz.quizProgress;
+    }
     const activeList = Array.isArray(quiz.activeQuestions) ? quiz.activeQuestions : [];
     const idx = activeList.findIndex((q) => q.id === nonQuizActiveQuestion.id);
-    if (idx < 0) return quiz.quizProgress;
+    if (idx < 0) {
+      const fromOrder = resolveIndexFromOrder();
+      if (fromOrder != null) {
+        return { ...quiz.quizProgress, index: fromOrder };
+      }
+      return quiz.quizProgress;
+    }
     return {
       ...quiz.quizProgress,
       index: idx + 1,

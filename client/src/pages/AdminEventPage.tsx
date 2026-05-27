@@ -135,6 +135,12 @@ import type { ReactionSession } from "./quiz-play/types";
 import { parseApiErrorMessage } from "../utils/apiError";
 import { patchQuestionsFromPublicView } from "../features/publicView/patchQuestionFromPublicView";
 import {
+  applyBrandThemeVisualSetters,
+  getBrandThemePatchForTheme,
+  type BrandThemeVisualSetters,
+} from "../features/branding/applyBrandThemeVisual";
+import { sanitizeBrandThemeId, type BrandThemeId } from "@meyouquize/shared";
+import {
   getRandomizerPool,
   makeRandomizerTimestamp,
   pickRandomWinners,
@@ -691,6 +697,7 @@ export function AdminEventPage() {
   const [brandPlayerBackgroundImageUrl, setBrandPlayerBackgroundImageUrl] = useState("");
   const [brandProjectorBackgroundImageUrl, setBrandProjectorBackgroundImageUrl] = useState("");
   const [brandBodyBackgroundColor, setBrandBodyBackgroundColor] = useState("#000000");
+  const [brandTheme, setBrandTheme] = useState<BrandThemeId>("default");
   const [availableFonts, setAvailableFonts] = useState<
     Array<{ id: string; family: string; url: string; kind: "static" | "variable" }>
   >([]);
@@ -1023,6 +1030,11 @@ export function AdminEventPage() {
     setBrandPlayerBackgroundImageUrl,
     setBrandProjectorBackgroundImageUrl,
     setBrandBodyBackgroundColor,
+    setBrandTheme,
+    setSpeakerTileBackgroundColor,
+    setSpeakerTileTextColor,
+    setProgramTileBackgroundColor,
+    setProgramTileTextColor,
     setShowFirstCorrectAnswerer,
     setFirstCorrectWinnersCount,
     setSpeakerQuestionsPayload,
@@ -1139,6 +1151,67 @@ export function AdminEventPage() {
     brandProjectorBackgroundImageUrl,
     brandBodyBackgroundColor,
   });
+
+  const brandThemeVisualSetters = useMemo((): BrandThemeVisualSetters => {
+    return {
+      setProjectorBackground,
+      setVoteQuestionTextColor,
+      setVoteOptionTextColor,
+      setVoteProgressTrackColor,
+      setVoteProgressBarColor,
+      setPlayerVoteOptionTextColor,
+      setPlayerVoteProgressTrackColor,
+      setPlayerVoteProgressBarColor,
+      setBrandPrimaryColor,
+      setBrandAccentColor,
+      setBrandSurfaceColor,
+      setBrandTextColor,
+      setBrandFontFamily,
+      setBrandFontUrl,
+      setBrandLogoUrl,
+      setBrandPlayerBackgroundImageUrl,
+      setBrandProjectorBackgroundImageUrl,
+      setBrandBodyBackgroundColor,
+      setSpeakerTileBackgroundColor,
+      setSpeakerTileTextColor,
+      setProgramTileBackgroundColor,
+      setProgramTileTextColor,
+    };
+  }, [
+    setProjectorBackground,
+    setVoteQuestionTextColor,
+    setVoteOptionTextColor,
+    setVoteProgressTrackColor,
+    setVoteProgressBarColor,
+    setPlayerVoteOptionTextColor,
+    setPlayerVoteProgressTrackColor,
+    setPlayerVoteProgressBarColor,
+    setBrandPrimaryColor,
+    setBrandAccentColor,
+    setBrandSurfaceColor,
+    setBrandTextColor,
+    setBrandFontFamily,
+    setBrandFontUrl,
+    setBrandLogoUrl,
+    setBrandPlayerBackgroundImageUrl,
+    setBrandProjectorBackgroundImageUrl,
+    setBrandBodyBackgroundColor,
+    setSpeakerTileBackgroundColor,
+    setSpeakerTileTextColor,
+    setProgramTileBackgroundColor,
+    setProgramTileTextColor,
+  ]);
+
+  const handleBrandThemeChange = useCallback(
+    (theme: BrandThemeId) => {
+      if (theme === brandTheme) return;
+      const patch = getBrandThemePatchForTheme(theme);
+      setBrandTheme(theme);
+      applyBrandThemeVisualSetters(patch, brandThemeVisualSetters);
+      emitBrandingPatch(patch);
+    },
+    [brandTheme, brandThemeVisualSetters, emitBrandingPatch],
+  );
 
   useEffect(() => {
     if (!quizId || !room?.publicView || typeof room.publicView !== "object") return;
@@ -1285,6 +1358,7 @@ export function AdminEventPage() {
     setBrandPlayerBackgroundImageUrl(b.brandPlayerBackgroundImageUrl);
     setBrandProjectorBackgroundImageUrl(b.brandProjectorBackgroundImageUrl);
     setBrandBodyBackgroundColor(b.brandBodyBackgroundColor);
+    setBrandTheme(b.brandTheme);
     if (typeof pv.showFirstCorrectAnswerer === "boolean") {
       setShowFirstCorrectAnswerer(pv.showFirstCorrectAnswerer);
     }
@@ -1608,6 +1682,8 @@ export function AdminEventPage() {
     });
   }, [publicViewMode, projectorJoinQrVisible, room?.title]);
   const brandingProps = useAdminBrandingProps({
+    brandTheme,
+    onBrandThemeChange: handleBrandThemeChange,
     projectorBackground,
     setProjectorBackground,
     brandBodyBackgroundColor,

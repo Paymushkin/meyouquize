@@ -7,8 +7,12 @@ import { BrandPlayerUiResultsSection } from "./branding/BrandPlayerUiResultsSect
 import { BrandProjectorJoinQrSection } from "./branding/BrandProjectorJoinQrSection";
 import { BrandScreenColorsSection } from "./branding/BrandScreenColorsSection";
 import { BrandTagCloudSection } from "./branding/BrandTagCloudSection";
+import { BrandThemeSection } from "./branding/BrandThemeSection";
+import type { BrandThemeId } from "@meyouquize/shared";
 
 type Props = {
+  brandTheme: BrandThemeId;
+  onBrandThemeChange: (theme: BrandThemeId) => void;
   projectorBackground: string;
   setProjectorBackground: (value: string) => void;
   brandBodyBackgroundColor: string;
@@ -79,6 +83,8 @@ type Props = {
 
 export function AdminBrandingSection(props: Props) {
   const {
+    brandTheme,
+    onBrandThemeChange,
     projectorBackground,
     setProjectorBackground,
     brandBodyBackgroundColor,
@@ -149,6 +155,7 @@ export function AdminBrandingSection(props: Props) {
           Брендирование
         </Typography>
         <Stack spacing={1}>
+          <BrandThemeSection brandTheme={brandTheme} onThemeChange={onBrandThemeChange} />
           <BrandScreenColorsSection
             colorGridSx={colorGridSx}
             projectorBackground={projectorBackground}

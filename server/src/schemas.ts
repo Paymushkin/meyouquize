@@ -458,6 +458,7 @@ export const setPublicViewSchema = z.object({
     .string()
     .regex(/^#([0-9a-fA-F]{6})$/)
     .optional(),
+  brandTheme: z.enum(["default", "meyou"]).optional(),
   /** @deprecated */
   brandBackgroundImageUrl: optionalClientAssetUrlSchema,
 });

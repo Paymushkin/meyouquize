@@ -4,6 +4,7 @@ import {
   DEFAULT_PROJECTOR_JOIN_QR_VISIBLE,
   PROJECTOR_JOIN_QR_TEXT_MAX_LENGTH,
   normalizePublicViewState,
+  sanitizeBrandThemeId,
   QUIZ_RESULTS_TILE_ID,
   SPEAKER_TILE_ID,
   withQuizResultsTileLast,
@@ -16,6 +17,7 @@ import {
   type ReportModuleId,
   type PublicViewMode,
   type PublicViewPatch as SharedPublicViewPatch,
+  type BrandThemeId,
   type PublicViewPayload as SharedPublicViewPayload,
 } from "@meyouquize/shared";
 
@@ -51,7 +53,9 @@ type PlayerUiResultKeys =
   | "playerVoteProgressTrackColor"
   | "playerVoteProgressBarColor";
 
-export type BrandingState = Pick<SharedPublicViewPayload, BrandingKeys | PlayerUiResultKeys>;
+export type BrandingState = Pick<SharedPublicViewPayload, BrandingKeys | PlayerUiResultKeys> & {
+  brandTheme: BrandThemeId;
+};
 
 export type CloudManualStateByQuestion = Record<
   string,
@@ -139,6 +143,7 @@ export function toBrandingState(payload: Partial<PublicViewPayload>): BrandingSt
     brandPlayerBackgroundImageUrl: view.brandPlayerBackgroundImageUrl,
     brandProjectorBackgroundImageUrl: view.brandProjectorBackgroundImageUrl,
     brandBodyBackgroundColor: view.brandBodyBackgroundColor,
+    brandTheme: sanitizeBrandThemeId(view.brandTheme),
     projectorJoinQrVisible: view.projectorJoinQrVisible,
     projectorJoinQrText: view.projectorJoinQrText,
     projectorJoinQrTextColor: view.projectorJoinQrTextColor,

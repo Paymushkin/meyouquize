@@ -56,6 +56,20 @@ function sortActiveQuestionsByActivation<T extends { activatedAt: Date | null; o
   });
 }
 
+/** Текущий вопрос квиза в сабквизе — с последним `activatedAt` (не самый старый активный). */
+function pickPrimaryActiveSubQuizQuestion<
+  T extends { subQuizId: string | null; isActive: boolean; activatedAt: Date | null },
+>(questions: T[]): T | undefined {
+  const activeInSubQuizzes = questions.filter((q) => q.isActive && q.subQuizId != null);
+  if (activeInSubQuizzes.length === 0) return undefined;
+  return [...activeInSubQuizzes].sort((a, b) => {
+    const aTs = a.activatedAt?.getTime() ?? 0;
+    const bTs = b.activatedAt?.getTime() ?? 0;
+    if (bTs !== aTs) return bTs - aTs;
+    return 0;
+  })[0];
+}
+
 function isStoredAnswerValidForQuestion(
   question: { type: QuestionType; options: Array<{ id: string }> },
   rawSelectedOptionIds: string,
@@ -663,6 +677,8 @@ export type QuizProgressPayload = {
   questionFlowMode: "manual" | "auto";
   index: number;
   total: number;
+  /** Порядок вопросов сабквиза (как в админке) — для счётчика «Вопрос N / M» у игрока. */
+  orderedQuestionIds: string[];
 };
 
 export type PlayerVisibleResultTile = {
@@ -698,7 +714,8 @@ export async function getQuizPublicState(quizId: string) {
     select: { id: true, title: true },
   });
   const activeQuestions = sortActiveQuestionsByActivation(quiz.questions.filter((q) => q.isActive));
-  const activeQuestion = activeQuestions[0];
+  const primarySubQuizQuestion = pickPrimaryActiveSubQuizQuestion(quiz.questions);
+  const activeQuestion = primarySubQuizQuestion ?? activeQuestions[0];
   let quizProgress: QuizProgressPayload | null = null;
   const view = publicViewJsonToState(quiz.publicView as Prisma.JsonValue | null);
   const playerVisibleResults = await getPlayerVisibleResultsForQuiz(
@@ -717,13 +734,15 @@ export async function getQuizPublicState(quizId: string) {
         select: { questionFlowMode: true },
       }),
     ]);
-    const idx = inSub.findIndex((q) => q.id === activeQuestion.id);
+    const orderedQuestionIds = inSub.map((q) => q.id);
+    const idx = orderedQuestionIds.indexOf(activeQuestion.id);
     if (idx >= 0) {
       quizProgress = {
         subQuizId: activeQuestion.subQuizId,
         questionFlowMode: subQuiz?.questionFlowMode === QuestionFlowMode.AUTO ? "auto" : "manual",
         index: idx + 1,
         total: inSub.length,
+        orderedQuestionIds,
       };
     }
   }

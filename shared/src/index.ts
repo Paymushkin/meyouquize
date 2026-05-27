@@ -1,3 +1,6 @@
+import type { BrandThemeId } from "./brandThemes.js";
+import { sanitizeBrandThemeId } from "./brandThemes.js";
+
 export type QuestionType = "single" | "multi" | "tag_cloud" | "ranking";
 export type QuizStatus = "draft" | "live" | "finished";
 export const SPEAKER_TILE_ID = "speaker_tile";
@@ -290,6 +293,8 @@ export interface PublicViewState {
   brandProjectorBackgroundImageUrl: string;
   /** Бренд: цвет фона body (внешняя область страницы игрока) */
   brandBodyBackgroundColor: string;
+  /** Пресет оформления: стандартный или MeYOU (как demo, только визуал). */
+  brandTheme?: BrandThemeId;
   /** @deprecated legacy поле, используйте раздельные player/projector */
   brandBackgroundImageUrl?: string;
 }
@@ -408,6 +413,7 @@ export const DEFAULT_PUBLIC_VIEW_STATE: PublicViewState = {
   brandPlayerBackgroundImageUrl: "",
   brandProjectorBackgroundImageUrl: "",
   brandBodyBackgroundColor: "#000000",
+  brandTheme: "default",
 };
 
 function clampInt(value: number, min: number, max: number): number {
@@ -1101,8 +1107,19 @@ export function normalizePublicViewState(
       value?.brandBodyBackgroundColor,
       base.brandBodyBackgroundColor,
     ),
+    brandTheme: sanitizeBrandThemeId(value?.brandTheme ?? base.brandTheme),
   };
 }
+
+export type { BrandThemeId, BrandThemeVisualState } from "./brandThemes.js";
+export {
+  DEFAULT_BRAND_THEME_ID,
+  getBrandThemeVisualPatch,
+  getBrandThemeVisualPreset,
+  getDefaultBrandThemeVisual,
+  getMeyouBrandThemeVisual,
+  sanitizeBrandThemeId,
+} from "./brandThemes.js";
 
 export function mergePublicViewState(
   prev: PublicViewState,

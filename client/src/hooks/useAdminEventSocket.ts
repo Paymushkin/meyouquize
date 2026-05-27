@@ -67,6 +67,11 @@ type Params = {
   setBrandPlayerBackgroundImageUrl: (value: string) => void;
   setBrandProjectorBackgroundImageUrl: (value: string) => void;
   setBrandBodyBackgroundColor: (value: string) => void;
+  setBrandTheme: (value: import("@meyouquize/shared").BrandThemeId) => void;
+  setSpeakerTileBackgroundColor: (value: string) => void;
+  setSpeakerTileTextColor: (value: string) => void;
+  setProgramTileBackgroundColor: (value: string) => void;
+  setProgramTileTextColor: (value: string) => void;
   setPlayerVoteOptionTextColor: (value: string) => void;
   setPlayerVoteProgressTrackColor: (value: string) => void;
   setPlayerVoteProgressBarColor: (value: string) => void;
@@ -122,6 +127,11 @@ export function useAdminEventSocket<TQuestion extends QuestionFormPatchable>(
     setBrandPlayerBackgroundImageUrl,
     setBrandProjectorBackgroundImageUrl,
     setBrandBodyBackgroundColor,
+    setBrandTheme,
+    setSpeakerTileBackgroundColor,
+    setSpeakerTileTextColor,
+    setProgramTileBackgroundColor,
+    setProgramTileTextColor,
     setPlayerVoteOptionTextColor,
     setPlayerVoteProgressTrackColor,
     setPlayerVoteProgressBarColor,
@@ -149,6 +159,7 @@ export function useAdminEventSocket<TQuestion extends QuestionFormPatchable>(
 
   const applyBrandingState = useCallback(
     (payload: PublicViewPayload) => {
+      const view = normalizePublicViewState(payload);
       const nextBranding = toBrandingState(payload);
       setProjectorBackground(nextBranding.projectorBackground);
       setCloudQuestionColor(nextBranding.cloudQuestionColor);
@@ -173,6 +184,11 @@ export function useAdminEventSocket<TQuestion extends QuestionFormPatchable>(
       setBrandPlayerBackgroundImageUrl(nextBranding.brandPlayerBackgroundImageUrl);
       setBrandProjectorBackgroundImageUrl(nextBranding.brandProjectorBackgroundImageUrl);
       setBrandBodyBackgroundColor(nextBranding.brandBodyBackgroundColor);
+      setBrandTheme(nextBranding.brandTheme);
+      setSpeakerTileBackgroundColor(view.speakerTileBackgroundColor);
+      setSpeakerTileTextColor(view.speakerTileTextColor);
+      setProgramTileBackgroundColor(view.programTileBackgroundColor);
+      setProgramTileTextColor(view.programTileTextColor);
       setPlayerVoteOptionTextColor(nextBranding.playerVoteOptionTextColor);
       setPlayerVoteProgressTrackColor(nextBranding.playerVoteProgressTrackColor);
       setPlayerVoteProgressBarColor(nextBranding.playerVoteProgressBarColor);
@@ -204,6 +220,11 @@ export function useAdminEventSocket<TQuestion extends QuestionFormPatchable>(
       setBrandPlayerBackgroundImageUrl,
       setBrandProjectorBackgroundImageUrl,
       setBrandBodyBackgroundColor,
+      setBrandTheme,
+      setSpeakerTileBackgroundColor,
+      setSpeakerTileTextColor,
+      setProgramTileBackgroundColor,
+      setProgramTileTextColor,
       setPlayerVoteOptionTextColor,
       setPlayerVoteProgressTrackColor,
       setPlayerVoteProgressBarColor,
