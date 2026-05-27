@@ -171,6 +171,8 @@ export function buildApp() {
       ok: true,
       /** Проверка деплоя: на VPS должно быть `quiz-all`, иначе зачёт облака тегов только по первому эталону. */
       tagCloudReferenceScope: "quiz-all",
+      /** Счётчик «Вопрос N/M» у игрока: orderedQuestionIds + stepIndex на activeQuestion. */
+      quizProgressOrderedIds: true,
     });
   });
 

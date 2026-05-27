@@ -49,6 +49,11 @@ import {
   RestoreJoinPendingBlock,
 } from "./quiz-play/QuizPlayBrandingBlocks";
 import type { QuizState, ReactionType } from "./quiz-play/types";
+import {
+  isRoomMultiActiveFlow,
+  isSubQuizAutoFlow,
+  resolveQuizProgressForQuestion,
+} from "./quiz-play/resolveQuizProgressDisplay";
 import type { SpeakerQuestionsPayload } from "../types/speakerQuestions";
 const REACTION_WINDOW_MS = 1000;
 const REACTION_MAX_PER_WINDOW = 10;
@@ -204,10 +209,10 @@ export function QuizPlayPage() {
       const accepted = activeList.find((q) => q.id === acceptedQuestionId);
       if (accepted) return accepted;
     }
-    // Для голосований комнаты и авто-режима квиза показываем первый активный неотвеченный вопрос.
+    // Авто-сабквиз и голосования комнаты (несколько active без quizProgress).
     const autoFlow =
-      quiz.quizProgress?.questionFlowMode === "auto" ||
-      (Array.isArray(quiz.activeQuestions) && quiz.activeQuestions.length > 1);
+      isSubQuizAutoFlow(quiz.quizProgress) ||
+      isRoomMultiActiveFlow(quiz.quizProgress, activeList.length);
     if (!quiz.quizProgress || autoFlow) {
       return activeList.find((q) => !submittedQuestionIds.includes(q.id)) ?? null;
     }
@@ -609,41 +614,22 @@ export function QuizPlayPage() {
         : selected;
   const displayedQuizProgress = useMemo(() => {
     if (!quiz?.quizProgress || !nonQuizActiveQuestion?.id) return quiz?.quizProgress ?? null;
-    const isAuto =
-      quiz.quizProgress.questionFlowMode === "auto" ||
-      (Array.isArray(quiz.activeQuestions) && quiz.activeQuestions.length > 1);
-    const resolveIndexFromOrder = () => {
-      const order = quiz.quizProgress?.orderedQuestionIds;
-      if (!order?.length) return null;
-      const pos = order.indexOf(nonQuizActiveQuestion.id);
-      return pos >= 0 ? pos + 1 : null;
-    };
-    if (!isAuto) {
-      const fromOrder = resolveIndexFromOrder();
-      if (fromOrder != null) {
-        return {
-          ...quiz.quizProgress,
-          index: fromOrder,
-          total: quiz.quizProgress.orderedQuestionIds?.length ?? quiz.quizProgress.total,
-        };
-      }
-      return quiz.quizProgress;
-    }
+    const resolved = resolveQuizProgressForQuestion(
+      quiz.quizProgress,
+      nonQuizActiveQuestion.id,
+      quiz.activeQuestion,
+    );
+    if (!resolved) return null;
+    if (!isSubQuizAutoFlow(quiz.quizProgress)) return resolved;
     const activeList = Array.isArray(quiz.activeQuestions) ? quiz.activeQuestions : [];
     const idx = activeList.findIndex((q) => q.id === nonQuizActiveQuestion.id);
-    if (idx < 0) {
-      const fromOrder = resolveIndexFromOrder();
-      if (fromOrder != null) {
-        return { ...quiz.quizProgress, index: fromOrder };
-      }
-      return quiz.quizProgress;
-    }
+    if (idx < 0) return resolved;
     return {
-      ...quiz.quizProgress,
+      ...resolved,
       index: idx + 1,
-      total: Math.max(quiz.quizProgress.total, activeList.length),
+      total: Math.max(resolved.total, activeList.length),
     };
-  }, [quiz?.quizProgress, quiz?.activeQuestions, nonQuizActiveQuestion?.id]);
+  }, [quiz?.quizProgress, quiz?.activeQuestion, quiz?.activeQuestions, nonQuizActiveQuestion?.id]);
   const titleText = quiz?.title?.trim() || quizTitle.trim();
   const shouldShowEventTitle = quiz?.showEventTitleOnPlayer ?? true;
   const visiblePlayerBanners = useMemo(

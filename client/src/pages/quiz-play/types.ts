@@ -12,6 +12,10 @@ export type ActiveQuestion = {
   maxAnswers?: number;
   options: Array<{ id: string; text: string }>;
   isClosed: boolean;
+  /** Порядковый номер вопроса в сабквизе (1-based), с сервера. */
+  stepIndex?: number;
+  /** Число вопросов в сабквизе. */
+  stepTotal?: number;
 };
 
 export type ReactionType = string;

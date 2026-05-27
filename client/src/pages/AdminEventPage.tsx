@@ -2183,13 +2183,11 @@ export function AdminEventPage() {
     });
     if (enabled) {
       setQuestionId(question.id);
-      const group = question.subQuizId ?? null;
       setQuestionForms((prev) =>
-        prev.map((q, idx) => {
-          const qGroup = q.subQuizId ?? null;
-          if (qGroup !== group) return q;
-          return { ...q, isActive: idx === questionIndex };
-        }),
+        prev.map((q, idx) => ({
+          ...q,
+          isActive: idx === questionIndex,
+        })),
       );
     } else {
       setQuestionForms((prev) =>

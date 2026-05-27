@@ -722,6 +722,8 @@ export async function getQuizPublicState(quizId: string) {
     quiz.id,
     view.playerVisibleResultQuestionIds ?? [],
   );
+  let activeStepIndex: number | undefined;
+  let activeStepTotal: number | undefined;
   if (activeQuestion?.subQuizId) {
     const [inSub, subQuiz] = await Promise.all([
       prisma.question.findMany({
@@ -731,16 +733,27 @@ export async function getQuizPublicState(quizId: string) {
       }),
       prisma.subQuiz.findUnique({
         where: { id: activeQuestion.subQuizId },
-        select: { questionFlowMode: true },
+        select: { questionFlowMode: true, currentQuestionIndex: true },
       }),
     ]);
     const orderedQuestionIds = inSub.map((q) => q.id);
     const idx = orderedQuestionIds.indexOf(activeQuestion.id);
     if (idx >= 0) {
+      const flowMode = subQuiz?.questionFlowMode === QuestionFlowMode.AUTO ? "auto" : "manual";
+      const cursorIdx = subQuiz?.currentQuestionIndex ?? idx;
+      const indexFromCursor =
+        flowMode === "manual" &&
+        cursorIdx >= 0 &&
+        cursorIdx < orderedQuestionIds.length &&
+        orderedQuestionIds[cursorIdx] === activeQuestion.id
+          ? cursorIdx + 1
+          : idx + 1;
+      activeStepIndex = indexFromCursor;
+      activeStepTotal = inSub.length;
       quizProgress = {
         subQuizId: activeQuestion.subQuizId,
-        questionFlowMode: subQuiz?.questionFlowMode === QuestionFlowMode.AUTO ? "auto" : "manual",
-        index: idx + 1,
+        questionFlowMode: flowMode,
+        index: indexFromCursor,
         total: inSub.length,
         orderedQuestionIds,
       };
@@ -820,6 +833,8 @@ export async function getQuizPublicState(quizId: string) {
           maxAnswers: activeQuestion.maxAnswers,
           options: activeQuestion.options.map((o) => ({ id: o.id, text: o.text })),
           isClosed: activeQuestion.isClosed,
+          stepIndex: activeStepIndex,
+          stepTotal: activeStepTotal,
           rankingKind:
             activeQuestion.type === QuestionType.RANKING
               ? rankingKindToApi(activeQuestion.rankingKind)
@@ -1966,15 +1981,10 @@ export async function setQuestionEnabled(quizId: string, questionId: string, ena
   if (!question) throw new Error("Question not found");
 
   if (enabled) {
-    const subKey = question.subQuizId ?? null;
     await prisma.$transaction([
       prisma.question.updateMany({
-        where: {
-          quizId,
-          subQuizId: subKey,
-          id: { not: questionId },
-        },
-        data: { isActive: false },
+        where: { quizId, id: { not: questionId } },
+        data: { isActive: false, isClosed: true },
       }),
       prisma.question.update({
         where: { id: questionId },
