@@ -50,7 +50,6 @@ import {
 } from "./quiz-play/QuizPlayBrandingBlocks";
 import type { QuizState, ReactionType } from "./quiz-play/types";
 import {
-  isRoomMultiActiveFlow,
   isSubQuizAutoFlow,
   resolveQuizProgressForQuestion,
 } from "./quiz-play/resolveQuizProgressDisplay";
@@ -209,10 +208,11 @@ export function QuizPlayPage() {
       const accepted = activeList.find((q) => q.id === acceptedQuestionId);
       if (accepted) return accepted;
     }
-    // Авто-сабквиз и голосования комнаты (несколько active без quizProgress).
-    const autoFlow =
-      isSubQuizAutoFlow(quiz.quizProgress) ||
-      isRoomMultiActiveFlow(quiz.quizProgress, activeList.length);
+    // Авто-сабквиз: основной источник — questionFlowMode.
+    // На проде встречается ситуация, когда questionFlowMode может не быть "auto",
+    // но при этом активных вопросов > 1 (реально запущен авто-режим).
+    // Поэтому добавляем fallback по количеству active.
+    const autoFlow = isSubQuizAutoFlow(quiz.quizProgress) || activeList.length > 1;
     if (!quiz.quizProgress || autoFlow) {
       return activeList.find((q) => !submittedQuestionIds.includes(q.id)) ?? null;
     }
@@ -620,15 +620,7 @@ export function QuizPlayPage() {
       quiz.activeQuestion,
     );
     if (!resolved) return null;
-    if (!isSubQuizAutoFlow(quiz.quizProgress)) return resolved;
-    const activeList = Array.isArray(quiz.activeQuestions) ? quiz.activeQuestions : [];
-    const idx = activeList.findIndex((q) => q.id === nonQuizActiveQuestion.id);
-    if (idx < 0) return resolved;
-    return {
-      ...resolved,
-      index: idx + 1,
-      total: Math.max(resolved.total, activeList.length),
-    };
+    return resolved;
   }, [quiz?.quizProgress, quiz?.activeQuestion, quiz?.activeQuestions, nonQuizActiveQuestion?.id]);
   const titleText = quiz?.title?.trim() || quizTitle.trim();
   const shouldShowEventTitle = quiz?.showEventTitleOnPlayer ?? true;
