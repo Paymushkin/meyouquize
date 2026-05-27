@@ -19,6 +19,8 @@ import {
 } from "./schemas.js";
 import { isAdminTokenValid } from "./admin-session-cache.js";
 import { registerSocketHandlers } from "./socket/register-handlers.js";
+import { broadcastDashboardResultsNow } from "./socket/dashboard-results.js";
+import { getSocketIo, setSocketIo } from "./socket/io-holder.js";
 import { attachSocketIoRedisAdapter } from "./socket/redis-io-adapter.js";
 import { isPrivateNetworkViteDevPort } from "./cors-allow.js";
 import { prisma } from "./prisma.js";
@@ -447,7 +449,11 @@ export function buildApp() {
       const parsed = patchQuestionProjectorSchema.safeParse(req.body);
       if (!parsed.success) return res.status(400).json({ error: "Invalid payload" });
       try {
-        await patchQuestionProjectorSettings(eventName, questionId, parsed.data);
+        const quizId = await patchQuestionProjectorSettings(eventName, questionId, parsed.data);
+        const io = getSocketIo();
+        if (io) {
+          await broadcastDashboardResultsNow(io, quizId);
+        }
         return res.status(204).end();
       } catch (error) {
         const message = error instanceof Error ? error.message : "Not found";
@@ -612,6 +618,7 @@ export async function buildServer() {
       console.error("[server] Redis init failed, continuing without cluster adapter", err);
     }
   }
+  setSocketIo(io);
   registerSocketHandlers(io);
   return { app, io, httpServer };
 }

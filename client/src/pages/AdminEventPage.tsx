@@ -5017,7 +5017,7 @@ export function AdminEventPage() {
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setConfirmResetSubQuizAnswers(null)}>Отмена</Button>
-          <Button color="warning" variant="contained" onClick={runConfirmedResetSubQuizAnswers}>
+          <Button color="error" variant="contained" onClick={runConfirmedResetSubQuizAnswers}>
             Обнулить
           </Button>
         </DialogActions>

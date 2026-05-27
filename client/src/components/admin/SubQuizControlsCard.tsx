@@ -149,41 +149,46 @@ export function SubQuizControlsCard(props: Props) {
           </Tooltip>
         </Stack>
         <Divider flexItem sx={{ my: 1.25 }} />
-        <Stack spacing={1.25} sx={{ pt: 1 }}>
-          <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap alignItems="center">
-            <TextField
-              type="number"
-              label="Лидеров (TOP)"
-              size="small"
-              value={firstCorrectWinnersCount}
-              onChange={(e) => onChangeLeadersTop(Number(e.target.value) || 1)}
-              onBlur={(e) => onCommitLeadersTop(Number(e.target.value))}
-              sx={{ width: 152 }}
-              inputProps={{ min: 1, max: 20 }}
-            />
-            <TextField
-              type="number"
-              label="Пользователей в результатах"
-              size="small"
-              value={highlightedLeadersCount}
-              onChange={(e) => onChangeResultsUsers(Number(e.target.value) || 0)}
-              onBlur={(e) => onCommitResultsUsers(Number(e.target.value))}
-              sx={{ width: 250 }}
-              inputProps={{ min: 0, max: 100 }}
-            />
-          </Stack>
+        <Stack
+          direction="row"
+          spacing={1}
+          flexWrap="wrap"
+          useFlexGap
+          alignItems="center"
+          sx={{ pt: 1 }}
+        >
+          <TextField
+            type="number"
+            label="Лидеров (TOP)"
+            size="small"
+            value={firstCorrectWinnersCount}
+            onChange={(e) => onChangeLeadersTop(Number(e.target.value) || 1)}
+            onBlur={(e) => onCommitLeadersTop(Number(e.target.value))}
+            sx={{ width: 152 }}
+            inputProps={{ min: 1, max: 20 }}
+          />
+          <TextField
+            type="number"
+            label="Пользователей в результатах"
+            size="small"
+            value={highlightedLeadersCount}
+            onChange={(e) => onChangeResultsUsers(Number(e.target.value) || 0)}
+            onBlur={(e) => onCommitResultsUsers(Number(e.target.value))}
+            sx={{ width: 250 }}
+            inputProps={{ min: 0, max: 100 }}
+          />
           <Tooltip title="Удалить все ответы участников по вопросам этого квиза (баллы и таблица лидеров). Действие необратимо.">
             <span>
               <Button
                 variant="outlined"
                 size="small"
-                color="warning"
+                color="error"
                 startIcon={<RestartAltIcon />}
                 onClick={onRequestResetAnswers}
                 disabled={!quizId || quizIndexMap.length === 0}
                 sx={{ textTransform: "none" }}
               >
-                Обнулить результаты квиза
+                Обнулить
               </Button>
             </span>
           </Tooltip>

@@ -603,7 +603,7 @@ export async function patchQuestionProjectorSettings(
     projectorFirstCorrectWinnersCount?: number;
     rankingProjectorMetric?: "avg_rank" | "avg_score" | "total_score";
   },
-): Promise<void> {
+): Promise<string> {
   const room = await prisma.quiz.findUnique({ where: { slug: eventName }, select: { id: true } });
   if (!room) throw new Error("Room not found");
   const question = await prisma.question.findFirst({
@@ -632,12 +632,13 @@ export async function patchQuestionProjectorSettings(
     }
     data.rankingProjectorMetric = rankingMetricToPrisma(patch.rankingProjectorMetric);
   }
-  if (Object.keys(data).length === 0) return;
+  if (Object.keys(data).length === 0) return room.id;
 
   await prisma.question.update({
     where: { id: questionId },
     data,
   });
+  return room.id;
 }
 
 /** @deprecated use replaceRoomContent */
