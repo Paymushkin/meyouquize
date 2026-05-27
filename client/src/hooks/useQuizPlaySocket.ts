@@ -158,20 +158,26 @@ export function useQuizPlaySocket({
       clearCurrentInputs();
       setError("");
     };
-    const onAnswersCleared = (payload: { all?: boolean; questionId?: string }) => {
+    const onAnswersCleared = (payload: {
+      all?: boolean;
+      questionId?: string;
+      questionIds?: string[];
+    }) => {
       if (payload.all) {
         hydrateSubmittedAnswers({});
         clearCurrentInputs();
         return;
       }
-      if (payload.questionId) {
+      const clearedIds = payload.questionIds ?? (payload.questionId ? [payload.questionId] : []);
+      if (clearedIds.length > 0) {
+        const clearedSet = new Set(clearedIds);
         setSubmittedAnswers((prev) => {
           const next = { ...prev };
-          delete next[payload.questionId!];
+          for (const id of clearedIds) delete next[id];
           return next;
         });
-        setSubmittedQuestionIds((prev) => prev.filter((id) => id !== payload.questionId));
-        if (activeQuestionIdRef.current === payload.questionId) {
+        setSubmittedQuestionIds((prev) => prev.filter((id) => !clearedSet.has(id)));
+        if (activeQuestionIdRef.current != null && clearedSet.has(activeQuestionIdRef.current)) {
           clearCurrentInputs();
         }
       }

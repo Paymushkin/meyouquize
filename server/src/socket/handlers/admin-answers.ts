@@ -1,6 +1,14 @@
 import type { Server } from "socket.io";
-import { resetAnswersSchema, resetQuestionAnswersSchema } from "../../schemas.js";
-import { resetAllQuizAnswers, resetQuestionAnswers } from "../../quiz-service.js";
+import {
+  resetAnswersSchema,
+  resetQuestionAnswersSchema,
+  resetSubQuizAnswersSchema,
+} from "../../schemas.js";
+import {
+  resetAllQuizAnswers,
+  resetQuestionAnswers,
+  resetSubQuizAnswers,
+} from "../../quiz-service.js";
 import { broadcastDashboardResultsNow } from "../dashboard-results.js";
 import { emitToQuizPlayersAndDashboard } from "../quiz-rooms.js";
 import type { EnrichedSocket } from "../handler-common.js";
@@ -30,6 +38,21 @@ export function registerAdminAnswerHandlers(socket: EnrichedSocket, io: Server) 
       await broadcastDashboardResultsNow(io, payload.quizId);
     } catch (error) {
       fail(socket, error instanceof Error ? error.message : "Reset all failed");
+    }
+  });
+
+  socket.on("admin:answers:reset-sub-quiz", async (raw: unknown) => {
+    try {
+      await assertAdmin(socket);
+      const payload = resetSubQuizAnswersSchema.parse(raw);
+      const questionIds = await resetSubQuizAnswers(payload.quizId, payload.subQuizId);
+      emitToQuizPlayersAndDashboard(io, payload.quizId, "answers:cleared", {
+        subQuizId: payload.subQuizId,
+        questionIds,
+      });
+      await broadcastDashboardResultsNow(io, payload.quizId);
+    } catch (error) {
+      fail(socket, error instanceof Error ? error.message : "Reset sub-quiz failed");
     }
   });
 }

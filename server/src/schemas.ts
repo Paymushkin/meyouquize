@@ -211,6 +211,11 @@ export const resetQuestionAnswersSchema = z.object({
   questionId: z.string().min(1),
 });
 
+export const resetSubQuizAnswersSchema = z.object({
+  quizId: z.string().min(1),
+  subQuizId: z.string().min(1),
+});
+
 export const subscribeResultsSchema = z.object({
   slug: z.string().min(1),
   viewer: z.enum(["projector", "admin"]).optional(),

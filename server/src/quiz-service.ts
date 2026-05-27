@@ -2314,6 +2314,20 @@ export async function resetAllQuizAnswers(quizId: string) {
   return getDashboardResults(quizId);
 }
 
+export async function resetSubQuizAnswers(quizId: string, subQuizId: string) {
+  const questions = await prisma.question.findMany({
+    where: { quizId, subQuizId },
+    select: { id: true },
+  });
+  const questionIds = questions.map((q) => q.id);
+  if (questionIds.length > 0) {
+    await prisma.answer.deleteMany({
+      where: { quizId, questionId: { in: questionIds } },
+    });
+  }
+  return questionIds;
+}
+
 export type StandaloneVoteAdminDetail = {
   question: {
     id: string;

@@ -414,6 +414,10 @@ export function AdminEventPage() {
   const [resultsSubQuizId, setResultsSubQuizId] = useState<string>("");
   const [isQuestionDialogOpen, setIsQuestionDialogOpen] = useState(false);
   const [confirmResetQuestionIndex, setConfirmResetQuestionIndex] = useState<number | null>(null);
+  const [confirmResetSubQuizAnswers, setConfirmResetSubQuizAnswers] = useState<{
+    subQuizId: string;
+    title: string;
+  } | null>(null);
   const [confirmDeleteQuestionIndex, setConfirmDeleteQuestionIndex] = useState<number | null>(null);
   const [confirmResetDemoOpen, setConfirmResetDemoOpen] = useState(false);
   const [confirmDeleteSubQuizId, setConfirmDeleteSubQuizId] = useState<string | null>(null);
@@ -2052,6 +2056,18 @@ export function AdminEventPage() {
     if (!quizId) return;
     socket.emit("admin:answers:reset-all", { quizId });
     setMessage("Все ответы в комнате обнулены");
+  }
+
+  function confirmResetSubQuizAnswersById(subQuizId: string, title: string) {
+    setConfirmResetSubQuizAnswers({ subQuizId, title });
+  }
+
+  function runConfirmedResetSubQuizAnswers() {
+    if (!quizId || !confirmResetSubQuizAnswers) return;
+    const { subQuizId, title } = confirmResetSubQuizAnswers;
+    setConfirmResetSubQuizAnswers(null);
+    socket.emit("admin:answers:reset-sub-quiz", { quizId, subQuizId });
+    setMessage(`Ответы по квизу «${title}» обнулены`);
   }
 
   function exportLeaderboardCsv() {
@@ -3850,6 +3866,12 @@ export function AdminEventPage() {
                                                 sq.title.trim() || playerQuizResultsTileText,
                                               );
                                             }}
+                                            onRequestResetAnswers={() =>
+                                              confirmResetSubQuizAnswersById(
+                                                sq.id,
+                                                sq.title.trim() || "Квиз",
+                                              )
+                                            }
                                           />
                                         </Stack>
                                       ) : (
@@ -4976,6 +4998,26 @@ export function AdminEventPage() {
         <DialogActions>
           <Button onClick={() => setConfirmResetQuestionIndex(null)}>Отмена</Button>
           <Button color="warning" variant="contained" onClick={runConfirmedResetQuestionAnswers}>
+            Обнулить
+          </Button>
+        </DialogActions>
+      </Dialog>
+      <Dialog
+        open={confirmResetSubQuizAnswers !== null}
+        onClose={() => setConfirmResetSubQuizAnswers(null)}
+        maxWidth="xs"
+        fullWidth
+      >
+        <DialogTitle>Обнулить результаты квиза?</DialogTitle>
+        <DialogContent>
+          <Typography>
+            Будут удалены все ответы участников по квизу «{confirmResetSubQuizAnswers?.title}».
+            Таблица лидеров и баллы по этому квизу сбросятся. Действие нельзя отменить.
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setConfirmResetSubQuizAnswers(null)}>Отмена</Button>
+          <Button color="warning" variant="contained" onClick={runConfirmedResetSubQuizAnswers}>
             Обнулить
           </Button>
         </DialogActions>
