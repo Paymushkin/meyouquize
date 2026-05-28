@@ -1047,8 +1047,17 @@ export function QuestionPopupCard(props: QuestionPopupCardProps) {
       : {}),
     transition: "transform 180ms ease, box-shadow 220ms ease, background-color 180ms ease",
     transform: isSelected ? "scale(1.03)" : "scale(1)",
-    boxShadow: isSelected ? `0 0 0 2px ${alpha(brandPrimaryColor, 0.42)}` : "none",
+    boxShadow: "none",
+    position: "relative",
+    justifyContent: "center",
+    pl: 4.5,
+    pr: 4.5,
     "& .MuiButton-startIcon": {
+      position: "absolute",
+      top: 8,
+      left: 8,
+      marginLeft: 0,
+      marginRight: 0,
       transformOrigin: "center",
       animation: isSelected ? "mqCheckIn 320ms cubic-bezier(0.22, 1, 0.36, 1)" : "none",
     },
@@ -1134,7 +1143,14 @@ export function QuestionPopupCard(props: QuestionPopupCardProps) {
                       sx={optionButtonSx(isSelected)}
                       disabled={answeredCurrentQuestion}
                       onClick={() => toggleOption(option.id)}
-                      startIcon={isSelected ? <CheckCircleIcon /> : undefined}
+                      startIcon={
+                        <CheckCircleIcon
+                          sx={{
+                            opacity: isSelected ? 1 : 0,
+                            transition: "opacity 140ms ease",
+                          }}
+                        />
+                      }
                     >
                       {option.text}
                     </Button>

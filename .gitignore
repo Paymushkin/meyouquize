@@ -12,3 +12,4 @@ coverage
 **/.vite
 media
 load/results/
+.cursor/
