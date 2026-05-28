@@ -278,11 +278,18 @@ export function QuizPlayPage() {
     };
   }, [joined, nickname, slug]);
 
-  const { titleText, brandPrimaryColor, brandPlayerBackgroundImageUrl, brandBodyBackgroundColor } =
-    useQuizPlayMetaBranding({
-      slug,
-      quiz,
-    });
+  const {
+    titleText,
+    brandPrimaryColor,
+    formTextColor,
+    formBackgroundColor,
+    formInputTextColor,
+    brandPlayerBackgroundImageUrl,
+    brandBodyBackgroundColor,
+  } = useQuizPlayMetaBranding({
+    slug,
+    quiz,
+  });
 
   useEffect(() => {
     if (!slug || !nickname.trim()) return;
@@ -504,7 +511,6 @@ export function QuizPlayPage() {
   ]);
   const playerVoteOptionTextColor = quiz?.playerVoteOptionTextColor?.trim() || "#ffffff";
   const playerVoteProgressBarColor = quiz?.playerVoteProgressBarColor?.trim() || "#F3F722";
-  const brandTextColor = quiz?.brandTextColor?.trim() || "#111";
   const brandFontFamily = quiz?.brandFontFamily?.trim() || "Jost, Arial, sans-serif";
   const brandLogoUrl = resolveClientAssetUrl(quiz?.brandLogoUrl?.trim() ?? "");
   const brandBackground = buildBrandBackground({
@@ -624,8 +630,8 @@ export function QuizPlayPage() {
           {joined ? (
             <PlayerIdentityBar
               nickname={nickname}
-              brandPrimaryColor={brandPrimaryColor}
-              brandTextColor={brandTextColor}
+              formBackgroundColor={formBackgroundColor}
+              formTextColor={formTextColor}
               connectionChip={connectionChip}
               onNicknameClick={editNickname}
             />
@@ -675,7 +681,9 @@ export function QuizPlayPage() {
           ) : null}
           {!joined && !restoreJoinPending && (
             <JoinCard
-              brandPrimaryColor={brandPrimaryColor}
+              formBackgroundColor={formBackgroundColor}
+              formTextColor={formTextColor}
+              formInputTextColor={formInputTextColor}
               nickname={nickname}
               nicknameInputRef={nicknameInputRef}
               onNicknameChange={setNick}

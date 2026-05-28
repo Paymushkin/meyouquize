@@ -449,6 +449,10 @@ export const setPublicViewSchema = z.object({
     .string()
     .regex(/^#([0-9a-fA-F]{6})$/)
     .optional(),
+  brandInputTextColor: z
+    .string()
+    .regex(/^#([0-9a-fA-F]{6})$/)
+    .optional(),
   brandFontFamily: z.string().trim().max(200).optional(),
   brandFontUrl: optionalClientAssetUrlSchema,
   brandLogoUrl: optionalClientAssetUrlSchema,

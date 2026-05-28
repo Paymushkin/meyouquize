@@ -566,8 +566,8 @@ const NICKNAME_CHIP_SX: SxProps<Theme> = {
 
 function buildConnectionChipSx(
   connectionChip: ConnectionChipState,
-  brandPrimaryColor: string,
-  brandTextColor: string,
+  accentBackgroundColor: string,
+  accentTextColor: string,
 ): SxProps<Theme> {
   const accentFill = "accentFill" in connectionChip;
   return {
@@ -576,10 +576,10 @@ function buildConnectionChipSx(
     fontWeight: 700,
     ...(accentFill
       ? {
-          backgroundColor: brandPrimaryColor,
-          color: brandTextColor,
+          backgroundColor: accentBackgroundColor,
+          color: accentTextColor,
           border: "1px solid rgba(255,255,255,0.35)",
-          boxShadow: `0 0 0 1px ${alpha(brandPrimaryColor, 0.45)} inset`,
+          boxShadow: `0 0 0 1px ${alpha(accentBackgroundColor, 0.45)} inset`,
         }
       : {}),
     "& .MuiChip-label": {
@@ -588,10 +588,10 @@ function buildConnectionChipSx(
       height: "100%",
       fontWeight: 700,
       letterSpacing: 0.2,
-      ...(accentFill ? { color: brandTextColor } : {}),
+      ...(accentFill ? { color: accentTextColor } : {}),
     },
     "& .MuiChip-icon": {
-      ...(accentFill ? { color: brandTextColor } : {}),
+      ...(accentFill ? { color: accentTextColor } : {}),
     },
   };
 }
@@ -621,19 +621,19 @@ const JOIN_CARD_CONTENT_SX: SxProps<Theme> = {
   "&:last-child": { pb: 2 },
 };
 
-function buildJoinNicknameInputSx(brandPrimaryColor: string): SxProps<Theme> {
+function buildJoinNicknameInputSx(focusColor: string, formTextColor: string): SxProps<Theme> {
   return {
     minHeight: 56,
-    color: "#fff",
-    "& .MuiOutlinedInput-input": { color: "#fff" },
+    color: formTextColor,
+    "& .MuiOutlinedInput-input": { color: formTextColor },
     "& .MuiOutlinedInput-notchedOutline": {
-      borderColor: "rgba(255,255,255,0.45)",
+      borderColor: alpha(formTextColor, 0.45),
     },
     "&:hover .MuiOutlinedInput-notchedOutline": {
-      borderColor: "rgba(255,255,255,0.72)",
+      borderColor: alpha(formTextColor, 0.72),
     },
     "&.Mui-focused .MuiOutlinedInput-notchedOutline": {
-      borderColor: brandPrimaryColor,
+      borderColor: focusColor,
     },
   };
 }
@@ -651,24 +651,27 @@ const RANDOM_NICKNAME_BUTTON_SX: SxProps<Theme> = {
   },
 };
 
-function buildBrandPrimaryContainedButtonSx(brandPrimaryColor: string): SxProps<Theme> {
+function buildBrandPrimaryContainedButtonSx(
+  backgroundColor: string,
+  textColor: string,
+): SxProps<Theme> {
   return {
-    bgcolor: brandPrimaryColor,
-    color: "#111",
-    "&:hover": { bgcolor: brandPrimaryColor, filter: "brightness(0.94)" },
+    bgcolor: backgroundColor,
+    color: textColor,
+    "&:hover": { bgcolor: backgroundColor, filter: "brightness(0.94)" },
   };
 }
 
 type PlayerIdentityBarProps = {
   nickname: string;
-  brandPrimaryColor: string;
-  brandTextColor: string;
+  formBackgroundColor: string;
+  formTextColor: string;
   connectionChip: ConnectionChipState;
   onNicknameClick: () => void;
 };
 
 export function PlayerIdentityBar(props: PlayerIdentityBarProps) {
-  const { nickname, brandPrimaryColor, brandTextColor, connectionChip, onNicknameClick } = props;
+  const { nickname, formBackgroundColor, formTextColor, connectionChip, onNicknameClick } = props;
   return (
     <Box sx={PLAYER_BAR_ROOT_SX}>
       <Stack direction="row" alignItems="center" justifyContent="space-between" spacing={1}>
@@ -692,7 +695,7 @@ export function PlayerIdentityBar(props: PlayerIdentityBarProps) {
           label={connectionChip.label}
           {...("accentFill" in connectionChip ? {} : { color: connectionChip.color })}
           variant={connectionChip.variant}
-          sx={buildConnectionChipSx(connectionChip, brandPrimaryColor, brandTextColor)}
+          sx={buildConnectionChipSx(connectionChip, formBackgroundColor, formTextColor)}
         />
       </Stack>
     </Box>
@@ -841,7 +844,9 @@ export function ReactionsDock(props: ReactionsDockProps) {
 }
 
 type JoinCardProps = {
-  brandPrimaryColor: string;
+  formBackgroundColor: string;
+  formTextColor: string;
+  formInputTextColor: string;
   nickname: string;
   nicknameInputRef: RefObject<HTMLInputElement | null>;
   onNicknameChange: (value: string) => void;
@@ -851,7 +856,9 @@ type JoinCardProps = {
 
 export function JoinCard(props: JoinCardProps) {
   const {
-    brandPrimaryColor,
+    formBackgroundColor,
+    formTextColor,
+    formInputTextColor,
     nickname,
     nicknameInputRef,
     onNicknameChange,
@@ -870,16 +877,27 @@ export function JoinCard(props: JoinCardProps) {
               onChange={(e) => onNicknameChange(e.target.value)}
               placeholder="Введите имя или используйте случайное"
               fullWidth
-              sx={buildJoinNicknameInputSx(brandPrimaryColor)}
+              sx={buildJoinNicknameInputSx(formBackgroundColor, formInputTextColor)}
             />
-            <Button variant="outlined" onClick={onRandomNickname} sx={RANDOM_NICKNAME_BUTTON_SX}>
+            <Button
+              variant="outlined"
+              onClick={onRandomNickname}
+              sx={{
+                ...RANDOM_NICKNAME_BUTTON_SX,
+                color: formInputTextColor,
+                borderColor: alpha(formInputTextColor, 0.45),
+                "&:hover": {
+                  borderColor: alpha(formInputTextColor, 0.72),
+                },
+              }}
+            >
               Случайное имя
             </Button>
           </Stack>
           <Button
             variant="contained"
             onClick={onJoin}
-            sx={buildBrandPrimaryContainedButtonSx(brandPrimaryColor)}
+            sx={buildBrandPrimaryContainedButtonSx(formBackgroundColor, formTextColor)}
           >
             Войти
           </Button>

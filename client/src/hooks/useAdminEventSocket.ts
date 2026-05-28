@@ -61,6 +61,7 @@ type Params = {
   setBrandAccentColor: (value: string) => void;
   setBrandSurfaceColor: (value: string) => void;
   setBrandTextColor: (value: string) => void;
+  setBrandInputTextColor: (value: string) => void;
   setBrandFontFamily: (value: string) => void;
   setBrandFontUrl: (value: string) => void;
   setBrandLogoUrl: (value: string) => void;
@@ -121,6 +122,7 @@ export function useAdminEventSocket<TQuestion extends QuestionFormPatchable>(
     setBrandAccentColor,
     setBrandSurfaceColor,
     setBrandTextColor,
+    setBrandInputTextColor,
     setBrandFontFamily,
     setBrandFontUrl,
     setBrandLogoUrl,
@@ -178,6 +180,7 @@ export function useAdminEventSocket<TQuestion extends QuestionFormPatchable>(
       setBrandAccentColor(nextBranding.brandAccentColor);
       setBrandSurfaceColor(nextBranding.brandSurfaceColor);
       setBrandTextColor(nextBranding.brandTextColor);
+      setBrandInputTextColor(nextBranding.brandInputTextColor);
       setBrandFontFamily(nextBranding.brandFontFamily);
       setBrandFontUrl(nextBranding.brandFontUrl);
       setBrandLogoUrl(nextBranding.brandLogoUrl);
@@ -214,6 +217,7 @@ export function useAdminEventSocket<TQuestion extends QuestionFormPatchable>(
       setBrandAccentColor,
       setBrandSurfaceColor,
       setBrandTextColor,
+      setBrandInputTextColor,
       setBrandFontFamily,
       setBrandFontUrl,
       setBrandLogoUrl,

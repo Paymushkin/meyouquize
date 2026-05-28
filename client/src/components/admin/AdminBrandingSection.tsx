@@ -61,6 +61,8 @@ type Props = {
   setBrandSurfaceColor: (value: string) => void;
   brandTextColor: string;
   setBrandTextColor: (value: string) => void;
+  brandInputTextColor: string;
+  setBrandInputTextColor: (value: string) => void;
   brandFontFamily: string;
   setBrandFontFamily: (value: string) => void;
   setBrandFontUrl: (value: string) => void;
@@ -126,6 +128,8 @@ export function AdminBrandingSection(props: Props) {
     setBrandSurfaceColor,
     brandTextColor,
     setBrandTextColor,
+    brandInputTextColor,
+    setBrandInputTextColor,
     brandFontFamily,
     setBrandFontFamily,
     setBrandFontUrl,
@@ -220,6 +224,8 @@ export function AdminBrandingSection(props: Props) {
             setBrandSurfaceColor={setBrandSurfaceColor}
             brandTextColor={brandTextColor}
             setBrandTextColor={setBrandTextColor}
+            brandInputTextColor={brandInputTextColor}
+            setBrandInputTextColor={setBrandInputTextColor}
             brandLogoUrl={brandLogoUrl}
             setBrandLogoUrl={setBrandLogoUrl}
             brandPlayerBackgroundImageUrl={brandPlayerBackgroundImageUrl}

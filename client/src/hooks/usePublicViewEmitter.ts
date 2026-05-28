@@ -104,6 +104,7 @@ type UsePublicViewEmitterParams = {
   brandAccentColor: string;
   brandSurfaceColor: string;
   brandTextColor: string;
+  brandInputTextColor: string;
   brandFontFamily: string;
   brandFontUrl: string;
   brandLogoUrl: string;
@@ -189,6 +190,7 @@ export function usePublicViewEmitter(params: UsePublicViewEmitterParams) {
     brandAccentColor,
     brandSurfaceColor,
     brandTextColor,
+    brandInputTextColor,
     brandFontFamily,
     brandFontUrl,
     brandLogoUrl,
@@ -307,6 +309,7 @@ export function usePublicViewEmitter(params: UsePublicViewEmitterParams) {
         brandAccentColor: patch.brandAccentColor ?? brandAccentColor,
         brandSurfaceColor: patch.brandSurfaceColor ?? brandSurfaceColor,
         brandTextColor: patch.brandTextColor ?? brandTextColor,
+        brandInputTextColor: patch.brandInputTextColor ?? brandInputTextColor,
         brandFontFamily: patch.brandFontFamily ?? brandFontFamily,
         brandFontUrl: patch.brandFontUrl ?? brandFontUrl,
         brandLogoUrl: patch.brandLogoUrl ?? brandLogoUrl,
@@ -393,6 +396,7 @@ export function usePublicViewEmitter(params: UsePublicViewEmitterParams) {
       brandAccentColor,
       brandSurfaceColor,
       brandTextColor,
+      brandInputTextColor,
       brandFontFamily,
       brandFontUrl,
       brandLogoUrl,

@@ -281,6 +281,8 @@ export interface PublicViewState {
   brandSurfaceColor: string;
   /** Бренд: базовый цвет текста */
   brandTextColor: string;
+  /** Бренд: цвет текста и обводки инпутов в формах игрока */
+  brandInputTextColor: string;
   /** Бренд: семейство шрифта */
   brandFontFamily: string;
   /** Бренд: URL файла кастомного шрифта (если используется) */
@@ -407,6 +409,7 @@ export const DEFAULT_PUBLIC_VIEW_STATE: PublicViewState = {
   brandAccentColor: "#1976d2",
   brandSurfaceColor: "#ffffff",
   brandTextColor: "#1f1f1f",
+  brandInputTextColor: "#ffffff",
   brandFontFamily: "Jost, Arial, sans-serif",
   brandFontUrl: "",
   brandLogoUrl: "",
@@ -1094,6 +1097,7 @@ export function normalizePublicViewState(
     brandAccentColor: sanitizeHex6(value?.brandAccentColor, base.brandAccentColor),
     brandSurfaceColor: sanitizeHex6(value?.brandSurfaceColor, base.brandSurfaceColor),
     brandTextColor: sanitizeHex6(value?.brandTextColor, base.brandTextColor),
+    brandInputTextColor: sanitizeHex6(value?.brandInputTextColor, base.brandInputTextColor),
     brandFontFamily: sanitizeBrandFontFamily(value?.brandFontFamily, base.brandFontFamily),
     brandFontUrl: sanitizeBrandUrl(value?.brandFontUrl),
     brandLogoUrl: sanitizeBrandUrl(value?.brandLogoUrl),

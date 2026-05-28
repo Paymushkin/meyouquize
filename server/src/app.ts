@@ -534,6 +534,11 @@ export function buildApp() {
       title: quiz.title,
       status: quiz.status,
       brandPrimaryColor: view.brandPrimaryColor,
+      brandAccentColor: view.brandAccentColor,
+      brandTextColor: view.brandTextColor,
+      brandInputTextColor: view.brandInputTextColor,
+      playerVoteOptionTextColor: view.playerVoteOptionTextColor,
+      playerVoteProgressBarColor: view.playerVoteProgressBarColor,
       brandPlayerBackgroundImageUrl: view.brandPlayerBackgroundImageUrl,
       brandBodyBackgroundColor: view.brandBodyBackgroundColor,
     });

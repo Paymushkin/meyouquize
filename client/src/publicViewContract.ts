@@ -39,6 +39,7 @@ type BrandingKeys =
   | "brandAccentColor"
   | "brandSurfaceColor"
   | "brandTextColor"
+  | "brandInputTextColor"
   | "brandFontFamily"
   | "brandFontUrl"
   | "brandLogoUrl"
@@ -137,6 +138,7 @@ export function toBrandingState(payload: Partial<PublicViewPayload>): BrandingSt
     brandAccentColor: view.brandAccentColor,
     brandSurfaceColor: view.brandSurfaceColor,
     brandTextColor: view.brandTextColor,
+    brandInputTextColor: view.brandInputTextColor,
     brandFontFamily: view.brandFontFamily,
     brandFontUrl: view.brandFontUrl,
     brandLogoUrl: view.brandLogoUrl,

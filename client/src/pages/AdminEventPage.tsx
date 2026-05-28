@@ -691,6 +691,7 @@ export function AdminEventPage() {
   const [brandAccentColor, setBrandAccentColor] = useState("#1976d2");
   const [brandSurfaceColor, setBrandSurfaceColor] = useState("#ffffff");
   const [brandTextColor, setBrandTextColor] = useState("#1f1f1f");
+  const [brandInputTextColor, setBrandInputTextColor] = useState("#ffffff");
   const [brandFontFamily, setBrandFontFamily] = useState("Jost, Arial, sans-serif");
   const [brandFontUrl, setBrandFontUrl] = useState("");
   const [brandLogoUrl, setBrandLogoUrl] = useState("");
@@ -1024,6 +1025,7 @@ export function AdminEventPage() {
     setBrandAccentColor,
     setBrandSurfaceColor,
     setBrandTextColor,
+    setBrandInputTextColor,
     setBrandFontFamily,
     setBrandFontUrl,
     setBrandLogoUrl,
@@ -1144,6 +1146,7 @@ export function AdminEventPage() {
     brandAccentColor,
     brandSurfaceColor,
     brandTextColor,
+    brandInputTextColor,
     brandFontFamily,
     brandFontUrl,
     brandLogoUrl,
@@ -1166,6 +1169,7 @@ export function AdminEventPage() {
       setBrandAccentColor,
       setBrandSurfaceColor,
       setBrandTextColor,
+      setBrandInputTextColor,
       setBrandFontFamily,
       setBrandFontUrl,
       setBrandLogoUrl,
@@ -1352,6 +1356,7 @@ export function AdminEventPage() {
     setBrandAccentColor(b.brandAccentColor);
     setBrandSurfaceColor(b.brandSurfaceColor);
     setBrandTextColor(b.brandTextColor);
+    setBrandInputTextColor(b.brandInputTextColor);
     setBrandFontFamily(b.brandFontFamily);
     setBrandFontUrl(b.brandFontUrl);
     setBrandLogoUrl(b.brandLogoUrl);
@@ -1730,6 +1735,8 @@ export function AdminEventPage() {
     setBrandSurfaceColor,
     brandTextColor,
     setBrandTextColor,
+    brandInputTextColor,
+    setBrandInputTextColor,
     brandFontFamily,
     setBrandFontFamily,
     setBrandFontUrl,

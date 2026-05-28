@@ -22,6 +22,8 @@ type Props = {
   setBrandSurfaceColor: (value: string) => void;
   brandTextColor: string;
   setBrandTextColor: (value: string) => void;
+  brandInputTextColor: string;
+  setBrandInputTextColor: (value: string) => void;
   brandLogoUrl: string;
   setBrandLogoUrl: (value: string) => void;
   brandPlayerBackgroundImageUrl: string;
@@ -44,6 +46,8 @@ export function BrandImagesSection(props: Props) {
     setBrandSurfaceColor,
     brandTextColor,
     setBrandTextColor,
+    brandInputTextColor,
+    setBrandInputTextColor,
     brandLogoUrl,
     setBrandLogoUrl,
     brandPlayerBackgroundImageUrl,
@@ -86,6 +90,12 @@ export function BrandImagesSection(props: Props) {
               value={brandTextColor}
               onChange={setBrandTextColor}
               onBlur={() => emitPatch({ brandTextColor })}
+            />
+            <CompactColorField
+              label="Input text/border"
+              value={brandInputTextColor}
+              onChange={setBrandInputTextColor}
+              onBlur={() => emitPatch({ brandInputTextColor })}
             />
           </Box>
           <Box
