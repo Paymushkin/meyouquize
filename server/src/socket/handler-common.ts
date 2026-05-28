@@ -1,5 +1,5 @@
 import type { Socket } from "socket.io";
-import { env } from "../env.js";
+import { isAdminAuthBypassed } from "../admin-auth-guard.js";
 import { isAdminTokenValid } from "../admin-session-cache.js";
 
 export type SocketData = {
@@ -62,7 +62,7 @@ function readCookieValue(cookieHeader: string, key: string): string | null {
 }
 
 export async function assertAdmin(socket: EnrichedSocket): Promise<void> {
-  if (env.localAdminNoAuth) {
+  if (isAdminAuthBypassed()) {
     socket.data.isAdmin = true;
     return;
   }

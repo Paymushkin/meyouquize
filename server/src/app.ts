@@ -9,6 +9,7 @@ import path from "node:path";
 import { Server } from "socket.io";
 import multer from "multer";
 import { adminCredentialMatch } from "./admin-accounts.js";
+import { isAdminAuthBypassed } from "./admin-auth-guard.js";
 import { env } from "./env.js";
 import {
   adminAuthSchema,
@@ -78,7 +79,7 @@ async function adminAuthMiddleware(
   res: express.Response,
   next: express.NextFunction,
 ) {
-  if (env.localAdminNoAuth) return next();
+  if (isAdminAuthBypassed()) return next();
   const token = req.cookies[ADMIN_COOKIE];
   if (!token) return res.status(401).json(apiError("UNAUTHORIZED", "Unauthorized"));
   const session = await prisma.adminSession.findUnique({ where: { token } });
@@ -202,7 +203,7 @@ export function buildApp() {
   });
 
   app.post("/api/admin/auth", authLimiter, async (req, res) => {
-    if (env.localAdminNoAuth) {
+    if (isAdminAuthBypassed()) {
       return res.json({ ok: true, bypass: true });
     }
     const parsed = adminAuthSchema.safeParse(req.body);
@@ -598,7 +599,7 @@ export async function buildServer() {
     },
   });
   io.use(async (socket, next) => {
-    if (env.localAdminNoAuth) {
+    if (isAdminAuthBypassed()) {
       socket.data.isAdmin = true;
       next();
       return;
