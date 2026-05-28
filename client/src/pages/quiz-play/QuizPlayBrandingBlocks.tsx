@@ -544,6 +544,120 @@ type ConnectionChipState =
   | { label: string; variant: "filled"; accentFill: true }
   | { label: string; color: "warning" | "error"; variant: "filled" | "outlined" };
 
+const PLAYER_BAR_ROOT_SX: SxProps<Theme> = { mb: 3 };
+
+const NICKNAME_CHIP_SX: SxProps<Theme> = {
+  alignItems: "center",
+  cursor: "pointer",
+  color: "#111",
+  borderColor: "rgba(0,0,0,0.35)",
+  bgcolor: "rgba(255,255,255,0.92)",
+  "& .MuiChip-icon": {
+    color: "rgba(0,0,0,0.72)",
+  },
+  "& .MuiChip-label": {
+    display: "flex",
+    alignItems: "center",
+    height: "100%",
+    fontWeight: 600,
+    color: "#111",
+  },
+};
+
+function buildConnectionChipSx(
+  connectionChip: ConnectionChipState,
+  brandPrimaryColor: string,
+): SxProps<Theme> {
+  const accentFill = "accentFill" in connectionChip;
+  return {
+    alignItems: "center",
+    borderRadius: 1.25,
+    fontWeight: 700,
+    ...(accentFill
+      ? {
+          backgroundColor: brandPrimaryColor,
+          color: "#111",
+          border: "1px solid rgba(255,255,255,0.35)",
+          boxShadow: `0 0 0 1px ${alpha(brandPrimaryColor, 0.45)} inset`,
+        }
+      : {}),
+    "& .MuiChip-label": {
+      display: "flex",
+      alignItems: "center",
+      height: "100%",
+      fontWeight: 700,
+      letterSpacing: 0.2,
+      ...(accentFill ? { color: "#111" } : {}),
+    },
+    "& .MuiChip-icon": {
+      ...(accentFill ? { color: "rgba(0,0,0,0.72)" } : {}),
+    },
+  };
+}
+
+const JOIN_CARD_ROOT_SX: SxProps<Theme> = {
+  mt: { xs: 2, md: "auto" },
+  mb: {
+    xs: "calc(env(safe-area-inset-bottom, 0px) + 76px)",
+    md: 5,
+  },
+  width: "100%",
+  maxWidth: 520,
+  mx: "auto",
+  bgcolor: "transparent",
+  borderColor: "transparent",
+  boxShadow: "none",
+};
+
+const JOIN_CARD_CONTENT_SX: SxProps<Theme> = {
+  bgcolor: "rgba(38, 38, 38, 0.84)",
+  color: "#fff",
+  backdropFilter: "blur(4px)",
+  border: "1px solid rgba(255,255,255,0.2)",
+  borderRadius: 2,
+  boxShadow: "0 18px 48px rgba(0,0,0,0.45)",
+  p: 2,
+  "&:last-child": { pb: 2 },
+};
+
+function buildJoinNicknameInputSx(brandPrimaryColor: string): SxProps<Theme> {
+  return {
+    minHeight: 56,
+    color: "#fff",
+    "& .MuiOutlinedInput-input": { color: "#fff" },
+    "& .MuiOutlinedInput-notchedOutline": {
+      borderColor: "rgba(255,255,255,0.45)",
+    },
+    "&:hover .MuiOutlinedInput-notchedOutline": {
+      borderColor: "rgba(255,255,255,0.72)",
+    },
+    "&.Mui-focused .MuiOutlinedInput-notchedOutline": {
+      borderColor: brandPrimaryColor,
+    },
+  };
+}
+
+const RANDOM_NICKNAME_BUTTON_SX: SxProps<Theme> = {
+  color: "#ffffff",
+  borderColor: "rgba(255, 255, 255, 0.5)",
+  minHeight: 56,
+  px: 4,
+  mx: { xs: 0, sm: 1 },
+  minWidth: { sm: 180 },
+  whiteSpace: "nowrap",
+  "&:hover": {
+    borderColor: "rgba(255, 255, 255, 0.75)",
+  },
+};
+
+function buildBrandPrimaryContainedButtonSx(brandPrimaryColor: string): SxProps<Theme> {
+  return {
+    bgcolor: brandPrimaryColor,
+    color: "#111",
+    "&:hover": { bgcolor: brandPrimaryColor, filter: "brightness(0.94)" },
+  };
+}
+
 type PlayerIdentityBarProps = {
   nickname: string;
   brandPrimaryColor: string;
@@ -554,7 +668,7 @@ type PlayerIdentityBarProps = {
 export function PlayerIdentityBar(props: PlayerIdentityBarProps) {
   const { nickname, brandPrimaryColor, connectionChip, onNicknameClick } = props;
   return (
-    <Box sx={{ mb: 3 }}>
+    <Box sx={PLAYER_BAR_ROOT_SX}>
       <Stack direction="row" alignItems="center" justifyContent="space-between" spacing={1}>
         <Stack direction="row" spacing={0.75} alignItems="center">
           <Chip
@@ -563,23 +677,7 @@ export function PlayerIdentityBar(props: PlayerIdentityBarProps) {
             label={nickname.trim() || "без ника"}
             variant="outlined"
             onClick={onNicknameClick}
-            sx={{
-              alignItems: "center",
-              cursor: "pointer",
-              color: "#111",
-              borderColor: "rgba(0,0,0,0.35)",
-              bgcolor: "rgba(255,255,255,0.92)",
-              "& .MuiChip-icon": {
-                color: "rgba(0,0,0,0.72)",
-              },
-              "& .MuiChip-label": {
-                display: "flex",
-                alignItems: "center",
-                height: "100%",
-                fontWeight: 600,
-                color: "#111",
-              },
-            }}
+            sx={NICKNAME_CHIP_SX}
           />
           <Tooltip title="Изменить имя">
             <IconButton size="small" aria-label="Изменить имя" onClick={onNicknameClick}>
@@ -592,30 +690,7 @@ export function PlayerIdentityBar(props: PlayerIdentityBarProps) {
           label={connectionChip.label}
           {...("accentFill" in connectionChip ? {} : { color: connectionChip.color })}
           variant={connectionChip.variant}
-          sx={{
-            alignItems: "center",
-            borderRadius: 1.25,
-            fontWeight: 700,
-            ...("accentFill" in connectionChip
-              ? {
-                  backgroundColor: brandPrimaryColor,
-                  color: "#111",
-                  border: "1px solid rgba(255,255,255,0.35)",
-                  boxShadow: `0 0 0 1px ${alpha(brandPrimaryColor, 0.45)} inset`,
-                }
-              : {}),
-            "& .MuiChip-label": {
-              display: "flex",
-              alignItems: "center",
-              height: "100%",
-              fontWeight: 700,
-              letterSpacing: 0.2,
-              ...("accentFill" in connectionChip ? { color: "#111" } : {}),
-            },
-            "& .MuiChip-icon": {
-              ...("accentFill" in connectionChip ? { color: "rgba(0,0,0,0.72)" } : {}),
-            },
-          }}
+          sx={buildConnectionChipSx(connectionChip, brandPrimaryColor)}
         />
       </Stack>
     </Box>
@@ -782,34 +857,8 @@ export function JoinCard(props: JoinCardProps) {
     onJoin,
   } = props;
   return (
-    <Card
-      variant="outlined"
-      sx={{
-        mt: { xs: 2, md: "auto" },
-        mb: {
-          xs: "calc(env(safe-area-inset-bottom, 0px) + 76px)",
-          md: 5,
-        },
-        width: "100%",
-        maxWidth: 520,
-        mx: "auto",
-        bgcolor: "transparent",
-        borderColor: "transparent",
-        boxShadow: "none",
-      }}
-    >
-      <CardContent
-        sx={{
-          bgcolor: "rgba(38, 38, 38, 0.84)",
-          color: "#fff",
-          backdropFilter: "blur(4px)",
-          border: "1px solid rgba(255,255,255,0.2)",
-          borderRadius: 2,
-          boxShadow: "0 18px 48px rgba(0,0,0,0.45)",
-          p: 2,
-          "&:last-child": { pb: 2 },
-        }}
-      >
+    <Card variant="outlined" sx={JOIN_CARD_ROOT_SX}>
+      <CardContent sx={JOIN_CARD_CONTENT_SX}>
         <Stack spacing={2}>
           <Stack direction={{ xs: "column", sm: "row" }} spacing={1}>
             <OutlinedInput
@@ -819,48 +868,16 @@ export function JoinCard(props: JoinCardProps) {
               onChange={(e) => onNicknameChange(e.target.value)}
               placeholder="Введите имя или используйте случайное"
               fullWidth
-              sx={{
-                minHeight: 56,
-                color: "#fff",
-                "& .MuiOutlinedInput-input": { color: "#fff" },
-                "& .MuiOutlinedInput-notchedOutline": {
-                  borderColor: "rgba(255,255,255,0.45)",
-                },
-                "&:hover .MuiOutlinedInput-notchedOutline": {
-                  borderColor: "rgba(255,255,255,0.72)",
-                },
-                "&.Mui-focused .MuiOutlinedInput-notchedOutline": {
-                  borderColor: brandPrimaryColor,
-                },
-              }}
+              sx={buildJoinNicknameInputSx(brandPrimaryColor)}
             />
-            <Button
-              variant="outlined"
-              onClick={onRandomNickname}
-              sx={{
-                color: "#ffffff",
-                borderColor: "rgba(255, 255, 255, 0.5)",
-                minHeight: 56,
-                px: 4,
-                mx: { xs: 0, sm: 1 },
-                minWidth: { sm: 180 },
-                whiteSpace: "nowrap",
-                "&:hover": {
-                  borderColor: "rgba(255, 255, 255, 0.75)",
-                },
-              }}
-            >
+            <Button variant="outlined" onClick={onRandomNickname} sx={RANDOM_NICKNAME_BUTTON_SX}>
               Случайное имя
             </Button>
           </Stack>
           <Button
             variant="contained"
             onClick={onJoin}
-            sx={{
-              bgcolor: brandPrimaryColor,
-              color: "#111",
-              "&:hover": { bgcolor: brandPrimaryColor, filter: "brightness(0.94)" },
-            }}
+            sx={buildBrandPrimaryContainedButtonSx(brandPrimaryColor)}
           >
             Войти
           </Button>
