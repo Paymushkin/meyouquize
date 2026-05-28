@@ -532,6 +532,7 @@ export function buildApp() {
       slug: quiz.slug,
       title: quiz.title,
       status: quiz.status,
+      brandPrimaryColor: view.brandPrimaryColor,
       brandPlayerBackgroundImageUrl: view.brandPlayerBackgroundImageUrl,
       brandBodyBackgroundColor: view.brandBodyBackgroundColor,
     });

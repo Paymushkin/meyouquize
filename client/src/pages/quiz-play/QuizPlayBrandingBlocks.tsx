@@ -33,7 +33,6 @@ import {
 import { alpha, type SxProps, type Theme } from "@mui/material/styles";
 import { useState, type Dispatch, type RefObject, type SetStateAction } from "react";
 import type { ActiveQuestion, QuizState, ReactionType } from "./types";
-import { BRAND_ACCENT } from "../../theme/brandTheme";
 import { resolveClientAssetUrl } from "../../utils/resolveClientAssetUrl";
 import { sanitizeClientAssetUrl, sanitizeExternalHttpUrl } from "../../utils/safeUrls";
 
@@ -547,12 +546,13 @@ type ConnectionChipState =
 
 type PlayerIdentityBarProps = {
   nickname: string;
+  brandPrimaryColor: string;
   connectionChip: ConnectionChipState;
   onNicknameClick: () => void;
 };
 
 export function PlayerIdentityBar(props: PlayerIdentityBarProps) {
-  const { nickname, connectionChip, onNicknameClick } = props;
+  const { nickname, brandPrimaryColor, connectionChip, onNicknameClick } = props;
   return (
     <Box sx={{ mb: 3 }}>
       <Stack direction="row" alignItems="center" justifyContent="space-between" spacing={1}>
@@ -594,16 +594,22 @@ export function PlayerIdentityBar(props: PlayerIdentityBarProps) {
           variant={connectionChip.variant}
           sx={{
             alignItems: "center",
+            borderRadius: 1.25,
+            fontWeight: 700,
             ...("accentFill" in connectionChip
               ? {
-                  backgroundColor: BRAND_ACCENT,
+                  backgroundColor: brandPrimaryColor,
                   color: "#111",
+                  border: "1px solid rgba(255,255,255,0.35)",
+                  boxShadow: `0 0 0 1px ${alpha(brandPrimaryColor, 0.45)} inset`,
                 }
               : {}),
             "& .MuiChip-label": {
               display: "flex",
               alignItems: "center",
               height: "100%",
+              fontWeight: 700,
+              letterSpacing: 0.2,
               ...("accentFill" in connectionChip ? { color: "#111" } : {}),
             },
             "& .MuiChip-icon": {
@@ -758,6 +764,7 @@ export function ReactionsDock(props: ReactionsDockProps) {
 }
 
 type JoinCardProps = {
+  brandPrimaryColor: string;
   nickname: string;
   nicknameInputRef: RefObject<HTMLInputElement | null>;
   onNicknameChange: (value: string) => void;
@@ -766,7 +773,14 @@ type JoinCardProps = {
 };
 
 export function JoinCard(props: JoinCardProps) {
-  const { nickname, nicknameInputRef, onNicknameChange, onRandomNickname, onJoin } = props;
+  const {
+    brandPrimaryColor,
+    nickname,
+    nicknameInputRef,
+    onNicknameChange,
+    onRandomNickname,
+    onJoin,
+  } = props;
   return (
     <Card
       variant="outlined"
@@ -779,9 +793,23 @@ export function JoinCard(props: JoinCardProps) {
         width: "100%",
         maxWidth: 520,
         mx: "auto",
+        bgcolor: "transparent",
+        borderColor: "transparent",
+        boxShadow: "none",
       }}
     >
-      <CardContent>
+      <CardContent
+        sx={{
+          bgcolor: "rgba(38, 38, 38, 0.84)",
+          color: "#fff",
+          backdropFilter: "blur(4px)",
+          border: "1px solid rgba(255,255,255,0.2)",
+          borderRadius: 2,
+          boxShadow: "0 18px 48px rgba(0,0,0,0.45)",
+          p: 2,
+          "&:last-child": { pb: 2 },
+        }}
+      >
         <Stack spacing={2}>
           <Stack direction={{ xs: "column", sm: "row" }} spacing={1}>
             <OutlinedInput
@@ -791,7 +819,20 @@ export function JoinCard(props: JoinCardProps) {
               onChange={(e) => onNicknameChange(e.target.value)}
               placeholder="Введите имя или используйте случайное"
               fullWidth
-              sx={{ minHeight: 56 }}
+              sx={{
+                minHeight: 56,
+                color: "#fff",
+                "& .MuiOutlinedInput-input": { color: "#fff" },
+                "& .MuiOutlinedInput-notchedOutline": {
+                  borderColor: "rgba(255,255,255,0.45)",
+                },
+                "&:hover .MuiOutlinedInput-notchedOutline": {
+                  borderColor: "rgba(255,255,255,0.72)",
+                },
+                "&.Mui-focused .MuiOutlinedInput-notchedOutline": {
+                  borderColor: brandPrimaryColor,
+                },
+              }}
             />
             <Button
               variant="outlined"
@@ -804,12 +845,23 @@ export function JoinCard(props: JoinCardProps) {
                 mx: { xs: 0, sm: 1 },
                 minWidth: { sm: 180 },
                 whiteSpace: "nowrap",
+                "&:hover": {
+                  borderColor: "rgba(255, 255, 255, 0.75)",
+                },
               }}
             >
               Случайное имя
             </Button>
           </Stack>
-          <Button variant="contained" onClick={onJoin}>
+          <Button
+            variant="contained"
+            onClick={onJoin}
+            sx={{
+              bgcolor: brandPrimaryColor,
+              color: "#111",
+              "&:hover": { bgcolor: brandPrimaryColor, filter: "brightness(0.94)" },
+            }}
+          >
             Войти
           </Button>
         </Stack>

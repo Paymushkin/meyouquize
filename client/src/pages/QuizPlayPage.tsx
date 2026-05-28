@@ -23,13 +23,18 @@ import {
 import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
 import KeyboardArrowDownIcon from "@mui/icons-material/KeyboardArrowDown";
 import KeyboardArrowUpIcon from "@mui/icons-material/KeyboardArrowUp";
-import { API_BASE } from "../config";
 import { SpeakerQuestionsDialog } from "../components/quiz/SpeakerQuestionsDialog";
 import { PlayerVoteResultsDialog } from "../components/quiz/PlayerVoteResultsDialog";
 import { PlayerQuizReportDialog } from "../components/quiz/PlayerQuizReportDialog";
+import {
+  PLAYER_DIALOG_CONTENT_SX,
+  PLAYER_DIALOG_PAPER_SX,
+  PLAYER_DIALOG_TITLE_SX,
+} from "../components/quiz/playerDialogStyles";
 import { useQuizPlayCompletion } from "../hooks/useQuizPlayCompletion";
 import { useQuizPlayScrollLock } from "../hooks/useQuizPlayScrollLock";
 import { useQuizPlaySocket } from "../hooks/useQuizPlaySocket";
+import { useQuizPlayMetaBranding } from "../hooks/useQuizPlayMetaBranding";
 import { useBrandFont } from "../hooks/useBrandFont";
 import { useEventFavicon } from "../hooks/useEventFavicon";
 import { socket } from "../socket";
@@ -104,7 +109,6 @@ function emitJoinWithLog(slug: string, reason: "manual" | "restore", nick: strin
 
 export function QuizPlayPage() {
   const { slug = "" } = useParams();
-  const [quizTitle, setQuizTitle] = useState("");
   const [nickname, setNick] = useState(() => {
     const roomNickname = slug ? localStorage.getItem(getRoomNickKey(slug)) : "";
     return roomNickname || getNickname() || "";
@@ -127,8 +131,6 @@ export function QuizPlayPage() {
   const [acceptedQuestionId, setAcceptedQuestionId] = useState<string | null>(null);
   const [dismissedQuestionId, setDismissedQuestionId] = useState<string | null>(null);
   const [error, setError] = useState("");
-  const [metaBrandPlayerBackgroundImageUrl, setMetaBrandPlayerBackgroundImageUrl] = useState("");
-  const [metaBrandBodyBackgroundColor, setMetaBrandBodyBackgroundColor] = useState("#000000");
   const [connectionStatus, setConnectionStatus] = useState<"online" | "reconnecting" | "offline">(
     "reconnecting",
   );
@@ -337,42 +339,11 @@ export function QuizPlayPage() {
     };
   }, [joined, nickname, slug]);
 
-  useEffect(() => {
-    document.title = quiz?.title?.trim() || "Квиз";
-  }, [quiz?.title]);
-
-  useEffect(() => {
-    if (!slug) return;
-    const controller = new AbortController();
-    void (async () => {
-      try {
-        const response = await fetch(`${API_BASE}/api/quiz/by-slug/${slug}/meta`, {
-          signal: controller.signal,
-        });
-        if (!response.ok) return;
-        const payload = (await response.json()) as {
-          title?: string;
-          brandPlayerBackgroundImageUrl?: string;
-          brandBodyBackgroundColor?: string;
-        };
-        if (typeof payload.title === "string") {
-          setQuizTitle(payload.title);
-        }
-        if (typeof payload.brandPlayerBackgroundImageUrl === "string") {
-          setMetaBrandPlayerBackgroundImageUrl(payload.brandPlayerBackgroundImageUrl);
-        }
-        if (
-          typeof payload.brandBodyBackgroundColor === "string" &&
-          payload.brandBodyBackgroundColor.trim()
-        ) {
-          setMetaBrandBodyBackgroundColor(payload.brandBodyBackgroundColor);
-        }
-      } catch {
-        // ignore network errors, socket state can still provide title later
-      }
-    })();
-    return () => controller.abort();
-  }, [slug]);
+  const { titleText, brandPrimaryColor, brandPlayerBackgroundImageUrl, brandBodyBackgroundColor } =
+    useQuizPlayMetaBranding({
+      slug,
+      quiz,
+    });
 
   useEffect(() => {
     if (!slug || !nickname.trim()) return;
@@ -499,6 +470,31 @@ export function QuizPlayPage() {
     setNicknameDialogOpen(false);
   }
 
+  function logoutFromProfile() {
+    if (!slug) return;
+    const confirmed = window.confirm("Выйти из профиля на этом устройстве?");
+    if (!confirmed) return;
+    try {
+      localStorage.removeItem(getRoomJoinKey(slug));
+      localStorage.removeItem(getRoomNickKey(slug));
+    } catch {
+      // ignore storage errors in private mode
+    }
+    setNicknameDialogOpen(false);
+    setQuiz(null);
+    setJoined(false);
+    setRestoreJoinPending(false);
+    setSubmittedAnswers({});
+    setSubmittedQuestionIds([]);
+    setPlayerAnswersHydrated(false);
+    setAcceptedQuestionId(null);
+    setDismissedQuestionId(null);
+    setError("");
+    setSpeakerQuestions(null);
+    setSpeakerDialogOpen(false);
+    socket.disconnect();
+  }
+
   function toggleOption(id: string) {
     if (!nonQuizActiveQuestion) return;
     if (nonQuizActiveQuestion.type === "single") {
@@ -622,7 +618,6 @@ export function QuizPlayPage() {
     if (!resolved) return null;
     return resolved;
   }, [quiz?.quizProgress, quiz?.activeQuestion, quiz?.activeQuestions, nonQuizActiveQuestion?.id]);
-  const titleText = quiz?.title?.trim() || quizTitle.trim();
   const shouldShowEventTitle = quiz?.showEventTitleOnPlayer ?? true;
   const visiblePlayerBanners = useMemo(
     () => getVisiblePlayerBanners(quiz?.playerBanners),
@@ -671,16 +666,10 @@ export function QuizPlayPage() {
     quiz?.playerSubQuizzes,
     quiz?.mySubQuizScores,
   ]);
-  const brandPrimaryColor = quiz?.brandPrimaryColor?.trim() || "#7c5acb";
   const playerVoteOptionTextColor = quiz?.playerVoteOptionTextColor?.trim() || "#ffffff";
   const playerVoteProgressBarColor = quiz?.playerVoteProgressBarColor?.trim() || "#F3F722";
   const brandFontFamily = quiz?.brandFontFamily?.trim() || "Jost, Arial, sans-serif";
   const brandLogoUrl = resolveClientAssetUrl(quiz?.brandLogoUrl?.trim() ?? "");
-  const brandPlayerBackgroundImageUrl = resolveClientAssetUrl(
-    quiz?.brandPlayerBackgroundImageUrl?.trim() || metaBrandPlayerBackgroundImageUrl.trim(),
-  );
-  const brandBodyBackgroundColor =
-    quiz?.brandBodyBackgroundColor?.trim() || metaBrandBodyBackgroundColor;
   const brandBackground = buildBrandBackground({
     backgroundImageUrl: brandPlayerBackgroundImageUrl,
   });
@@ -827,6 +816,7 @@ export function QuizPlayPage() {
           {joined ? (
             <PlayerIdentityBar
               nickname={nickname}
+              brandPrimaryColor={brandPrimaryColor}
               connectionChip={connectionChip}
               onNicknameClick={editNickname}
             />
@@ -876,6 +866,7 @@ export function QuizPlayPage() {
           ) : null}
           {!joined && !restoreJoinPending && (
             <JoinCard
+              brandPrimaryColor={brandPrimaryColor}
               nickname={nickname}
               nicknameInputRef={nicknameInputRef}
               onNicknameChange={setNick}
@@ -968,9 +959,12 @@ export function QuizPlayPage() {
             onClose={() => setNicknameDialogOpen(false)}
             fullWidth
             maxWidth="xs"
+            PaperProps={{
+              sx: PLAYER_DIALOG_PAPER_SX,
+            }}
           >
-            <DialogTitle>Изменить имя</DialogTitle>
-            <DialogContent>
+            <DialogTitle sx={PLAYER_DIALOG_TITLE_SX}>Изменить имя</DialogTitle>
+            <DialogContent sx={PLAYER_DIALOG_CONTENT_SX}>
               <TextField
                 autoFocus
                 margin="dense"
@@ -978,13 +972,41 @@ export function QuizPlayPage() {
                 value={nicknameDraft}
                 onChange={(e) => setNicknameDraft(e.target.value)}
                 placeholder="Введите новое имя"
+                sx={{
+                  "& .MuiOutlinedInput-root": {
+                    color: "#fff",
+                    "& fieldset": { borderColor: "rgba(255,255,255,0.45)" },
+                    "&:hover fieldset": { borderColor: "rgba(255,255,255,0.72)" },
+                    "&.Mui-focused fieldset": { borderColor: brandPrimaryColor },
+                  },
+                }}
               />
             </DialogContent>
-            <DialogActions>
-              <Button onClick={() => setNicknameDialogOpen(false)}>Отмена</Button>
-              <Button variant="contained" onClick={submitNicknameUpdate}>
-                Сохранить
+            <DialogActions sx={{ px: 3, pb: 2, pt: 0.5, justifyContent: "space-between" }}>
+              <Button
+                color="error"
+                variant="outlined"
+                onClick={logoutFromProfile}
+                sx={{ borderColor: "rgba(255, 120, 120, 0.85)", color: "#ff9e9e" }}
+              >
+                Выйти
               </Button>
+              <Stack direction="row" spacing={1}>
+                <Button onClick={() => setNicknameDialogOpen(false)} sx={{ color: "#ffffff" }}>
+                  Отмена
+                </Button>
+                <Button
+                  variant="contained"
+                  onClick={submitNicknameUpdate}
+                  sx={{
+                    bgcolor: brandPrimaryColor,
+                    color: "#111",
+                    "&:hover": { bgcolor: brandPrimaryColor, filter: "brightness(0.94)" },
+                  }}
+                >
+                  Сохранить
+                </Button>
+              </Stack>
             </DialogActions>
           </Dialog>
         </>
