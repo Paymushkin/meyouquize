@@ -16,6 +16,7 @@ export type BrandThemeVisualState = {
   brandAccentColor: string;
   brandSurfaceColor: string;
   brandTextColor: string;
+  brandInputTextColor: string;
   brandFontFamily: string;
   brandFontUrl: string;
   brandLogoUrl: string;
@@ -41,6 +42,7 @@ const MEYOU_THEME_VISUAL: BrandThemeVisualState = {
   brandAccentColor: "#F3F722",
   brandSurfaceColor: "#000000",
   brandTextColor: "#FFFFFF",
+  brandInputTextColor: "#ffffff",
   brandFontFamily: "Roboto, Arial, sans-serif",
   brandFontUrl: "/fonts/roboto/Roboto-VariableFont_wdth,wght.ttf",
   brandLogoUrl: "/logo.svg",
@@ -72,6 +74,7 @@ export function getDefaultBrandThemeVisual(): BrandThemeVisualState {
     brandAccentColor: "#1976d2",
     brandSurfaceColor: "#ffffff",
     brandTextColor: "#1f1f1f",
+    brandInputTextColor: "#ffffff",
     brandFontFamily: "Jost, Arial, sans-serif",
     brandFontUrl: "",
     brandLogoUrl: "",

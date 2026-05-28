@@ -17,6 +17,7 @@ export type BrandThemeVisualSetters = {
   setBrandAccentColor: (value: string) => void;
   setBrandSurfaceColor: (value: string) => void;
   setBrandTextColor: (value: string) => void;
+  setBrandInputTextColor: (value: string) => void;
   setBrandFontFamily: (value: string) => void;
   setBrandFontUrl: (value: string) => void;
   setBrandLogoUrl: (value: string) => void;
@@ -49,6 +50,7 @@ export function applyBrandThemeVisualSetters(
   setters.setBrandAccentColor(visual.brandAccentColor);
   setters.setBrandSurfaceColor(visual.brandSurfaceColor);
   setters.setBrandTextColor(visual.brandTextColor);
+  setters.setBrandInputTextColor(visual.brandInputTextColor);
   setters.setBrandFontFamily(visual.brandFontFamily);
   setters.setBrandFontUrl(visual.brandFontUrl);
   setters.setBrandLogoUrl(visual.brandLogoUrl);
