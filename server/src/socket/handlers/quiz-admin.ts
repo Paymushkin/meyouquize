@@ -27,7 +27,7 @@ import { broadcastDashboardResultsNow } from "../dashboard-results.js";
 import { broadcastQuizPublicState } from "../quiz-rooms.js";
 import type { EnrichedSocket } from "../handler-common.js";
 import { assertAdmin, fail } from "../handler-common.js";
-import { trialLog } from "../trial-logs.js";
+import { trialLog, trialQuizStatePayload, trialSocketPayload } from "../trial-logs.js";
 
 const reactionStopTimers = new Map<string, NodeJS.Timeout>();
 const recentAdminCommands = new Map<string, number>();
@@ -94,10 +94,8 @@ export function registerQuizAdminHandlers(socket: EnrichedSocket, io: Server) {
         quizId: payload.quizId,
         questionId: payload.questionId,
         enabled: payload.enabled,
-        socketId: socket.id,
-        activeQuestions: state?.activeQuestions?.length ?? 0,
-        progressIndex: state?.quizProgress?.index ?? null,
-        progressTotal: state?.quizProgress?.total ?? null,
+        ...trialSocketPayload(socket.id),
+        ...trialQuizStatePayload(state),
       });
       await broadcastQuizPublicState(io, payload.quizId, state);
     } catch (error) {
@@ -194,10 +192,8 @@ export function registerQuizAdminHandlers(socket: EnrichedSocket, io: Server) {
       trialLog("admin_sub_quiz_start_auto", {
         quizId: payload.quizId,
         subQuizId: payload.subQuizId,
-        socketId: socket.id,
-        activeQuestions: state?.activeQuestions?.length ?? 0,
-        progressIndex: state?.quizProgress?.index ?? null,
-        progressTotal: state?.quizProgress?.total ?? null,
+        ...trialSocketPayload(socket.id),
+        ...trialQuizStatePayload(state),
       });
       await broadcastQuizPublicState(io, payload.quizId, state);
     } catch (error) {

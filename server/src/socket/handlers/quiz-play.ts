@@ -28,7 +28,12 @@ import type { EnrichedSocket } from "../handler-common.js";
 import { fail } from "../handler-common.js";
 import { addReaction } from "../../reactions-service.js";
 import { persistReactionWidgetCounts } from "../../reaction-widget-stats.js";
-import { trialLog } from "../trial-logs.js";
+import {
+  trialErrorMessage,
+  trialLog,
+  trialQuizStatePayload,
+  trialSocketPayload,
+} from "../trial-logs.js";
 
 const REACTION_WINDOW_MS = 1000;
 const REACTION_MAX_PER_WINDOW = 10;
@@ -68,16 +73,14 @@ export function registerQuizPlayHandlers(socket: EnrichedSocket, io: Server) {
       trialLog("quiz_join_ok", {
         quizId: joined.quizId,
         participantId: joined.participantId,
-        socketId: socket.id,
-        activeQuestions: state.activeQuestions?.length ?? 0,
-        progressIndex: state.quizProgress?.index ?? null,
-        progressTotal: state.quizProgress?.total ?? null,
+        ...trialSocketPayload(socket.id),
+        ...trialQuizStatePayload(state),
       });
       emitQuizOnlineCount(io, joined.quizId);
     } catch (error) {
       trialLog("quiz_join_error", {
-        socketId: socket.id,
-        error: error instanceof Error ? error.message : "Join failed",
+        ...trialSocketPayload(socket.id),
+        error: trialErrorMessage(error, "Join failed"),
       });
       fail(socket, error instanceof Error ? error.message : "Join failed");
     }
@@ -86,7 +89,7 @@ export function registerQuizPlayHandlers(socket: EnrichedSocket, io: Server) {
   socket.on("answer:submit", async (raw: unknown) => {
     try {
       if (!allowAnswerSubmit(socket.id)) {
-        trialLog("answer_submit_rate_limited", { socketId: socket.id });
+        trialLog("answer_submit_rate_limited", trialSocketPayload(socket.id));
         fail(socket, "Too many answers in a short time. Please wait.");
         return;
       }
@@ -103,6 +106,7 @@ export function registerQuizPlayHandlers(socket: EnrichedSocket, io: Server) {
         quizId: payload.quizId,
         questionId: payload.questionId,
         participantId: socket.data.participantId,
+        ...trialSocketPayload(socket.id),
       });
       scheduleDashboardResultsBroadcast(io, payload.quizId);
     } catch (error) {
@@ -114,7 +118,8 @@ export function registerQuizPlayHandlers(socket: EnrichedSocket, io: Server) {
         quizId: payload.quizId ?? null,
         questionId: payload.questionId ?? null,
         participantId: socket.data.participantId ?? null,
-        error: error instanceof Error ? error.message : "Submit failed",
+        ...trialSocketPayload(socket.id),
+        error: trialErrorMessage(error, "Submit failed"),
       });
       fail(socket, error instanceof Error ? error.message : "Submit failed");
     }
