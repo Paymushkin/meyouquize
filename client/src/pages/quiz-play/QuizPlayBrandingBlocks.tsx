@@ -567,6 +567,7 @@ const NICKNAME_CHIP_SX: SxProps<Theme> = {
 function buildConnectionChipSx(
   connectionChip: ConnectionChipState,
   brandPrimaryColor: string,
+  brandTextColor: string,
 ): SxProps<Theme> {
   const accentFill = "accentFill" in connectionChip;
   return {
@@ -576,7 +577,7 @@ function buildConnectionChipSx(
     ...(accentFill
       ? {
           backgroundColor: brandPrimaryColor,
-          color: "#111",
+          color: brandTextColor,
           border: "1px solid rgba(255,255,255,0.35)",
           boxShadow: `0 0 0 1px ${alpha(brandPrimaryColor, 0.45)} inset`,
         }
@@ -587,10 +588,10 @@ function buildConnectionChipSx(
       height: "100%",
       fontWeight: 700,
       letterSpacing: 0.2,
-      ...(accentFill ? { color: "#111" } : {}),
+      ...(accentFill ? { color: brandTextColor } : {}),
     },
     "& .MuiChip-icon": {
-      ...(accentFill ? { color: "rgba(0,0,0,0.72)" } : {}),
+      ...(accentFill ? { color: brandTextColor } : {}),
     },
   };
 }
@@ -661,12 +662,13 @@ function buildBrandPrimaryContainedButtonSx(brandPrimaryColor: string): SxProps<
 type PlayerIdentityBarProps = {
   nickname: string;
   brandPrimaryColor: string;
+  brandTextColor: string;
   connectionChip: ConnectionChipState;
   onNicknameClick: () => void;
 };
 
 export function PlayerIdentityBar(props: PlayerIdentityBarProps) {
-  const { nickname, brandPrimaryColor, connectionChip, onNicknameClick } = props;
+  const { nickname, brandPrimaryColor, brandTextColor, connectionChip, onNicknameClick } = props;
   return (
     <Box sx={PLAYER_BAR_ROOT_SX}>
       <Stack direction="row" alignItems="center" justifyContent="space-between" spacing={1}>
@@ -690,7 +692,7 @@ export function PlayerIdentityBar(props: PlayerIdentityBarProps) {
           label={connectionChip.label}
           {...("accentFill" in connectionChip ? {} : { color: connectionChip.color })}
           variant={connectionChip.variant}
-          sx={buildConnectionChipSx(connectionChip, brandPrimaryColor)}
+          sx={buildConnectionChipSx(connectionChip, brandPrimaryColor, brandTextColor)}
         />
       </Stack>
     </Box>

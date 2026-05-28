@@ -15,7 +15,7 @@ import {
   TextField,
   Typography,
 } from "@mui/material";
-import { expandTagCloudSubmitLines, ruBallLabel, SPEAKER_TILE_ID } from "@meyouquize/shared";
+import { ruBallLabel, SPEAKER_TILE_ID } from "@meyouquize/shared";
 import {
   buildPlayerQuizResultsTilesForPlayer,
   resolveEnabledQuizReportSubQuizIds,
@@ -35,6 +35,7 @@ import { useQuizPlayCompletion } from "../hooks/useQuizPlayCompletion";
 import { useQuizPlayScrollLock } from "../hooks/useQuizPlayScrollLock";
 import { useQuizPlaySocket } from "../hooks/useQuizPlaySocket";
 import { useQuizPlayMetaBranding } from "../hooks/useQuizPlayMetaBranding";
+import { useQuizPlayQuestionFlow } from "../hooks/useQuizPlayQuestionFlow";
 import { useBrandFont } from "../hooks/useBrandFont";
 import { useEventFavicon } from "../hooks/useEventFavicon";
 import { socket } from "../socket";
@@ -54,10 +55,6 @@ import {
   RestoreJoinPendingBlock,
 } from "./quiz-play/QuizPlayBrandingBlocks";
 import type { QuizState, ReactionType } from "./quiz-play/types";
-import {
-  isSubQuizAutoFlow,
-  resolveQuizProgressForQuestion,
-} from "./quiz-play/resolveQuizProgressDisplay";
 import type { SpeakerQuestionsPayload } from "../types/speakerQuestions";
 const REACTION_WINDOW_MS = 1000;
 const REACTION_MAX_PER_WINDOW = 10;
@@ -122,14 +119,9 @@ export function QuizPlayPage() {
     return wasJoined && persistedNick.trim().length > 0;
   });
   const [quiz, setQuiz] = useState<QuizState | null>(null);
-  const [selected, setSelected] = useState<string[]>([]);
-  const [rankOrder, setRankOrder] = useState<string[]>([]);
-  const [tagAnswers, setTagAnswers] = useState<string[]>([""]);
   const [submittedAnswers, setSubmittedAnswers] = useState<Record<string, string[]>>({});
   const [submittedQuestionIds, setSubmittedQuestionIds] = useState<string[]>([]);
   const [playerAnswersHydrated, setPlayerAnswersHydrated] = useState(false);
-  const [acceptedQuestionId, setAcceptedQuestionId] = useState<string | null>(null);
-  const [dismissedQuestionId, setDismissedQuestionId] = useState<string | null>(null);
   const [error, setError] = useState("");
   const [connectionStatus, setConnectionStatus] = useState<"online" | "reconnecting" | "offline">(
     "reconnecting",
@@ -145,21 +137,9 @@ export function QuizPlayPage() {
   const [quizReportSubQuizId, setQuizReportSubQuizId] = useState("");
   const [bootLoading, setBootLoading] = useState(true);
   const nicknameInputRef = useRef<HTMLInputElement | null>(null);
-  const activeQuestionIdRef = useRef<string | null>(null);
-  const activeQuestionTypeRef = useRef<"single" | "multi" | "tag_cloud" | "ranking" | null>(null);
-  const selectedRef = useRef<string[]>([]);
-  const rankOrderRef = useRef<string[]>([]);
-  const tagAnswersRef = useRef<string[]>([""]);
   const rankRowRefs = useRef<Map<string, HTMLDivElement>>(new Map());
   const prevRankRowTopsRef = useRef<Map<string, number>>(new Map());
   const reactionTimestampsRef = useRef<number[]>([]);
-  const pendingSubmitPayloadRef = useRef<{
-    quizId: string;
-    questionId: string;
-    optionIds?: string[];
-    rankedOptionIds?: string[];
-    tagAnswers?: string[];
-  } | null>(null);
   /** Последний известный активный вопрос сабквиза (чтобы при снятии вопроса с экрана понять, что это был последний). */
   const lastSubQuizProgressRef = useRef<{
     questionId: string;
@@ -182,86 +162,45 @@ export function QuizPlayPage() {
     submittedQuestionIds,
     lastSubQuizProgressRef,
   });
-  const handleQuestionSubmitted = useCallback((questionId: string) => {
-    setAcceptedQuestionId(questionId);
-    if (pendingSubmitPayloadRef.current?.questionId === questionId) {
-      pendingSubmitPayloadRef.current = null;
-    }
-  }, []);
+  const {
+    nonQuizActiveQuestion,
+    selected,
+    setSelected,
+    rankOrder,
+    setRankOrder,
+    tagAnswers,
+    setTagAnswers,
+    activeQuestionIdRef,
+    activeQuestionTypeRef,
+    selectedRef,
+    rankOrderRef,
+    tagAnswersRef,
+    canSubmit,
+    toggleOption,
+    moveRankOption,
+    submit,
+    onQuestionSubmitted: handleQuestionSubmitted,
+    onQuizJoined: handleQuizJoined,
+    closeQuestionPopup,
+    resetQuestionFlow,
+    answeredCurrentQuestion,
+    shouldHideAnsweredPopup,
+    shouldHideAnsweredUntilHydrated,
+    shouldHideDismissedPopup,
+    displayedSelected,
+    displayedQuizProgress,
+    acceptedQuestionId,
+  } = useQuizPlayQuestionFlow({
+    quiz,
+    submittedQuestionIds,
+    submittedAnswers,
+    playerAnswersHydrated,
+  });
   const handleParticipantMissing = useCallback(() => {
     if (!slug) return;
     const safeNick = (nickname || "").trim() || "Игрок";
     emitJoinWithLog(slug, "restore", safeNick);
   }, [nickname, slug]);
-  const handleQuizJoined = useCallback(() => {
-    const payload = pendingSubmitPayloadRef.current;
-    if (!payload) return;
-    socket.emit("answer:submit", payload);
-  }, []);
-
-  const nonQuizActiveQuestion = useMemo(() => {
-    if (!quiz) return null;
-    const activeList = Array.isArray(quiz.activeQuestions)
-      ? quiz.activeQuestions
-      : quiz.activeQuestion
-        ? [quiz.activeQuestion]
-        : [];
-    if (acceptedQuestionId) {
-      const accepted = activeList.find((q) => q.id === acceptedQuestionId);
-      if (accepted) return accepted;
-    }
-    // Авто-сабквиз: основной источник — questionFlowMode.
-    // На проде встречается ситуация, когда questionFlowMode может не быть "auto",
-    // но при этом активных вопросов > 1 (реально запущен авто-режим).
-    // Поэтому добавляем fallback по количеству active.
-    const autoFlow = isSubQuizAutoFlow(quiz.quizProgress) || activeList.length > 1;
-    if (!quiz.quizProgress || autoFlow) {
-      return activeList.find((q) => !submittedQuestionIds.includes(q.id)) ?? null;
-    }
-    return quiz.activeQuestion;
-  }, [quiz, submittedQuestionIds, acceptedQuestionId]);
-
-  useEffect(() => {
-    activeQuestionIdRef.current = nonQuizActiveQuestion?.id ?? null;
-    activeQuestionTypeRef.current = nonQuizActiveQuestion?.type ?? null;
-  }, [nonQuizActiveQuestion]);
-
-  useEffect(() => {
-    if (!nonQuizActiveQuestion) {
-      setSelected([]);
-      setRankOrder([]);
-      setTagAnswers([""]);
-      return;
-    }
-    setSelected([]);
-    setTagAnswers([""]);
-    if (nonQuizActiveQuestion.type === "ranking") {
-      setRankOrder(nonQuizActiveQuestion.options.map((o) => o.id));
-      return;
-    }
-    setRankOrder([]);
-  }, [nonQuizActiveQuestion?.id]);
-
-  useEffect(() => {
-    selectedRef.current = selected;
-  }, [selected]);
-
-  useEffect(() => {
-    rankOrderRef.current = rankOrder;
-  }, [rankOrder]);
-
-  useEffect(() => {
-    tagAnswersRef.current = tagAnswers;
-  }, [tagAnswers]);
-
-  useEffect(() => {
-    const q = nonQuizActiveQuestion;
-    if (!q || q.type !== "ranking") {
-      setRankOrder([]);
-      return;
-    }
-    setRankOrder(q.options.map((o) => o.id));
-  }, [nonQuizActiveQuestion]);
 
   useEffect(() => {
     if (!slug) return;
@@ -411,28 +350,6 @@ export function QuizPlayPage() {
     [slug],
   );
 
-  const canSubmit = useMemo(() => {
-    if (!quiz || !nonQuizActiveQuestion) return false;
-    const alreadySubmitted = submittedQuestionIds.includes(nonQuizActiveQuestion.id);
-    if (nonQuizActiveQuestion.type === "tag_cloud") {
-      const filled = tagAnswers.map((value) => value.trim()).filter(Boolean);
-      return filled.length > 0 && !nonQuizActiveQuestion.isClosed && !alreadySubmitted;
-    }
-    if (nonQuizActiveQuestion.type === "ranking") {
-      const n = nonQuizActiveQuestion.options.length;
-      const setOk = new Set(rankOrder);
-      return (
-        n > 0 &&
-        rankOrder.length === n &&
-        rankOrder.every((id) => setOk.has(id)) &&
-        setOk.size === n &&
-        !nonQuizActiveQuestion.isClosed &&
-        !alreadySubmitted
-      );
-    }
-    return selected.length > 0 && !nonQuizActiveQuestion.isClosed && !alreadySubmitted;
-  }, [quiz, nonQuizActiveQuestion, selected, rankOrder, submittedQuestionIds, tagAnswers]);
-
   function join() {
     const trimmed = nickname.trim();
     if (!trimmed) {
@@ -487,68 +404,11 @@ export function QuizPlayPage() {
     setSubmittedAnswers({});
     setSubmittedQuestionIds([]);
     setPlayerAnswersHydrated(false);
-    setAcceptedQuestionId(null);
-    setDismissedQuestionId(null);
+    resetQuestionFlow();
     setError("");
     setSpeakerQuestions(null);
     setSpeakerDialogOpen(false);
     socket.disconnect();
-  }
-
-  function toggleOption(id: string) {
-    if (!nonQuizActiveQuestion) return;
-    if (nonQuizActiveQuestion.type === "single") {
-      setSelected((prev) => (prev.includes(id) ? [] : [id]));
-      return;
-    }
-    setSelected((prev) => (prev.includes(id) ? prev.filter((v) => v !== id) : [...prev, id]));
-  }
-
-  function moveRankOption(id: string, direction: -1 | 1) {
-    setRankOrder((prev) => {
-      const i = prev.indexOf(id);
-      if (i < 0) return prev;
-      const j = i + direction;
-      if (j < 0 || j >= prev.length) return prev;
-      const next = [...prev];
-      const tmp = next[i];
-      next[i] = next[j]!;
-      next[j] = tmp!;
-      return next;
-    });
-  }
-
-  function submit() {
-    if (!quiz || !nonQuizActiveQuestion || !canSubmit) return;
-    if (nonQuizActiveQuestion.type === "tag_cloud") {
-      const payload = {
-        quizId: quiz.id,
-        questionId: nonQuizActiveQuestion.id,
-        tagAnswers: expandTagCloudSubmitLines(
-          tagAnswers.map((value) => value.trim()).filter(Boolean),
-        ),
-      };
-      pendingSubmitPayloadRef.current = payload;
-      socket.emit("answer:submit", payload);
-      return;
-    }
-    if (nonQuizActiveQuestion.type === "ranking") {
-      const payload = {
-        quizId: quiz.id,
-        questionId: nonQuizActiveQuestion.id,
-        rankedOptionIds: rankOrder,
-      };
-      pendingSubmitPayloadRef.current = payload;
-      socket.emit("answer:submit", payload);
-      return;
-    }
-    const payload = {
-      quizId: quiz.id,
-      questionId: nonQuizActiveQuestion.id,
-      optionIds: selected,
-    };
-    pendingSubmitPayloadRef.current = payload;
-    socket.emit("answer:submit", payload);
   }
 
   function submitSpeakerQuestion() {
@@ -594,30 +454,6 @@ export function QuizPlayPage() {
     };
   }, [persistNickname]);
 
-  const answeredCurrentQuestion =
-    !!nonQuizActiveQuestion?.id && submittedQuestionIds.includes(nonQuizActiveQuestion.id);
-  const isShowingAcceptedInPopup =
-    !!nonQuizActiveQuestion?.id && acceptedQuestionId === nonQuizActiveQuestion.id;
-  const shouldHideAnsweredPopup = answeredCurrentQuestion && !isShowingAcceptedInPopup;
-  const shouldHideAnsweredUntilHydrated = !playerAnswersHydrated;
-  const shouldHideDismissedPopup =
-    !!nonQuizActiveQuestion?.id && dismissedQuestionId === nonQuizActiveQuestion.id;
-  const displayedSelected =
-    nonQuizActiveQuestion?.id && submittedAnswers[nonQuizActiveQuestion.id]
-      ? submittedAnswers[nonQuizActiveQuestion.id]
-      : nonQuizActiveQuestion?.type === "ranking"
-        ? rankOrder
-        : selected;
-  const displayedQuizProgress = useMemo(() => {
-    if (!quiz?.quizProgress || !nonQuizActiveQuestion?.id) return quiz?.quizProgress ?? null;
-    const resolved = resolveQuizProgressForQuestion(
-      quiz.quizProgress,
-      nonQuizActiveQuestion.id,
-      quiz.activeQuestion,
-    );
-    if (!resolved) return null;
-    return resolved;
-  }, [quiz?.quizProgress, quiz?.activeQuestion, quiz?.activeQuestions, nonQuizActiveQuestion?.id]);
   const shouldShowEventTitle = quiz?.showEventTitleOnPlayer ?? true;
   const visiblePlayerBanners = useMemo(
     () => getVisiblePlayerBanners(quiz?.playerBanners),
@@ -668,6 +504,7 @@ export function QuizPlayPage() {
   ]);
   const playerVoteOptionTextColor = quiz?.playerVoteOptionTextColor?.trim() || "#ffffff";
   const playerVoteProgressBarColor = quiz?.playerVoteProgressBarColor?.trim() || "#F3F722";
+  const brandTextColor = quiz?.brandTextColor?.trim() || "#111";
   const brandFontFamily = quiz?.brandFontFamily?.trim() || "Jost, Arial, sans-serif";
   const brandLogoUrl = resolveClientAssetUrl(quiz?.brandLogoUrl?.trim() ?? "");
   const brandBackground = buildBrandBackground({
@@ -731,35 +568,6 @@ export function QuizPlayPage() {
     };
   }, [brandBodyBackgroundColor]);
 
-  useEffect(() => {
-    if (!acceptedQuestionId) return;
-    const timer = window.setTimeout(() => {
-      setDismissedQuestionId(acceptedQuestionId);
-      setAcceptedQuestionId(null);
-    }, 2200);
-    return () => window.clearTimeout(timer);
-  }, [acceptedQuestionId]);
-
-  useEffect(() => {
-    const activeQuestionId = nonQuizActiveQuestion?.id;
-    if (!activeQuestionId) {
-      setDismissedQuestionId(null);
-      return;
-    }
-    if (dismissedQuestionId && dismissedQuestionId !== activeQuestionId) {
-      setDismissedQuestionId(null);
-    }
-  }, [nonQuizActiveQuestion?.id, dismissedQuestionId]);
-
-  function closeQuestionPopup() {
-    const activeQuestionId = nonQuizActiveQuestion?.id;
-    if (!activeQuestionId) return;
-    setDismissedQuestionId(activeQuestionId);
-    if (acceptedQuestionId === activeQuestionId) {
-      setAcceptedQuestionId(null);
-    }
-  }
-
   useLayoutEffect(() => {
     if (
       !nonQuizActiveQuestion ||
@@ -817,6 +625,7 @@ export function QuizPlayPage() {
             <PlayerIdentityBar
               nickname={nickname}
               brandPrimaryColor={brandPrimaryColor}
+              brandTextColor={brandTextColor}
               connectionChip={connectionChip}
               onNicknameClick={editNickname}
             />
