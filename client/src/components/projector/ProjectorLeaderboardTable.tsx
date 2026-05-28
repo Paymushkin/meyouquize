@@ -12,6 +12,8 @@ export type ProjectorLeaderboardTableProps = {
   fadeKey: number;
   maxContentWidth?: number;
   brandPrimaryColor: string;
+  brandAccentColor?: string;
+  brandTextColor?: string;
   /**
    * Встраивание в ограниченный блок (превью на лендинге):
    * без minHeight: 100dvh; уменьшенные шрифты, отступы и толщина рамки строк.
@@ -27,8 +29,12 @@ export function ProjectorLeaderboardTable(props: ProjectorLeaderboardTableProps)
     fadeKey,
     maxContentWidth = 1920,
     brandPrimaryColor,
+    brandAccentColor,
+    brandTextColor,
     embedded = false,
   } = props;
+  const badgeBackgroundColor = brandAccentColor ?? brandPrimaryColor;
+  const badgeTextColor = brandTextColor ?? "#111";
   const [revealedFromBottom, setRevealedFromBottom] = useState(0);
 
   /** Превью на лендинге: меньше шрифты и отступы (без CSS scale). */
@@ -48,7 +54,7 @@ export function ProjectorLeaderboardTable(props: ProjectorLeaderboardTableProps)
         rowBorder: "1px solid",
         leftClusterGap: 0.6,
         rankWh: { xs: 22, sm: 26 } as const,
-        rankFont: { xs: "0.68rem", sm: "0.78rem" } as const,
+        rankFont: { xs: "0.78rem", sm: "0.92rem" } as const,
         trophy: { xs: 16, sm: 18 } as const,
         nickFont: { xs: "0.78rem", sm: "0.95rem" } as const,
         rightPl: { xs: 0.75, sm: 1 } as const,
@@ -75,7 +81,7 @@ export function ProjectorLeaderboardTable(props: ProjectorLeaderboardTableProps)
         rowBorder: "2px solid",
         leftClusterGap: 1.2,
         rankWh: { xs: 42, sm: 48 } as const,
-        rankFont: { xs: "1.15rem", sm: "1.35rem" } as const,
+        rankFont: { xs: "1.5rem", sm: "2rem" } as const,
         trophy: { xs: 34, sm: 38 } as const,
         nickFont: { xs: "1.5rem", sm: "2rem" } as const,
         rightPl: { xs: 2, sm: 2.5 } as const,
@@ -256,8 +262,8 @@ export function ProjectorLeaderboardTable(props: ProjectorLeaderboardTableProps)
                           display: "flex",
                           alignItems: "center",
                           justifyContent: "center",
-                          bgcolor: brandPrimaryColor,
-                          color: "#111",
+                          bgcolor: badgeBackgroundColor,
+                          color: badgeTextColor,
                           fontWeight: 800,
                           fontSize: c.rankFont,
                           fontVariantNumeric: "tabular-nums",
@@ -324,8 +330,8 @@ export function ProjectorLeaderboardTable(props: ProjectorLeaderboardTableProps)
                           px: c.scorePx,
                           py: c.scorePy,
                           borderRadius: 999,
-                          bgcolor: brandPrimaryColor,
-                          color: "#111",
+                          bgcolor: badgeBackgroundColor,
+                          color: badgeTextColor,
                           textAlign: "center",
                           fontWeight: 800,
                           fontVariantNumeric: "tabular-nums",

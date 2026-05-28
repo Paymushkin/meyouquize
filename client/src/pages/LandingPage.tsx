@@ -55,7 +55,7 @@ import type {
   ProjectorQuestionResult,
   ProjectorTagCloudWord,
 } from "../types/projectorDashboard";
-import { BRAND_ACCENT, BRAND_BORDER, BRAND_SURFACE } from "../theme/brandTheme";
+import { BRAND_ACCENT, BRAND_BORDER, BRAND_SURFACE, BRAND_TEXT } from "../theme/brandTheme";
 
 /** Три вопроса демо-квиза по 3 сцены: голосование → выбор + результаты → принято + обновление на проекторе */
 const DEMO_QUIZ_POLLS = [
@@ -1583,6 +1583,8 @@ function DemoQuizScenarioTab({ sectionRef, demoTabRef }: DemoQuizScenarioTabProp
                     winnersRowsCount={3}
                     fadeKey={sceneIndex}
                     brandPrimaryColor={BRAND_ACCENT}
+                    brandAccentColor={BRAND_ACCENT}
+                    brandTextColor={BRAND_TEXT}
                     embedded
                   />
                 </Box>

@@ -264,6 +264,8 @@ export function ResultsPage() {
           fadeKey={resultsAnimationTick}
           maxContentWidth={containerContentMaxPx}
           brandPrimaryColor={view.brandPrimaryColor}
+          brandAccentColor={view.brandAccentColor}
+          brandTextColor={view.brandTextColor}
         />
       )}
       {showEventTitleScreen && (
