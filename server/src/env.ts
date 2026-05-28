@@ -200,4 +200,13 @@ export const env = {
   socketIoRequiresRedis,
   socketIoPingTimeoutMs,
   socketIoPingIntervalMs,
+  /** Локальная разработка: не требовать пароль админки (HTTP + socket). */
+  localAdminNoAuth:
+    process.env.LOCAL_ADMIN_NO_AUTH === "1" ||
+    process.env.LOCAL_ADMIN_NO_AUTH?.trim().toLowerCase() === "true" ||
+    (process.env.NODE_ENV !== "production" && parseNetworkMode() === "lan"),
+  /** Временные диагностические логи для пилота с живой аудиторией. */
+  trialLogsEnabled:
+    process.env.DEBUG_TRIAL_LOGS === "1" ||
+    process.env.DEBUG_TRIAL_LOGS?.trim().toLowerCase() === "true",
 };

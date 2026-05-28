@@ -5,6 +5,7 @@ import {
   getParticipantScoresBySubQuizForQuiz,
   type getQuizPublicState,
 } from "../quiz-service.js";
+import { trialLog } from "./trial-logs.js";
 
 type QuizPublicPayload = NonNullable<Awaited<ReturnType<typeof getQuizPublicState>>>;
 
@@ -48,6 +49,14 @@ export async function broadcastQuizPublicState(
   state: QuizPublicPayload | null,
 ): Promise<void> {
   if (!state) return;
+  trialLog("broadcast_state_quiz", {
+    quizId,
+    activeQuestions: state.activeQuestions?.length ?? 0,
+    activeQuestionId: state.activeQuestion?.id ?? null,
+    progressIndex: state.quizProgress?.index ?? null,
+    progressTotal: state.quizProgress?.total ?? null,
+    progressFlowMode: state.quizProgress?.questionFlowMode ?? null,
+  });
   emitToQuizDashboard(io, quizId, "state:quiz", state);
   const [totals, subQuizTotals] = await Promise.all([
     getParticipantScoreTotalsByQuiz(quizId),

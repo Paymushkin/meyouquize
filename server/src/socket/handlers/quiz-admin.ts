@@ -27,6 +27,7 @@ import { broadcastDashboardResultsNow } from "../dashboard-results.js";
 import { broadcastQuizPublicState } from "../quiz-rooms.js";
 import type { EnrichedSocket } from "../handler-common.js";
 import { assertAdmin, fail } from "../handler-common.js";
+import { trialLog } from "../trial-logs.js";
 
 const reactionStopTimers = new Map<string, NodeJS.Timeout>();
 const recentAdminCommands = new Map<string, number>();
@@ -89,6 +90,15 @@ export function registerQuizAdminHandlers(socket: EnrichedSocket, io: Server) {
       await assertAdmin(socket);
       const payload = toggleQuestionSchema.parse(raw);
       const state = await setQuestionEnabled(payload.quizId, payload.questionId, payload.enabled);
+      trialLog("admin_question_toggle", {
+        quizId: payload.quizId,
+        questionId: payload.questionId,
+        enabled: payload.enabled,
+        socketId: socket.id,
+        activeQuestions: state?.activeQuestions?.length ?? 0,
+        progressIndex: state?.quizProgress?.index ?? null,
+        progressTotal: state?.quizProgress?.total ?? null,
+      });
       await broadcastQuizPublicState(io, payload.quizId, state);
     } catch (error) {
       fail(socket, error instanceof Error ? error.message : "Toggle failed");
@@ -181,6 +191,14 @@ export function registerQuizAdminHandlers(socket: EnrichedSocket, io: Server) {
       if (shouldSkipDuplicateCommand(socket.id, "sub-quiz:start-auto", raw)) return;
       const payload = startSubQuizAutoSchema.parse(raw);
       const state = await startSubQuizAuto(payload.quizId, payload.subQuizId);
+      trialLog("admin_sub_quiz_start_auto", {
+        quizId: payload.quizId,
+        subQuizId: payload.subQuizId,
+        socketId: socket.id,
+        activeQuestions: state?.activeQuestions?.length ?? 0,
+        progressIndex: state?.quizProgress?.index ?? null,
+        progressTotal: state?.quizProgress?.total ?? null,
+      });
       await broadcastQuizPublicState(io, payload.quizId, state);
     } catch (error) {
       fail(socket, error instanceof Error ? error.message : "Start auto sub-quiz failed");

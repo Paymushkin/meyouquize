@@ -78,6 +78,7 @@ async function adminAuthMiddleware(
   res: express.Response,
   next: express.NextFunction,
 ) {
+  if (env.localAdminNoAuth) return next();
   const token = req.cookies[ADMIN_COOKIE];
   if (!token) return res.status(401).json(apiError("UNAUTHORIZED", "Unauthorized"));
   const session = await prisma.adminSession.findUnique({ where: { token } });
@@ -201,6 +202,9 @@ export function buildApp() {
   });
 
   app.post("/api/admin/auth", authLimiter, async (req, res) => {
+    if (env.localAdminNoAuth) {
+      return res.json({ ok: true, bypass: true });
+    }
     const parsed = adminAuthSchema.safeParse(req.body);
     if (!parsed.success)
       return res.status(400).json(apiError("INVALID_PAYLOAD", "Invalid payload"));
@@ -593,6 +597,11 @@ export async function buildServer() {
     },
   });
   io.use(async (socket, next) => {
+    if (env.localAdminNoAuth) {
+      socket.data.isAdmin = true;
+      next();
+      return;
+    }
     const cookie = socket.handshake.headers.cookie ?? "";
     const token = cookie
       .split(";")

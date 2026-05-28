@@ -1,4 +1,5 @@
 import type { Socket } from "socket.io";
+import { env } from "../env.js";
 import { isAdminTokenValid } from "../admin-session-cache.js";
 
 export type SocketData = {
@@ -61,6 +62,10 @@ function readCookieValue(cookieHeader: string, key: string): string | null {
 }
 
 export async function assertAdmin(socket: EnrichedSocket): Promise<void> {
+  if (env.localAdminNoAuth) {
+    socket.data.isAdmin = true;
+    return;
+  }
   const token = readCookieValue(socket.handshake?.headers?.cookie ?? "", "mq_admin");
   if (!token) throw new Error("Forbidden");
   const valid = await isAdminTokenValid(token);

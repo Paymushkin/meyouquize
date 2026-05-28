@@ -2058,7 +2058,7 @@ export async function startSubQuizAuto(quizId: string, subQuizId: string) {
     }),
     prisma.subQuiz.update({
       where: { id: subQuizId },
-      data: { currentQuestionIndex: 0 },
+      data: { currentQuestionIndex: 0, questionFlowMode: QuestionFlowMode.AUTO },
     }),
     prisma.quiz.update({
       where: { id: quizId },
