@@ -29,6 +29,12 @@ export function useQuizPlayMetaBranding({ slug, quiz }: Params) {
   }, [quiz?.title]);
 
   useEffect(() => {
+    if (typeof quiz?.title === "string") {
+      setQuizTitle(quiz.title);
+    }
+  }, [quiz?.title]);
+
+  useEffect(() => {
     if (!slug) return;
     const controller = new AbortController();
     void (async () => {

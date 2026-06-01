@@ -142,6 +142,10 @@ export const updateRoomSchema = z.object({
   title: z.string().max(120),
 });
 
+export const patchSubQuizTitleSchema = z.object({
+  title: z.string().max(120),
+});
+
 export const replaceRoomContentSchema = z.object({
   subQuizzes: z.array(subQuizBlockSchema),
   standaloneQuestions: z.array(questionSchema),

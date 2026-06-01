@@ -15,6 +15,7 @@ import {
   adminAuthSchema,
   createRoomSchema,
   patchQuestionProjectorSchema,
+  patchSubQuizTitleSchema,
   replaceRoomContentSchema,
   updateRoomSchema,
 } from "./schemas.js";
@@ -42,6 +43,7 @@ import {
   patchQuestionProjectorSettings,
   replaceRoomContent,
   updateRoomTitle,
+  updateSubQuizTitle,
 } from "./quiz-service.js";
 import { renderPublicReportPdf } from "./report-pdf.js";
 import { resetDemoQuizToDefault } from "./demo-seed.js";
@@ -406,6 +408,28 @@ export function buildApp() {
         .json({ error: message });
     }
   });
+
+  app.patch(
+    "/api/admin/rooms/:eventName/sub-quizzes/:subQuizId",
+    adminAuthMiddleware,
+    async (req, res) => {
+      const eventName = Array.isArray(req.params.eventName)
+        ? req.params.eventName[0]
+        : req.params.eventName;
+      const subQuizId = Array.isArray(req.params.subQuizId)
+        ? req.params.subQuizId[0]
+        : req.params.subQuizId;
+      const parsed = patchSubQuizTitleSchema.safeParse(req.body);
+      if (!parsed.success) return res.status(400).json({ error: "Invalid payload" });
+      try {
+        const quizId = await updateSubQuizTitle(eventName, subQuizId, parsed.data.title);
+        return res.json({ ok: true, quizId });
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "Not found";
+        return res.status(message === "SubQuiz not found" ? 404 : 404).json({ error: message });
+      }
+    },
+  );
 
   app.post("/api/admin/rooms/:eventName/reset-test-data", adminAuthMiddleware, async (req, res) => {
     const eventName = Array.isArray(req.params.eventName)

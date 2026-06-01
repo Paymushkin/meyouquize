@@ -53,6 +53,18 @@ export function useAdminEventApi(params: Params) {
 
   const lastPersistQuestionsErrorRef = useRef<string | null>(null);
 
+  const readSubQuizTitleFromSnapshot = useCallback((snapshot: string, subQuizId: string) => {
+    try {
+      const parsed = JSON.parse(snapshot) as {
+        subQuizzes?: Array<{ id?: string; title?: string }>;
+      };
+      const hit = parsed.subQuizzes?.find((s) => s.id === subQuizId);
+      return (hit?.title ?? "").trim();
+    } catch {
+      return "";
+    }
+  }, []);
+
   const checkSession = useCallback(async () => {
     const response = await fetch(`${API_BASE}/api/admin/me`, { credentials: "include" });
     setIsAuth(response.ok);
@@ -202,8 +214,48 @@ export function useAdminEventApi(params: Params) {
     [eventName, lastSavedSnapshotRef, setMessage],
   );
 
+  const saveSubQuizTitle = useCallback(
+    async (
+      subQuizId: string,
+      title: string,
+      sheets: SubQuizSheet[],
+      questions: QuestionForm[],
+      quizIdForRefresh?: string | null,
+    ) => {
+      const trimmed = title.trim();
+      const savedTitle = readSubQuizTitleFromSnapshot(lastSavedSnapshotRef.current, subQuizId);
+      if (trimmed === savedTitle) return;
+      const response = await fetch(
+        `${API_BASE}/api/admin/rooms/${encodeURIComponent(eventName)}/sub-quizzes/${encodeURIComponent(subQuizId)}`,
+        {
+          method: "PATCH",
+          credentials: "include",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ title: trimmed }),
+        },
+      );
+      if (!response.ok) {
+        setMessage("Не удалось сохранить название квиза");
+        return;
+      }
+      const payload = (await response.json()) as { quizId?: string };
+      const nextSheets = sheets.map((s) => (s.id === subQuizId ? { ...s, title: trimmed } : s));
+      setSubQuizSheets(nextSheets);
+      lastSavedSnapshotRef.current = serializeRoomContent(nextSheets, questions);
+      const refreshId = payload.quizId ?? quizIdForRefresh;
+      if (refreshId) {
+        socket.emit("quiz:state:refresh", { quizId: refreshId });
+      }
+    },
+    [eventName, lastSavedSnapshotRef, readSubQuizTitleFromSnapshot, setMessage, setSubQuizSheets],
+  );
+
   const saveQuizTitle = useCallback(
-    async (title: string, currentRoomTitle: string | undefined) => {
+    async (
+      title: string,
+      currentRoomTitle: string | undefined,
+      quizIdForRefresh?: string | null,
+    ) => {
       const trimmed = title.trim();
       const currentTrimmed = (currentRoomTitle ?? "").trim();
       if (trimmed === currentTrimmed) return;
@@ -217,7 +269,12 @@ export function useAdminEventApi(params: Params) {
         setMessage("Не удалось сохранить название квиза");
         return;
       }
+      const updatedRoom = (await response.json()) as AdminEventRoom;
       setRoom((prev) => (prev ? { ...prev, title: trimmed } : prev));
+      const refreshId = updatedRoom.id ?? quizIdForRefresh;
+      if (refreshId) {
+        socket.emit("quiz:state:refresh", { quizId: refreshId });
+      }
       setMessage("Название квиза сохранено");
     },
     [eventName, setMessage, setRoom],
@@ -229,6 +286,7 @@ export function useAdminEventApi(params: Params) {
     persistQuestions,
     lastPersistQuestionsErrorRef,
     patchQuestionProjectorSettings,
+    saveSubQuizTitle,
     saveQuizTitle,
   };
 }

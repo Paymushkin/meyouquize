@@ -761,6 +761,7 @@ export function AdminEventPage() {
     lastPersistQuestionsErrorRef,
     patchQuestionProjectorSettings,
     saveQuizTitle: saveQuizTitleApi,
+    saveSubQuizTitle: saveSubQuizTitleApi,
   } = useAdminEventApi({
     eventName,
     cloudManualStorageKey,
@@ -795,7 +796,7 @@ export function AdminEventPage() {
   );
 
   function saveQuizTitle() {
-    void saveQuizTitleApi(editableTitle, room?.title);
+    void saveQuizTitleApi(editableTitle, room?.title, quizId);
   }
 
   const joinUrl = useMemo(() => {
@@ -3753,6 +3754,15 @@ export function AdminEventPage() {
                                               prev.map((s) =>
                                                 s.id === sq.id ? { ...s, title } : s,
                                               ),
+                                            );
+                                          }}
+                                          onBlur={() => {
+                                            void saveSubQuizTitleApi(
+                                              sq.id,
+                                              sq.title,
+                                              subQuizSheets,
+                                              questionForms,
+                                              quizId,
                                             );
                                           }}
                                           onClick={(e) => e.stopPropagation()}

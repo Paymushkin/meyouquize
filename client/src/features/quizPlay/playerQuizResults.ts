@@ -23,7 +23,8 @@ export function resolveQuizResultsTileTitle(
 ): string {
   if (!effectiveSubQuizId) return caption;
   const hit = subQuizzes?.find((s) => s.id === effectiveSubQuizId);
-  return hit?.title?.trim() || caption;
+  if (!hit) return caption;
+  return hit.title.trim();
 }
 
 export function resolveQuizResultsTileScore(

@@ -435,6 +435,21 @@ export async function listParticipantNicknamesByEventName(eventName: string): Pr
   return deduped;
 }
 
+export async function updateSubQuizTitle(eventName: string, subQuizId: string, title: string) {
+  const room = await prisma.quiz.findUnique({ where: { slug: eventName }, select: { id: true } });
+  if (!room) throw new Error("Room not found");
+  const subQuiz = await prisma.subQuiz.findFirst({
+    where: { id: subQuizId, quizId: room.id },
+    select: { id: true },
+  });
+  if (!subQuiz) throw new Error("SubQuiz not found");
+  await prisma.subQuiz.update({
+    where: { id: subQuizId },
+    data: { title: title.trim() },
+  });
+  return room.id;
+}
+
 export async function updateRoomTitle(eventName: string, title: string) {
   const room = await prisma.quiz.findUnique({ where: { slug: eventName } });
   if (!room) throw new Error("Room not found");
@@ -784,7 +799,7 @@ export async function getQuizPublicState(quizId: string) {
     playerQuizResultsSubQuizIds: view.playerQuizResultsSubQuizIds,
     playerSubQuizzes: subQuizzesForPlayer.map((sq) => ({
       id: sq.id,
-      title: sq.title?.trim() ? sq.title.trim() : "Квиз",
+      title: sq.title?.trim() ?? "",
     })),
     playerVoteOptionTextColor: view.playerVoteOptionTextColor,
     playerVoteProgressTrackColor: view.playerVoteProgressTrackColor,

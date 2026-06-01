@@ -23,6 +23,7 @@ export function PlayerQuizResultsTile({
   preview = false,
   previewWidth = 128,
 }: PlayerQuizResultsTileProps) {
+  const displayTitle = title.trim();
   const scoreLine = typeof score === "number" ? ruBallLabel(score).toUpperCase() : null;
   const isInteractive = !preview && onClick != null;
 
@@ -35,8 +36,12 @@ export function PlayerQuizResultsTile({
         preview
           ? undefined
           : scoreLine
-            ? `${title}, ${scoreLine}, подробнее`
-            : `${title}, подробнее`
+            ? displayTitle
+              ? `${displayTitle}, ${scoreLine}, подробнее`
+              : `${scoreLine}, подробнее`
+            : displayTitle
+              ? `${displayTitle}, подробнее`
+              : "Подробнее"
       }
       sx={{
         ...(preview
@@ -98,24 +103,26 @@ export function PlayerQuizResultsTile({
           alignSelf: "flex-start",
         }}
       >
-        <Typography
-          component="span"
-          sx={{
-            display: "-webkit-box",
-            WebkitLineClamp: 2,
-            WebkitBoxOrient: "vertical",
-            overflow: "hidden",
-            fontWeight: 700,
-            fontSize: "clamp(0.5rem, 2.35vw, 0.8rem)",
-            lineHeight: 1.2,
-            letterSpacing: "0.02em",
-            textTransform: "uppercase",
-            wordBreak: "break-word",
-          }}
-          title={title}
-        >
-          {title}
-        </Typography>
+        {displayTitle ? (
+          <Typography
+            component="span"
+            sx={{
+              display: "-webkit-box",
+              WebkitLineClamp: 2,
+              WebkitBoxOrient: "vertical",
+              overflow: "hidden",
+              fontWeight: 700,
+              fontSize: "clamp(0.5rem, 2.35vw, 0.8rem)",
+              lineHeight: 1.2,
+              letterSpacing: "0.02em",
+              textTransform: "uppercase",
+              wordBreak: "break-word",
+            }}
+            title={displayTitle}
+          >
+            {displayTitle}
+          </Typography>
+        ) : null}
         {scoreLine ? (
           <Typography
             component="span"
