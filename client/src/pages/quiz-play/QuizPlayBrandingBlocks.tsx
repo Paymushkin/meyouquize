@@ -1055,21 +1055,40 @@ export function QuestionPopupCard(props: QuestionPopupCardProps) {
     "& .MuiChip-label": { px: 1, fontSize: "0.72rem", fontWeight: 600, color: "inherit" },
     "& .MuiChip-icon": { color: "inherit" },
   } as const;
+  const questionTypeBubbleSx = {
+    alignSelf: "flex-start",
+    height: "auto",
+    borderRadius: 999,
+    bgcolor: brandPrimaryColor,
+    color: playerVoteOptionTextColor,
+    border: "none",
+    "& .MuiChip-label": {
+      px: 1.5,
+      py: 0.6,
+      fontSize: "0.75rem",
+      fontWeight: 600,
+      lineHeight: 1.25,
+      whiteSpace: "normal",
+      color: playerVoteOptionTextColor,
+    },
+  } as const;
   const optionButtonSx = (isSelected: boolean) => ({
-    ...(isSelected
-      ? {
-          bgcolor: brandPrimaryColor,
-          color: playerVoteOptionTextColor,
-          "&:hover": { bgcolor: alpha(brandPrimaryColor, 0.88) },
-        }
-      : {}),
-    transition: "transform 180ms ease, box-shadow 220ms ease, background-color 180ms ease",
-    transform: isSelected ? "scale(1.03)" : "scale(1)",
+    boxSizing: "border-box",
+    border: "2px solid",
+    borderColor: isSelected ? brandPrimaryColor : "rgba(255,255,255,0.45)",
+    bgcolor: isSelected ? brandPrimaryColor : "transparent",
+    color: isSelected ? playerVoteOptionTextColor : "inherit",
+    "&:hover": {
+      bgcolor: isSelected ? alpha(brandPrimaryColor, 0.88) : "rgba(255,255,255,0.06)",
+    },
+    transition: "background-color 180ms ease, border-color 180ms ease, color 180ms ease",
     boxShadow: "none",
     position: "relative",
-    justifyContent: "center",
+    justifyContent: "flex-start",
+    textAlign: "left",
+    whiteSpace: "normal",
     pl: 4.5,
-    pr: 4.5,
+    pr: 2,
     "& .MuiButton-startIcon": {
       position: "absolute",
       top: 8,
@@ -1116,16 +1135,15 @@ export function QuestionPopupCard(props: QuestionPopupCardProps) {
           <Stack spacing={2}>
             {showAcceptedHint ? <Alert severity="success">Ответ принят</Alert> : null}
             <Stack direction="row" alignItems="center" justifyContent="space-between">
-              <Stack direction="row" spacing={1} alignItems="center">
-                {question.scoringMode !== "poll" && quizProgress && quizProgress.total > 0 ? (
-                  <Chip
-                    label={`Вопрос ${quizProgress.index} / ${quizProgress.total}`}
-                    size="small"
-                    sx={metaChipSx}
-                  />
-                ) : null}
-                <Chip label={getQuestionTypeLabel(question)} size="small" sx={metaChipSx} />
-              </Stack>
+              {question.scoringMode !== "poll" && quizProgress && quizProgress.total > 0 ? (
+                <Chip
+                  label={`Вопрос ${quizProgress.index} / ${quizProgress.total}`}
+                  size="small"
+                  sx={metaChipSx}
+                />
+              ) : (
+                <Box />
+              )}
               <IconButton
                 aria-label="Закрыть"
                 size="small"
@@ -1135,57 +1153,68 @@ export function QuestionPopupCard(props: QuestionPopupCardProps) {
                 <CloseIcon fontSize="small" />
               </IconButton>
             </Stack>
-            <Typography
-              variant="h4"
-              sx={{
-                fontWeight: 700,
-                lineHeight: 1.2,
-                fontSize: {
-                  xs: `${mobileQuestionFontRem}rem`,
-                  sm: `${desktopQuestionFontRem}rem`,
-                },
-                py: 1,
-              }}
-            >
-              {question.text}
-            </Typography>
-            {question.type !== "tag_cloud" && question.type !== "ranking" && (
-              <Stack direction="row" spacing={1.25} flexWrap="wrap" useFlexGap sx={{ pb: 2 }}>
-                {question.options.map((option) => {
-                  const isSelected = displayedSelected.includes(option.id);
-                  return (
-                    <Button
-                      key={option.id}
-                      variant={isSelected ? "contained" : "outlined"}
-                      color={isSelected ? "primary" : "inherit"}
-                      sx={optionButtonSx(isSelected)}
-                      disabled={answeredCurrentQuestion}
-                      onClick={() => toggleOption(option.id)}
-                      startIcon={
-                        <CheckCircleIcon
-                          sx={{
-                            opacity: isSelected ? 1 : 0,
-                            transition: "opacity 140ms ease",
-                          }}
-                        />
-                      }
-                    >
-                      {option.text}
-                    </Button>
-                  );
-                })}
-              </Stack>
-            )}
-            {question.type === "ranking" && (
-              <Stack spacing={1.25} sx={{ pb: 2 }}>
-                <Typography variant="body2" color="text.secondary">
-                  {rankingHint ||
-                    (question.rankingKind === "jury"
-                      ? "Расставьте варианты от лучшего к худшему."
-                      : "Расставьте варианты от лучшего к худшему (первый в списке — лучший).")}
+            <Stack spacing={3.5} sx={{ width: "100%" }}>
+              <Stack spacing={1}>
+                <Typography
+                  variant="h4"
+                  sx={{
+                    fontWeight: 700,
+                    lineHeight: 1.2,
+                    fontSize: {
+                      xs: `${mobileQuestionFontRem}rem`,
+                      sm: `${desktopQuestionFontRem}rem`,
+                    },
+                    py: 0.5,
+                  }}
+                >
+                  {question.text}
                 </Typography>
-                {(answeredCurrentQuestion ? (submittedAnswers[question.id] ?? []) : rankOrder).map(
-                  (id, idx) => {
+                <Chip
+                  label={getQuestionTypeLabel(question)}
+                  size="small"
+                  sx={questionTypeBubbleSx}
+                />
+              </Stack>
+              {question.type !== "tag_cloud" && question.type !== "ranking" && (
+                <Stack spacing={1.25} sx={{ width: "100%", alignItems: "stretch" }}>
+                  {question.options.map((option) => {
+                    const isSelected = displayedSelected.includes(option.id);
+                    return (
+                      <Button
+                        key={option.id}
+                        fullWidth
+                        variant="outlined"
+                        color="inherit"
+                        sx={optionButtonSx(isSelected)}
+                        disabled={answeredCurrentQuestion}
+                        onClick={() => toggleOption(option.id)}
+                        startIcon={
+                          <CheckCircleIcon
+                            sx={{
+                              opacity: isSelected ? 1 : 0,
+                              transition: "opacity 140ms ease",
+                            }}
+                          />
+                        }
+                      >
+                        {option.text}
+                      </Button>
+                    );
+                  })}
+                </Stack>
+              )}
+              {question.type === "ranking" && (
+                <Stack spacing={1.25}>
+                  <Typography variant="body2" color="text.secondary">
+                    {rankingHint ||
+                      (question.rankingKind === "jury"
+                        ? "Расставьте варианты от лучшего к худшему."
+                        : "Расставьте варианты от лучшего к худшему (первый в списке — лучший).")}
+                  </Typography>
+                  {(answeredCurrentQuestion
+                    ? (submittedAnswers[question.id] ?? [])
+                    : rankOrder
+                  ).map((id, idx) => {
                     const option = question.options.find((o) => o.id === id);
                     if (!option) return null;
                     const tierPts =
@@ -1277,14 +1306,15 @@ export function QuestionPopupCard(props: QuestionPopupCardProps) {
                         )}
                       </Stack>
                     );
-                  },
-                )}
-              </Stack>
-            )}
-            {question.type === "tag_cloud" && (
-              <Stack spacing={1.5} sx={{ pb: 2 }}>
-                {(answeredCurrentQuestion ? (submittedAnswers[question.id] ?? []) : tagAnswers).map(
-                  (value, index) => (
+                  })}
+                </Stack>
+              )}
+              {question.type === "tag_cloud" && (
+                <Stack spacing={1.5}>
+                  {(answeredCurrentQuestion
+                    ? (submittedAnswers[question.id] ?? [])
+                    : tagAnswers
+                  ).map((value, index) => (
                     <Stack
                       key={`tag-answer-${index}`}
                       direction="row"
@@ -1342,12 +1372,12 @@ export function QuestionPopupCard(props: QuestionPopupCardProps) {
                         </IconButton>
                       )}
                     </Stack>
-                  ),
-                )}
-              </Stack>
-            )}
+                  ))}
+                </Stack>
+              )}
+            </Stack>
           </Stack>
-          <Box sx={{ pt: 1 }}>
+          <Box sx={{ pt: 3.5 }}>
             {!answeredCurrentQuestion ? (
               <Button
                 disabled={!canSubmit}

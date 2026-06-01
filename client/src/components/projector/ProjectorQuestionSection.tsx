@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 import { Fade, Stack, Typography } from "@mui/material";
-import type { PublicViewState } from "@meyouquize/shared";
+import { voteQuestionTextTypographyStyle, type PublicViewState } from "@meyouquize/shared";
 import type { ProjectorQuestionResult } from "../../types/projectorDashboard";
 import { ProjectorFirstCorrectHero } from "./ProjectorFirstCorrectHero";
 import { QuestionChart } from "./QuestionChart";
@@ -29,8 +29,13 @@ export function ProjectorQuestionSection(props: ProjectorQuestionSectionProps) {
     selectedQuestion.optionStats.length > 6
       ? Math.min(0.45, (selectedQuestion.optionStats.length - 6) * 0.08)
       : 0;
-  const desktopQuestionFontRem = Math.max(1.85, 3.05 - longTextPenalty - optionsCountPenalty);
-  const mobileQuestionFontRem = Math.max(1.6, desktopQuestionFontRem - 0.35);
+  const questionTitleFontScale = 1.5;
+  const desktopQuestionFontRem =
+    Math.max(1.85, 3.05 - longTextPenalty - optionsCountPenalty) * questionTitleFontScale;
+  const mobileQuestionFontRem = Math.max(
+    1.6 * questionTitleFontScale,
+    desktopQuestionFontRem - 0.35 * questionTitleFontScale,
+  );
   const waitingForFirstWinner =
     view.showFirstCorrectAnswerer &&
     !showProjectorWinnersHero &&
@@ -39,29 +44,32 @@ export function ProjectorQuestionSection(props: ProjectorQuestionSectionProps) {
     selectedQuestion.rankingKind !== "jury" &&
     firstCorrectWinnersShown.length === 0;
 
+  const questionTextSx = useMemo(
+    () => voteQuestionTextTypographyStyle(view.voteQuestionTextColor),
+    [view.voteQuestionTextColor],
+  );
+
   const tagCloudHeader = useMemo(() => {
     if (!isTagCloudQuestion || view.questionRevealStage !== "options") return undefined;
     return (
       <Typography
         variant="h3"
-        align="center"
+        align="left"
         sx={{
           fontWeight: 700,
           whiteSpace: "pre-wrap",
           wordBreak: "break-word",
           bgcolor: "transparent",
-          backgroundImage: "none",
           boxShadow: "none",
           fontSize: {
             xs: `${mobileQuestionFontRem}rem`,
             md: `${desktopQuestionFontRem}rem`,
           },
-          color: view.voteQuestionTextColor,
+          ...questionTextSx,
           fontFamily: view.brandFontFamily,
-          textAlign: "center",
-          width: "fit-content",
+          textAlign: "left",
+          width: "100%",
           maxWidth: "min(1280px, 100%)",
-          mx: "auto",
           px: fullScreenCloud ? 2 : 0,
           pt: fullScreenCloud ? 1 : 0,
           pb: fullScreenCloud ? 1 : 1.5,
@@ -78,7 +86,7 @@ export function ProjectorQuestionSection(props: ProjectorQuestionSectionProps) {
     selectedQuestion.text,
     view.brandFontFamily,
     view.questionRevealStage,
-    view.voteQuestionTextColor,
+    questionTextSx,
   ]);
 
   return (
@@ -109,7 +117,7 @@ export function ProjectorQuestionSection(props: ProjectorQuestionSectionProps) {
                     height: "100%",
                     minHeight: 0,
                     justifyContent: "center",
-                    alignItems: "center",
+                    alignItems: "flex-start",
                   }
                 : {}),
             }),
@@ -137,7 +145,7 @@ export function ProjectorQuestionSection(props: ProjectorQuestionSectionProps) {
             variant="h4"
             sx={{
               fontWeight: 700,
-              color: view.voteQuestionTextColor,
+              ...questionTextSx,
               fontFamily: view.brandFontFamily,
             }}
           >
@@ -149,24 +157,24 @@ export function ProjectorQuestionSection(props: ProjectorQuestionSectionProps) {
           {!isTagCloudQuestion && (
             <Typography
               variant="h3"
-              align="center"
+              align="left"
               sx={{
                 fontWeight: 700,
                 mb: 0,
                 whiteSpace: "pre-wrap",
                 wordBreak: "break-word",
                 bgcolor: "transparent",
-                backgroundImage: "none",
                 boxShadow: "none",
                 fontSize: {
                   xs: `${mobileQuestionFontRem}rem`,
                   md: `${desktopQuestionFontRem}rem`,
                 },
+                textAlign: "left",
                 px: fullScreenCloud ? 2 : 0,
                 pt: fullScreenCloud ? 2 : 0,
-                color: view.voteQuestionTextColor,
+                ...questionTextSx,
                 fontFamily: view.brandFontFamily,
-                ...(!fullScreenCloud ? { width: "100%" } : {}),
+                width: "100%",
               }}
             >
               {selectedQuestion.text}
@@ -207,6 +215,7 @@ export function ProjectorQuestionSection(props: ProjectorQuestionSectionProps) {
                 cloudSpiral={view.cloudSpiral}
                 cloudAnimationStrength={view.cloudAnimationStrength}
                 voteOptionTextColor={view.voteOptionTextColor}
+                voteOptionBorderColor={view.voteOptionBorderColor}
                 voteProgressTrackColor={view.voteProgressTrackColor}
                 voteProgressBarColor={view.voteProgressBarColor}
                 brandPrimaryColor={view.brandPrimaryColor}

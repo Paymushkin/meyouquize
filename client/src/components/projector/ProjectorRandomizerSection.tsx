@@ -1,6 +1,6 @@
 import EmojiEventsIcon from "@mui/icons-material/EmojiEvents";
 import { Box, Stack, Typography } from "@mui/material";
-import type { PublicViewState } from "@meyouquize/shared";
+import { voteQuestionTextTypographyStyle, type PublicViewState } from "@meyouquize/shared";
 import {
   RANDOMIZER_WINNER_HOLD_MS,
   useRandomizerAnimation,
@@ -31,7 +31,7 @@ export function ProjectorRandomizerSection({ view }: Props) {
           variant="h3"
           align="center"
           sx={{
-            color: view.voteQuestionTextColor,
+            ...voteQuestionTextTypographyStyle(view.voteQuestionTextColor),
             fontWeight: 700,
             fontFamily: view.brandFontFamily,
           }}
@@ -146,7 +146,7 @@ export function ProjectorRandomizerSection({ view }: Props) {
                 variant="subtitle1"
                 sx={{
                   mb: 1,
-                  color: view.voteQuestionTextColor,
+                  ...voteQuestionTextTypographyStyle(view.voteQuestionTextColor),
                   fontWeight: 700,
                   fontFamily: view.brandFontFamily,
                   textAlign: "center",

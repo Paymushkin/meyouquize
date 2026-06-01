@@ -249,7 +249,7 @@ export function ResultsPage() {
                     height: "100dvh",
                     display: "flex",
                     flexDirection: "column",
-                    alignItems: "center",
+                    alignItems: "flex-start",
                     justifyContent: "center",
                     py: 0,
                     boxSizing: "border-box",

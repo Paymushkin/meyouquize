@@ -1,10 +1,15 @@
 import { Fragment, type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import { Box, Fade, LinearProgress, Paper, Stack, Typography } from "@mui/material";
-import { useTheme } from "@mui/material/styles";
+import { alpha, useTheme } from "@mui/material/styles";
 import { animated, to, useTransition } from "@react-spring/web";
 import cloud from "d3-cloud";
-import { collectTagCloudQuizReferenceAliases, normalizeTagComparable } from "@meyouquize/shared";
+import {
+  collectTagCloudQuizReferenceAliases,
+  normalizeTagComparable,
+  voteFillOutlineColor,
+  voteProgressBarFillStyle,
+} from "@meyouquize/shared";
 import { buildCloudWordsForDisplay } from "../../features/tagCloudMerge";
 import { colorByWord } from "../../features/projectorChart/colorByWord";
 import type { ProjectorLayoutWord, ProjectorQuestionResult } from "../../types/projectorDashboard";
@@ -13,6 +18,12 @@ import { resolveMuiFontFamily } from "../../utils/muiFontFamily";
 const MIN_BAR_DISPLAY_PERCENT = 1.75;
 const CORRECT_OPTION_COLOR = "#4caf50";
 const DEFAULT_OUTLINE_COLOR = "rgba(255,255,255,0.35)";
+/** Трек столбика: 80% прозрачности (непрозрачность 20%). */
+const VOTE_PROGRESS_TRACK_OPACITY = 0.2;
+
+function voteProgressTrackBackground(trackColor: string): string {
+  return alpha(trackColor, VOTE_PROGRESS_TRACK_OPACITY);
+}
 
 /** Стабильные ссылки: иначе дефолт `= []` в параметрах даёт новый массив на каждый рендер и бесконечно перезапускает layout облака. */
 const EMPTY_HIDDEN_TAGS: string[] = [];
@@ -31,6 +42,11 @@ function buildOptionLabelSx(voteOptionTextColor: string) {
 function buildStatSx(voteOptionTextColor: string) {
   return { color: voteOptionTextColor, fontWeight: 600 };
 }
+
+/** Этап «результаты»: плотнее строки внутри варианта. */
+const resultsOptionTextSx = {
+  lineHeight: 1.15,
+} as const;
 
 export type QuestionChartProps = {
   question: ProjectorQuestionResult;
@@ -51,6 +67,7 @@ export type QuestionChartProps = {
   /** При пересчёте layout (d3-cloud) существующие теги прыгают на место без spring; анимация остаётся у новых (enter). */
   tagCloudSnapRelayout?: boolean;
   voteOptionTextColor?: string;
+  voteOptionBorderColor?: string;
   voteProgressTrackColor?: string;
   voteProgressBarColor?: string;
   brandPrimaryColor?: string;
@@ -77,6 +94,7 @@ export function QuestionChart(props: QuestionChartProps) {
     cloudAnimationStrength = 30,
     tagCloudSnapRelayout = false,
     voteOptionTextColor = "#1f1f1f",
+    voteOptionBorderColor = "rgba(255,255,255,0.4)",
     voteProgressTrackColor = "#e3e3e3",
     voteProgressBarColor = "#1976d2",
     brandPrimaryColor = "#1976d2",
@@ -294,14 +312,16 @@ export function QuestionChart(props: QuestionChartProps) {
         ? DEFAULT_OUTLINE_COLOR
         : o.isCorrect
           ? CORRECT_OPTION_COLOR
-          : voteProgressBarColor;
-      const barColor =
-        o.isCorrect && showCorrectOption ? CORRECT_OPTION_COLOR : voteProgressBarColor;
+          : voteFillOutlineColor(voteProgressBarColor);
+      const barFillStyle =
+        o.isCorrect && showCorrectOption
+          ? { backgroundColor: CORRECT_OPTION_COLOR }
+          : voteProgressBarFillStyle(voteProgressBarColor);
       const barSx = {
         height: 24,
         borderRadius: 99,
         overflow: "hidden",
-        bgcolor: voteProgressTrackColor,
+        bgcolor: voteProgressTrackBackground(voteProgressTrackColor),
         transition: "outline-color 320ms ease, box-shadow 320ms ease, background-color 320ms ease",
         outline: `2px solid ${outlineColor}`,
         outlineOffset: "1px",
@@ -312,8 +332,8 @@ export function QuestionChart(props: QuestionChartProps) {
           : {}),
         "& .MuiLinearProgress-bar": {
           borderRadius: 99,
-          bgcolor: barColor,
-          transition: "transform 0.55s cubic-bezier(0.4, 0, 0.2, 1), background-color 320ms ease",
+          ...barFillStyle,
+          transition: "transform 0.55s cubic-bezier(0.4, 0, 0.2, 1), background 320ms ease",
         },
       };
       return {
@@ -348,10 +368,10 @@ export function QuestionChart(props: QuestionChartProps) {
         height: 24,
         borderRadius: 99,
         overflow: "hidden",
-        bgcolor: voteProgressTrackColor,
+        bgcolor: voteProgressTrackBackground(voteProgressTrackColor),
         "& .MuiLinearProgress-bar": {
           borderRadius: 99,
-          bgcolor: voteProgressBarColor,
+          ...voteProgressBarFillStyle(voteProgressBarColor),
           transition: "transform 0.55s cubic-bezier(0.4, 0, 0.2, 1)",
         },
       },
@@ -527,8 +547,9 @@ export function QuestionChart(props: QuestionChartProps) {
     width: "100%",
     gridTemplateColumns: "fit-content(50ch) minmax(0, 1fr) auto",
     columnGap: 3.5,
-    rowGap: 1.5,
+    rowGap: 3,
     alignItems: "center",
+    justifyItems: "start",
     bgcolor: "transparent",
   } as const;
 
@@ -544,8 +565,13 @@ export function QuestionChart(props: QuestionChartProps) {
   const resultsPenalty = answersPenaltyTotal * 0.55;
   const resultsAnswerDesktopRem = Math.max(1.12, 1.52 - resultsPenalty);
   const resultsAnswerMobileRem = Math.max(1.02, resultsAnswerDesktopRem - 0.1);
-  const optionsAnswerDesktopRem = Math.max(1.22, 1.95 - answersPenaltyTotal * 0.9);
-  const optionsAnswerMobileRem = Math.max(1.08, optionsAnswerDesktopRem - 0.3);
+  const optionsAnswerFontScale = 1.25;
+  const optionsAnswerDesktopRem =
+    Math.max(1.22, 1.95 - answersPenaltyTotal * 0.9) * optionsAnswerFontScale;
+  const optionsAnswerMobileRem = Math.max(
+    1.08 * optionsAnswerFontScale,
+    optionsAnswerDesktopRem - 0.3 * optionsAnswerFontScale,
+  );
 
   const statCell = (row: (typeof voteRows)[number] | (typeof rankingBlock.rows)[number]) =>
     "statValue" in row ? row.statValue : row.percentLabel;
@@ -592,22 +618,24 @@ export function QuestionChart(props: QuestionChartProps) {
                       : {}),
                     minHeight: { xs: 92, md: 112 },
                     borderRadius: 2,
-                    px: { xs: 2, md: 2.5 },
-                    py: { xs: 1.25, md: 1.6 },
+                    px: { xs: 4, md: 5 },
+                    py: { xs: 2.5, md: 3.2 },
                     display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    textAlign: "center",
+                    alignItems: "flex-start",
+                    justifyContent: "flex-start",
+                    textAlign: "left",
                     border: "2px solid",
-                    borderColor: "rgba(255,255,255,0.4)",
-                    bgcolor: "rgba(255,255,255,0.08)",
-                    backdropFilter: "blur(2px)",
+                    borderColor: voteOptionBorderColor,
+                    bgcolor: "transparent",
                   }}
                 >
                   <Typography
                     variant="h4"
+                    align="left"
                     sx={{
                       ...row.optionLabelSx,
+                      width: "100%",
+                      textAlign: "left",
                       lineHeight: 1.2,
                       fontSize: {
                         xs: `${optionsAnswerMobileRem}rem`,
@@ -623,7 +651,7 @@ export function QuestionChart(props: QuestionChartProps) {
           ) : (
             <>
               <Stack
-                spacing={2}
+                spacing={3}
                 sx={{ width: "100%", display: { xs: "flex", md: "none" }, bgcolor: "transparent" }}
               >
                 {rankingStatHeader != null && (
@@ -642,7 +670,7 @@ export function QuestionChart(props: QuestionChartProps) {
                   <Box
                     key={row.optionId}
                     sx={{
-                      py: 0.5,
+                      py: 1,
                       width: "100%",
                       minWidth: 0,
                     }}
@@ -688,9 +716,12 @@ export function QuestionChart(props: QuestionChartProps) {
                           </Box>
                           <Typography
                             variant="h6"
+                            align="left"
                             sx={{
                               ...row.optionLabelSx,
+                              ...resultsOptionTextSx,
                               minWidth: 0,
+                              textAlign: "left",
                               overflowWrap: "anywhere",
                               fontSize: {
                                 xs: `${resultsAnswerMobileRem}rem`,
@@ -772,8 +803,11 @@ export function QuestionChart(props: QuestionChartProps) {
                         </Box>
                         <Typography
                           variant="h6"
+                          align="left"
                           sx={{
                             ...row.optionLabelSx,
+                            ...resultsOptionTextSx,
+                            textAlign: "left",
                             overflowWrap: "anywhere",
                             fontSize: {
                               xs: `${resultsAnswerMobileRem}rem`,

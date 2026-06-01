@@ -21,6 +21,8 @@ type Props = {
   setVoteQuestionTextColor: (value: string) => void;
   voteOptionTextColor: string;
   setVoteOptionTextColor: (value: string) => void;
+  voteOptionBorderColor: string;
+  setVoteOptionBorderColor: (value: string) => void;
   voteProgressTrackColor: string;
   setVoteProgressTrackColor: (value: string) => void;
   voteProgressBarColor: string;
@@ -95,6 +97,8 @@ export function AdminBrandingSection(props: Props) {
     setVoteQuestionTextColor,
     voteOptionTextColor,
     setVoteOptionTextColor,
+    voteOptionBorderColor,
+    setVoteOptionBorderColor,
     voteProgressTrackColor,
     setVoteProgressTrackColor,
     voteProgressBarColor,
@@ -170,6 +174,8 @@ export function AdminBrandingSection(props: Props) {
             setVoteQuestionTextColor={setVoteQuestionTextColor}
             voteOptionTextColor={voteOptionTextColor}
             setVoteOptionTextColor={setVoteOptionTextColor}
+            voteOptionBorderColor={voteOptionBorderColor}
+            setVoteOptionBorderColor={setVoteOptionBorderColor}
             voteProgressTrackColor={voteProgressTrackColor}
             setVoteProgressTrackColor={setVoteProgressTrackColor}
             voteProgressBarColor={voteProgressBarColor}

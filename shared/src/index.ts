@@ -1,5 +1,7 @@
 import type { BrandThemeId } from "./brandThemes.js";
 import { sanitizeBrandThemeId } from "./brandThemes.js";
+import { sanitizeVoteOptionBorderColor } from "./voteOptionBorderColor.js";
+import { sanitizeVoteFillColor, sanitizeVoteQuestionTextColor } from "./voteQuestionTextStyle.js";
 
 export type QuestionType = "single" | "multi" | "tag_cloud" | "ranking";
 export type QuizStatus = "draft" | "live" | "finished";
@@ -153,6 +155,8 @@ export interface PublicViewState {
   /** Обычное голосование: стиль столбиков */
   voteQuestionTextColor: string;
   voteOptionTextColor: string;
+  /** Бордер плиток вариантов на проекторе (этап «варианты»): #hex или rgba(...). */
+  voteOptionBorderColor: string;
   voteProgressTrackColor: string;
   voteProgressBarColor: string;
   /** Для голосований комнаты: показывать на проекторе ники первых верно ответивших */
@@ -339,6 +343,7 @@ export const DEFAULT_PUBLIC_VIEW_STATE: PublicViewState = {
   cloudAnimationStrength: 30,
   voteQuestionTextColor: "#1f1f1f",
   voteOptionTextColor: "#1f1f1f",
+  voteOptionBorderColor: "rgba(255,255,255,0.4)",
   voteProgressTrackColor: "#e3e3e3",
   voteProgressBarColor: "#1976d2",
   showFirstCorrectAnswerer: false,
@@ -605,6 +610,20 @@ function sanitizeBrandUrl(value: string | undefined): string {
   return value.trim().slice(0, 1000);
 }
 
+/** Пустая строка, если значение не абсолютный http(s) URL (для Zod optionalExternalHttpUrl). */
+export function sanitizeExternalHttpUrl(value: string | undefined): string {
+  if (typeof value !== "string") return "";
+  const v = value.trim().slice(0, 1000);
+  if (!v) return "";
+  try {
+    const u = new URL(v);
+    if (u.protocol === "http:" || u.protocol === "https:") return v;
+  } catch {
+    /* ignore */
+  }
+  return "";
+}
+
 function sanitizeBanners(items: PublicBanner[] | undefined): PublicBanner[] {
   if (!Array.isArray(items)) return [];
   return items
@@ -614,7 +633,9 @@ function sanitizeBanners(items: PublicBanner[] | undefined): PublicBanner[] {
         item.size === "1x1" ? "1x1" : item.size === "full" ? "full" : "2x1";
       return {
         id: item.id.trim().slice(0, 80),
-        linkUrl: typeof item.linkUrl === "string" ? item.linkUrl.trim().slice(0, 1000) : "",
+        linkUrl: sanitizeExternalHttpUrl(
+          typeof item.linkUrl === "string" ? item.linkUrl : undefined,
+        ),
         backgroundUrl:
           typeof item.backgroundUrl === "string" ? item.backgroundUrl.trim().slice(0, 1000) : "",
         size,
@@ -854,13 +875,23 @@ export function normalizePublicViewState(
       0,
       100,
     ),
-    voteQuestionTextColor: sanitizeHex6(value?.voteQuestionTextColor, base.voteQuestionTextColor),
+    voteQuestionTextColor: sanitizeVoteQuestionTextColor(
+      value?.voteQuestionTextColor,
+      base.voteQuestionTextColor,
+    ),
     voteOptionTextColor: sanitizeHex6(value?.voteOptionTextColor, base.voteOptionTextColor),
+    voteOptionBorderColor: sanitizeVoteOptionBorderColor(
+      value?.voteOptionBorderColor,
+      base.voteOptionBorderColor,
+    ),
     voteProgressTrackColor: sanitizeHex6(
       value?.voteProgressTrackColor,
       base.voteProgressTrackColor,
     ),
-    voteProgressBarColor: sanitizeHex6(value?.voteProgressBarColor, base.voteProgressBarColor),
+    voteProgressBarColor: sanitizeVoteFillColor(
+      value?.voteProgressBarColor,
+      base.voteProgressBarColor,
+    ),
     showFirstCorrectAnswerer:
       typeof value?.showFirstCorrectAnswerer === "boolean"
         ? value.showFirstCorrectAnswerer
@@ -927,10 +958,11 @@ export function normalizePublicViewState(
       base.programTileBackgroundColor,
     ),
     programTileTextColor: sanitizeHex6(value?.programTileTextColor, base.programTileTextColor),
-    programTileLinkUrl:
+    programTileLinkUrl: sanitizeExternalHttpUrl(
       typeof value?.programTileLinkUrl === "string"
-        ? value.programTileLinkUrl.trim().slice(0, 1000)
+        ? value.programTileLinkUrl
         : base.programTileLinkUrl,
+    ),
     programTileVisible:
       typeof value?.programTileVisible === "boolean"
         ? value.programTileVisible
@@ -1151,6 +1183,31 @@ export function resolveProjectorLeaderboardRows(
   if (boards.length > 0) return boards[0]?.rows ?? [];
   return legacyLeaderboard;
 }
+
+export {
+  DEFAULT_VOTE_OPTION_BORDER_COLOR,
+  isValidVoteOptionBorderColor,
+  sanitizeVoteOptionBorderColor,
+  voteOptionBorderColorToPickerHex,
+} from "./voteOptionBorderColor.js";
+
+export {
+  buildVoteFillGradient,
+  buildVoteQuestionTextGradient,
+  isValidVoteFillColor,
+  isValidVoteQuestionTextColor,
+  isVoteFillGradient,
+  isVoteQuestionTextGradient,
+  parseVoteFillGradient,
+  parseVoteQuestionTextGradient,
+  sanitizeVoteFillColor,
+  sanitizeVoteQuestionTextColor,
+  voteFillOutlineColor,
+  voteProgressBarFillStyle,
+  voteQuestionTextTypographyStyle,
+  VOTE_FILL_GRADIENT_RE,
+  VOTE_QUESTION_TEXT_GRADIENT_RE,
+} from "./voteQuestionTextStyle.js";
 
 export type { BrandThemeId, BrandThemeVisualState } from "./brandThemes.js";
 export {

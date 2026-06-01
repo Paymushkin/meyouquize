@@ -20,7 +20,7 @@ export function useProjectorJoinQr(params: Params) {
       return;
     }
     let cancelled = false;
-    void QRCode.toDataURL(joinUrl, { margin: 1, width: 280 }).then(
+    void QRCode.toDataURL(joinUrl, { margin: 1, width: 420 }).then(
       (nextDataUrl) => {
         if (!cancelled) setJoinQrDataUrl(nextDataUrl);
       },

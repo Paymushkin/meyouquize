@@ -1,6 +1,7 @@
 import EmojiEventsIcon from "@mui/icons-material/EmojiEvents";
 import { Box, Paper, Stack, Typography } from "@mui/material";
 import { alpha } from "@mui/material/styles";
+import { isVoteQuestionTextGradient, voteQuestionTextTypographyStyle } from "@meyouquize/shared";
 
 export type ProjectorFirstCorrectHeroProps = {
   questionText: string;
@@ -36,8 +37,8 @@ export function ProjectorFirstCorrectHero(props: ProjectorFirstCorrectHeroProps)
           mb: 2,
           whiteSpace: "pre-wrap",
           wordBreak: "break-word",
-          color: textColor,
-          opacity: 0.75,
+          ...voteQuestionTextTypographyStyle(textColor),
+          ...(isVoteQuestionTextGradient(textColor) ? {} : { opacity: 0.75 }),
         }}
       >
         {questionText}

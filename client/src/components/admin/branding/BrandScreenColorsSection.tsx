@@ -2,7 +2,9 @@ import { Accordion, AccordionDetails, AccordionSummary, Box, Typography } from "
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import type { SxProps, Theme } from "@mui/material/styles";
 import type { PublicViewSetPatch } from "../../../publicViewContract";
+import { voteOptionBorderColorToPickerHex } from "@meyouquize/shared";
 import { CompactColorField } from "./CompactColorField";
+import { VoteQuestionTextStyleField } from "./VoteQuestionTextStyleField";
 
 type Props = {
   colorGridSx: SxProps<Theme>;
@@ -14,6 +16,8 @@ type Props = {
   setVoteQuestionTextColor: (value: string) => void;
   voteOptionTextColor: string;
   setVoteOptionTextColor: (value: string) => void;
+  voteOptionBorderColor: string;
+  setVoteOptionBorderColor: (value: string) => void;
   voteProgressTrackColor: string;
   setVoteProgressTrackColor: (value: string) => void;
   voteProgressBarColor: string;
@@ -32,6 +36,8 @@ export function BrandScreenColorsSection(props: Props) {
     setVoteQuestionTextColor,
     voteOptionTextColor,
     setVoteOptionTextColor,
+    voteOptionBorderColor,
+    setVoteOptionBorderColor,
     voteProgressTrackColor,
     setVoteProgressTrackColor,
     voteProgressBarColor,
@@ -58,11 +64,11 @@ export function BrandScreenColorsSection(props: Props) {
             onChange={setBrandBodyBackgroundColor}
             onBlur={() => emitPatch({ brandBodyBackgroundColor })}
           />
-          <CompactColorField
+          <VoteQuestionTextStyleField
             label="Текст вопроса (голосование)"
             value={voteQuestionTextColor}
             onChange={setVoteQuestionTextColor}
-            onBlur={() => emitPatch({ voteQuestionTextColor })}
+            onCommit={(next) => emitPatch({ voteQuestionTextColor: next })}
           />
           <CompactColorField
             label="Текст ответов и % (проектор)"
@@ -71,16 +77,22 @@ export function BrandScreenColorsSection(props: Props) {
             onBlur={() => emitPatch({ voteOptionTextColor })}
           />
           <CompactColorField
+            label="Бордер вариантов (проектор)"
+            value={voteOptionBorderColorToPickerHex(voteOptionBorderColor)}
+            onChange={setVoteOptionBorderColor}
+            onBlur={() => emitPatch({ voteOptionBorderColor })}
+          />
+          <CompactColorField
             label="Трек столбика (проектор)"
             value={voteProgressTrackColor}
             onChange={setVoteProgressTrackColor}
             onBlur={() => emitPatch({ voteProgressTrackColor })}
           />
-          <CompactColorField
+          <VoteQuestionTextStyleField
             label="Заполнение столбика (проектор)"
             value={voteProgressBarColor}
             onChange={setVoteProgressBarColor}
-            onBlur={() => emitPatch({ voteProgressBarColor })}
+            onCommit={(next) => emitPatch({ voteProgressBarColor: next })}
           />
         </Box>
       </AccordionDetails>

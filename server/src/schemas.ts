@@ -1,5 +1,10 @@
 import { z } from "zod";
-import { PROJECTOR_JOIN_QR_TEXT_MAX_LENGTH } from "@meyouquize/shared";
+import {
+  isValidVoteFillColor,
+  isValidVoteOptionBorderColor,
+  isValidVoteQuestionTextColor,
+  PROJECTOR_JOIN_QR_TEXT_MAX_LENGTH,
+} from "@meyouquize/shared";
 
 function isHttpUrl(value: string): boolean {
   try {
@@ -288,11 +293,23 @@ export const setPublicViewSchema = z.object({
   cloudAnimationStrength: z.number().int().min(0).max(100).optional(),
   voteQuestionTextColor: z
     .string()
-    .regex(/^#([0-9a-fA-F]{6})$/)
+    .trim()
+    .max(200)
+    .refine(isValidVoteQuestionTextColor, {
+      message: "Must be #RRGGBB or linear-gradient(deg, #hex 0%, #hex 100%)",
+    })
     .optional(),
   voteOptionTextColor: z
     .string()
     .regex(/^#([0-9a-fA-F]{6})$/)
+    .optional(),
+  voteOptionBorderColor: z
+    .string()
+    .trim()
+    .max(80)
+    .refine(isValidVoteOptionBorderColor, {
+      message: "Must be #RRGGBB or rgba(r,g,b,a)",
+    })
     .optional(),
   voteProgressTrackColor: z
     .string()
@@ -300,7 +317,11 @@ export const setPublicViewSchema = z.object({
     .optional(),
   voteProgressBarColor: z
     .string()
-    .regex(/^#([0-9a-fA-F]{6})$/)
+    .trim()
+    .max(200)
+    .refine(isValidVoteFillColor, {
+      message: "Must be #RRGGBB or linear-gradient(deg, #hex 0%, #hex 100%)",
+    })
     .optional(),
   showFirstCorrectAnswerer: z.boolean().optional(),
   firstCorrectWinnersCount: z.number().int().min(1).max(20).optional(),
@@ -315,7 +336,7 @@ export const setPublicViewSchema = z.object({
     .array(
       z.object({
         id: z.string().trim().min(1).max(80),
-        linkUrl: externalHttpUrlSchema,
+        linkUrl: optionalExternalHttpUrlSchema,
         backgroundUrl: clientAssetUrlSchema,
         size: z.enum(["2x1", "1x1", "full"]).optional(),
         isVisible: z.boolean().optional(),

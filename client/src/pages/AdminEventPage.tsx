@@ -674,6 +674,7 @@ export function AdminEventPage() {
   const [cloudAnimationStrength, setCloudAnimationStrength] = useState(30);
   const [voteQuestionTextColor, setVoteQuestionTextColor] = useState("#1f1f1f");
   const [voteOptionTextColor, setVoteOptionTextColor] = useState("#1f1f1f");
+  const [voteOptionBorderColor, setVoteOptionBorderColor] = useState("rgba(255,255,255,0.4)");
   const [voteProgressTrackColor, setVoteProgressTrackColor] = useState("#e3e3e3");
   const [voteProgressBarColor, setVoteProgressBarColor] = useState("#1976d2");
   const [playerVoteOptionTextColor, setPlayerVoteOptionTextColor] = useState("#ffffff");
@@ -1014,6 +1015,7 @@ export function AdminEventPage() {
     setCloudAnimationStrength,
     setVoteQuestionTextColor,
     setVoteOptionTextColor,
+    setVoteOptionBorderColor,
     setVoteProgressTrackColor,
     setVoteProgressBarColor,
     setPlayerVoteOptionTextColor,
@@ -1090,6 +1092,7 @@ export function AdminEventPage() {
     cloudAnimationStrength,
     voteQuestionTextColor,
     voteOptionTextColor,
+    voteOptionBorderColor,
     voteProgressTrackColor,
     voteProgressBarColor,
     playerVoteOptionTextColor,
@@ -1187,6 +1190,7 @@ export function AdminEventPage() {
     setProjectorBackground,
     setVoteQuestionTextColor,
     setVoteOptionTextColor,
+    setVoteOptionBorderColor,
     setVoteProgressTrackColor,
     setVoteProgressBarColor,
     setPlayerVoteOptionTextColor,
@@ -1352,6 +1356,7 @@ export function AdminEventPage() {
     setCloudAnimationStrength(clampInt(b.cloudAnimationStrength, 0, 100));
     setVoteQuestionTextColor(b.voteQuestionTextColor);
     setVoteOptionTextColor(b.voteOptionTextColor);
+    setVoteOptionBorderColor(b.voteOptionBorderColor);
     setVoteProgressTrackColor(b.voteProgressTrackColor);
     setVoteProgressBarColor(b.voteProgressBarColor);
     setPlayerVoteOptionTextColor(b.playerVoteOptionTextColor);
@@ -1702,6 +1707,8 @@ export function AdminEventPage() {
     setVoteQuestionTextColor,
     voteOptionTextColor,
     setVoteOptionTextColor,
+    voteOptionBorderColor,
+    setVoteOptionBorderColor,
     voteProgressTrackColor,
     setVoteProgressTrackColor,
     voteProgressBarColor,

@@ -33,6 +33,7 @@ type BrandingKeys =
   | "cloudAnimationStrength"
   | "voteQuestionTextColor"
   | "voteOptionTextColor"
+  | "voteOptionBorderColor"
   | "voteProgressTrackColor"
   | "voteProgressBarColor"
   | "brandPrimaryColor"
@@ -132,6 +133,7 @@ export function toBrandingState(payload: Partial<PublicViewPayload>): BrandingSt
     cloudAnimationStrength: view.cloudAnimationStrength,
     voteQuestionTextColor: view.voteQuestionTextColor,
     voteOptionTextColor: view.voteOptionTextColor,
+    voteOptionBorderColor: view.voteOptionBorderColor,
     voteProgressTrackColor: view.voteProgressTrackColor,
     voteProgressBarColor: view.voteProgressBarColor,
     brandPrimaryColor: view.brandPrimaryColor,

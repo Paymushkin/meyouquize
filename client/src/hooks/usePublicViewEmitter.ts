@@ -1,3 +1,4 @@
+import { sanitizeExternalHttpUrl } from "@meyouquize/shared";
 import { useCallback } from "react";
 import { socket } from "../socket";
 import type {
@@ -23,6 +24,15 @@ type QuestionViewState = {
   tagCountOverrides?: CloudWordCount[];
 };
 
+function playerBannersForEmit(banners: PublicBanner[]): PublicBanner[] {
+  return banners
+    .map((item) => ({
+      ...item,
+      linkUrl: sanitizeExternalHttpUrl(item.linkUrl),
+    }))
+    .filter((item) => item.id && item.linkUrl && item.backgroundUrl);
+}
+
 type UsePublicViewEmitterParams = {
   quizId: string;
   publicViewMode: PublicViewMode;
@@ -43,6 +53,7 @@ type UsePublicViewEmitterParams = {
   cloudAnimationStrength: number;
   voteQuestionTextColor: string;
   voteOptionTextColor: string;
+  voteOptionBorderColor: string;
   voteProgressTrackColor: string;
   voteProgressBarColor: string;
   showFirstCorrectAnswerer: boolean;
@@ -138,6 +149,7 @@ export function usePublicViewEmitter(params: UsePublicViewEmitterParams) {
     cloudAnimationStrength,
     voteQuestionTextColor,
     voteOptionTextColor,
+    voteOptionBorderColor,
     voteProgressTrackColor,
     voteProgressBarColor,
     showFirstCorrectAnswerer,
@@ -263,12 +275,13 @@ export function usePublicViewEmitter(params: UsePublicViewEmitterParams) {
         cloudAnimationStrength: patch.cloudAnimationStrength ?? cloudAnimationStrength,
         voteQuestionTextColor: patch.voteQuestionTextColor ?? voteQuestionTextColor,
         voteOptionTextColor: patch.voteOptionTextColor ?? voteOptionTextColor,
+        voteOptionBorderColor: patch.voteOptionBorderColor ?? voteOptionBorderColor,
         voteProgressTrackColor: patch.voteProgressTrackColor ?? voteProgressTrackColor,
         voteProgressBarColor: patch.voteProgressBarColor ?? voteProgressBarColor,
         showFirstCorrectAnswerer: patch.showFirstCorrectAnswerer ?? showFirstCorrectAnswerer,
         firstCorrectWinnersCount: patch.firstCorrectWinnersCount ?? firstCorrectWinnersCount,
         showEventTitleOnPlayer: patch.showEventTitleOnPlayer ?? showEventTitleOnPlayer,
-        playerBanners: patch.playerBanners ?? playerBanners,
+        playerBanners: playerBannersForEmit(patch.playerBanners ?? playerBanners),
         speakerTileText: patch.speakerTileText ?? speakerTileText,
         speakerTileBackgroundColor: patch.speakerTileBackgroundColor ?? speakerTileBackgroundColor,
         speakerTileTextColor: patch.speakerTileTextColor ?? speakerTileTextColor,
@@ -277,7 +290,7 @@ export function usePublicViewEmitter(params: UsePublicViewEmitterParams) {
         programTileText: patch.programTileText ?? programTileText,
         programTileBackgroundColor: patch.programTileBackgroundColor ?? programTileBackgroundColor,
         programTileTextColor: patch.programTileTextColor ?? programTileTextColor,
-        programTileLinkUrl: patch.programTileLinkUrl ?? programTileLinkUrl,
+        programTileLinkUrl: sanitizeExternalHttpUrl(patch.programTileLinkUrl ?? programTileLinkUrl),
         programTileVisible: patch.programTileVisible ?? programTileVisible,
         playerQuizResultsTileVisible:
           patch.playerQuizResultsTileVisible ?? playerQuizResultsTileVisible,
@@ -359,6 +372,7 @@ export function usePublicViewEmitter(params: UsePublicViewEmitterParams) {
       cloudCorrectTagColor,
       voteQuestionTextColor,
       voteOptionTextColor,
+      voteOptionBorderColor,
       voteProgressTrackColor,
       voteProgressBarColor,
       showFirstCorrectAnswerer,

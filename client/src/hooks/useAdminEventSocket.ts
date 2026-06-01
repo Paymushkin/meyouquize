@@ -55,6 +55,7 @@ type Params = {
   setCloudAnimationStrength: (value: number) => void;
   setVoteQuestionTextColor: (value: string) => void;
   setVoteOptionTextColor: (value: string) => void;
+  setVoteOptionBorderColor: (value: string) => void;
   setVoteProgressTrackColor: (value: string) => void;
   setVoteProgressBarColor: (value: string) => void;
   setBrandPrimaryColor: (value: string) => void;
@@ -116,6 +117,7 @@ export function useAdminEventSocket<TQuestion extends QuestionFormPatchable>(
     setCloudAnimationStrength,
     setVoteQuestionTextColor,
     setVoteOptionTextColor,
+    setVoteOptionBorderColor,
     setVoteProgressTrackColor,
     setVoteProgressBarColor,
     setBrandPrimaryColor,
@@ -174,6 +176,7 @@ export function useAdminEventSocket<TQuestion extends QuestionFormPatchable>(
       setCloudAnimationStrength(nextBranding.cloudAnimationStrength);
       setVoteQuestionTextColor(nextBranding.voteQuestionTextColor);
       setVoteOptionTextColor(nextBranding.voteOptionTextColor);
+      setVoteOptionBorderColor(nextBranding.voteOptionBorderColor);
       setVoteProgressTrackColor(nextBranding.voteProgressTrackColor);
       setVoteProgressBarColor(nextBranding.voteProgressBarColor);
       setBrandPrimaryColor(nextBranding.brandPrimaryColor);

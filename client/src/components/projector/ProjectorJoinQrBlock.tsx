@@ -41,8 +41,8 @@ export function ProjectorJoinQrBlock(props: Props) {
         src={qrDataUrl}
         alt="QR-код входа в ивент"
         sx={{
-          width: "clamp(160px, 22vw, 280px)",
-          height: "clamp(160px, 22vw, 280px)",
+          width: "clamp(200px, 32vw, 420px)",
+          height: "clamp(200px, 32vw, 420px)",
           borderRadius: 1,
           flexShrink: 0,
         }}
