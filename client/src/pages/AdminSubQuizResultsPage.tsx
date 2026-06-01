@@ -203,6 +203,9 @@ export function AdminSubQuizResultsPage() {
     socket.emit("admin:results:view:set", {
       quizId: payload.quizId,
       mode: next,
+      ...(next === "leaderboard" && payload.subQuizId
+        ? { leaderboardSubQuizId: payload.subQuizId }
+        : {}),
     });
   }, [payload, publicViewMode]);
 
@@ -221,6 +224,9 @@ export function AdminSubQuizResultsPage() {
         quizId: payload.quizId,
         mode: publicViewMode,
         highlightedLeadersCount: safe,
+        ...(publicViewMode === "leaderboard" && payload.subQuizId
+          ? { leaderboardSubQuizId: payload.subQuizId }
+          : {}),
       });
     },
     [payload?.quizId, publicViewMode],

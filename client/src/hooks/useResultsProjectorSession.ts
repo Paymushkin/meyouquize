@@ -1,5 +1,9 @@
 import { useEffect, useMemo, useReducer, useState } from "react";
-import { normalizePublicViewState, type PublicViewPayload } from "@meyouquize/shared";
+import {
+  normalizePublicViewState,
+  resolveProjectorLeaderboardRows,
+  type PublicViewPayload,
+} from "@meyouquize/shared";
 import {
   buildProjectorWinnersHeroDebugInfo,
   computeProjectorDerived,
@@ -16,6 +20,20 @@ import { useProjectorBodyBackground } from "./useProjectorBodyBackground";
 import type { SpeakerQuestionsPayload } from "../types/speakerQuestions";
 import type { ReactionSession } from "../pages/quiz-play/types";
 import { parseSocketErrorMessage } from "../utils/socketError";
+
+function buildLeaderboardAnimKey(state: ProjectorSessionState): string {
+  const { view, leaderboardsBySubQuiz, leaders } = state;
+  const rows = resolveProjectorLeaderboardRows(
+    leaderboardsBySubQuiz,
+    view.leaderboardSubQuizId,
+    leaders,
+  );
+  const limit = Math.max(0, Math.min(100, view.highlightedLeadersCount));
+  const shown = rows.slice(0, limit);
+  return `${view.leaderboardSubQuizId}|${shown
+    .map((row) => `${row.participantId}:${row.score}:${row.totalResponseMs}`)
+    .join(";")}`;
+}
 
 export type UseResultsProjectorSessionResult = ProjectorDerived & {
   quizTitle: string;
@@ -53,11 +71,17 @@ export function useResultsProjectorSession(
     const onDashboard = (payload: {
       perQuestion: ProjectorQuestionResult[];
       leaderboard: ProjectorLeader[];
+      leaderboardsBySubQuiz?: Array<{
+        subQuizId: string;
+        title: string;
+        rows: ProjectorLeader[];
+      }>;
     }) => {
       dispatch({
         type: "dashboard",
         perQuestion: payload.perQuestion,
         leaderboard: payload.leaderboard,
+        leaderboardsBySubQuiz: payload.leaderboardsBySubQuiz ?? [],
       });
     };
     const onPublicView = (payload: PublicViewPayload) => {
@@ -97,11 +121,12 @@ export function useResultsProjectorSession(
     };
   }, [slug]);
 
+  const derived = useMemo(() => computeProjectorDerived(state), [state]);
+  const leaderboardAnimKey = useMemo(() => buildLeaderboardAnimKey(state), [state]);
+
   useEffect(() => {
     dispatch({ type: "bumpLeaderboardAnim" });
-  }, [state.leaders]);
-
-  const derived = useMemo(() => computeProjectorDerived(state), [state]);
+  }, [leaderboardAnimKey]);
 
   useProjectorBodyBackground(
     state.view.projectorBackground,

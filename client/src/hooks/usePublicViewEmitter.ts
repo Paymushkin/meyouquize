@@ -29,6 +29,8 @@ type UsePublicViewEmitterParams = {
   publicViewQuestionId?: string;
   questionRevealStage: "options" | "results";
   highlightedLeadersCount: number;
+  /** Сабквиз для режима leaderboard на проекторе (из вкладки «Результаты»). */
+  resultsLeaderboardSubQuizId: string;
   questionForms: QuestionViewState[];
   projectorBackground: string;
   cloudQuestionColor: string;
@@ -123,6 +125,7 @@ export function usePublicViewEmitter(params: UsePublicViewEmitterParams) {
     publicViewQuestionId,
     questionRevealStage,
     highlightedLeadersCount,
+    resultsLeaderboardSubQuizId,
     questionForms,
     projectorBackground,
     cloudQuestionColor,
@@ -224,12 +227,25 @@ export function usePublicViewEmitter(params: UsePublicViewEmitterParams) {
       const nextQuestionId =
         nextMode === "question" ? (patch.questionId ?? publicViewQuestionId) : undefined;
       const questionState = getQuestionViewState(nextQuestionId);
+      const leaderboardSubQuizIdRaw =
+        patch.leaderboardSubQuizId !== undefined
+          ? patch.leaderboardSubQuizId
+          : nextMode === "leaderboard"
+            ? resultsLeaderboardSubQuizId
+            : undefined;
+      const leaderboardSubQuizIdForEmit =
+        leaderboardSubQuizIdRaw !== undefined ? String(leaderboardSubQuizIdRaw).trim() : "";
       const nextPayload = {
         quizId,
         mode: nextMode,
         questionId: nextQuestionId,
         questionRevealStage: patch.questionRevealStage ?? questionRevealStage,
         highlightedLeadersCount: patch.highlightedLeadersCount ?? highlightedLeadersCount,
+        ...(nextMode === "leaderboard" && leaderboardSubQuizIdForEmit
+          ? { leaderboardSubQuizId: leaderboardSubQuizIdForEmit }
+          : patch.leaderboardSubQuizId !== undefined
+            ? { leaderboardSubQuizId: leaderboardSubQuizIdForEmit }
+            : {}),
         showVoteCount: patch.showVoteCount ?? questionState.showVoteCount,
         showCorrectOption: patch.showCorrectOption ?? questionState.showCorrectOption,
         showQuestionTitle: patch.showQuestionTitle ?? questionState.showQuestionTitle,
@@ -333,6 +349,7 @@ export function usePublicViewEmitter(params: UsePublicViewEmitterParams) {
       cloudTagPadding,
       getQuestionViewState,
       highlightedLeadersCount,
+      resultsLeaderboardSubQuizId,
       projectorBackground,
       publicViewMode,
       publicViewQuestionId,

@@ -1,4 +1,4 @@
-import type { PublicViewState } from "@meyouquize/shared";
+import { resolveProjectorLeaderboardRows, type PublicViewState } from "@meyouquize/shared";
 import type { ProjectorLeader, ProjectorQuestionResult } from "../../types/projectorDashboard";
 import type { ProjectorSessionState } from "./projectorSessionReducer";
 
@@ -16,12 +16,13 @@ export type ProjectorDerived = {
 };
 
 export function computeProjectorDerived(state: ProjectorSessionState): ProjectorDerived {
-  const { questions, leaders, view } = state;
+  const { questions, leaders, leaderboardsBySubQuiz, view } = state;
   const {
     mode,
     questionId: publicQuestionId,
     highlightedLeadersCount,
     firstCorrectWinnersCount,
+    leaderboardSubQuizId,
   } = view;
 
   const selectedQuestion =
@@ -29,7 +30,15 @@ export function computeProjectorDerived(state: ProjectorSessionState): Projector
       ? questions.find((q) => q.questionId === publicQuestionId)
       : undefined;
 
-  const leadersShown = leaders.slice(0, Math.max(0, Math.min(100, highlightedLeadersCount)));
+  const leaderboardRows = resolveProjectorLeaderboardRows(
+    leaderboardsBySubQuiz,
+    leaderboardSubQuizId,
+    leaders,
+  );
+  const leadersShown = leaderboardRows.slice(
+    0,
+    Math.max(0, Math.min(100, highlightedLeadersCount)),
+  );
 
   const winnersRowsCount = Math.max(
     0,

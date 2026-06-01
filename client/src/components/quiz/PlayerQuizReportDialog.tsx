@@ -38,6 +38,11 @@ function normalizeAnswerLine(s: string): string {
   return s.normalize("NFKC").trim().toLowerCase().replace(/\s+/g, " ");
 }
 
+function isQuestionAnswered(q: PlayerSubQuizReportQuestionRow): boolean {
+  const answer = q.userAnswerText.trim();
+  return answer.length > 0 && answer !== "Нет ответа";
+}
+
 function isQuestionFullyCorrect(q: PlayerSubQuizReportQuestionRow): boolean {
   if (q.userAnswerText.trim() === "" || q.userAnswerText === "Нет ответа") {
     return false;
@@ -122,6 +127,7 @@ export function PlayerQuizReportDialog(props: Props) {
 
   const leaderboardLine = report ? leaderboardPositionLine(report) : null;
   const titleText = loading ? "Загрузка…" : report?.title?.trim() || "Квиз";
+  const answeredQuestions = report?.questions.filter(isQuestionAnswered) ?? [];
 
   return (
     <Dialog
@@ -160,11 +166,13 @@ export function PlayerQuizReportDialog(props: Props) {
           </Box>
         ) : error ? (
           <Typography sx={{ color: "#ff8a80" }}>{error}</Typography>
-        ) : report && report.questions.length === 0 ? (
-          <Typography sx={PLAYER_DIALOG_SECONDARY_TEXT}>В этом квизе пока нет вопросов.</Typography>
+        ) : report && answeredQuestions.length === 0 ? (
+          <Typography sx={PLAYER_DIALOG_SECONDARY_TEXT}>
+            Пока нет отвеченных вопросов. Здесь появятся только те, на которые вы уже ответили.
+          </Typography>
         ) : report ? (
           <Stack spacing={0.75} sx={{ pt: 0.5 }}>
-            {report.questions.map((q, idx, arr) => {
+            {answeredQuestions.map((q, idx, arr) => {
               const ok = isQuestionFullyCorrect(q);
               const showRef = shouldShowReferenceAnswer(q);
               const pointsBadge = pointsEarnedBadgeOrNull(q);

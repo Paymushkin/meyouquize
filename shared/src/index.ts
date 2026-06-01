@@ -131,6 +131,8 @@ export interface PublicViewState {
   questionId?: string;
   questionRevealStage: QuestionRevealStage;
   highlightedLeadersCount: number;
+  /** Сабквиз для режима `leaderboard` на проекторе (пусто = первый по sortOrder). */
+  leaderboardSubQuizId: string;
   showVoteCount: boolean;
   /** Показывать подсветку правильного ответа в вариантах на проекторе */
   showCorrectOption: boolean;
@@ -319,6 +321,7 @@ export const DEFAULT_PUBLIC_VIEW_STATE: PublicViewState = {
   mode: "title",
   questionRevealStage: "options",
   highlightedLeadersCount: 3,
+  leaderboardSubQuizId: "",
   showVoteCount: false,
   showCorrectOption: false,
   showQuestionTitle: true,
@@ -814,6 +817,10 @@ export function normalizePublicViewState(
       0,
       100,
     ),
+    leaderboardSubQuizId:
+      typeof value?.leaderboardSubQuizId === "string"
+        ? value.leaderboardSubQuizId.trim().slice(0, 80)
+        : base.leaderboardSubQuizId,
     showVoteCount:
       typeof value?.showVoteCount === "boolean" ? value.showVoteCount : base.showVoteCount,
     showCorrectOption:
@@ -1113,6 +1120,36 @@ export function normalizePublicViewState(
     ),
     brandTheme: sanitizeBrandThemeId(value?.brandTheme ?? base.brandTheme),
   };
+}
+
+export type ProjectorLeaderboardRow = {
+  participantId: string;
+  nickname: string;
+  score: number;
+  totalResponseMs: number;
+};
+
+export type ProjectorLeaderboardBySubQuiz = {
+  subQuizId: string;
+  title?: string;
+  rows: ProjectorLeaderboardRow[];
+};
+
+/** Строки лидерборда для проектора: по выбранному сабквизу; без id — первый в списке. */
+export function resolveProjectorLeaderboardRows(
+  leaderboardsBySubQuiz: ProjectorLeaderboardBySubQuiz[],
+  preferredSubQuizId: string | undefined,
+  legacyLeaderboard: ProjectorLeaderboardRow[] = [],
+): ProjectorLeaderboardRow[] {
+  const boards = leaderboardsBySubQuiz ?? [];
+  const pref = preferredSubQuizId?.trim();
+  if (pref) {
+    if (boards.length === 0) return [];
+    const hit = boards.find((b) => b.subQuizId === pref);
+    return hit?.rows ?? [];
+  }
+  if (boards.length > 0) return boards[0]?.rows ?? [];
+  return legacyLeaderboard;
 }
 
 export type { BrandThemeId, BrandThemeVisualState } from "./brandThemes.js";

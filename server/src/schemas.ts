@@ -239,6 +239,7 @@ export const setPublicViewSchema = z.object({
   questionId: z.string().min(1).optional(),
   questionRevealStage: z.enum(["options", "results"]).optional(),
   highlightedLeadersCount: z.number().int().min(0).max(100).optional(),
+  leaderboardSubQuizId: z.string().trim().max(80).optional(),
   showVoteCount: z.boolean().optional(),
   showCorrectOption: z.boolean().optional(),
   showQuestionTitle: z.boolean().optional(),

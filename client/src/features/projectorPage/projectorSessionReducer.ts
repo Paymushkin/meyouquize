@@ -4,11 +4,16 @@ import {
   type PublicViewPayload,
   type PublicViewState,
 } from "@meyouquize/shared";
-import type { ProjectorLeader, ProjectorQuestionResult } from "../../types/projectorDashboard";
+import type {
+  ProjectorLeader,
+  ProjectorLeaderboardBySubQuiz,
+  ProjectorQuestionResult,
+} from "../../types/projectorDashboard";
 
 export type ProjectorSessionState = {
   questions: ProjectorQuestionResult[];
   leaders: ProjectorLeader[];
+  leaderboardsBySubQuiz: ProjectorLeaderboardBySubQuiz[];
   quizTitle: string;
   view: PublicViewState;
   /** Инкремент при изменении лидерборда — анимация таблицы без лишних срабатываний на обновление вопросов. */
@@ -16,13 +21,19 @@ export type ProjectorSessionState = {
 };
 
 export type ProjectorSessionAction =
-  | { type: "dashboard"; perQuestion: ProjectorQuestionResult[]; leaderboard: ProjectorLeader[] }
+  | {
+      type: "dashboard";
+      perQuestion: ProjectorQuestionResult[];
+      leaderboard: ProjectorLeader[];
+      leaderboardsBySubQuiz: ProjectorLeaderboardBySubQuiz[];
+    }
   | { type: "publicView"; payload: PublicViewPayload }
   | { type: "bumpLeaderboardAnim" };
 
 export const initialProjectorSessionState: ProjectorSessionState = {
   questions: [],
   leaders: [],
+  leaderboardsBySubQuiz: [],
   quizTitle: "",
   view: DEFAULT_PUBLIC_VIEW_STATE,
   resultsAnimationTick: 0,
@@ -38,6 +49,7 @@ export function projectorSessionReducer(
         ...state,
         questions: action.perQuestion,
         leaders: action.leaderboard,
+        leaderboardsBySubQuiz: action.leaderboardsBySubQuiz,
       };
     case "publicView": {
       const view = mergePublicViewState(state.view, action.payload);

@@ -49,3 +49,9 @@ export type ProjectorLeader = {
   /** Время ответов (тай-брейк): сумма responseMs по всем вопросам в сабквизе. */
   totalResponseMs: number;
 };
+
+export type ProjectorLeaderboardBySubQuiz = {
+  subQuizId: string;
+  title: string;
+  rows: ProjectorLeader[];
+};

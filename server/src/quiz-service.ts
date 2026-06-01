@@ -1499,6 +1499,24 @@ function formatOptionLabelsInOrder(
   return labels.length > 0 ? labels.join(", ") : "—";
 }
 
+function participantHasAnswerForQuestion(
+  type: QuestionType,
+  ans: { selectedOptionIds: string } | undefined,
+): boolean {
+  if (!ans) return false;
+  if (
+    type === QuestionType.SINGLE ||
+    type === QuestionType.MULTI ||
+    type === QuestionType.RANKING
+  ) {
+    return parseSelectedIds(ans.selectedOptionIds).length > 0;
+  }
+  if (type === QuestionType.TAG_CLOUD) {
+    return parseTagAnswers(ans.selectedOptionIds, false).length > 0;
+  }
+  return false;
+}
+
 /** Личный отчёт участника по вопросам сабквиза (для плитки «Мой квиз»). */
 export async function getParticipantPersonalSubQuizReport(
   quizId: string,
@@ -1557,6 +1575,8 @@ export async function getParticipantPersonalSubQuizReport(
   for (const q of questions) {
     const opts = q.options.map((o) => ({ id: o.id, text: o.text }));
     const ans = answerByQ.get(q.id);
+    if (!participantHasAnswerForQuestion(q.type, ans)) continue;
+
     const scoreAwarded = ans != null ? ans.scoreAwarded : null;
     if (typeof scoreAwarded === "number") totalScore += scoreAwarded;
 

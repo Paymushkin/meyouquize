@@ -1077,6 +1077,7 @@ export function AdminEventPage() {
     publicViewQuestionId,
     questionRevealStage,
     highlightedLeadersCount,
+    resultsLeaderboardSubQuizId: resultsSubQuizId,
     questionForms,
     projectorBackground,
     cloudQuestionColor,
@@ -1333,6 +1334,9 @@ export function AdminEventPage() {
     setQuestionRevealStage(pv.questionRevealStage === "results" ? "results" : "options");
     if (typeof pv.highlightedLeadersCount === "number") {
       setHighlightedLeadersCount(pv.highlightedLeadersCount);
+    }
+    if (typeof pv.leaderboardSubQuizId === "string" && pv.leaderboardSubQuizId.trim()) {
+      setResultsSubQuizId(pv.leaderboardSubQuizId.trim());
     }
     const qid = typeof pv.questionId === "string" ? pv.questionId : undefined;
     if (qid) setQuestionForms((prev) => patchQuestionsFromPublicView(prev, pv));
@@ -2228,6 +2232,13 @@ export function AdminEventPage() {
           : undefined;
       const nextQuestionRevealStage =
         mode === "question" && targetQuestion?.type !== "tag_cloud" ? "options" : "results";
+      const leaderboardSubQuizIdForEmit =
+        mode === "leaderboard"
+          ? (extraPatch?.leaderboardSubQuizId ?? resultsSubQuizId ?? "").trim() || undefined
+          : undefined;
+      if (mode === "leaderboard" && leaderboardSubQuizIdForEmit) {
+        setResultsSubQuizId(leaderboardSubQuizIdForEmit);
+      }
       setShowFirstCorrectAnswerer(false);
       setPublicViewMode(mode);
       setPublicViewQuestionId(nextQuestionId);
@@ -2238,10 +2249,13 @@ export function AdminEventPage() {
         questionRevealStage: nextQuestionRevealStage,
         showCorrectOption: targetQuestion?.showCorrectOption ?? false,
         showFirstCorrectAnswerer: false,
+        ...(leaderboardSubQuizIdForEmit
+          ? { leaderboardSubQuizId: leaderboardSubQuizIdForEmit }
+          : {}),
         ...extraPatch,
       });
     },
-    [emitPublicViewSet, questionForms, quizId],
+    [emitPublicViewSet, questionForms, quizId, resultsSubQuizId],
   );
 
   function setQuestionRevealStageForQuestion(
@@ -3890,7 +3904,10 @@ export function AdminEventPage() {
                                                 subQuizId: sq.id,
                                               });
                                             }}
-                                            isLeaderboardShown={publicViewMode === "leaderboard"}
+                                            isLeaderboardShown={
+                                              publicViewMode === "leaderboard" &&
+                                              resultsSubQuizId === sq.id
+                                            }
                                             firstCorrectWinnersCount={firstCorrectWinnersCount}
                                             highlightedLeadersCount={highlightedLeadersCount}
                                             onPrev={() => {
@@ -3926,13 +3943,18 @@ export function AdminEventPage() {
                                                 subQuizId: sq.id,
                                               });
                                             }}
-                                            onToggleResults={() =>
-                                              setPublicResultsView(
-                                                publicViewMode === "leaderboard"
-                                                  ? "title"
-                                                  : "leaderboard",
-                                              )
-                                            }
+                                            onToggleResults={() => {
+                                              if (
+                                                publicViewMode === "leaderboard" &&
+                                                resultsSubQuizId === sq.id
+                                              ) {
+                                                setPublicResultsView("title");
+                                                return;
+                                              }
+                                              setPublicResultsView("leaderboard", undefined, {
+                                                leaderboardSubQuizId: sq.id,
+                                              });
+                                            }}
                                             onChangeLeadersTop={(next) =>
                                               setFirstCorrectWinnersCount(
                                                 Math.max(1, Math.min(20, next)),
@@ -4376,7 +4398,15 @@ export function AdminEventPage() {
                     title: x.title,
                   }))}
                   selectedResultsSubQuizId={resultsSubQuizId}
-                  onSelectResultsSubQuiz={setResultsSubQuizId}
+                  onSelectResultsSubQuiz={(subQuizId) => {
+                    setResultsSubQuizId(subQuizId);
+                    if (publicViewMode === "leaderboard" && quizId) {
+                      emitPublicViewSet({
+                        mode: "leaderboard",
+                        leaderboardSubQuizId: subQuizId,
+                      });
+                    }
+                  }}
                 />
               )}
               {activeSection === "report" && (
