@@ -1067,9 +1067,11 @@ export function QuestionPopupCard(props: QuestionPopupCardProps) {
     transform: isSelected ? "scale(1.03)" : "scale(1)",
     boxShadow: "none",
     position: "relative",
-    justifyContent: "center",
+    justifyContent: "flex-start",
+    textAlign: "left",
+    whiteSpace: "normal",
     pl: 4.5,
-    pr: 4.5,
+    pr: 2,
     "& .MuiButton-startIcon": {
       position: "absolute",
       top: 8,
@@ -1140,6 +1142,7 @@ export function QuestionPopupCard(props: QuestionPopupCardProps) {
               sx={{
                 fontWeight: 700,
                 lineHeight: 1.2,
+                textAlign: "left",
                 fontSize: {
                   xs: `${mobileQuestionFontRem}rem`,
                   sm: `${desktopQuestionFontRem}rem`,
@@ -1150,12 +1153,13 @@ export function QuestionPopupCard(props: QuestionPopupCardProps) {
               {question.text}
             </Typography>
             {question.type !== "tag_cloud" && question.type !== "ranking" && (
-              <Stack direction="row" spacing={1.25} flexWrap="wrap" useFlexGap sx={{ pb: 2 }}>
+              <Stack spacing={1.25} sx={{ width: "100%", alignItems: "stretch", pb: 2 }}>
                 {question.options.map((option) => {
                   const isSelected = displayedSelected.includes(option.id);
                   return (
                     <Button
                       key={option.id}
+                      fullWidth
                       variant={isSelected ? "contained" : "outlined"}
                       color={isSelected ? "primary" : "inherit"}
                       sx={optionButtonSx(isSelected)}
@@ -1237,6 +1241,7 @@ export function QuestionPopupCard(props: QuestionPopupCardProps) {
                               textTransform: "uppercase",
                               letterSpacing: 0.02,
                               color: "text.secondary",
+                              textAlign: "left",
                             }}
                           >
                             {option.text}
