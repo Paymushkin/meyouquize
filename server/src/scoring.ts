@@ -9,6 +9,7 @@ export interface ScoringQuestionOption {
 export interface ScoringQuestion {
   type: QuestionType;
   options: ScoringQuestionOption[];
+  acceptAnyAnswerAsCorrect?: boolean;
 }
 
 function normalizeSelection(ids: string[]): string[] {
@@ -16,6 +17,10 @@ function normalizeSelection(ids: string[]): string[] {
 }
 
 export function evaluateAnswer(question: ScoringQuestion, selectedOptionIds: string[]): boolean {
+  if (question.acceptAnyAnswerAsCorrect) {
+    if (question.type === QuestionType.SINGLE) return selectedOptionIds.length === 1;
+    return selectedOptionIds.length > 0;
+  }
   const correctIds = normalizeSelection(
     question.options.filter((o) => o.isCorrect).map((o) => o.id),
   );

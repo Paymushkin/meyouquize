@@ -60,6 +60,8 @@ model Question {
   isClosed    Boolean       @default(false)
   /** POLL: баллы не начисляются */
   scoringMode ScoringMode   @default(QUIZ)
+  /** Для SINGLE/MULTI в режиме QUIZ: любой выбранный вариант считается правильным и даёт полный балл. */
+  acceptAnyAnswerAsCorrect Boolean @default(false)
   /** Голосования комнаты: показывать на проекторе ники первых верно ответивших (если включено глобально). */
   projectorShowFirstCorrect Boolean @default(true)
   /** Сколько первых верно ответивших показывать на проекторе (1–20), если projectorShowFirstCorrect. */

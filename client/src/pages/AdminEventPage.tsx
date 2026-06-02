@@ -34,6 +34,8 @@ import {
   Accordion,
   AccordionDetails,
   AccordionSummary,
+  Checkbox,
+  FormControlLabel,
   Tooltip,
   Typography,
 } from "@mui/material";
@@ -1920,6 +1922,7 @@ export function AdminEventPage() {
         const next = { ...q, ...patch };
         if (patch.type === "tag_cloud") {
           next.editorQuizMode = true;
+          next.acceptAnyAnswerAsCorrect = false;
           if (next.options.length < 2) {
             next.options = [
               { text: "", isCorrect: true },
@@ -1934,6 +1937,7 @@ export function AdminEventPage() {
           }
         } else if (patch.type === "ranking") {
           next.editorQuizMode = true;
+          next.acceptAnyAnswerAsCorrect = false;
           next.rankingKind = next.rankingKind ?? "jury";
           if (!next.rankingPlayerHint?.trim()) {
             next.rankingPlayerHint =
@@ -1957,6 +1961,7 @@ export function AdminEventPage() {
                 : Array.from({ length: n }, (_, j) => j + 1);
           }
         } else if (patch.type === "single" || patch.type === "multi") {
+          next.acceptAnyAnswerAsCorrect = next.acceptAnyAnswerAsCorrect === true;
           if (q.type === "tag_cloud") {
             next.editorQuizMode = true;
             if (next.options.length > 0 && !next.options.some((o) => o.isCorrect)) {
@@ -1964,7 +1969,11 @@ export function AdminEventPage() {
             }
           }
         }
-        if (patch.type === "single" && isEditorQuizMode(next)) {
+        if (
+          patch.type === "single" &&
+          isEditorQuizMode(next) &&
+          next.acceptAnyAnswerAsCorrect !== true
+        ) {
           let firstCorrect = next.options.findIndex((o) => o.isCorrect);
           if (firstCorrect === -1 && next.options.length > 0) {
             firstCorrect = 0;
@@ -4729,6 +4738,7 @@ export function AdminEventPage() {
                       updateQuestion(selectedQuestionIndex, {
                         type: "single",
                         editorQuizMode: false,
+                        acceptAnyAnswerAsCorrect: false,
                         options: questionForms[selectedQuestionIndex].options.map((opt) => ({
                           ...opt,
                           isCorrect: false,
@@ -4773,6 +4783,25 @@ export function AdminEventPage() {
                       maxWidth: "100%",
                     }}
                     helperText="От 1 до 5"
+                  />
+                ) : null}
+                {isEditorQuizMode(questionForms[selectedQuestionIndex]) &&
+                (questionForms[selectedQuestionIndex].type === "single" ||
+                  questionForms[selectedQuestionIndex].type === "multi") ? (
+                  <FormControlLabel
+                    control={
+                      <Checkbox
+                        checked={
+                          questionForms[selectedQuestionIndex].acceptAnyAnswerAsCorrect === true
+                        }
+                        onChange={(e) =>
+                          updateQuestion(selectedQuestionIndex, {
+                            acceptAnyAnswerAsCorrect: e.target.checked,
+                          })
+                        }
+                      />
+                    }
+                    label="Любой ответ правильный"
                   />
                 ) : null}
                 {isEditorQuizMode(questionForms[selectedQuestionIndex]) &&

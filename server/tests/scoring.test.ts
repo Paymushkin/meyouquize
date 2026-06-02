@@ -37,6 +37,32 @@ describe("evaluateAnswer", () => {
     expect(evaluateAnswer(question, ["a"])).toBe(false);
     expect(evaluateAnswer(question, ["a", "c"])).toBe(false);
   });
+
+  it("accepts any selected option when flag is enabled", () => {
+    const singleQuestion = {
+      type: QuestionType.SINGLE,
+      acceptAnyAnswerAsCorrect: true,
+      options: [
+        { id: "a", isCorrect: true },
+        { id: "b", isCorrect: false },
+      ],
+    };
+    expect(evaluateAnswer(singleQuestion, ["a"])).toBe(true);
+    expect(evaluateAnswer(singleQuestion, ["b"])).toBe(true);
+    expect(evaluateAnswer(singleQuestion, ["a", "b"])).toBe(false);
+
+    const multiQuestion = {
+      type: QuestionType.MULTI,
+      acceptAnyAnswerAsCorrect: true,
+      options: [
+        { id: "a", isCorrect: true },
+        { id: "b", isCorrect: false },
+      ],
+    };
+    expect(evaluateAnswer(multiQuestion, ["b"])).toBe(true);
+    expect(evaluateAnswer(multiQuestion, ["a", "b"])).toBe(true);
+    expect(evaluateAnswer(multiQuestion, [])).toBe(false);
+  });
 });
 
 describe("evaluateRankingAnswer", () => {

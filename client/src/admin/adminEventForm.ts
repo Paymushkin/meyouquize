@@ -21,6 +21,8 @@ export type QuestionForm = {
   type: QuestionType;
   /** В подквизе: переключатель опрос/квиз (баллы). У голосований комнаты не используется для single/multi — правильные ответы задаются всегда (без баллов). */
   editorQuizMode: boolean;
+  /** Для single/multi в режиме квиза: любой выбранный вариант засчитывается как правильный. */
+  acceptAnyAnswerAsCorrect?: boolean;
   points: number;
   maxAnswers: number;
   isActive?: boolean;
@@ -56,6 +58,7 @@ export type AdminEventRoomQuestion = {
   order: number;
   subQuizId?: string | null;
   scoringMode?: "POLL" | "QUIZ";
+  acceptAnyAnswerAsCorrect?: boolean;
   projectorShowFirstCorrect?: boolean;
   projectorFirstCorrectWinnersCount?: number;
   rankingPointsByRank?: unknown;
@@ -167,6 +170,7 @@ export function createEmptyQuestion(subQuizId: string | null = null): QuestionFo
     text: "",
     type: "single",
     editorQuizMode: true,
+    acceptAnyAnswerAsCorrect: false,
     points: 1,
     maxAnswers: 3,
     showVoteCount: false,
@@ -225,6 +229,7 @@ export function toQuestionReplaceInput(q: QuestionForm) {
     points: coerceQuestionPoints(q.points),
     maxAnswers: coerceMaxAnswers(q.maxAnswers),
     scoringMode,
+    acceptAnyAnswerAsCorrect: q.acceptAnyAnswerAsCorrect === true,
     projectorShowFirstCorrect: q.projectorShowFirstCorrect ?? true,
     projectorFirstCorrectWinnersCount: Math.max(
       1,
@@ -358,11 +363,12 @@ export function validateQuestionFormEntry(q: QuestionForm, index: number): strin
   }
 
   const correctCount = q.options.reduce((n, o) => n + (o.isCorrect ? 1 : 0), 0);
+  const acceptAnyAnswer = q.acceptAnyAnswerAsCorrect === true;
 
-  if (correctCount < 1) {
+  if (!acceptAnyAnswer && correctCount < 1) {
     return `Вопрос ${label}: отметьте хотя бы один правильный вариант (для подсказки на экране и списка первых верно ответивших).`;
   }
-  if (q.type === "single" && correctCount !== 1) {
+  if (!acceptAnyAnswer && q.type === "single" && correctCount !== 1) {
     return `Вопрос ${label}: при типе «один правильный» отметьте ровно один вариант (сейчас отмечено: ${correctCount}).`;
   }
   return null;
@@ -444,6 +450,7 @@ export function mapLoadedRoomQuestions(
               ? "ranking"
               : "tag_cloud",
       editorQuizMode: q.scoringMode === undefined || q.scoringMode === "QUIZ",
+      acceptAnyAnswerAsCorrect: q.acceptAnyAnswerAsCorrect === true,
       points: coerceQuestionPoints(q.points),
       maxAnswers: coerceMaxAnswers(q.maxAnswers) ?? 3,
       isActive: q.isActive,
@@ -492,6 +499,7 @@ export function mergeServerQuestionsIntoForms(
               ? "ranking"
               : "tag_cloud",
       editorQuizMode: q.scoringMode === undefined || q.scoringMode === "QUIZ",
+      acceptAnyAnswerAsCorrect: q.acceptAnyAnswerAsCorrect === true,
       points: coerceQuestionPoints(q.points),
       maxAnswers: coerceMaxAnswers(q.maxAnswers) ?? 3,
       isActive: q.isActive,

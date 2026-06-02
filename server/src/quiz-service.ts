@@ -116,6 +116,8 @@ export type QuestionReplaceInput = {
   points: number;
   maxAnswers?: number;
   scoringMode?: "poll" | "quiz";
+  /** Для SINGLE/MULTI в режиме QUIZ: любой выбранный ответ засчитывается как правильный. */
+  acceptAnyAnswerAsCorrect?: boolean;
   /** Показывать победителей на проекторе для этого вопроса (вместе с глобальной настройкой комнаты). */
   projectorShowFirstCorrect?: boolean;
   projectorFirstCorrectWinnersCount?: number;
@@ -282,6 +284,12 @@ function optionsForReplaceQuestion(
   return q.options
     .filter((o) => o.text.trim())
     .map((o) => ({ text: o.text.trim(), isCorrect: true }));
+}
+
+function acceptAnyAnswerAsCorrectForReplaceQuestion(q: QuestionReplaceInput): boolean {
+  if (q.type !== "single" && q.type !== "multi") return false;
+  if (q.scoringMode === "poll") return false;
+  return q.acceptAnyAnswerAsCorrect === true;
 }
 
 function rankingQuestionCreateData(q: QuestionReplaceInput) {
@@ -540,6 +548,7 @@ export async function replaceRoomContent(eventName: string, content: RoomContent
         points: pointsForReplaceQuestion(q),
         maxAnswers: maxAnswersForReplaceQuestion(q),
         scoringMode: mode,
+        acceptAnyAnswerAsCorrect: acceptAnyAnswerAsCorrectForReplaceQuestion(q),
         projectorShowFirstCorrect: q.projectorShowFirstCorrect ?? true,
         projectorFirstCorrectWinnersCount: Math.max(
           1,
@@ -825,6 +834,7 @@ export async function getQuizPublicState(quizId: string) {
       scoringMode: q.scoringMode === ScoringMode.POLL ? "poll" : "quiz",
       maxAnswers: q.maxAnswers,
       options: q.options.map((o) => ({ id: o.id, text: o.text })),
+      acceptAnyAnswerAsCorrect: q.acceptAnyAnswerAsCorrect,
       isClosed: q.isClosed,
       rankingKind: q.type === QuestionType.RANKING ? rankingKindToApi(q.rankingKind) : undefined,
       rankingPlayerHint:
@@ -847,6 +857,7 @@ export async function getQuizPublicState(quizId: string) {
           scoringMode: activeQuestion.scoringMode === ScoringMode.POLL ? "poll" : "quiz",
           maxAnswers: activeQuestion.maxAnswers,
           options: activeQuestion.options.map((o) => ({ id: o.id, text: o.text })),
+          acceptAnyAnswerAsCorrect: activeQuestion.acceptAnyAnswerAsCorrect,
           isClosed: activeQuestion.isClosed,
           stepIndex: activeStepIndex,
           stepTotal: activeStepTotal,
@@ -2339,7 +2350,13 @@ export async function submitAnswer(payload: {
     isCorrect = evaluated.isCorrect;
     scoreAwarded = evaluated.scoreAwarded;
   } else if (question.type !== QuestionType.TAG_CLOUD) {
-    isCorrect = evaluateAnswer(question as QuestionWithOptions, selected);
+    isCorrect = evaluateAnswer(
+      {
+        ...(question as QuestionWithOptions),
+        acceptAnyAnswerAsCorrect: question.acceptAnyAnswerAsCorrect,
+      },
+      selected,
+    );
     scoreAwarded = question.scoringMode === ScoringMode.QUIZ && isCorrect ? question.points : 0;
   }
 

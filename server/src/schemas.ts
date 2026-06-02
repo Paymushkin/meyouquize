@@ -35,6 +35,7 @@ const questionSchema = z
     points: z.coerce.number().int().min(1).max(10_000).default(1),
     maxAnswers: z.coerce.number().int().min(1).max(5).optional(),
     scoringMode: z.enum(["poll", "quiz"]).optional(),
+    acceptAnyAnswerAsCorrect: z.boolean().optional(),
     projectorShowFirstCorrect: z.boolean().optional(),
     projectorFirstCorrectWinnersCount: z.number().int().min(1).max(20).optional(),
     rankingPointsByRank: z.array(z.number().int().min(0).max(10_000)).nullable().optional(),

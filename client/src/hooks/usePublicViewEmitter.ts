@@ -13,6 +13,11 @@ import type {
   RandomizerMode,
 } from "../features/randomizer/randomizerLogic";
 
+function sanitizeHexColor(value: string, fallback: string): string {
+  const trimmed = value.trim();
+  return /^#[0-9a-fA-F]{6}$/.test(trimmed) ? trimmed : fallback;
+}
+
 type QuestionViewState = {
   id?: string;
   showVoteCount?: boolean;
@@ -235,6 +240,14 @@ export function usePublicViewEmitter(params: UsePublicViewEmitterParams) {
             : undefined;
       const leaderboardSubQuizIdForEmit =
         leaderboardSubQuizIdRaw !== undefined ? String(leaderboardSubQuizIdRaw).trim() : "";
+      const safeVoteQuestionTextColor = sanitizeHexColor(
+        patch.voteQuestionTextColor ?? voteQuestionTextColor,
+        "#1f1f1f",
+      );
+      const safeVoteProgressBarColor = sanitizeHexColor(
+        patch.voteProgressBarColor ?? voteProgressBarColor,
+        "#1976d2",
+      );
       const nextPayload = {
         quizId,
         mode: nextMode,
@@ -261,10 +274,10 @@ export function usePublicViewEmitter(params: UsePublicViewEmitterParams) {
         cloudTagPadding: patch.cloudTagPadding ?? cloudTagPadding,
         cloudSpiral: patch.cloudSpiral ?? cloudSpiral,
         cloudAnimationStrength: patch.cloudAnimationStrength ?? cloudAnimationStrength,
-        voteQuestionTextColor: patch.voteQuestionTextColor ?? voteQuestionTextColor,
+        voteQuestionTextColor: safeVoteQuestionTextColor,
         voteOptionTextColor: patch.voteOptionTextColor ?? voteOptionTextColor,
         voteProgressTrackColor: patch.voteProgressTrackColor ?? voteProgressTrackColor,
-        voteProgressBarColor: patch.voteProgressBarColor ?? voteProgressBarColor,
+        voteProgressBarColor: safeVoteProgressBarColor,
         showFirstCorrectAnswerer: patch.showFirstCorrectAnswerer ?? showFirstCorrectAnswerer,
         firstCorrectWinnersCount: patch.firstCorrectWinnersCount ?? firstCorrectWinnersCount,
         showEventTitleOnPlayer: patch.showEventTitleOnPlayer ?? showEventTitleOnPlayer,
