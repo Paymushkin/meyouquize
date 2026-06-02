@@ -1,0 +1,21 @@
+{
+  "run_http": true,
+  "http_fetch_quiz_page": true,
+  "http_vus": 200,
+  "http_duration": "30s",
+  "player_count": 200,
+  "run_submit": false,
+  "submit_players": 0,
+  "run_dashboard": false,
+  "dashboard_wait_ms": 2500,
+  "hold_ms": 2000,
+  "join_ramp_ms": 30000,
+  "join_distribution": "normal",
+  "join_ack_timeout_ms": 20000,
+  "submit_timeout_ms": 20000,
+  "run_walkthrough": true,
+  "walkthrough_timeout_ms": 200000,
+  "walkthrough_vote_window_ms": 20000,
+  "run_walkthrough_auto_advance": true,
+  "walkthrough_step_pause_ms": 500
+}

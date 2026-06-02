@@ -8,7 +8,7 @@ PROFILE_FILE="${LOAD_DIR}/profiles/${PROFILE_NAME}.json"
 
 if [[ ! -f "${PROFILE_FILE}" ]]; then
   echo "Unknown profile: ${PROFILE_NAME}"
-  echo "Available: smoke, nominal, nominal-ui, nominal-admin, nominal-admin-500, peak, soak"
+  echo "Available: smoke, nominal, nominal-ui, nominal-admin, nominal-admin-500, peak, soak, quiz-519736-200-walkthrough"
   exit 1
 fi
 
@@ -50,6 +50,7 @@ SUBMIT_TIMEOUT_MS="$(parse_json_default "${PROFILE_FILE}" submit_timeout_ms 1200
 JOIN_RAMP_MS="$(parse_json_default "${PROFILE_FILE}" join_ramp_ms 0)"
 JOIN_DISTRIBUTION="$(parse_json_default "${PROFILE_FILE}" join_distribution uniform)"
 JOIN_ACK_TIMEOUT_MS="$(parse_json_default "${PROFILE_FILE}" join_ack_timeout_ms 15000)"
+HTTP_FETCH_QUIZ_PAGE="$(parse_json_default "${PROFILE_FILE}" http_fetch_quiz_page false)"
 SUBMIT_ON_JOIN="$(parse_json_default "${PROFILE_FILE}" submit_on_join false)"
 SUBMIT_DELAY_MIN_MS="$(parse_json_default "${PROFILE_FILE}" submit_delay_min_ms 1000)"
 SUBMIT_DELAY_MAX_MS="$(parse_json_default "${PROFILE_FILE}" submit_delay_max_ms 5000)"
@@ -63,7 +64,7 @@ WALKTHROUGH_STEP_PAUSE_MS="$(parse_json_default "${PROFILE_FILE}" walkthrough_st
 echo "[load] profile=${PROFILE_NAME}"
 echo "[load] out=${out_dir}"
 echo "[load] base=${BASE_URL} slug=${QUIZ_SLUG}"
-echo "[load] run_http=${RUN_HTTP}"
+echo "[load] run_http=${RUN_HTTP} http_fetch_quiz_page=${HTTP_FETCH_QUIZ_PAGE}"
 echo "[load] hold_ms=${HOLD_MS}"
 echo "[load] join_ramp_ms=${JOIN_RAMP_MS} join_distribution=${JOIN_DISTRIBUTION} join_ack_timeout_ms=${JOIN_ACK_TIMEOUT_MS}"
 echo "[load] realistic_vote=${REALISTIC_VOTE} vote_window_ms=${VOTE_WINDOW_MS} vote_distribution=${VOTE_DISTRIBUTION} submit_timeout_ms=${SUBMIT_TIMEOUT_MS}"
@@ -77,6 +78,8 @@ if [[ "${RUN_HTTP}" == "true" ]]; then
   k6 run \
     --summary-export "${out_dir}/k6-summary.json" \
     -e BASE_URL="${BASE_URL}" \
+    -e QUIZ_SLUG="${QUIZ_SLUG}" \
+    -e HTTP_FETCH_QUIZ_PAGE="${HTTP_FETCH_QUIZ_PAGE}" \
     -e ADMIN_LOGIN="${ADMIN_LOGIN:-}" \
     -e ADMIN_PASSWORD="${ADMIN_PASSWORD:-}" \
     -e HTTP_VUS="${HTTP_VUS}" \

@@ -25,6 +25,7 @@ function buildOptionLabelSx(voteOptionTextColor: string) {
     textTransform: "none" as const,
     color: voteOptionTextColor,
     fontWeight: 400,
+    lineHeight: 1.2,
   };
 }
 

@@ -29,8 +29,8 @@ export function ProjectorQuestionSection(props: ProjectorQuestionSectionProps) {
     selectedQuestion.optionStats.length > 6
       ? Math.min(0.45, (selectedQuestion.optionStats.length - 6) * 0.08)
       : 0;
-  const desktopQuestionFontRem = Math.max(1.85, 3.05 - longTextPenalty - optionsCountPenalty);
-  const mobileQuestionFontRem = Math.max(1.6, desktopQuestionFontRem - 0.35);
+  const desktopQuestionFontRem = Math.max(2.1, 3.5 - longTextPenalty - optionsCountPenalty);
+  const mobileQuestionFontRem = Math.max(1.75, desktopQuestionFontRem - 0.35);
   const waitingForFirstWinner =
     view.showFirstCorrectAnswerer &&
     !showProjectorWinnersHero &&
@@ -149,7 +149,7 @@ export function ProjectorQuestionSection(props: ProjectorQuestionSectionProps) {
           {!isTagCloudQuestion && (
             <Typography
               variant="h3"
-              align="center"
+              align="left"
               sx={{
                 fontWeight: 700,
                 mb: 0,

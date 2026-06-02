@@ -610,6 +610,7 @@ async function runWalkthroughFlow(joinedClients) {
   let walkthroughSubmitOk = 0;
   let walkthroughSubmitFail = 0;
   const walkthroughFailReasons = new Map();
+  let idleWithoutQuestionSince = 0;
 
   while (Date.now() - walkthroughStart < walkthroughTimeoutMs) {
     let targetState = null;
@@ -635,9 +636,19 @@ async function runWalkthroughFlow(joinedClients) {
     }
 
     if (!targetState || !targetQuestion?.id) {
+      if (answeredQuestionIds.size > 0) {
+        if (idleWithoutQuestionSince === 0) idleWithoutQuestionSince = Date.now();
+        if (Date.now() - idleWithoutQuestionSince >= 3000) {
+          console.info(
+            `[socket-load] walkthrough: no more unanswered questions after ${answeredQuestionIds.size} steps — finishing early`,
+          );
+          break;
+        }
+      }
       await sleep(250);
       continue;
     }
+    idleWithoutQuestionSince = 0;
 
     const question = targetQuestion;
     const quizId = targetState.id;

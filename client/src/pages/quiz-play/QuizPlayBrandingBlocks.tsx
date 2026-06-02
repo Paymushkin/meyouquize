@@ -70,6 +70,10 @@ export function buildQuizPlayContainerSx(params: QuizPlayContainerSxParams): SxP
         fontFamily: brandFontFamily,
         fontStyle: "normal",
       },
+    "& .mq-event-title.MuiTypography-root": {
+      textAlign: "left",
+      "--Typography-textAlign": "left",
+    },
     pt: 2,
     maxWidth: "678px !important",
     pb: {
@@ -115,53 +119,52 @@ export function EventTitleBlock(props: EventTitleBlockProps) {
     return null;
   }
   return (
-    <Box
+    <Stack
+      spacing={1}
+      alignItems="stretch"
       sx={{
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        minHeight: joined ? 0 : { xs: 96, sm: 128 },
         width: "100%",
+        minHeight: joined ? 0 : { xs: 96, sm: 128 },
         ...(hasActiveQuestion ? { minHeight: 0, mb: 2 } : {}),
         ...(joined ? { mb: 4 } : {}),
-        ...(!joined ? { flex: 1 } : {}),
+        ...(!joined ? { flex: 1, justifyContent: "flex-start" } : {}),
       }}
     >
-      <Stack spacing={1} alignItems="center" sx={{ width: "100%" }}>
-        {safeBrandLogoUrl ? (
-          <Box
-            component="img"
-            src={resolveClientAssetUrl(safeBrandLogoUrl)}
-            alt="Логотип"
-            sx={{
-              alignSelf: "flex-start",
-              mb: 1.5,
-              maxHeight: 56,
-              maxWidth: "min(60vw, 280px)",
-              objectFit: "contain",
-            }}
-          />
-        ) : null}
-        {normalizedTitleText ? (
-          <Typography
-            variant="h3"
-            gutterBottom
-            align="left"
-            sx={{
-              width: "100%",
-              fontWeight: 400,
-              fontStyle: "normal",
-              letterSpacing: 0.2,
-              fontSize: "clamp(1.6rem, 4.8vw, 2.8rem)",
-              whiteSpace: "pre-line",
-              mb: 4,
-            }}
-          >
-            {titleText}
-          </Typography>
-        ) : null}
-      </Stack>
-    </Box>
+      {safeBrandLogoUrl ? (
+        <Box
+          component="img"
+          src={resolveClientAssetUrl(safeBrandLogoUrl)}
+          alt="Логотип"
+          sx={{
+            alignSelf: "flex-start",
+            mb: 1.5,
+            maxHeight: 56,
+            maxWidth: "min(60vw, 280px)",
+            objectFit: "contain",
+          }}
+        />
+      ) : null}
+      {normalizedTitleText ? (
+        <Typography
+          className="mq-event-title"
+          variant="h3"
+          gutterBottom
+          align="left"
+          sx={{
+            width: "100%",
+            alignSelf: "stretch",
+            fontWeight: 400,
+            fontStyle: "normal",
+            letterSpacing: 0.2,
+            fontSize: "clamp(2.4rem, 7.2vw, 4.2rem)",
+            whiteSpace: "pre-line",
+            mb: 4,
+          }}
+        >
+          {titleText}
+        </Typography>
+      ) : null}
+    </Stack>
   );
 }
 
