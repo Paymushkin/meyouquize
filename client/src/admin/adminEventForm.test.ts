@@ -58,6 +58,7 @@ describe("mapLoadedRoomQuestions", () => {
           type: "SINGLE",
           scoringMode: "POLL",
           points: 0,
+          maxAnswers: 1,
           order: 0,
           isActive: false,
           options: [
