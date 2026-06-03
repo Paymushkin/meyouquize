@@ -597,8 +597,8 @@ export function QuestionChart(props: QuestionChartProps) {
                     py: { xs: 1.25, md: 1.6 },
                     display: "flex",
                     alignItems: "center",
-                    justifyContent: "center",
-                    textAlign: "center",
+                    justifyContent: "flex-start",
+                    textAlign: "left",
                     border: "2px solid",
                     borderColor: "rgba(255,255,255,0.4)",
                     bgcolor: "rgba(255,255,255,0.08)",
@@ -610,6 +610,7 @@ export function QuestionChart(props: QuestionChartProps) {
                     sx={{
                       ...row.optionLabelSx,
                       lineHeight: 1.2,
+                      textAlign: "left",
                       fontSize: {
                         xs: `${optionsAnswerMobileRem}rem`,
                         md: `${optionsAnswerDesktopRem}rem`,
