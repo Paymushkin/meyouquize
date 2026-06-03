@@ -1,7 +1,11 @@
 import EmojiEventsIcon from "@mui/icons-material/EmojiEvents";
 import { Box, Paper, Stack, Typography } from "@mui/material";
 import { alpha } from "@mui/material/styles";
-import { isVoteQuestionTextGradient, voteQuestionTextTypographyStyle } from "@meyouquize/shared";
+import {
+  isVoteQuestionTextGradient,
+  voteFillOutlineColor,
+  voteQuestionTextTypographyStyle,
+} from "@meyouquize/shared";
 
 export type ProjectorFirstCorrectHeroProps = {
   questionText: string;
@@ -15,17 +19,19 @@ export type ProjectorFirstCorrectHeroProps = {
  */
 export function ProjectorFirstCorrectHero(props: ProjectorFirstCorrectHeroProps) {
   const { questionText, textColor, winnerNames } = props;
+  /** В блоке победителя — сплошной цвет из брендинга (для градиента берём начальный stop). */
+  const winnerLabelColor = voteFillOutlineColor(textColor, "#ffffff");
 
   return (
     <Box
       sx={{
         width: "100%",
-        maxWidth: "min(92vw, 640px)",
+        maxWidth: "min(96vw, 880px)",
         mx: "auto",
         px: { xs: 1.5, sm: 2 },
         display: "flex",
         flexDirection: "column",
-        alignItems: "center",
+        alignItems: "stretch",
         textAlign: "center",
       }}
     >
@@ -46,12 +52,17 @@ export function ProjectorFirstCorrectHero(props: ProjectorFirstCorrectHeroProps)
       <Paper
         elevation={0}
         sx={{
-          px: { xs: 3, sm: 5 },
+          width: "100%",
+          px: { xs: 3, sm: 6 },
           py: { xs: 4, sm: 5 },
           borderRadius: 4,
           textAlign: "center",
           border: "1px solid",
-          borderColor: (theme) => alpha(textColor, theme.palette.mode === "dark" ? 0.28 : 0.22),
+          borderColor: (theme) =>
+            alpha(
+              voteFillOutlineColor(textColor, "#ffffff"),
+              theme.palette.mode === "dark" ? 0.28 : 0.22,
+            ),
           bgcolor: "transparent",
           boxShadow: "none",
         }}
@@ -84,8 +95,7 @@ export function ProjectorFirstCorrectHero(props: ProjectorFirstCorrectHeroProps)
             sx={{
               letterSpacing: "0.22em",
               fontWeight: 700,
-              color: textColor,
-              opacity: 0.8,
+              color: winnerLabelColor,
             }}
           >
             {winnerNames.length === 1
@@ -100,7 +110,8 @@ export function ProjectorFirstCorrectHero(props: ProjectorFirstCorrectHeroProps)
                 fontWeight: 800,
                 lineHeight: 1.2,
                 wordBreak: "break-word",
-                color: textColor,
+                color: winnerLabelColor,
+                width: "100%",
               }}
             >
               {winnerNames[0]}
@@ -124,9 +135,9 @@ export function ProjectorFirstCorrectHero(props: ProjectorFirstCorrectHeroProps)
                     sx={{
                       fontWeight: 800,
                       fontVariantNumeric: "tabular-nums",
-                      color: textColor,
-                      opacity: 0.65,
                       minWidth: "1.25em",
+                      color: winnerLabelColor,
+                      opacity: 0.65,
                     }}
                   >
                     {i + 1}.
@@ -134,7 +145,7 @@ export function ProjectorFirstCorrectHero(props: ProjectorFirstCorrectHeroProps)
                   <Typography
                     component="span"
                     variant="h4"
-                    sx={{ fontWeight: 700, wordBreak: "break-word", color: textColor }}
+                    sx={{ fontWeight: 700, wordBreak: "break-word", color: winnerLabelColor }}
                   >
                     {name}
                   </Typography>
