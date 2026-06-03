@@ -11,6 +11,7 @@ import {
   isQuizResultsTileId,
   parseQuizResultsSubQuizIdFromTileId,
   quizResultsTileIdForSubQuiz,
+  prunePlayerUiRefsForRoom,
   type CloudWordCount,
   type PublicBanner,
   type PublicReactionWidgetStats,
@@ -116,6 +117,7 @@ export {
   isQuizResultsTileId,
   parseQuizResultsSubQuizIdFromTileId,
   quizResultsTileIdForSubQuiz,
+  prunePlayerUiRefsForRoom,
 };
 
 export function toBrandingState(payload: Partial<PublicViewPayload>): BrandingState {

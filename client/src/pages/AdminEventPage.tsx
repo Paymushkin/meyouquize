@@ -86,6 +86,7 @@ import {
   quizResultsTileIdForSubQuiz,
   withQuizResultsTileLast,
   normalizePublicViewState,
+  prunePlayerUiRefsForRoom,
   toBrandingState,
   type CloudManualStateByQuestion,
   type PublicReactionWidgetStats,
@@ -1814,6 +1815,46 @@ export function AdminEventPage() {
     });
     const persisted = await persistQuestions(nextForms, nextSheets);
     if (persisted !== false) {
+      const validSubQuizIds = new Set(nextSheets.map((s) => s.id));
+      const validQuestionIds = new Set(
+        nextForms
+          .map((q) => q.id)
+          .filter((id): id is string => typeof id === "string" && id.trim().length > 0),
+      );
+      const prunedPlayerUi = prunePlayerUiRefsForRoom(
+        {
+          playerQuizResultsSubQuizIds,
+          playerQuizResultsSubQuizId,
+          playerQuizResultsTileVisible,
+          playerTilesOrder,
+          playerVisibleResultQuestionIds,
+          leaderboardSubQuizId: resultsSubQuizId,
+          reportVoteQuestionIds,
+          reportQuizQuestionIds,
+          reportQuizSubQuizIds,
+        },
+        validSubQuizIds,
+        validQuestionIds,
+      );
+      const nextTilesOrder = buildEffectiveTilesOrder(
+        prunedPlayerUi.playerTilesOrder,
+        playerBanners,
+      );
+      setPlayerQuizResultsSubQuizIds(prunedPlayerUi.playerQuizResultsSubQuizIds);
+      setPlayerQuizResultsSubQuizId(prunedPlayerUi.playerQuizResultsSubQuizId);
+      setPlayerQuizResultsTileVisible(prunedPlayerUi.playerQuizResultsTileVisible);
+      setPlayerTilesOrder(nextTilesOrder);
+      setPlayerVisibleResultQuestionIds(prunedPlayerUi.playerVisibleResultQuestionIds);
+      if (resultsSubQuizId !== prunedPlayerUi.leaderboardSubQuizId) {
+        setResultsSubQuizId(prunedPlayerUi.leaderboardSubQuizId);
+      }
+      setReportVoteQuestionIds(prunedPlayerUi.reportVoteQuestionIds);
+      setReportQuizQuestionIds(prunedPlayerUi.reportQuizQuestionIds);
+      setReportQuizSubQuizIds(prunedPlayerUi.reportQuizSubQuizIds);
+      emitPublicViewSet({
+        ...prunedPlayerUi,
+        playerTilesOrder: nextTilesOrder,
+      });
       setMessage("Квиз удалён");
       if (nextForms.length === 0) setQuestionId("");
     }

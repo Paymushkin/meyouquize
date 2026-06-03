@@ -153,6 +153,23 @@ function defaultRankingPlayerHint(kind: "quiz" | "jury"): string {
     : "Расставьте варианты от лучшего к худшему. Баллы по позициям задаёт ведущий; зачёт в общей таблице не меняется.";
 }
 
+/**
+ * Голосования комнаты (subQuizId=null) на сервере всегда scoringMode poll,
+ * но в редакторе «один/несколько правильных» задаются через isCorrect на вариантах.
+ */
+export function editorQuizModeFromLoadedQuestion(
+  q: Pick<AdminEventRoomQuestion, "type" | "scoringMode" | "options">,
+  subQuizId: string | null,
+): boolean {
+  if (subQuizId != null) {
+    return q.scoringMode === undefined || q.scoringMode === "QUIZ";
+  }
+  if (q.type === "SINGLE" || q.type === "MULTI") {
+    return q.options.some((o) => o.isCorrect);
+  }
+  return q.scoringMode === undefined || q.scoringMode === "QUIZ";
+}
+
 export type RoomContentPayload = {
   subQuizzes: Array<{
     id?: string;
@@ -449,7 +466,7 @@ export function mapLoadedRoomQuestions(
             : q.type === "RANKING"
               ? "ranking"
               : "tag_cloud",
-      editorQuizMode: q.scoringMode === undefined || q.scoringMode === "QUIZ",
+      editorQuizMode: editorQuizModeFromLoadedQuestion(q, subQuizId),
       acceptAnyAnswerAsCorrect: q.acceptAnyAnswerAsCorrect === true,
       points: coerceQuestionPoints(q.points),
       maxAnswers: coerceMaxAnswers(q.maxAnswers) ?? 3,
@@ -498,7 +515,7 @@ export function mergeServerQuestionsIntoForms(
             : q.type === "RANKING"
               ? "ranking"
               : "tag_cloud",
-      editorQuizMode: q.scoringMode === undefined || q.scoringMode === "QUIZ",
+      editorQuizMode: editorQuizModeFromLoadedQuestion(q, subQuizId),
       acceptAnyAnswerAsCorrect: q.acceptAnyAnswerAsCorrect === true,
       points: coerceQuestionPoints(q.points),
       maxAnswers: coerceMaxAnswers(q.maxAnswers) ?? 3,
