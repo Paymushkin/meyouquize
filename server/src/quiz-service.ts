@@ -5,6 +5,8 @@ import {
   normalizeTagComparable,
   parseStoredTagAnswersJson,
   type PublicViewState,
+  playerUiRefsChanged,
+  prunePublicViewForRoomContent,
 } from "@meyouquize/shared";
 import {
   Prisma,
@@ -16,7 +18,7 @@ import {
   ScoringMode,
 } from "@prisma/client";
 import { prisma } from "./prisma.js";
-import { publicViewJsonToState } from "./socket/public-view-store.js";
+import { publicViewJsonToState, saveStoredPublicView } from "./socket/public-view-store.js";
 import { parseSelectedIds, randomSlug, randomToken } from "./utils.js";
 import {
   buildTagCloudReferenceTags,
@@ -621,6 +623,22 @@ export async function replaceRoomContent(eventName: string, content: RoomContent
       },
     });
   });
+
+  const [subQuizzes, questions, roomRow] = await Promise.all([
+    prisma.subQuiz.findMany({ where: { quizId: roomId }, select: { id: true } }),
+    prisma.question.findMany({ where: { quizId: roomId }, select: { id: true } }),
+    prisma.quiz.findUnique({ where: { id: roomId }, select: { publicView: true } }),
+  ]);
+  const storedView = publicViewJsonToState(roomRow?.publicView ?? null);
+  const prunedView = prunePublicViewForRoomContent(
+    storedView,
+    new Set(subQuizzes.map((sq) => sq.id)),
+    new Set(questions.map((q) => q.id)),
+  );
+  if (playerUiRefsChanged(storedView, prunedView)) {
+    await saveStoredPublicView(roomId, prunedView);
+  }
+
   return getRoomByEventName(eventName);
 }
 
@@ -732,7 +750,11 @@ export async function getQuizPublicState(quizId: string) {
   const primarySubQuizQuestion = pickPrimaryActiveSubQuizQuestion(quiz.questions);
   const activeQuestion = primarySubQuizQuestion ?? activeQuestions[0];
   let quizProgress: QuizProgressPayload | null = null;
-  const view = publicViewJsonToState(quiz.publicView as Prisma.JsonValue | null);
+  const view = prunePublicViewForRoomContent(
+    publicViewJsonToState(quiz.publicView as Prisma.JsonValue | null),
+    new Set(subQuizzesForPlayer.map((sq) => sq.id)),
+    new Set(quiz.questions.map((q) => q.id)),
+  );
   const playerVisibleResults = await getPlayerVisibleResultsForQuiz(
     quiz.id,
     view.playerVisibleResultQuestionIds ?? [],

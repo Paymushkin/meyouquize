@@ -1246,3 +1246,10 @@ export function mergePublicViewState(
   }
   return merged;
 }
+
+export {
+  prunePlayerUiRefsForRoom,
+  prunePublicViewForRoomContent,
+  playerUiRefsChanged,
+  type PlayerUiRefsSlice,
+} from "./prunePlayerUiRefs.js";

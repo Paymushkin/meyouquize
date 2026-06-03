@@ -44,8 +44,7 @@ export function resolveEnabledQuizReportSubQuizIds(input: {
   subQuizzes?: PlayerSubQuizRef[];
 }): string[] {
   const validIds = new Set((input.subQuizzes ?? []).map((s) => s.id));
-  const filterKnown = (ids: string[]) =>
-    validIds.size === 0 ? ids : ids.filter((id) => validIds.has(id));
+  const filterKnown = (ids: string[]) => ids.filter((id) => validIds.has(id));
 
   if (Array.isArray(input.subQuizIds) && input.subQuizIds.length > 0) {
     const seen = new Set<string>();

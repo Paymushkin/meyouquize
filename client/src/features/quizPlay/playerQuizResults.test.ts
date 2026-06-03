@@ -37,6 +37,15 @@ describe("resolveEnabledQuizReportSubQuizIds", () => {
       }),
     ).toEqual(["a", "b"]);
   });
+
+  it("drops ids that are not in subQuizzes", () => {
+    expect(
+      resolveEnabledQuizReportSubQuizIds({
+        subQuizIds: ["a", "missing"],
+        subQuizzes,
+      }),
+    ).toEqual(["a"]);
+  });
 });
 
 describe("resolveQuizResultsTileTitle", () => {
