@@ -596,7 +596,7 @@ export function QuestionChart(props: QuestionChartProps) {
                     px: { xs: 2, md: 2.5 },
                     py: { xs: 1.25, md: 1.6 },
                     display: "flex",
-                    alignItems: "center",
+                    alignItems: "flex-start",
                     justifyContent: "flex-start",
                     textAlign: "left",
                     border: "2px solid",
