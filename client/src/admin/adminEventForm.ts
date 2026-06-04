@@ -23,6 +23,8 @@ export type QuestionForm = {
   editorQuizMode: boolean;
   points: number;
   maxAnswers: number;
+  /** Только UI админки: корзина «отработанные» (голосования комнаты). */
+  adminDone?: boolean;
   isActive?: boolean;
   showVoteCount?: boolean;
   showCorrectOption?: boolean;
@@ -53,6 +55,7 @@ export type AdminEventRoomQuestion = {
   points: number;
   maxAnswers: number;
   isActive: boolean;
+  adminDone?: boolean;
   order: number;
   subQuizId?: string | null;
   scoringMode?: "POLL" | "QUIZ";
@@ -247,6 +250,7 @@ export function toQuestionReplaceInput(q: QuestionForm) {
       1,
       Math.min(20, Math.trunc(q.projectorFirstCorrectWinnersCount ?? 1)),
     ),
+    adminDone: q.adminDone ?? false,
     ...(q.type === "ranking"
       ? {
           rankingPointsByRank:
@@ -464,6 +468,7 @@ export function mapLoadedRoomQuestions(
       points: coerceQuestionPoints(q.points),
       maxAnswers: coerceMaxAnswers(q.maxAnswers) ?? 3,
       isActive: q.isActive,
+      adminDone: Boolean(q.adminDone),
       showVoteCount: false,
       showQuestionTitle: true,
       projectorShowFirstCorrect: q.projectorShowFirstCorrect ?? true,
@@ -512,6 +517,7 @@ export function mergeServerQuestionsIntoForms(
       points: coerceQuestionPoints(q.points),
       maxAnswers: coerceMaxAnswers(q.maxAnswers) ?? 3,
       isActive: q.isActive,
+      adminDone: Boolean(q.adminDone),
       showVoteCount: mergeFrom.find((item) => item.id === q.id)?.showVoteCount ?? false,
       showQuestionTitle: mergeFrom.find((item) => item.id === q.id)?.showQuestionTitle ?? true,
       projectorShowFirstCorrect: q.projectorShowFirstCorrect ?? true,

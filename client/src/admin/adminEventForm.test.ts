@@ -59,6 +59,7 @@ describe("mapLoadedRoomQuestions", () => {
           scoringMode: "POLL",
           points: 0,
           maxAnswers: 1,
+          adminDone: true,
           order: 0,
           isActive: false,
           options: [
@@ -73,5 +74,6 @@ describe("mapLoadedRoomQuestions", () => {
 
     expect(form.editorQuizMode).toBe(true);
     expect(form.options[0]?.isCorrect).toBe(true);
+    expect(form.adminDone).toBe(true);
   });
 });

@@ -58,6 +58,8 @@ model Question {
   maxAnswers  Int           @default(1)
   isActive    Boolean       @default(false)
   isClosed    Boolean       @default(false)
+  /** Только UI админки: «отработанные» голосования; не влияет на isActive / isClosed. */
+  adminDone   Boolean       @default(false)
   /** POLL: баллы не начисляются */
   scoringMode ScoringMode   @default(QUIZ)
   /** Голосования комнаты: показывать на проекторе ники первых верно ответивших (если включено глобально). */

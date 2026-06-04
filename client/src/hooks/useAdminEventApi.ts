@@ -214,6 +214,37 @@ export function useAdminEventApi(params: Params) {
     [eventName, lastSavedSnapshotRef, setMessage],
   );
 
+  const patchQuestionAdminDone = useCallback(
+    async (
+      questionId: string,
+      adminDone: boolean,
+      sheets: SubQuizSheet[],
+      questions: QuestionForm[],
+      quizIdForRefresh?: string | null,
+    ) => {
+      const response = await fetch(
+        `${API_BASE}/api/admin/rooms/${encodeURIComponent(eventName)}/questions/${encodeURIComponent(questionId)}/admin-done`,
+        {
+          method: "PATCH",
+          credentials: "include",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ adminDone }),
+        },
+      );
+      if (!response.ok) {
+        setMessage("Не удалось обновить статус «отработано»");
+        return false;
+      }
+      lastSavedSnapshotRef.current = serializeRoomContent(sheets, questions);
+      setMessage("");
+      if (quizIdForRefresh) {
+        socket.emit("quiz:state:refresh", { quizId: quizIdForRefresh });
+      }
+      return true;
+    },
+    [eventName, lastSavedSnapshotRef, setMessage],
+  );
+
   const saveSubQuizTitle = useCallback(
     async (
       subQuizId: string,
@@ -286,6 +317,7 @@ export function useAdminEventApi(params: Params) {
     persistQuestions,
     lastPersistQuestionsErrorRef,
     patchQuestionProjectorSettings,
+    patchQuestionAdminDone,
     saveSubQuizTitle,
     saveQuizTitle,
   };

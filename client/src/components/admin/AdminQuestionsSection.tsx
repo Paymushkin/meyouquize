@@ -1,4 +1,6 @@
 import AddIcon from "@mui/icons-material/Add";
+import KeyboardArrowDownIcon from "@mui/icons-material/KeyboardArrowDown";
+import KeyboardArrowUpIcon from "@mui/icons-material/KeyboardArrowUp";
 import CloudQueueIcon from "@mui/icons-material/CloudQueue";
 import FormatListNumberedIcon from "@mui/icons-material/FormatListNumbered";
 import HowToVoteIcon from "@mui/icons-material/HowToVote";
@@ -11,6 +13,7 @@ import {
   CardContent,
   Collapse,
   Divider,
+  IconButton,
   LinearProgress,
   List,
   ListItemButton,
@@ -83,6 +86,11 @@ type Props = {
   ) => void;
   playerVisibleResultQuestionIds: string[];
   togglePlayerVisibleResultQuestionId: (questionId: string) => void;
+  /** Перенос в «отработанные» / обратно (только голосования комнаты). */
+  adminDoneToggle?: {
+    mode: "markDone" | "markActive";
+    onToggle: (globalIndex: number) => void;
+  };
 };
 
 export function AdminQuestionsSection(props: Props) {
@@ -120,6 +128,7 @@ export function AdminQuestionsSection(props: Props) {
     setQuestionRevealStageForQuestion,
     playerVisibleResultQuestionIds,
     togglePlayerVisibleResultQuestionId,
+    adminDoneToggle,
   } = props;
 
   function questionTypeLabel(type: QuestionForm["type"]) {
@@ -128,7 +137,7 @@ export function AdminQuestionsSection(props: Props) {
     return "Голосование";
   }
 
-  const settingsExpanded = (qIndex: number) => expandedQuestionSettingsIndex === qIndex;
+  const settingsExpanded = (globalIndex: number) => expandedQuestionSettingsIndex === globalIndex;
   const hasHeader =
     Boolean(listHeaderPrimaryAction) || listHeaderShowAddButton || listTitle.trim().length > 0;
 
@@ -242,6 +251,40 @@ export function AdminQuestionsSection(props: Props) {
                           py: 0.5,
                         }}
                       >
+                        {adminDoneToggle ? (
+                          <Tooltip
+                            title={
+                              !question.id
+                                ? "Сначала сохраните вопрос"
+                                : adminDoneToggle.mode === "markActive"
+                                  ? "Вернуть в актуальные"
+                                  : "В отработанные"
+                            }
+                          >
+                            <span>
+                              <IconButton
+                                size="small"
+                                disabled={!question.id}
+                                onClick={(event) => {
+                                  event.stopPropagation();
+                                  adminDoneToggle.onToggle(g);
+                                }}
+                                aria-label={
+                                  adminDoneToggle.mode === "markActive"
+                                    ? "Вернуть в актуальные"
+                                    : "В отработанные"
+                                }
+                                sx={{ flexShrink: 0, p: 0.25 }}
+                              >
+                                {adminDoneToggle.mode === "markActive" ? (
+                                  <KeyboardArrowUpIcon sx={{ fontSize: 18 }} />
+                                ) : (
+                                  <KeyboardArrowDownIcon sx={{ fontSize: 18 }} />
+                                )}
+                              </IconButton>
+                            </span>
+                          </Tooltip>
+                        ) : null}
                         <Tooltip title={questionTypeLabel(question.type)} enterTouchDelay={400}>
                           <Box
                             component="span"
@@ -298,7 +341,7 @@ export function AdminQuestionsSection(props: Props) {
                           (question.projectorShowFirstCorrect ?? true),
                         )}
                         questionActive={Boolean(question.isActive)}
-                        settingsExpanded={settingsExpanded(qIndex)}
+                        settingsExpanded={settingsExpanded(g)}
                         onSlideshow={(event) => {
                           event.stopPropagation();
                           runAdminQuestionSlideshowFlow({
@@ -328,9 +371,7 @@ export function AdminQuestionsSection(props: Props) {
                         }}
                         onToggleSettings={(event) => {
                           event.stopPropagation();
-                          setExpandedQuestionSettingsIndex((current) =>
-                            current === qIndex ? null : qIndex,
-                          );
+                          setExpandedQuestionSettingsIndex((current) => (current === g ? null : g));
                         }}
                         onRevealResults={(event) => {
                           event.stopPropagation();
@@ -344,11 +385,7 @@ export function AdminQuestionsSection(props: Props) {
                         }}
                       />
                     </ListItemButton>
-                    <Collapse
-                      in={expandedQuestionSettingsIndex === qIndex}
-                      timeout="auto"
-                      unmountOnExit
-                    >
+                    <Collapse in={expandedQuestionSettingsIndex === g} timeout="auto" unmountOnExit>
                       <Box
                         sx={{
                           px: 1.5,

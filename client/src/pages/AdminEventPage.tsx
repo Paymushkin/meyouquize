@@ -762,6 +762,7 @@ export function AdminEventPage() {
     persistQuestions,
     lastPersistQuestionsErrorRef,
     patchQuestionProjectorSettings,
+    patchQuestionAdminDone,
     saveQuizTitle: saveQuizTitleApi,
     saveSubQuizTitle: saveSubQuizTitleApi,
   } = useAdminEventApi({
@@ -816,10 +817,22 @@ export function AdminEventPage() {
     [questionForms],
   );
 
-  const votesSelectedListIndex = useMemo(() => {
-    const si = votesIndexMap.indexOf(selectedQuestionIndex);
+  const activeVoteIndices = useMemo(
+    () => votesIndexMap.filter((i) => !questionForms[i]?.adminDone),
+    [votesIndexMap, questionForms],
+  );
+  const doneVoteIndices = useMemo(
+    () => votesIndexMap.filter((i) => Boolean(questionForms[i]?.adminDone)),
+    [votesIndexMap, questionForms],
+  );
+  const activeVotesSelectedListIndex = useMemo(() => {
+    const si = activeVoteIndices.indexOf(selectedQuestionIndex);
     return si < 0 ? 0 : si;
-  }, [votesIndexMap, selectedQuestionIndex]);
+  }, [activeVoteIndices, selectedQuestionIndex]);
+  const doneVotesSelectedListIndex = useMemo(() => {
+    const si = doneVoteIndices.indexOf(selectedQuestionIndex);
+    return si < 0 ? 0 : si;
+  }, [doneVoteIndices, selectedQuestionIndex]);
   const availableVoteQuestions = useMemo(
     () =>
       votesIndexMap
@@ -3136,6 +3149,25 @@ export function AdminEventPage() {
     });
   }
 
+  async function toggleQuestionAdminDone(globalIndex: number) {
+    const prev = questionForms[globalIndex];
+    if (!prev?.id) {
+      setMessage("Сначала сохраните вопрос");
+      return;
+    }
+    const nextDone = !prev.adminDone;
+    const nextForms = questionForms.map((q, idx) =>
+      idx === globalIndex ? { ...q, adminDone: nextDone } : q,
+    );
+    setQuestionForms(nextForms);
+    const ok = await patchQuestionAdminDone(prev.id, nextDone, subQuizSheets, nextForms, quizId);
+    if (!ok) {
+      setQuestionForms((forms) =>
+        forms.map((q, idx) => (idx === globalIndex ? { ...q, adminDone: prev.adminDone } : q)),
+      );
+    }
+  }
+
   async function updateQuestionProjectorShowFirstCorrect(questionIndex: number, next: boolean) {
     const prev = questionForms[questionIndex];
     if (!prev?.id) {
@@ -4119,52 +4151,151 @@ export function AdminEventPage() {
                                 Голосование
                               </Button>
                             </Box>
-                            <AdminQuestionsSection
-                              listTitle=""
-                              addButtonLabel="Добавить голосование"
-                              listHeaderShowAddButton={false}
-                              questionForms={votesIndexMap.map((i) => questionForms[i])}
-                              selectedListIndex={votesSelectedListIndex}
-                              remapQuestionIndex={(local) => votesIndexMap[local] ?? 0}
-                              eventName={eventName}
-                              expandedQuestionSettingsIndex={expandedQuestionSettingsIndex}
-                              setExpandedQuestionSettingsIndex={setExpandedQuestionSettingsIndex}
-                              questionResults={questionResults}
-                              publicViewMode={publicViewMode}
-                              publicViewQuestionId={publicViewQuestionId}
-                              setMessage={setMessage}
-                              openQuestionDialog={openQuestionDialog}
-                              addQuestion={() => addQuestionToSubQuiz(null)}
-                              setPublicResultsView={setPublicResultsView}
-                              updateQuestionShowVoteCount={updateQuestionShowVoteCount}
-                              updateQuestionShowCorrectOption={updateQuestionShowCorrectOption}
-                              openTagInputDialog={openTagInputDialog}
-                              openTagResultsDialog={openTagResultsDialog}
-                              confirmResetQuestionAnswersByIndex={
-                                confirmResetQuestionAnswersByIndex
-                              }
-                              toggleQuestion={toggleQuestion}
-                              updateQuestionProjectorShowFirstCorrect={
-                                updateQuestionProjectorShowFirstCorrect
-                              }
-                              patchQuestionProjectorFirstCorrectWinnersCount={
-                                patchQuestionProjectorFirstCorrectWinnersCount
-                              }
-                              commitQuestionProjectorFirstCorrectWinnersCount={
-                                commitQuestionProjectorFirstCorrectWinnersCount
-                              }
-                              updateQuestionRankingProjectorMetric={
-                                updateQuestionRankingProjectorMetric
-                              }
-                              showFirstCorrectAnswerer={showFirstCorrectAnswerer}
-                              updateShowFirstCorrectAnswerer={updateShowFirstCorrectAnswerer}
-                              questionRevealStage={questionRevealStage}
-                              setQuestionRevealStageForQuestion={setQuestionRevealStageForQuestion}
-                              playerVisibleResultQuestionIds={playerVisibleResultQuestionIds}
-                              togglePlayerVisibleResultQuestionId={
-                                togglePlayerVisibleResultQuestionId
-                              }
-                            />
+                            <Stack spacing={2}>
+                              {activeVoteIndices.length > 0 ? (
+                                <AdminQuestionsSection
+                                  listTitle={`Актуальные (${activeVoteIndices.length})`}
+                                  addButtonLabel="Добавить голосование"
+                                  listHeaderShowAddButton={false}
+                                  questionForms={activeVoteIndices.map((i) => questionForms[i])}
+                                  selectedListIndex={activeVotesSelectedListIndex}
+                                  remapQuestionIndex={(local) => activeVoteIndices[local] ?? 0}
+                                  adminDoneToggle={{
+                                    mode: "markDone",
+                                    onToggle: toggleQuestionAdminDone,
+                                  }}
+                                  eventName={eventName}
+                                  expandedQuestionSettingsIndex={expandedQuestionSettingsIndex}
+                                  setExpandedQuestionSettingsIndex={
+                                    setExpandedQuestionSettingsIndex
+                                  }
+                                  questionResults={questionResults}
+                                  publicViewMode={publicViewMode}
+                                  publicViewQuestionId={publicViewQuestionId}
+                                  setMessage={setMessage}
+                                  openQuestionDialog={openQuestionDialog}
+                                  addQuestion={() => addQuestionToSubQuiz(null)}
+                                  setPublicResultsView={setPublicResultsView}
+                                  updateQuestionShowVoteCount={updateQuestionShowVoteCount}
+                                  updateQuestionShowCorrectOption={updateQuestionShowCorrectOption}
+                                  openTagInputDialog={openTagInputDialog}
+                                  openTagResultsDialog={openTagResultsDialog}
+                                  confirmResetQuestionAnswersByIndex={
+                                    confirmResetQuestionAnswersByIndex
+                                  }
+                                  toggleQuestion={toggleQuestion}
+                                  updateQuestionProjectorShowFirstCorrect={
+                                    updateQuestionProjectorShowFirstCorrect
+                                  }
+                                  patchQuestionProjectorFirstCorrectWinnersCount={
+                                    patchQuestionProjectorFirstCorrectWinnersCount
+                                  }
+                                  commitQuestionProjectorFirstCorrectWinnersCount={
+                                    commitQuestionProjectorFirstCorrectWinnersCount
+                                  }
+                                  updateQuestionRankingProjectorMetric={
+                                    updateQuestionRankingProjectorMetric
+                                  }
+                                  showFirstCorrectAnswerer={showFirstCorrectAnswerer}
+                                  updateShowFirstCorrectAnswerer={updateShowFirstCorrectAnswerer}
+                                  questionRevealStage={questionRevealStage}
+                                  setQuestionRevealStageForQuestion={
+                                    setQuestionRevealStageForQuestion
+                                  }
+                                  playerVisibleResultQuestionIds={playerVisibleResultQuestionIds}
+                                  togglePlayerVisibleResultQuestionId={
+                                    togglePlayerVisibleResultQuestionId
+                                  }
+                                />
+                              ) : (
+                                <Typography
+                                  variant="body2"
+                                  color="text.secondary"
+                                  sx={{ px: 0.5, py: 1 }}
+                                >
+                                  Нет актуальных голосований
+                                </Typography>
+                              )}
+                              {doneVoteIndices.length > 0 ? (
+                                <Accordion
+                                  defaultExpanded={false}
+                                  disableGutters
+                                  elevation={0}
+                                  sx={{
+                                    bgcolor: "transparent",
+                                    "&:before": { display: "none" },
+                                  }}
+                                >
+                                  <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+                                    <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
+                                      Отработанные ({doneVoteIndices.length})
+                                    </Typography>
+                                  </AccordionSummary>
+                                  <AccordionDetails sx={{ p: 0 }}>
+                                    <AdminQuestionsSection
+                                      listTitle=""
+                                      addButtonLabel="Добавить голосование"
+                                      listHeaderShowAddButton={false}
+                                      questionForms={doneVoteIndices.map((i) => questionForms[i])}
+                                      selectedListIndex={doneVotesSelectedListIndex}
+                                      remapQuestionIndex={(local) => doneVoteIndices[local] ?? 0}
+                                      adminDoneToggle={{
+                                        mode: "markActive",
+                                        onToggle: toggleQuestionAdminDone,
+                                      }}
+                                      eventName={eventName}
+                                      expandedQuestionSettingsIndex={expandedQuestionSettingsIndex}
+                                      setExpandedQuestionSettingsIndex={
+                                        setExpandedQuestionSettingsIndex
+                                      }
+                                      questionResults={questionResults}
+                                      publicViewMode={publicViewMode}
+                                      publicViewQuestionId={publicViewQuestionId}
+                                      setMessage={setMessage}
+                                      openQuestionDialog={openQuestionDialog}
+                                      addQuestion={() => addQuestionToSubQuiz(null)}
+                                      setPublicResultsView={setPublicResultsView}
+                                      updateQuestionShowVoteCount={updateQuestionShowVoteCount}
+                                      updateQuestionShowCorrectOption={
+                                        updateQuestionShowCorrectOption
+                                      }
+                                      openTagInputDialog={openTagInputDialog}
+                                      openTagResultsDialog={openTagResultsDialog}
+                                      confirmResetQuestionAnswersByIndex={
+                                        confirmResetQuestionAnswersByIndex
+                                      }
+                                      toggleQuestion={toggleQuestion}
+                                      updateQuestionProjectorShowFirstCorrect={
+                                        updateQuestionProjectorShowFirstCorrect
+                                      }
+                                      patchQuestionProjectorFirstCorrectWinnersCount={
+                                        patchQuestionProjectorFirstCorrectWinnersCount
+                                      }
+                                      commitQuestionProjectorFirstCorrectWinnersCount={
+                                        commitQuestionProjectorFirstCorrectWinnersCount
+                                      }
+                                      updateQuestionRankingProjectorMetric={
+                                        updateQuestionRankingProjectorMetric
+                                      }
+                                      showFirstCorrectAnswerer={showFirstCorrectAnswerer}
+                                      updateShowFirstCorrectAnswerer={
+                                        updateShowFirstCorrectAnswerer
+                                      }
+                                      questionRevealStage={questionRevealStage}
+                                      setQuestionRevealStageForQuestion={
+                                        setQuestionRevealStageForQuestion
+                                      }
+                                      playerVisibleResultQuestionIds={
+                                        playerVisibleResultQuestionIds
+                                      }
+                                      togglePlayerVisibleResultQuestionId={
+                                        togglePlayerVisibleResultQuestionId
+                                      }
+                                    />
+                                  </AccordionDetails>
+                                </Accordion>
+                              ) : null}
+                            </Stack>
                           </Stack>
                         ))}
                       {roomQuestionsTab === "randomizer" && (

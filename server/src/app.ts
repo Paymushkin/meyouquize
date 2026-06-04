@@ -14,6 +14,7 @@ import { env } from "./env.js";
 import {
   adminAuthSchema,
   createRoomSchema,
+  patchQuestionAdminDoneSchema,
   patchQuestionProjectorSchema,
   patchSubQuizTitleSchema,
   replaceRoomContentSchema,
@@ -40,6 +41,7 @@ import {
   listRooms,
   getStandaloneVoteAdminDetail,
   getSubQuizDetailedResults,
+  patchQuestionAdminDone,
   patchQuestionProjectorSettings,
   replaceRoomContent,
   updateRoomTitle,
@@ -466,6 +468,33 @@ export function buildApp() {
       return res.status(404).json({ error: error instanceof Error ? error.message : "Not found" });
     }
   });
+
+  app.patch(
+    "/api/admin/rooms/:eventName/questions/:questionId/admin-done",
+    adminAuthMiddleware,
+    async (req, res) => {
+      const eventName = Array.isArray(req.params.eventName)
+        ? req.params.eventName[0]
+        : req.params.eventName;
+      const questionId = Array.isArray(req.params.questionId)
+        ? req.params.questionId[0]
+        : req.params.questionId;
+      const parsed = patchQuestionAdminDoneSchema.safeParse(req.body);
+      if (!parsed.success) return res.status(400).json({ error: "Invalid payload" });
+      try {
+        const quizId = await patchQuestionAdminDone(eventName, questionId, parsed.data.adminDone);
+        const io = getSocketIo();
+        if (io) {
+          await broadcastDashboardResultsNow(io, quizId);
+        }
+        return res.status(204).end();
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "Not found";
+        const code = message === "Room not found" || message === "Question not found" ? 404 : 500;
+        return res.status(code).json({ error: message });
+      }
+    },
+  );
 
   app.patch(
     "/api/admin/rooms/:eventName/questions/:questionId/projector-settings",

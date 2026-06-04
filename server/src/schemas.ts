@@ -46,6 +46,7 @@ const questionSchema = z
     rankingProjectorMetric: z.enum(["avg_rank", "avg_score", "total_score"]).optional(),
     rankingKind: z.enum(["quiz", "jury"]).optional(),
     rankingPlayerHint: z.string().trim().max(300).nullable().optional(),
+    adminDone: z.boolean().optional(),
     options: z.array(
       z.object({
         text: z.string().min(1),
@@ -177,6 +178,13 @@ export const patchQuestionProjectorSchema = z
       });
     }
   });
+
+/** Перенос голосования в «отработанные» в админке (без replace всей комнаты). */
+export const patchQuestionAdminDoneSchema = z
+  .object({
+    adminDone: z.boolean(),
+  })
+  .strict();
 
 /** @deprecated */
 export const replaceQuestionsSchema = replaceRoomContentSchema;

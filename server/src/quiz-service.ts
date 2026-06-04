@@ -129,6 +129,8 @@ export type QuestionReplaceInput = {
   rankingKind?: "quiz" | "jury";
   /** Для RANKING: кастомная подсказка игроку; null/undefined = текст по умолчанию. */
   rankingPlayerHint?: string | null;
+  /** Только UI админки: корзина «отработанные». */
+  adminDone?: boolean;
   options: Array<{ text: string; isCorrect: boolean }>;
 };
 
@@ -547,6 +549,7 @@ export async function replaceRoomContent(eventName: string, content: RoomContent
           1,
           Math.min(20, Math.trunc(q.projectorFirstCorrectWinnersCount ?? 1)),
         ),
+        adminDone: q.adminDone ?? false,
         ...rankingQuestionCreateData(q),
         ...tagCloudQuestionCreateData(q),
       };
@@ -684,6 +687,26 @@ export async function patchQuestionProjectorSettings(
   await prisma.question.update({
     where: { id: questionId },
     data,
+  });
+  return room.id;
+}
+
+export async function patchQuestionAdminDone(
+  eventName: string,
+  questionId: string,
+  adminDone: boolean,
+): Promise<string> {
+  const room = await prisma.quiz.findUnique({ where: { slug: eventName }, select: { id: true } });
+  if (!room) throw new Error("Room not found");
+  const question = await prisma.question.findFirst({
+    where: { id: questionId, quizId: room.id },
+    select: { id: true },
+  });
+  if (!question) throw new Error("Question not found");
+
+  await prisma.question.update({
+    where: { id: questionId },
+    data: { adminDone },
   });
   return room.id;
 }
