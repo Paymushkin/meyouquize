@@ -8,6 +8,7 @@
     "shared"
   ],
   "scripts": {
+    "predev": "npm run build -w shared",
     "dev": "concurrently -n server,client \"npm run dev -w server\" \"npm run dev -w client\"",
     "build": "npm run build -w shared && npm run build -w server && npm run build -w client",
     "test": "npm run test:unit",
