@@ -23,10 +23,13 @@ replace_host() {
 replace_host deploy/env/.env.runtime
 cp deploy/env/.env.runtime .env
 
+bash "$ROOT/deploy/scripts/sync-lan-host.sh" event >/dev/null
+
 echo ""
 echo "Готово: deploy/env/.env.runtime и .env"
 echo "  LAN_HOST=$LAN_IP"
 echo "  Участники открывают: http://$LAN_IP/"
+echo "  При каждом event:start IP подставится заново (CLIENT_ORIGIN_AUTO=1)."
 echo ""
 echo "Проверьте ADMIN_PASSWORD в .env, затем:"
 echo "  npm run event:start"

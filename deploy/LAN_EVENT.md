@@ -41,7 +41,7 @@ sudo npm run event:start
 - **Игроки:** `http://<LAN_IP>/` (slug в пути, как настроено в комнате)
 - **Админка:** `http://<LAN_IP>/admin/<slug>`
 
-IP подставляется в `event:init` автоматически (`en0` и др.). Вручную: `LAN_HOST=192.168.0.5 npm run event:init`.
+IP подставляется при **`event:init`** и **перед каждым `event:start`** (`sync-lan-host.sh`, `CLIENT_ORIGIN_AUTO=1`). Вручную зафиксировать: `CLIENT_ORIGIN_AUTO=0` и свой `LAN_HOST` / `CLIENT_ORIGIN`. Разово обновить без перезапуска ивента: `npm run sync:lan`.
 
 ## Что включено в конфигурации
 

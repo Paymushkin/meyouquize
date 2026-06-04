@@ -4,6 +4,8 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 cd "$ROOT"
 
+bash "$ROOT/deploy/scripts/sync-lan-host.sh" event
+
 bash "$ROOT/deploy/scripts/lan-event-check.sh"
 
 set -a
@@ -27,7 +29,7 @@ npm run prisma:migrate:deploy
 
 LAN_IP="${LAN_HOST:-}"
 if [[ -z "$LAN_IP" ]]; then
-  LAN_IP="$(echo "$CLIENT_ORIGIN" | sed -E 's|https?://([^/:]+).*|\1|')"
+  LAN_IP="$(bash "$ROOT/deploy/scripts/detect-lan-ip.sh")"
 fi
 
 SERVER_PID=""

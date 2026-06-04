@@ -8,6 +8,7 @@ import {
   tryDecodeAdminAccountsBase64,
   type AdminAccount,
 } from "./admin-accounts.js";
+import { buildAutoLanClientOrigins, detectLanIPv4 } from "./detect-lan-ip.js";
 
 const currentFile = fileURLToPath(import.meta.url);
 const serverSrcDir = path.dirname(currentFile);
@@ -45,6 +46,40 @@ function parseNetworkMode(): AppNetworkMode {
   const raw = (process.env.APP_NETWORK_MODE ?? "").trim().toLowerCase();
   if (raw === "internet" || raw === "lan") return raw;
   return process.env.NODE_ENV === "production" ? "internet" : "lan";
+}
+
+/** Дополнять CLIENT_ORIGIN текущим LAN IP (отключить: CLIENT_ORIGIN_AUTO=0). */
+function clientOriginAutoEnabled(mode: AppNetworkMode): boolean {
+  if (process.env.CLIENT_ORIGIN_AUTO === "0") return false;
+  if (process.env.CLIENT_ORIGIN_AUTO === "1") return true;
+  return mode === "lan";
+}
+
+function resolveClientOrigins(mode: AppNetworkMode): string[] {
+  const explicit = (process.env.CLIENT_ORIGIN ?? "http://localhost:5173")
+    .split(",")
+    .map((origin) => origin.trim().replace(/\/+$/, ""))
+    .filter(Boolean);
+
+  if (!clientOriginAutoEnabled(mode)) return explicit;
+
+  const lanIp = detectLanIPv4();
+  if (!lanIp) return explicit;
+
+  const merged = [...buildAutoLanClientOrigins(lanIp), ...explicit];
+  const unique = [...new Set(merged)];
+  const hadLan = explicit.some((o) => {
+    try {
+      const h = new URL(o).hostname;
+      return h !== "localhost" && h !== "127.0.0.1";
+    } catch {
+      return false;
+    }
+  });
+  if (!hadLan || !explicit.includes(`http://${lanIp}`)) {
+    console.info(`[env] LAN auto-origin: http://${lanIp} (CLIENT_ORIGIN_AUTO)`);
+  }
+  return unique;
 }
 
 function readAdminLogin(): string {
@@ -120,10 +155,7 @@ function resolveAdminAccounts(): AdminAccount[] {
 }
 
 const networkMode = parseNetworkMode();
-const clientOrigins = (process.env.CLIENT_ORIGIN ?? "http://localhost:5173")
-  .split(",")
-  .map((origin) => origin.trim().replace(/\/+$/, ""))
-  .filter(Boolean);
+const clientOrigins = resolveClientOrigins(networkMode);
 const adminAccounts = resolveAdminAccounts();
 validateProductionSecurity(networkMode, clientOrigins, adminAccounts);
 
