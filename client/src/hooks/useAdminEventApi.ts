@@ -1,6 +1,7 @@
 import {
   useCallback,
   useRef,
+  useState,
   type Dispatch,
   type MutableRefObject,
   type SetStateAction,
@@ -52,6 +53,7 @@ export function useAdminEventApi(params: Params) {
   } = params;
 
   const lastPersistQuestionsErrorRef = useRef<string | null>(null);
+  const [authChecked, setAuthChecked] = useState(false);
 
   const readSubQuizTitleFromSnapshot = useCallback((snapshot: string, subQuizId: string) => {
     try {
@@ -66,9 +68,16 @@ export function useAdminEventApi(params: Params) {
   }, []);
 
   const checkSession = useCallback(async () => {
-    const response = await fetch(`${API_BASE}/api/admin/me`, { credentials: "include" });
-    setIsAuth(response.ok);
-    return response.ok;
+    try {
+      const response = await fetch(`${API_BASE}/api/admin/me`, { credentials: "include" });
+      setIsAuth(response.ok);
+      return response.ok;
+    } catch {
+      setIsAuth(false);
+      return false;
+    } finally {
+      setAuthChecked(true);
+    }
   }, [setIsAuth]);
 
   const loadRoom = useCallback(async () => {
@@ -312,6 +321,7 @@ export function useAdminEventApi(params: Params) {
   );
 
   return {
+    authChecked,
     checkSession,
     loadRoom,
     persistQuestions,

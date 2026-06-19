@@ -7,23 +7,27 @@ import cloud from "d3-cloud";
 import {
   collectTagCloudQuizReferenceAliases,
   normalizeTagComparable,
+  VOTE_MIN_BAR_DISPLAY_PERCENT,
   voteFillOutlineColor,
   voteProgressBarFillStyle,
+  voteProgressTrackBackground,
 } from "@meyouquize/shared";
 import { buildCloudWordsForDisplay } from "../../features/tagCloudMerge";
 import { colorByWord } from "../../features/projectorChart/colorByWord";
+import { resolveProjectorOptionRowSizes } from "../../features/projectorChart/resolveProjectorOptionRowSizes";
+import {
+  projectorOptionLabelImageSize,
+  projectorOptionRevealMinHeight,
+  questionHasOptionImages,
+} from "../../features/quizPlay/voteOptionImages";
+import { ProjectorSideBySideContent } from "./ProjectorSideBySideContent";
+import { ProjectorOptionLabel } from "../quiz/ProjectorOptionLabel";
+import { ProjectorTemperatureScale } from "./ProjectorTemperatureScale";
 import type { ProjectorLayoutWord, ProjectorQuestionResult } from "../../types/projectorDashboard";
 import { resolveMuiFontFamily } from "../../utils/muiFontFamily";
 
-const MIN_BAR_DISPLAY_PERCENT = 1.75;
 const CORRECT_OPTION_COLOR = "#4caf50";
 const DEFAULT_OUTLINE_COLOR = "rgba(255,255,255,0.35)";
-/** Трек столбика: 80% прозрачности (непрозрачность 20%). */
-const VOTE_PROGRESS_TRACK_OPACITY = 0.2;
-
-function voteProgressTrackBackground(trackColor: string): string {
-  return alpha(trackColor, VOTE_PROGRESS_TRACK_OPACITY);
-}
 
 /** Стабильные ссылки: иначе дефолт `= []` в параметрах даёт новый массив на каждый рендер и бесконечно перезапускает layout облака. */
 const EMPTY_HIDDEN_TAGS: string[] = [];
@@ -302,7 +306,7 @@ export function QuestionChart(props: QuestionChartProps) {
     const total = question.optionStats.reduce((sum, item) => sum + item.count, 0);
     return question.optionStats.map((o) => {
       const percent = total > 0 ? (o.count / total) * 100 : 0;
-      const barDisplayPercent = percent > 0 ? percent : MIN_BAR_DISPLAY_PERCENT;
+      const barDisplayPercent = percent > 0 ? percent : VOTE_MIN_BAR_DISPLAY_PERCENT;
       const percentLabel = showVoteCount
         ? `${percent.toFixed(1)}% (${o.count})`
         : `${percent.toFixed(1)}%`;
@@ -340,6 +344,7 @@ export function QuestionChart(props: QuestionChartProps) {
         optionId: o.optionId,
         isCorrect: o.isCorrect,
         text: o.text,
+        imageUrl: o.imageUrl,
         percent,
         barDisplayPercent,
         percentLabel,
@@ -357,6 +362,7 @@ export function QuestionChart(props: QuestionChartProps) {
     voteProgressTrackColor,
     voteProgressBarColor,
   ]);
+  const isTemperatureQuestion = question.type === "temperature";
   const isRegularVoteQuestion = question.type !== "tag_cloud";
   const isOptionsRevealStage = isRegularVoteQuestion && questionRevealStage === "options";
 
@@ -400,12 +406,13 @@ export function QuestionChart(props: QuestionChartProps) {
           const rank = typeof o.avgRank === "number" && o.avgRank > 0 ? o.avgRank : null;
           const spread = maxR > minR ? maxR - minR : 1;
           const barPercent = rank != null && maxR > minR ? ((maxR - rank) / spread) * 100 : 0;
-          const barDisplayPercent = barPercent > 0 ? barPercent : MIN_BAR_DISPLAY_PERCENT;
+          const barDisplayPercent = barPercent > 0 ? barPercent : VOTE_MIN_BAR_DISPLAY_PERCENT;
           const st = baseStyle();
           return {
             optionId: o.optionId,
             isCorrect: false,
             text: o.text,
+            imageUrl: o.imageUrl,
             percent: barPercent,
             barDisplayPercent,
             statValue: rank != null ? rank.toFixed(2) : "—",
@@ -428,7 +435,9 @@ export function QuestionChart(props: QuestionChartProps) {
         const v = typeof o[key] === "number" ? (o[key] as number) : null;
         const barPercent = v != null ? (Math.max(0, v) / denom) * 100 : 0;
         const barDisplayPercent =
-          barPercent > 0 ? Math.max(barPercent, MIN_BAR_DISPLAY_PERCENT) : MIN_BAR_DISPLAY_PERCENT;
+          barPercent > 0
+            ? Math.max(barPercent, VOTE_MIN_BAR_DISPLAY_PERCENT)
+            : VOTE_MIN_BAR_DISPLAY_PERCENT;
         const st = baseStyle();
         const statValue =
           v == null ? "—" : mode === "avg_score" ? v.toFixed(2) : String(Math.round(v));
@@ -436,6 +445,7 @@ export function QuestionChart(props: QuestionChartProps) {
           optionId: o.optionId,
           isCorrect: false,
           text: o.text,
+          imageUrl: o.imageUrl,
           percent: barPercent,
           barDisplayPercent,
           statValue,
@@ -453,6 +463,20 @@ export function QuestionChart(props: QuestionChartProps) {
     voteProgressBarColor,
     voteProgressTrackColor,
   ]);
+
+  const optionsRows = useMemo(
+    () => (question.type === "ranking" ? rankingBlock.rows : voteRows),
+    [question.type, rankingBlock.rows, voteRows],
+  );
+  const optionRowChunks = useMemo(() => {
+    const sizes = resolveProjectorOptionRowSizes(optionsRows.length);
+    let offset = 0;
+    return sizes.map((size) => {
+      const chunk = optionsRows.slice(offset, offset + size);
+      offset += size;
+      return chunk;
+    });
+  }, [optionsRows]);
 
   if (!hasData) {
     return null;
@@ -487,8 +511,8 @@ export function QuestionChart(props: QuestionChartProps) {
               flexShrink: 0,
               width: "100%",
               display: "flex",
-              justifyContent: "center",
-              alignItems: "center",
+              justifyContent: "flex-start",
+              alignItems: "flex-start",
             }}
           >
             {cloudHeader}
@@ -554,7 +578,7 @@ export function QuestionChart(props: QuestionChartProps) {
   } as const;
 
   const barRows = question.type === "ranking" ? rankingBlock.rows : voteRows;
-  const optionsRows = question.type === "ranking" ? rankingBlock.rows : voteRows;
+  const hasOptionImages = questionHasOptionImages(optionsRows);
   const rankingStatHeader = question.type === "ranking" ? rankingBlock.statColumnTitle : null;
   const answersCount = barRows.length;
   const longestAnswerLength = barRows.reduce((max, row) => Math.max(max, row.text.length), 0);
@@ -576,6 +600,56 @@ export function QuestionChart(props: QuestionChartProps) {
   const statCell = (row: (typeof voteRows)[number] | (typeof rankingBlock.rows)[number]) =>
     "statValue" in row ? row.statValue : row.percentLabel;
   const stageKey = isOptionsRevealStage ? "options" : "results";
+  const optionRevealGap = { xs: 1.25, sm: 1.5, md: 2 } as const;
+  const renderOptionRevealCard = (row: (typeof optionsRows)[number]) => (
+    <Box
+      key={row.optionId}
+      sx={{
+        minHeight: projectorOptionRevealMinHeight(hasOptionImages),
+        borderRadius: 2,
+        px: { xs: 3, md: 4 },
+        py: { xs: 2, md: 2.5 },
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "flex-start",
+        textAlign: "left",
+        border: "2px solid",
+        borderColor: voteOptionBorderColor,
+        bgcolor: "transparent",
+      }}
+    >
+      <ProjectorSideBySideContent
+        imageUrl={"imageUrl" in row ? row.imageUrl : undefined}
+        alt={row.text.trim() || "Вариант"}
+        spacing={2}
+        imageSx={{
+          width: { xs: 120, sm: 140, md: 160 },
+          maxWidth: { xs: 120, sm: 140, md: 160 },
+          maxHeight: { xs: 120, sm: 140, md: 160 },
+          borderRadius: 1.25,
+        }}
+      >
+        {row.text.trim() ? (
+          <Typography
+            variant="h4"
+            align="left"
+            sx={{
+              ...row.optionLabelSx,
+              width: "100%",
+              textAlign: "left",
+              lineHeight: 1.2,
+              fontSize: {
+                xs: `${optionsAnswerMobileRem}rem`,
+                md: `${optionsAnswerDesktopRem}rem`,
+              },
+            }}
+          >
+            {row.text}
+          </Typography>
+        ) : null}
+      </ProjectorSideBySideContent>
+    </Box>
+  );
 
   return (
     <Box
@@ -596,58 +670,46 @@ export function QuestionChart(props: QuestionChartProps) {
       >
         <Box sx={{ width: "100%" }}>
           {isOptionsRevealStage ? (
-            <Box
-              sx={{
-                width: "100%",
-                display: "grid",
-                gridTemplateColumns: {
-                  xs: "repeat(1, minmax(0, 1fr))",
-                  sm: "repeat(2, minmax(0, 1fr))",
-                },
-                gap: { xs: 1.25, sm: 1.5, md: 2 },
-                alignItems: "stretch",
-              }}
-            >
-              {optionsRows.map((row) => (
-                <Box
-                  key={row.optionId}
-                  sx={{
-                    ...(optionsRows.length % 2 === 1 &&
-                    optionsRows[optionsRows.length - 1]?.optionId === row.optionId
-                      ? { gridColumn: { xs: "auto", sm: "1 / -1" } }
-                      : {}),
-                    minHeight: { xs: 92, md: 112 },
-                    borderRadius: 2,
-                    px: { xs: 4, md: 5 },
-                    py: { xs: 2.5, md: 3.2 },
-                    display: "flex",
-                    alignItems: "flex-start",
-                    justifyContent: "flex-start",
-                    textAlign: "left",
-                    border: "2px solid",
-                    borderColor: voteOptionBorderColor,
-                    bgcolor: "transparent",
-                  }}
-                >
-                  <Typography
-                    variant="h4"
-                    align="left"
+            <>
+              <Box
+                sx={{
+                  width: "100%",
+                  display: { xs: "grid", sm: "none" },
+                  gridTemplateColumns: "minmax(0, 1fr)",
+                  gap: optionRevealGap,
+                  alignItems: "stretch",
+                }}
+              >
+                {optionsRows.map((row) => renderOptionRevealCard(row))}
+              </Box>
+              <Stack
+                spacing={optionRevealGap}
+                sx={{ width: "100%", display: { xs: "none", sm: "flex" } }}
+              >
+                {optionRowChunks.map((rowItems, rowIndex) => (
+                  <Box
+                    key={`projector-option-row-${rowIndex}`}
                     sx={{
-                      ...row.optionLabelSx,
+                      display: "grid",
+                      gridTemplateColumns: `repeat(${rowItems.length}, minmax(0, 1fr))`,
+                      gap: optionRevealGap,
+                      alignItems: "stretch",
                       width: "100%",
-                      textAlign: "left",
-                      lineHeight: 1.2,
-                      fontSize: {
-                        xs: `${optionsAnswerMobileRem}rem`,
-                        md: `${optionsAnswerDesktopRem}rem`,
-                      },
                     }}
                   >
-                    {row.text}
-                  </Typography>
-                </Box>
-              ))}
-            </Box>
+                    {rowItems.map((row) => renderOptionRevealCard(row))}
+                  </Box>
+                ))}
+              </Stack>
+            </>
+          ) : isTemperatureQuestion ? (
+            <ProjectorTemperatureScale
+              subtitle={question.temperatureSubtitle?.trim() || undefined}
+              temperatureValue={question.temperatureValue}
+              voteOptionTextColor={voteOptionTextColor}
+              voteProgressTrackColor={voteProgressTrackColor}
+              voteProgressBarColor={voteProgressBarColor}
+            />
           ) : (
             <>
               <Stack
@@ -714,13 +776,13 @@ export function QuestionChart(props: QuestionChartProps) {
                           >
                             <CheckCircleIcon sx={{ color: "#4caf50", fontSize: 22 }} />
                           </Box>
-                          <Typography
-                            variant="h6"
-                            align="left"
+                          <ProjectorOptionLabel
+                            text={row.text}
+                            imageUrl={"imageUrl" in row ? row.imageUrl : undefined}
+                            imageSize={projectorOptionLabelImageSize(hasOptionImages)}
                             sx={{
                               ...row.optionLabelSx,
                               ...resultsOptionTextSx,
-                              minWidth: 0,
                               textAlign: "left",
                               overflowWrap: "anywhere",
                               fontSize: {
@@ -728,9 +790,7 @@ export function QuestionChart(props: QuestionChartProps) {
                                 md: `${resultsAnswerDesktopRem}rem`,
                               },
                             }}
-                          >
-                            {row.text}
-                          </Typography>
+                          />
                         </Stack>
                       </Box>
                       <Typography variant="h6" sx={{ ...row.statSx, flexShrink: 0 }}>
@@ -801,9 +861,10 @@ export function QuestionChart(props: QuestionChartProps) {
                         >
                           <CheckCircleIcon sx={{ color: "#4caf50", fontSize: 22 }} />
                         </Box>
-                        <Typography
-                          variant="h6"
-                          align="left"
+                        <ProjectorOptionLabel
+                          text={row.text}
+                          imageUrl={"imageUrl" in row ? row.imageUrl : undefined}
+                          imageSize={projectorOptionLabelImageSize(hasOptionImages)}
                           sx={{
                             ...row.optionLabelSx,
                             ...resultsOptionTextSx,
@@ -814,9 +875,7 @@ export function QuestionChart(props: QuestionChartProps) {
                               md: `${resultsAnswerDesktopRem}rem`,
                             },
                           }}
-                        >
-                          {row.text}
-                        </Typography>
+                        />
                       </Stack>
                     </Box>
                     <LinearProgress

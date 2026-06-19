@@ -4,6 +4,29 @@ import { env } from "./env.js";
 import { ensureMigrationsAppliedOrThrow, resetProjectorViewOnStartup } from "./startup-checks.js";
 import { ensureDemoQuizExists } from "./demo-seed.js";
 
+function isIpcDisconnectedError(err: unknown): boolean {
+  return (
+    typeof err === "object" &&
+    err !== null &&
+    "code" in err &&
+    (err as NodeJS.ErrnoException).code === "ERR_IPC_DISCONNECTED"
+  );
+}
+
+function swallowIpcDisconnectError(err: NodeJS.ErrnoException) {
+  if (isIpcDisconnectedError(err)) return;
+  console.error("[cluster] worker error", err);
+}
+
+function attachClusterWorkerErrorGuards() {
+  if (!cluster.isWorker || !cluster.worker) return;
+  cluster.worker.prependListener("error", swallowIpcDisconnectError);
+  process.prependListener("error", swallowIpcDisconnectError);
+  process.on("disconnect", () => {
+    process.exit(0);
+  });
+}
+
 async function startListening() {
   const { httpServer, io } = await buildServer();
   const server = httpServer.listen(env.port, "0.0.0.0", () => {
@@ -73,8 +96,13 @@ async function runClusterPrimary() {
   console.info(`[cluster] primary forking ${n} workers (shared port ${env.port}, Redis adapter)`);
 
   for (let i = 0; i < n; i++) {
-    cluster.fork();
+    const worker = cluster.fork();
+    worker.prependListener("error", swallowIpcDisconnectError);
   }
+
+  cluster.on("fork", (worker) => {
+    worker.prependListener("error", swallowIpcDisconnectError);
+  });
 
   cluster.on("exit", (worker, code, signal) => {
     if (primaryShutdownInProgress) return;
@@ -95,5 +123,6 @@ if (cluster.isPrimary) {
     await runClusterPrimary();
   }
 } else {
+  attachClusterWorkerErrorGuards();
   await startListening();
 }

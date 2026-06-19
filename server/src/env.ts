@@ -14,9 +14,37 @@ const serverSrcDir = path.dirname(currentFile);
 const projectRootEnv = path.resolve(serverSrcDir, "../../.env");
 const runtimeEnvPath = path.resolve(serverSrcDir, "../../deploy/env/.env.runtime");
 
-dotenv.config({ path: projectRootEnv });
-dotenv.config({ path: runtimeEnvPath, override: true });
-dotenv.config();
+/** Integration/E2E: env задаётся в vitest/playwright setup — не подмешивать dev .env. */
+const skipDotenvForTestDatabase =
+  process.env.NODE_ENV === "test" && process.env.TEST_DATABASE === "1";
+
+if (!skipDotenvForTestDatabase) {
+  dotenv.config({ path: projectRootEnv });
+  dotenv.config({ path: runtimeEnvPath, override: true });
+  dotenv.config();
+}
+
+/** tsx watch + cluster из .env (auto/8) → ERR_IPC_DISCONNECTED при F5; после dotenv принудительно 1. */
+function applyDevClusterDefault() {
+  if ((process.env.CLUSTER_WORKERS_DEV_FORCE ?? "").trim() === "1") return;
+  const explicitDev = process.env.MEYOUQUIZE_DEV === "1";
+  const argv = process.argv.join(" ");
+  const isDevEntry =
+    explicitDev ||
+    argv.includes("src/index.ts") ||
+    argv.includes("tsx") ||
+    process.env.npm_lifecycle_event === "dev";
+  if (!isDevEntry) return;
+  /** event: .env.runtime часто задаёт NODE_ENV=production даже при npm run dev */
+  if (!explicitDev && (process.env.NODE_ENV ?? "").trim() === "production") return;
+  const prev = (process.env.CLUSTER_WORKERS ?? "").trim();
+  process.env.CLUSTER_WORKERS = "1";
+  if (prev && prev !== "1") {
+    console.info(`[env] CLUSTER_WORKERS=${prev} → 1 (npm run dev / tsx watch)`);
+  }
+}
+
+applyDevClusterDefault();
 
 /**
  * Малая инфраструктура: Node + Postgres. В `DATABASE_URL` — лимит Prisma (`?connection_limit=…`);
@@ -132,6 +160,14 @@ console.info(
 );
 
 /** Несколько воркеров на одном порту (node:cluster). >1 требует REDIS_URL для Socket.IO. */
+function resolveLocalAdminNoAuth(mode: AppNetworkMode): boolean {
+  const raw = (process.env.LOCAL_ADMIN_NO_AUTH ?? "").trim().toLowerCase();
+  if (raw === "0" || raw === "false") return false;
+  if (raw === "1" || raw === "true") return true;
+  /** LAN и локальный dev — без пароля; internet — только с явным LOCAL_ADMIN_NO_AUTH=1. */
+  return mode === "lan";
+}
+
 function resolveClusterWorkers(): number {
   const raw = (process.env.CLUSTER_WORKERS ?? "").trim().toLowerCase();
   if (raw === "" || raw === "1") return 1;
@@ -160,6 +196,9 @@ const socketIoPingIntervalMs = Math.min(
 );
 
 console.info(`[env] CLUSTER_WORKERS=${clusterWorkers} (set CLUSTER_WORKERS=1 to disable cluster)`);
+console.info(
+  `[env] localAdminNoAuth=${resolveLocalAdminNoAuth(networkMode)} (LAN/dev без пароля; отключить: LOCAL_ADMIN_NO_AUTH=0)`,
+);
 console.info(
   `[env] Socket.IO pingInterval=${socketIoPingIntervalMs}ms pingTimeout=${socketIoPingTimeoutMs}ms`,
 );
@@ -200,11 +239,8 @@ export const env = {
   socketIoRequiresRedis,
   socketIoPingTimeoutMs,
   socketIoPingIntervalMs,
-  /** Локальная разработка: не требовать пароль админки (HTTP + socket). */
-  localAdminNoAuth:
-    process.env.LOCAL_ADMIN_NO_AUTH === "1" ||
-    process.env.LOCAL_ADMIN_NO_AUTH?.trim().toLowerCase() === "true" ||
-    (process.env.NODE_ENV !== "production" && parseNetworkMode() === "lan"),
+  /** Локальная/LAN-сборка: не требовать пароль админки (HTTP + socket). */
+  localAdminNoAuth: resolveLocalAdminNoAuth(networkMode),
   /** Временные диагностические логи для пилота с живой аудиторией. */
   trialLogsEnabled:
     process.env.DEBUG_TRIAL_LOGS === "1" ||

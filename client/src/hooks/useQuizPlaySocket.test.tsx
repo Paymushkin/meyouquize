@@ -133,4 +133,47 @@ describe("useQuizPlaySocket", () => {
     expect(setPlayerAnswersHydrated).toHaveBeenCalledWith(true);
     expect(onQuestionSubmitted).toHaveBeenCalledWith("q-active");
   });
+
+  it("uses pending submit payload when active question ref was cleared", () => {
+    const setSubmittedAnswers = vi.fn();
+    const setSubmittedQuestionIds = vi.fn();
+    const setPlayerAnswersHydrated = vi.fn();
+    const onQuestionSubmitted = vi.fn();
+    const pendingSubmitPayloadRef = {
+      current: {
+        quizId: "quiz-1",
+        questionId: "q-ranking",
+        rankedOptionIds: ["opt-2", "opt-1"],
+      },
+    };
+
+    render(
+      <TestHarness
+        activeQuestionIdRef={{ current: null }}
+        activeQuestionTypeRef={{ current: "ranking" }}
+        selectedRef={{ current: [] }}
+        rankOrderRef={{ current: [] }}
+        tagAnswersRef={{ current: [""] }}
+        pendingSubmitPayloadRef={pendingSubmitPayloadRef}
+        setQuiz={vi.fn()}
+        setSelected={vi.fn()}
+        setRankOrder={vi.fn()}
+        setTagAnswers={vi.fn()}
+        setSubmittedAnswers={setSubmittedAnswers}
+        setSubmittedQuestionIds={setSubmittedQuestionIds}
+        setPlayerAnswersHydrated={setPlayerAnswersHydrated}
+        onQuestionSubmitted={onQuestionSubmitted}
+        setError={vi.fn()}
+        setJoined={vi.fn()}
+        setConnectionStatus={vi.fn()}
+        setSpeakerQuestions={vi.fn()}
+      />,
+    );
+
+    fireSocketEvent("answer:submitted");
+
+    expect(setSubmittedAnswers).toHaveBeenCalledWith(expect.any(Function));
+    expect(setSubmittedQuestionIds).toHaveBeenCalled();
+    expect(onQuestionSubmitted).toHaveBeenCalledWith("q-ranking");
+  });
 });

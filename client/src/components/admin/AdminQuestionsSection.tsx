@@ -1,4 +1,5 @@
 import AddIcon from "@mui/icons-material/Add";
+import ContentCopyIcon from "@mui/icons-material/ContentCopy";
 import KeyboardArrowDownIcon from "@mui/icons-material/KeyboardArrowDown";
 import KeyboardArrowUpIcon from "@mui/icons-material/KeyboardArrowUp";
 import CloudQueueIcon from "@mui/icons-material/CloudQueue";
@@ -26,6 +27,7 @@ import {
 import { Link as RouterLink } from "react-router-dom";
 import { isEditorQuizMode, type QuestionForm } from "../../admin/adminEventForm";
 import type { QuestionResult } from "../../admin/adminEventTypes";
+import { TemperatureQuestionLivePreview } from "./TemperatureQuestionLivePreview";
 import type { PublicViewMode } from "../../publicViewContract";
 import {
   runAdminQuestionRevealResultsFlow,
@@ -91,6 +93,8 @@ type Props = {
     mode: "markDone" | "markActive";
     onToggle: (globalIndex: number) => void;
   };
+  /** Клонировать голосование комнаты (вкладка «Голосования»). */
+  onCloneQuestion?: (globalIndex: number) => void;
 };
 
 export function AdminQuestionsSection(props: Props) {
@@ -129,11 +133,13 @@ export function AdminQuestionsSection(props: Props) {
     playerVisibleResultQuestionIds,
     togglePlayerVisibleResultQuestionId,
     adminDoneToggle,
+    onCloneQuestion,
   } = props;
 
   function questionTypeLabel(type: QuestionForm["type"]) {
     if (type === "tag_cloud") return "Облако тегов";
     if (type === "ranking") return "Ранжирование";
+    if (type === "temperature") return "Температура";
     return "Голосование";
   }
 
@@ -652,6 +658,24 @@ export function AdminQuestionsSection(props: Props) {
                                 </Stack>
                               );
                             }
+                            if (question.type === "temperature") {
+                              const stats = result?.optionStats ?? [];
+                              const bars = question.options.map((option, index) => {
+                                const liveOption = stats.find((item) => item.text === option.text);
+                                return {
+                                  key: `${qIndex}-${index}-${option.text}`,
+                                  text: option.text || `Вариант ${index + 1}`,
+                                  weight: option.weight ?? liveOption?.weight,
+                                  count: liveOption?.count ?? 0,
+                                };
+                              });
+                              return (
+                                <TemperatureQuestionLivePreview
+                                  temperatureValue={result?.temperatureValue}
+                                  bars={bars}
+                                />
+                              );
+                            }
                             const bars = question.options.map((option, index) => {
                               const liveOption = result?.optionStats.find(
                                 (item) => item.text === option.text,
@@ -698,17 +722,36 @@ export function AdminQuestionsSection(props: Props) {
                               </Stack>
                             );
                           })()}
-                          {showStandaloneAdminBlock ? (
-                            <Button
-                              component={RouterLink}
-                              to={`/admin/${eventName}/votes/${question.id}`}
-                              endIcon={<OpenInNewIcon />}
-                              size="small"
-                              variant="outlined"
-                              sx={{ alignSelf: "flex-start" }}
+                          {showStandaloneAdminBlock || onCloneQuestion ? (
+                            <Stack
+                              direction="row"
+                              spacing={1}
+                              alignSelf="flex-start"
+                              flexWrap="wrap"
                             >
-                              Подробно
-                            </Button>
+                              {showStandaloneAdminBlock ? (
+                                <Button
+                                  component={RouterLink}
+                                  to={`/admin/${eventName}/votes/${question.id}`}
+                                  endIcon={<OpenInNewIcon />}
+                                  size="small"
+                                  variant="outlined"
+                                >
+                                  Подробно
+                                </Button>
+                              ) : null}
+                              {onCloneQuestion && isStandaloneVote ? (
+                                <Button
+                                  startIcon={<ContentCopyIcon />}
+                                  size="small"
+                                  variant="outlined"
+                                  disabled={!question.id}
+                                  onClick={() => onCloneQuestion(g)}
+                                >
+                                  Клонировать
+                                </Button>
+                              ) : null}
+                            </Stack>
                           ) : null}
                         </Stack>
                       </Box>

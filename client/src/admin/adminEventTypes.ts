@@ -5,14 +5,16 @@ export type QuestionResult = {
   /** Для проектора: показывать блок «первые верно ответившие» (если включено глобально в комнате). */
   projectorShowFirstCorrect?: boolean;
   projectorFirstCorrectWinnersCount?: number;
-  type?: "single" | "multi" | "tag_cloud" | "ranking";
+  type?: "single" | "multi" | "tag_cloud" | "ranking" | "temperature";
   rankingProjectorMetric?: "avg_rank" | "avg_score" | "total_score";
   rankingKind?: "quiz" | "jury";
+  temperatureValue?: number | null;
   optionStats: Array<{
     optionId: string;
     text: string;
     count: number;
     isCorrect: boolean;
+    weight?: number;
     avgRank?: number;
     avgScore?: number;
     totalScore?: number;

@@ -30,7 +30,9 @@ export function useQuizPlayQuestionFlow(params: Params) {
   const [acceptedQuestionId, setAcceptedQuestionId] = useState<string | null>(null);
   const [dismissedQuestionId, setDismissedQuestionId] = useState<string | null>(null);
   const activeQuestionIdRef = useRef<string | null>(null);
-  const activeQuestionTypeRef = useRef<"single" | "multi" | "tag_cloud" | "ranking" | null>(null);
+  const activeQuestionTypeRef = useRef<
+    "single" | "multi" | "tag_cloud" | "ranking" | "temperature" | null
+  >(null);
   const selectedRef = useRef<string[]>([]);
   const rankOrderRef = useRef<string[]>([]);
   const tagAnswersRef = useRef<string[]>([""]);
@@ -167,7 +169,7 @@ export function useQuizPlayQuestionFlow(params: Params) {
   const toggleOption = useCallback(
     (id: string) => {
       if (!nonQuizActiveQuestion) return;
-      if (nonQuizActiveQuestion.type === "single") {
+      if (nonQuizActiveQuestion.type === "single" || nonQuizActiveQuestion.type === "temperature") {
         setSelected((prev) => (prev.includes(id) ? [] : [id]));
         return;
       }
@@ -267,6 +269,7 @@ export function useQuizPlayQuestionFlow(params: Params) {
     selectedRef,
     rankOrderRef,
     tagAnswersRef,
+    pendingSubmitPayloadRef,
     canSubmit,
     toggleOption,
     moveRankOption,
@@ -274,6 +277,7 @@ export function useQuizPlayQuestionFlow(params: Params) {
     onQuestionSubmitted,
     onQuizJoined,
     closeQuestionPopup,
+    pendingSubmitPayloadRef,
     resetQuestionFlow,
     answeredCurrentQuestion,
     shouldHideAnsweredPopup,

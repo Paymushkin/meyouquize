@@ -49,6 +49,7 @@ describe("PublicReportPage", () => {
           randomizer: { currentWinners: [], history: [] },
           reactions: { overlayText: "", widgets: [] },
           speakerQuestions: { enabled: false, total: 0, onScreen: 0, items: [] },
+          feedback: [],
           subQuizParticipantTables: [],
         }),
       })),

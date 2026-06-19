@@ -114,6 +114,25 @@ type PublicReportPayload = {
       reactions: Array<{ reaction: string; count: number }>;
     }>;
   };
+  feedback: Array<{
+    formId: string;
+    title: string;
+    responseCount: number;
+    scaleStats: Array<{
+      scaleId: string;
+      label: string;
+      options: [string, string, string, string, string];
+      counts: number[];
+      average: number | null;
+      responseCount: number;
+    }>;
+    responses: Array<{
+      nickname: string;
+      scaleAnswers: Record<string, number>;
+      comment: string | null;
+      submittedAt: string;
+    }>;
+  }>;
   subQuizParticipantTables: Array<{
     subQuizId: string;
     title: string;
@@ -798,6 +817,96 @@ export function PublicReportPage() {
             </CardContent>
           </Card>
         )}
+
+        {hasModule("feedback_summary") &&
+          payload!.feedback
+            .filter((form) => form.responseCount > 0)
+            .map((form) => (
+              <Card key={form.formId} variant="outlined" className="report-card">
+                <CardContent>
+                  <Stack
+                    direction="row"
+                    alignItems="center"
+                    justifyContent="space-between"
+                    sx={{ mb: 1 }}
+                  >
+                    <Typography variant="h6">{form.title || "Обратная связь"}</Typography>
+                    <Box
+                      sx={{
+                        minWidth: 32,
+                        height: 32,
+                        px: 1,
+                        borderRadius: 999,
+                        bgcolor: "primary.main",
+                        color: "primary.contrastText",
+                        display: "inline-flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        fontWeight: 800,
+                        lineHeight: 1,
+                      }}
+                    >
+                      {form.responseCount}
+                    </Box>
+                  </Stack>
+                  <Stack spacing={2}>
+                    {form.scaleStats.map((stat) => (
+                      <Box
+                        key={stat.scaleId}
+                        className="report-question"
+                        sx={{
+                          border: "1px dashed",
+                          borderColor: "divider",
+                          borderRadius: 1.5,
+                          px: 1.5,
+                          py: 1.25,
+                        }}
+                      >
+                        <Typography fontWeight={700}>
+                          {stat.label}
+                          {stat.average != null ? ` · среднее: ${stat.average}` : ""}
+                        </Typography>
+                        <QuestionBarChart
+                          rows={stat.options.map((text, idx) => ({
+                            text,
+                            count: stat.counts[idx] ?? 0,
+                            isCorrect: false,
+                          }))}
+                        />
+                      </Box>
+                    ))}
+                    {form.responses.some((row) => row.comment) ? (
+                      <Stack spacing={1}>
+                        <Typography variant="subtitle1" fontWeight={700}>
+                          Комментарии
+                        </Typography>
+                        {form.responses
+                          .filter((row) => row.comment)
+                          .slice(0, 50)
+                          .map((row) => (
+                            <Box
+                              key={`${row.nickname}-${row.submittedAt}`}
+                              className="report-row"
+                              sx={{
+                                border: "1px solid",
+                                borderColor: "divider",
+                                borderRadius: 1.5,
+                                px: 1.25,
+                                py: 1,
+                              }}
+                            >
+                              <Typography variant="body2" fontWeight={700}>
+                                {row.nickname}
+                              </Typography>
+                              <Typography variant="body2">{row.comment}</Typography>
+                            </Box>
+                          ))}
+                      </Stack>
+                    ) : null}
+                  </Stack>
+                </CardContent>
+              </Card>
+            ))}
 
         {hasModule("randomizer_summary") &&
           (payload!.randomizer.currentWinners.length > 0 ||

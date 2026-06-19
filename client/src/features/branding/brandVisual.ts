@@ -1,5 +1,8 @@
 type BrandVisualInput = {
   backgroundImageUrl?: string;
+  /** При cover: bottom — обрезать сверху, center — по центру (по умолчанию). */
+  backgroundAnchor?: "center" | "bottom";
+  backgroundAttachment?: "scroll" | "fixed";
 };
 
 function hexToRgba(hex: string, alpha: number): string {
@@ -15,10 +18,18 @@ export function buildBrandBackground(input: BrandVisualInput): {
   backgroundImage: string;
   backgroundSize?: string;
   backgroundPosition?: string;
+  backgroundAttachment?: string;
 } {
   const hasImage = !!input.backgroundImageUrl?.trim();
+  const imagePosition = input.backgroundAnchor === "bottom" ? "center bottom" : "center";
+  const attachment =
+    input.backgroundAttachment === "fixed" && hasImage ? "fixed, fixed" : undefined;
   if (!hasImage) {
-    return { backgroundImage: "none" };
+    return {
+      backgroundImage: "none",
+      backgroundSize: "auto",
+      backgroundPosition: "center",
+    };
   }
   const overlay = `linear-gradient(${hexToRgba("#000000", 0.25)}, ${hexToRgba("#000000", 0.25)})`;
   const layers: string[] = [overlay];
@@ -28,6 +39,7 @@ export function buildBrandBackground(input: BrandVisualInput): {
   return {
     backgroundImage: layers.join(", "),
     backgroundSize: "auto, cover",
-    backgroundPosition: "center",
+    backgroundPosition: `center, ${imagePosition}`,
+    ...(attachment ? { backgroundAttachment: attachment } : {}),
   };
 }

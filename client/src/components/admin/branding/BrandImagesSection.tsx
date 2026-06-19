@@ -117,6 +117,11 @@ export function BrandImagesSection(props: Props) {
                 setBrandLogoUrl(url);
                 emitPatch({ brandLogoUrl: url });
               }}
+              onClear={() => {
+                setBrandLogoUrl("");
+                emitPatch({ brandLogoUrl: "" });
+              }}
+              clearLabel="Убрать логотип"
               onError={onUploadFontError}
             />
             <BrandImageUploadTile
@@ -128,6 +133,11 @@ export function BrandImagesSection(props: Props) {
                 setBrandPlayerBackgroundImageUrl(url);
                 emitPatch({ brandPlayerBackgroundImageUrl: url });
               }}
+              onClear={() => {
+                setBrandPlayerBackgroundImageUrl("");
+                emitPatch({ brandPlayerBackgroundImageUrl: "" });
+              }}
+              clearLabel="Убрать фон"
               onError={onUploadFontError}
             />
             <BrandImageUploadTile
@@ -139,6 +149,11 @@ export function BrandImagesSection(props: Props) {
                 setBrandProjectorBackgroundImageUrl(url);
                 emitPatch({ brandProjectorBackgroundImageUrl: url });
               }}
+              onClear={() => {
+                setBrandProjectorBackgroundImageUrl("");
+                emitPatch({ brandProjectorBackgroundImageUrl: "" });
+              }}
+              clearLabel="Убрать фон проектора"
               onError={onUploadFontError}
             />
           </Box>

@@ -29,6 +29,7 @@ import LeaderboardIcon from "@mui/icons-material/Leaderboard";
 import AccessTimeIcon from "@mui/icons-material/AccessTime";
 import { AdminLoginForm } from "../components/AdminLoginForm";
 import { API_BASE } from "../config";
+import { useAdminAuth } from "../hooks/useAdminAuth";
 import {
   normalizePublicViewState,
   type PublicViewMode,
@@ -76,23 +77,17 @@ function formatSecondsFromMs(valueMs: number): string {
 
 export function AdminSubQuizResultsPage() {
   const { eventName = "", subQuizId = "" } = useParams();
-  const [isAuth, setIsAuth] = useState(false);
+  const { isAuth, authChecked, checkSession } = useAdminAuth();
   const [payload, setPayload] = useState<SubQuizResultsPayload | null>(null);
   const [error, setError] = useState("");
   const [publicViewMode, setPublicViewMode] = useState<PublicViewMode>("title");
   const [highlightedLeadersCount, setHighlightedLeadersCount] = useState(3);
   const [firstCorrectWinnersCount, setFirstCorrectWinnersCount] = useState(1);
 
-  async function checkSession() {
-    const response = await fetch(`${API_BASE}/api/admin/me`, { credentials: "include" });
-    setIsAuth(response.ok);
-    return response.ok;
-  }
-
   useEffect(() => {
     document.title = "Результаты квиза — админ";
     void checkSession();
-  }, []);
+  }, [checkSession]);
 
   const reloadPayload = useCallback(
     async (signal?: AbortSignal) => {
@@ -286,6 +281,10 @@ export function AdminSubQuizResultsPage() {
     URL.revokeObjectURL(url);
   }, [payload, placeMap, eventName]);
 
+  if (!authChecked) {
+    return null;
+  }
+
   if (!isAuth) {
     return (
       <Container maxWidth="sm" sx={{ py: 6 }}>
@@ -294,7 +293,7 @@ export function AdminSubQuizResultsPage() {
         </Typography>
         <AdminLoginForm
           onSuccess={() => {
-            setIsAuth(true);
+            void checkSession();
           }}
         />
       </Container>

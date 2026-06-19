@@ -6,12 +6,23 @@ import type { QuizState } from "../pages/quiz-play/types";
 import type { SpeakerQuestionsPayload } from "../types/speakerQuestions";
 import { parseSocketErrorCode, parseSocketErrorMessage } from "../utils/socketError";
 
+type SubmitPayload = {
+  quizId: string;
+  questionId: string;
+  optionIds?: string[];
+  rankedOptionIds?: string[];
+  tagAnswers?: string[];
+};
+
 type Params = {
   activeQuestionIdRef: MutableRefObject<string | null>;
-  activeQuestionTypeRef: MutableRefObject<"single" | "multi" | "tag_cloud" | "ranking" | null>;
+  activeQuestionTypeRef: MutableRefObject<
+    "single" | "multi" | "tag_cloud" | "ranking" | "temperature" | null
+  >;
   selectedRef: MutableRefObject<string[]>;
   rankOrderRef: MutableRefObject<string[]>;
   tagAnswersRef: MutableRefObject<string[]>;
+  pendingSubmitPayloadRef?: MutableRefObject<SubmitPayload | null>;
   setQuiz: Dispatch<SetStateAction<QuizState | null>>;
   setSelected: Dispatch<SetStateAction<string[]>>;
   setRankOrder: Dispatch<SetStateAction<string[]>>;
@@ -26,6 +37,8 @@ type Params = {
   setSpeakerQuestions: Dispatch<SetStateAction<SpeakerQuestionsPayload | null>>;
   onParticipantMissing?: () => void;
   onQuizJoined?: () => void;
+  /** Сброс «вошёл» в localStorage при ошибке входа (занятый ник и т.п.). */
+  onJoinFailed?: () => void;
 };
 
 export function useQuizPlaySocket({
@@ -34,6 +47,7 @@ export function useQuizPlaySocket({
   selectedRef,
   rankOrderRef,
   tagAnswersRef,
+  pendingSubmitPayloadRef,
   setQuiz,
   setSelected,
   setRankOrder,
@@ -48,6 +62,7 @@ export function useQuizPlaySocket({
   setSpeakerQuestions,
   onParticipantMissing,
   onQuizJoined,
+  onJoinFailed,
 }: Params) {
   useEffect(() => {
     if (!socket.connected) socket.connect();
@@ -131,7 +146,15 @@ export function useQuizPlaySocket({
         setError("");
         return;
       }
-      setError(message);
+      if (code === "NICKNAME_TAKEN" || message === "Ник уже используется в этой комнате") {
+        onJoinFailed?.();
+        return;
+      }
+      const displayMessage =
+        message === "Join failed"
+          ? "Не удалось войти в комнату. Проверьте имя и повторите попытку."
+          : message;
+      setError(displayMessage);
     };
     const onConnectError = () => {
       setConnectionStatus("reconnecting");
@@ -141,7 +164,9 @@ export function useQuizPlaySocket({
     };
     const onConnect = () => {
       setConnectionStatus("online");
-      setError("");
+      setError((prev) =>
+        prev.includes("Нет соединения") || prev.includes("backend доступен") ? "" : prev,
+      );
     };
     const onDisconnect = () => {
       setConnectionStatus("offline");
@@ -185,20 +210,24 @@ export function useQuizPlaySocket({
     const onSpeakerQuestions = (payload: SpeakerQuestionsPayload) => {
       setSpeakerQuestions(payload);
     };
+    const resolveSubmittedSelection = (payload: SubmitPayload | null | undefined): string[] => {
+      if (payload?.rankedOptionIds) return [...payload.rankedOptionIds];
+      if (payload?.optionIds) return [...payload.optionIds];
+      if (payload?.tagAnswers) return [...payload.tagAnswers];
+      return [...getCurrentSelection()];
+    };
     const onSubmitted = () => {
-      const activeQuestionId = activeQuestionIdRef.current;
-      if (activeQuestionId) {
-        const currentSelection = getCurrentSelection();
-        setSubmittedAnswers((prev) => ({
-          ...prev,
-          [activeQuestionId]: [...currentSelection],
-        }));
-        setSubmittedQuestionIds((prev) =>
-          prev.includes(activeQuestionId) ? prev : [...prev, activeQuestionId],
-        );
-        onQuestionSubmitted?.(activeQuestionId);
-        setPlayerAnswersHydrated(true);
-      }
+      const payload = pendingSubmitPayloadRef?.current ?? null;
+      const questionId = payload?.questionId ?? activeQuestionIdRef.current;
+      if (!questionId) return;
+      const currentSelection = resolveSubmittedSelection(payload);
+      setSubmittedAnswers((prev) => ({
+        ...prev,
+        [questionId]: currentSelection,
+      }));
+      setSubmittedQuestionIds((prev) => (prev.includes(questionId) ? prev : [...prev, questionId]));
+      onQuestionSubmitted?.(questionId);
+      setPlayerAnswersHydrated(true);
     };
     socket.on("state:quiz", onState);
     socket.on("player:quiz-score", onPlayerQuizScore);
@@ -244,8 +273,10 @@ export function useQuizPlaySocket({
     rankOrderRef,
     selectedRef,
     tagAnswersRef,
+    pendingSubmitPayloadRef,
     setSpeakerQuestions,
     onParticipantMissing,
     onQuizJoined,
+    onJoinFailed,
   ]);
 }

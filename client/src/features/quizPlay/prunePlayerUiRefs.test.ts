@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { prunePlayerUiRefsForRoom } from "@meyouquize/shared";
+import { prunePlayerUiRefsForRoom, prunePublicViewForRoomContent } from "@meyouquize/shared";
 import { resolveEnabledQuizReportSubQuizIds } from "./playerQuizResults";
 
 describe("prunePlayerUiRefsForRoom", () => {
@@ -35,6 +35,32 @@ describe("prunePlayerUiRefsForRoom", () => {
     expect(pruned.playerVisibleResultQuestionIds).toEqual([keptQ]);
     expect(pruned.leaderboardSubQuizId).toBe(keptSq);
     expect(pruned.reportQuizSubQuizIds).toEqual([keptSq]);
+  });
+});
+
+describe("prunePublicViewForRoomContent", () => {
+  it("resets projector question mode when question was deleted", () => {
+    const pruned = prunePublicViewForRoomContent(
+      {
+        mode: "question",
+        questionId: "q-deleted",
+        questionRevealStage: "results",
+        playerQuizResultsSubQuizIds: [],
+        playerQuizResultsSubQuizId: "",
+        playerQuizResultsTileVisible: false,
+        playerTilesOrder: [],
+        playerVisibleResultQuestionIds: [],
+        leaderboardSubQuizId: "",
+        reportVoteQuestionIds: [],
+        reportQuizQuestionIds: [],
+        reportQuizSubQuizIds: [],
+      },
+      new Set<string>(),
+      new Set(["q-kept"]),
+    );
+    expect(pruned.mode).toBe("title");
+    expect(pruned.questionId).toBeUndefined();
+    expect(pruned.questionRevealStage).toBe("options");
   });
 });
 

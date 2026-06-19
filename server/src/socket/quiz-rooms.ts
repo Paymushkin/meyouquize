@@ -1,5 +1,6 @@
 import type { Server } from "socket.io";
 import { env } from "../env.js";
+import { getFeedbackSubmittedParticipantIds } from "../feedback-service.js";
 import {
   getParticipantScoreTotalsByQuiz,
   getParticipantScoresBySubQuizForQuiz,
@@ -54,10 +55,14 @@ export async function broadcastQuizPublicState(
     ...trialQuizStatePayload(state),
   });
   emitToQuizDashboard(io, quizId, "state:quiz", state);
-  const [totals, subQuizTotals] = await Promise.all([
+  const [totals, subQuizTotals, submittedParticipantIds] = await Promise.all([
     getParticipantScoreTotalsByQuiz(quizId),
     getParticipantScoresBySubQuizForQuiz(quizId),
+    state.activeFeedbackForm?.id
+      ? getFeedbackSubmittedParticipantIds(state.activeFeedbackForm.id)
+      : Promise.resolve(new Set<string>()),
   ]);
+  const activeFormId = state.activeFeedbackForm?.id;
   const sockets = await io.in(quizPlayerRoom(quizId)).fetchSockets();
   for (const sk of sockets) {
     const pid = sk.data?.participantId;
@@ -65,7 +70,14 @@ export async function broadcastQuizPublicState(
       typeof pid === "string" && pid.trim().length > 0 ? (totals.get(pid) ?? 0) : 0;
     const mySubQuizScores =
       typeof pid === "string" && pid.trim().length > 0 ? (subQuizTotals.get(pid) ?? {}) : {};
-    sk.emit("state:quiz", { ...state, myTotalScore, mySubQuizScores });
+    const feedbackSubmitted =
+      activeFormId && typeof pid === "string" && pid.trim().length > 0
+        ? submittedParticipantIds.has(pid)
+        : false;
+    sk.emit("state:quiz", { ...state, myTotalScore, mySubQuizScores, feedbackSubmitted });
+    if (activeFormId) {
+      sk.emit("player:feedback-status", { submitted: feedbackSubmitted });
+    }
   }
 }
 

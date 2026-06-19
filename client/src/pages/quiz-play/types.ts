@@ -1,7 +1,10 @@
+import type { ActiveFeedbackForm } from "../../types/feedback";
+
 export type ActiveQuestion = {
   id: string;
   text: string;
-  type: "single" | "multi" | "tag_cloud" | "ranking";
+  imageUrl?: string;
+  type: "single" | "multi" | "tag_cloud" | "ranking" | "temperature";
   scoringMode?: "poll" | "quiz";
   /** Для ranking: квиз с эталоном или жюри (без зачёта в лидерборде) */
   rankingKind?: "quiz" | "jury";
@@ -10,7 +13,7 @@ export type ActiveQuestion = {
   /** Кастомная подсказка игроку для ранжирования (если не задана — дефолтный текст). */
   rankingPlayerHint?: string;
   maxAnswers?: number;
-  options: Array<{ id: string; text: string }>;
+  options: Array<{ id: string; text: string; imageUrl?: string }>;
   isClosed: boolean;
   /** Порядковый номер вопроса в сабквизе (1-based), с сервера. */
   stepIndex?: number;
@@ -48,18 +51,22 @@ export type ReactionSession = {
 export type PlayerVisibleResultOptionStat = {
   optionId: string;
   text: string;
+  imageUrl?: string;
   count: number;
   isCorrect: boolean;
   avgRank?: number;
   avgScore?: number;
   totalScore?: number;
+  weight?: number;
 };
 
 export type PlayerVisibleResultTile = {
   questionId: string;
   text: string;
-  type: "single" | "multi" | "ranking";
+  imageUrl?: string;
+  type: "single" | "multi" | "ranking" | "temperature";
   rankingProjectorMetric?: "avg_rank" | "avg_score" | "total_score";
+  temperatureValue?: number | null;
   optionStats: PlayerVisibleResultOptionStat[];
 };
 
@@ -67,7 +74,7 @@ export type PlayerSubQuizReportQuestionRow = {
   questionId: string;
   order: number;
   text: string;
-  type: "single" | "multi" | "tag_cloud" | "ranking";
+  type: "single" | "multi" | "tag_cloud" | "ranking" | "temperature";
   scoringMode: "poll" | "quiz";
   points: number;
   scoreAwarded: number | null;
@@ -144,4 +151,7 @@ export type QuizState = {
   } | null;
   activeQuestions?: ActiveQuestion[];
   activeQuestion: ActiveQuestion | null;
+  activeFeedbackForm?: ActiveFeedbackForm | null;
+  /** Ответил ли игрок по текущей активной форме обратной связи (только в payload игрока). */
+  feedbackSubmitted?: boolean;
 };

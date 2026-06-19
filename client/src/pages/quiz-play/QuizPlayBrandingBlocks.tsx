@@ -3,16 +3,13 @@ import { ruBallLabel } from "@meyouquize/shared";
 import { PlayerQuizResultsTile } from "../../components/quiz/PlayerQuizResultsTile";
 import { isQuizResultsTileId, PROGRAM_TILE_ID, SPEAKER_TILE_ID } from "../../publicViewContract";
 import type { PlayerQuizResultsTileModel } from "../../features/quizPlay/playerQuizResults";
-import CheckCircleIcon from "@mui/icons-material/CheckCircle";
+import { playerEventTitleSx } from "../../features/voteUi/voteQuestionLayout";
 import CloseIcon from "@mui/icons-material/Close";
-import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
 import EditOutlinedIcon from "@mui/icons-material/EditOutlined";
 import EmojiEventsIcon from "@mui/icons-material/EmojiEvents";
 import EventNoteIcon from "@mui/icons-material/EventNote";
 import PersonOutlineIcon from "@mui/icons-material/PersonOutline";
 import QuestionAnswerIcon from "@mui/icons-material/QuestionAnswer";
-import KeyboardArrowDownIcon from "@mui/icons-material/KeyboardArrowDown";
-import KeyboardArrowUpIcon from "@mui/icons-material/KeyboardArrowUp";
 import NorthEastIcon from "@mui/icons-material/NorthEast";
 import {
   Alert,
@@ -23,7 +20,6 @@ import {
   Chip,
   CircularProgress,
   IconButton,
-  LinearProgress,
   OutlinedInput,
   Stack,
   TextField,
@@ -31,8 +27,9 @@ import {
   Typography,
 } from "@mui/material";
 import { alpha, type SxProps, type Theme } from "@mui/material/styles";
-import { useState, type Dispatch, type RefObject, type SetStateAction } from "react";
-import type { ActiveQuestion, QuizState, ReactionType } from "./types";
+import { useState, type RefObject } from "react";
+import type { QuizState, ReactionType } from "./types";
+import { PlayerVisibleResultTileCard } from "../../components/quiz/PlayerVisibleResultTileCard";
 import { resolveClientAssetUrl } from "../../utils/resolveClientAssetUrl";
 import { sanitizeClientAssetUrl, sanitizeExternalHttpUrl } from "../../utils/safeUrls";
 
@@ -43,23 +40,18 @@ type BannerTile = {
   size: "2x1" | "1x1" | "full";
 };
 
-function getQuestionTypeLabel(question: ActiveQuestion): string {
-  if (question.type === "single") return "Один ответ";
-  if (question.type === "multi") return "Несколько ответов";
-  if (question.type === "ranking") return question.rankingKind === "jury" ? "Жюри" : "Ранжирование";
-  return "Облако тегов";
-}
-
 type QuizPlayContainerSxParams = {
-  brandBackground: Record<string, string>;
   brandFontFamily: string;
   hasActiveQuestion: boolean;
+  isJoinScreen?: boolean;
 };
 
 export function buildQuizPlayContainerSx(params: QuizPlayContainerSxParams): SxProps<Theme> {
-  const { brandBackground, brandFontFamily, hasActiveQuestion } = params;
+  const { brandFontFamily, hasActiveQuestion, isJoinScreen = false } = params;
   return {
-    ...brandBackground,
+    position: "relative",
+    zIndex: 1,
+    bgcolor: "transparent",
     fontFamily: brandFontFamily,
     fontStyle: "normal",
     "&, & *": {
@@ -70,12 +62,14 @@ export function buildQuizPlayContainerSx(params: QuizPlayContainerSxParams): SxP
         fontFamily: brandFontFamily,
         fontStyle: "normal",
       },
-    pt: 2,
+    pt: isJoinScreen ? { xs: 5, sm: 6 } : 2,
     maxWidth: "678px !important",
-    pb: {
-      xs: "calc(env(safe-area-inset-bottom, 0px) + 96px)",
-      sm: 4,
-    },
+    pb: isJoinScreen
+      ? "env(safe-area-inset-bottom, 0px)"
+      : {
+          xs: "calc(env(safe-area-inset-bottom, 0px) + 96px)",
+          sm: 4,
+        },
     minHeight: "100vh",
     height: hasActiveQuestion ? "auto" : "100dvh",
     overflowY: hasActiveQuestion ? "auto" : "hidden",
@@ -83,11 +77,13 @@ export function buildQuizPlayContainerSx(params: QuizPlayContainerSxParams): SxP
     display: "flex",
     flexDirection: "column",
     justifyContent: "flex-start",
+    alignItems: isJoinScreen ? "center" : "stretch",
   };
 }
 
 type EventTitleBlockProps = {
   joined: boolean;
+  isJoinScreen?: boolean;
   shouldShowEventTitle: boolean;
   restoreJoinPending: boolean;
   hasActiveQuestion: boolean;
@@ -98,6 +94,7 @@ type EventTitleBlockProps = {
 export function EventTitleBlock(props: EventTitleBlockProps) {
   const {
     joined,
+    isJoinScreen = false,
     shouldShowEventTitle,
     restoreJoinPending,
     hasActiveQuestion,
@@ -106,11 +103,12 @@ export function EventTitleBlock(props: EventTitleBlockProps) {
   } = props;
   const safeBrandLogoUrl = sanitizeClientAssetUrl(brandLogoUrl);
   const normalizedTitleText = titleText.trim();
+  const showTitle = shouldShowEventTitle && normalizedTitleText.length > 0;
   if (
     (!joined && restoreJoinPending) ||
-    (!joined && !shouldShowEventTitle) ||
     (joined && !shouldShowEventTitle) ||
-    (!safeBrandLogoUrl && normalizedTitleText.length < 1)
+    (!joined && !shouldShowEventTitle && !isJoinScreen) ||
+    (!safeBrandLogoUrl && !showTitle)
   ) {
     return null;
   }
@@ -118,16 +116,29 @@ export function EventTitleBlock(props: EventTitleBlockProps) {
     <Box
       sx={{
         display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        minHeight: joined ? 0 : { xs: 96, sm: 128 },
+        alignItems: isJoinScreen ? "flex-start" : "center",
+        justifyContent: isJoinScreen ? "flex-start" : "center",
+        minHeight: joined ? 0 : 0,
         width: "100%",
+        maxWidth: 520,
+        mx: "auto",
+        flexShrink: 0,
+        ...(isJoinScreen
+          ? {
+              px: { xs: 2, sm: 0 },
+              mt: { xs: 1, sm: 1.5 },
+              alignSelf: "stretch",
+            }
+          : {}),
         ...(hasActiveQuestion ? { minHeight: 0, mb: 2 } : {}),
         ...(joined ? { mb: 4 } : {}),
-        ...(!joined ? { flex: 1 } : {}),
       }}
     >
-      <Stack spacing={1} alignItems="center" sx={{ width: "100%" }}>
+      <Stack
+        spacing={isJoinScreen ? 1.5 : 1}
+        alignItems={isJoinScreen ? "flex-start" : "center"}
+        sx={{ width: "100%" }}
+      >
         {safeBrandLogoUrl ? (
           <Box
             component="img"
@@ -135,27 +146,30 @@ export function EventTitleBlock(props: EventTitleBlockProps) {
             alt="Логотип"
             sx={{
               alignSelf: "flex-start",
-              mb: 1.5,
+              mb: isJoinScreen ? 0.5 : 1.5,
               maxHeight: 56,
-              maxWidth: "min(60vw, 280px)",
+              maxWidth: isJoinScreen ? "min(56vw, 220px)" : "min(60vw, 280px)",
               objectFit: "contain",
             }}
           />
         ) : null}
-        {normalizedTitleText ? (
+        {showTitle ? (
           <Typography
             variant="h3"
-            gutterBottom
+            gutterBottom={!isJoinScreen}
             align="left"
-            sx={{
-              width: "100%",
-              fontWeight: 400,
-              fontStyle: "normal",
-              letterSpacing: 0.2,
-              fontSize: "clamp(1.6rem, 4.8vw, 2.8rem)",
-              whiteSpace: "pre-line",
-              mb: 4,
-            }}
+            sx={
+              isJoinScreen
+                ? {
+                    ...playerEventTitleSx(),
+                    fontWeight: 800,
+                    fontSize: "clamp(2rem, 7vw, 3.5rem)",
+                    lineHeight: 1.08,
+                    letterSpacing: 0.4,
+                    mb: 0,
+                  }
+                : playerEventTitleSx()
+            }
           >
             {titleText}
           </Typography>
@@ -222,9 +236,9 @@ export function PlayerTilesGrid(props: PlayerTilesGridProps) {
           md: "repeat(3, minmax(0, 1fr))",
         },
         justifyContent: "stretch",
-        gap: 1,
+        gap: { xs: 1.5, sm: 2 },
         mb: 2,
-        mt: 1,
+        mt: 1.5,
         alignItems: "start",
       }}
     >
@@ -414,128 +428,15 @@ export function PlayerTilesGrid(props: PlayerTilesGridProps) {
           </Box>
         );
       })}
-      {visibleResultTiles.map((tile) => {
-        const total = tile.optionStats.reduce((sum, row) => sum + row.count, 0);
-        return (
-          <Card
-            key={`player-result-${tile.questionId}`}
-            variant="outlined"
-            component="button"
-            type="button"
-            onClick={() => onSelectQuestion(tile.questionId)}
-            sx={{
-              gridColumn: "span 1",
-              width: "100%",
-              aspectRatio: "1 / 1",
-              textAlign: "left",
-              border: "1px solid",
-              borderColor: "divider",
-              bgcolor: "rgba(0,0,0,0.22)",
-              backdropFilter: "blur(3px)",
-              p: { xs: 1.75, sm: 2 },
-              cursor: "pointer",
-              overflow: "hidden",
-              position: "relative",
-              "&::after": {
-                content: '""',
-                position: "absolute",
-                left: 0,
-                right: 0,
-                bottom: 0,
-                height: { xs: 42, sm: 50 },
-                background:
-                  "linear-gradient(to bottom, rgba(8,12,24,0) 0%, rgba(8,12,24,0.85) 62%, rgba(8,12,24,0.98) 100%)",
-                pointerEvents: "none",
-                zIndex: 2,
-              },
-            }}
-          >
-            <CardContent
-              sx={{
-                p: 0,
-                "&:last-child": { pb: 0 },
-                position: "relative",
-                zIndex: 1,
-              }}
-            >
-              <Stack spacing={{ xs: 1.2, sm: 1.35 }} sx={{ height: "100%" }}>
-                <Typography
-                  variant="caption"
-                  sx={{
-                    fontWeight: 700,
-                    lineHeight: 1.2,
-                    fontSize: { xs: "1rem", sm: "1.1rem" },
-                    display: "-webkit-box",
-                    WebkitLineClamp: 2,
-                    WebkitBoxOrient: "vertical",
-                    overflow: "hidden",
-                  }}
-                  title={tile.text}
-                >
-                  {tile.text}
-                </Typography>
-                <Stack spacing={{ xs: 0.95, sm: 1.1 }} sx={{ mt: 0.85 }}>
-                  {tile.optionStats.slice(0, 3).map((row) => {
-                    const pct = total > 0 ? Math.round((row.count / total) * 100) : 0;
-                    return (
-                      <Box key={`${tile.questionId}_${row.optionId}`} sx={{ p: 0 }}>
-                        <Box sx={{ position: "relative", borderRadius: "5px", overflow: "hidden" }}>
-                          <LinearProgress
-                            color="primary"
-                            variant="determinate"
-                            value={pct}
-                            sx={{
-                              position: "absolute",
-                              inset: 0,
-                              height: "100%",
-                              bgcolor: alpha(playerVoteProgressBarColor, 0.35),
-                              "& .MuiLinearProgress-bar": {
-                                backgroundColor: playerVoteProgressBarColor,
-                              },
-                            }}
-                          />
-                          <Typography
-                            variant="caption"
-                            component="div"
-                            title={row.text}
-                            sx={{
-                              position: "relative",
-                              color: playerVoteOptionTextColor,
-                              fontWeight: 400,
-                              fontSize: { xs: "0.9rem", sm: "0.98rem" },
-                              pointerEvents: "none",
-                              px: { xs: 1.75, sm: 2 },
-                              py: { xs: 0.95, sm: 1.1 },
-                              maxWidth: "100%",
-                            }}
-                          >
-                            <Box
-                              component="span"
-                              sx={{
-                                display: "-webkit-box",
-                                lineHeight: 1.15,
-                                WebkitLineClamp: 2,
-                                WebkitBoxOrient: "vertical",
-                                overflow: "hidden",
-                                textOverflow: "ellipsis",
-                                wordBreak: "break-word",
-                                overflowWrap: "anywhere",
-                                maxHeight: "2.3em",
-                              }}
-                            >
-                              {row.text}
-                            </Box>
-                          </Typography>
-                        </Box>
-                      </Box>
-                    );
-                  })}
-                </Stack>
-              </Stack>
-            </CardContent>
-          </Card>
-        );
-      })}
+      {visibleResultTiles.map((tile) => (
+        <PlayerVisibleResultTileCard
+          key={`player-result-${tile.questionId}`}
+          tile={tile}
+          playerVoteOptionTextColor={playerVoteOptionTextColor}
+          playerVoteProgressBarColor={playerVoteProgressBarColor}
+          onSelect={() => onSelectQuestion(tile.questionId)}
+        />
+      ))}
     </Box>
   );
 }
@@ -552,6 +453,10 @@ const NICKNAME_CHIP_SX: SxProps<Theme> = {
   color: "#111",
   borderColor: "rgba(0,0,0,0.35)",
   bgcolor: "rgba(255,255,255,0.92)",
+  "&:hover, &.MuiChip-clickable:hover, &.MuiChip-clickableColorDefault:hover": {
+    bgcolor: "rgba(255,255,255,0.92)",
+    borderColor: "rgba(0,0,0,0.35)",
+  },
   "& .MuiChip-icon": {
     color: "rgba(0,0,0,0.72)",
   },
@@ -559,7 +464,7 @@ const NICKNAME_CHIP_SX: SxProps<Theme> = {
     display: "flex",
     alignItems: "center",
     height: "100%",
-    fontWeight: 600,
+    fontWeight: 400,
     color: "#111",
   },
 };
@@ -573,7 +478,7 @@ function buildConnectionChipSx(
   return {
     alignItems: "center",
     borderRadius: 1.25,
-    fontWeight: 700,
+    fontWeight: 400,
     ...(accentFill
       ? {
           backgroundColor: accentBackgroundColor,
@@ -586,7 +491,7 @@ function buildConnectionChipSx(
       display: "flex",
       alignItems: "center",
       height: "100%",
-      fontWeight: 700,
+      fontWeight: 400,
       letterSpacing: 0.2,
       ...(accentFill ? { color: accentTextColor } : {}),
     },
@@ -597,17 +502,32 @@ function buildConnectionChipSx(
 }
 
 const JOIN_CARD_ROOT_SX: SxProps<Theme> = {
-  mt: { xs: 2, md: "auto" },
-  mb: {
-    xs: "calc(env(safe-area-inset-bottom, 0px) + 76px)",
-    md: 5,
-  },
   width: "100%",
   maxWidth: 520,
   mx: "auto",
   bgcolor: "transparent",
   borderColor: "transparent",
   boxShadow: "none",
+};
+
+export const JOIN_SCREEN_STACK_SX: SxProps<Theme> = {
+  width: "100%",
+  maxWidth: 520,
+  px: { xs: 2, sm: 0 },
+  display: "flex",
+  flexDirection: "column",
+  alignItems: "stretch",
+  gap: 1.5,
+};
+
+export const JOIN_SCREEN_MAIN_SX: SxProps<Theme> = {
+  flex: 1,
+  width: "100%",
+  display: "flex",
+  flexDirection: "column",
+  alignItems: "center",
+  justifyContent: "center",
+  minHeight: 0,
 };
 
 const JOIN_CARD_CONTENT_SX: SxProps<Theme> = {
@@ -621,9 +541,11 @@ const JOIN_CARD_CONTENT_SX: SxProps<Theme> = {
   "&:last-child": { pb: 2 },
 };
 
-function buildJoinNicknameInputSx(focusColor: string, formTextColor: string): SxProps<Theme> {
-  return {
-    minHeight: 56,
+export function buildJoinNicknameInputSx(
+  focusColor: string,
+  formTextColor: string,
+): SxProps<Theme> {
+  const outlineSx = {
     color: formTextColor,
     "& .MuiOutlinedInput-input": { color: formTextColor },
     "& .MuiOutlinedInput-notchedOutline": {
@@ -635,6 +557,11 @@ function buildJoinNicknameInputSx(focusColor: string, formTextColor: string): Sx
     "&.Mui-focused .MuiOutlinedInput-notchedOutline": {
       borderColor: focusColor,
     },
+  };
+  return {
+    minHeight: 56,
+    ...outlineSx,
+    "& .MuiOutlinedInput-root": outlineSx,
   };
 }
 
@@ -651,7 +578,7 @@ const RANDOM_NICKNAME_BUTTON_SX: SxProps<Theme> = {
   },
 };
 
-function buildBrandPrimaryContainedButtonSx(
+export function buildBrandPrimaryContainedButtonSx(
   backgroundColor: string,
   textColor: string,
 ): SxProps<Theme> {
@@ -659,6 +586,17 @@ function buildBrandPrimaryContainedButtonSx(
     bgcolor: backgroundColor,
     color: textColor,
     "&:hover": { bgcolor: backgroundColor, filter: "brightness(0.94)" },
+  };
+}
+
+export function buildBrandOutlinedButtonSx(textColor: string): SxProps<Theme> {
+  return {
+    color: textColor,
+    borderColor: alpha(textColor, 0.45),
+    "&:hover": {
+      borderColor: alpha(textColor, 0.72),
+      bgcolor: alpha(textColor, 0.08),
+    },
   };
 }
 
@@ -848,6 +786,7 @@ type JoinCardProps = {
   formTextColor: string;
   formInputTextColor: string;
   nickname: string;
+  nicknameError?: string;
   nicknameInputRef: RefObject<HTMLInputElement | null>;
   onNicknameChange: (value: string) => void;
   onRandomNickname: () => void;
@@ -860,6 +799,7 @@ export function JoinCard(props: JoinCardProps) {
     formTextColor,
     formInputTextColor,
     nickname,
+    nicknameError,
     nicknameInputRef,
     onNicknameChange,
     onRandomNickname,
@@ -869,30 +809,38 @@ export function JoinCard(props: JoinCardProps) {
     <Card variant="outlined" sx={JOIN_CARD_ROOT_SX}>
       <CardContent sx={JOIN_CARD_CONTENT_SX}>
         <Stack spacing={2}>
-          <Stack direction={{ xs: "column", sm: "row" }} spacing={1}>
-            <OutlinedInput
-              autoFocus
-              inputRef={nicknameInputRef}
-              value={nickname}
-              onChange={(e) => onNicknameChange(e.target.value)}
-              placeholder="Введите имя или используйте случайное"
-              fullWidth
-              sx={buildJoinNicknameInputSx(formBackgroundColor, formInputTextColor)}
-            />
-            <Button
-              variant="outlined"
-              onClick={onRandomNickname}
-              sx={{
-                ...RANDOM_NICKNAME_BUTTON_SX,
-                color: formInputTextColor,
-                borderColor: alpha(formInputTextColor, 0.45),
-                "&:hover": {
-                  borderColor: alpha(formInputTextColor, 0.72),
-                },
-              }}
-            >
-              Случайное имя
-            </Button>
+          <Stack spacing={0.75}>
+            <Stack direction={{ xs: "column", sm: "row" }} spacing={1}>
+              <OutlinedInput
+                autoFocus
+                inputRef={nicknameInputRef}
+                value={nickname}
+                onChange={(e) => onNicknameChange(e.target.value)}
+                placeholder="Введите имя или используйте случайное"
+                fullWidth
+                error={Boolean(nicknameError)}
+                sx={buildJoinNicknameInputSx(formBackgroundColor, formInputTextColor)}
+              />
+              <Button
+                variant="outlined"
+                onClick={onRandomNickname}
+                sx={{
+                  ...RANDOM_NICKNAME_BUTTON_SX,
+                  color: formInputTextColor,
+                  borderColor: alpha(formInputTextColor, 0.45),
+                  "&:hover": {
+                    borderColor: alpha(formInputTextColor, 0.72),
+                  },
+                }}
+              >
+                Случайное имя
+              </Button>
+            </Stack>
+            {nicknameError ? (
+              <Typography variant="body2" color="error" sx={{ px: 0.25 }}>
+                {nicknameError}
+              </Typography>
+            ) : null}
           </Stack>
           <Button
             variant="contained"
@@ -987,419 +935,6 @@ export function CompletionOverlay(props: CompletionOverlayProps) {
               </Typography>
             ) : null}
           </Stack>
-        </CardContent>
-      </Card>
-    </Box>
-  );
-}
-
-type QuestionPopupCardProps = {
-  brandPrimaryColor: string;
-  playerVoteOptionTextColor: string;
-  question: ActiveQuestion;
-  quizProgress: QuizState["quizProgress"];
-  displayedSelected: string[];
-  answeredCurrentQuestion: boolean;
-  showAcceptedHint?: boolean;
-  submittedAnswers: Record<string, string[]>;
-  rankOrder: string[];
-  rankRowRefs: RefObject<Map<string, HTMLDivElement>>;
-  moveRankOption: (optionId: string, direction: -1 | 1) => void;
-  toggleOption: (id: string) => void;
-  closeQuestionPopup: () => void;
-  tagAnswers: string[];
-  setTagAnswers: Dispatch<SetStateAction<string[]>>;
-  canSubmit: boolean;
-  submit: () => void;
-  ruBallLabel: (n: number) => string;
-};
-
-export function QuestionPopupCard(props: QuestionPopupCardProps) {
-  const {
-    brandPrimaryColor,
-    playerVoteOptionTextColor,
-    question,
-    quizProgress,
-    displayedSelected,
-    answeredCurrentQuestion,
-    showAcceptedHint = false,
-    submittedAnswers,
-    rankOrder,
-    rankRowRefs,
-    moveRankOption,
-    toggleOption,
-    closeQuestionPopup,
-    tagAnswers,
-    setTagAnswers,
-    canSubmit,
-    submit,
-    ruBallLabel,
-  } = props;
-  const rankingHintRaw = question.rankingPlayerHint?.trim() ?? "";
-  const rankingHint =
-    rankingHintRaw ===
-    "Расставьте варианты от лучшего к худшему. Баллы по позициям задаёт ведущий; зачёт в общей таблице не меняется."
-      ? "Расставьте варианты от лучшего к худшему."
-      : rankingHintRaw;
-  const questionLength = question.text.trim().length;
-  const longTextPenalty = Math.min(1.25, Math.max(0, (questionLength - 72) / 170));
-  const desktopQuestionFontRem = Math.max(1.6, 2.25 - longTextPenalty);
-  const mobileQuestionFontRem = Math.max(1.05, desktopQuestionFontRem - 0.35);
-  const metaChipSx = {
-    height: 24,
-    color: "inherit",
-    bgcolor: "transparent",
-    border: "none",
-    borderRadius: 0,
-    borderBottom: `2px solid ${brandPrimaryColor}`,
-    "& .MuiChip-label": { px: 1, fontSize: "0.72rem", fontWeight: 600, color: "inherit" },
-    "& .MuiChip-icon": { color: "inherit" },
-  } as const;
-  const questionTypeBubbleSx = {
-    alignSelf: "flex-start",
-    height: "auto",
-    borderRadius: 999,
-    bgcolor: brandPrimaryColor,
-    color: playerVoteOptionTextColor,
-    border: "none",
-    "& .MuiChip-label": {
-      px: 1.5,
-      py: 0.6,
-      fontSize: "0.75rem",
-      fontWeight: 600,
-      lineHeight: 1.25,
-      whiteSpace: "normal",
-      color: playerVoteOptionTextColor,
-    },
-  } as const;
-  const optionButtonSx = (isSelected: boolean) => ({
-    boxSizing: "border-box",
-    border: "2px solid",
-    borderColor: isSelected ? brandPrimaryColor : "rgba(255,255,255,0.45)",
-    bgcolor: isSelected ? brandPrimaryColor : "transparent",
-    color: isSelected ? playerVoteOptionTextColor : "inherit",
-    "&:hover": {
-      bgcolor: isSelected ? alpha(brandPrimaryColor, 0.88) : "rgba(255,255,255,0.06)",
-    },
-    transition: "background-color 180ms ease, border-color 180ms ease, color 180ms ease",
-    boxShadow: "none",
-    position: "relative",
-    justifyContent: "flex-start",
-    textAlign: "left",
-    whiteSpace: "normal",
-    pl: 4.5,
-    pr: 2,
-    "& .MuiButton-startIcon": {
-      position: "absolute",
-      top: 8,
-      left: 8,
-      marginLeft: 0,
-      marginRight: 0,
-      transformOrigin: "center",
-      animation: isSelected ? "mqCheckIn 320ms cubic-bezier(0.22, 1, 0.36, 1)" : "none",
-    },
-    "@keyframes mqCheckIn": {
-      "0%": { transform: "scale(0.7)", opacity: 0 },
-      "55%": { transform: "scale(1.04)", opacity: 1 },
-      "100%": { transform: "scale(1)", opacity: 1 },
-    },
-  });
-
-  return (
-    <Box
-      sx={{
-        position: "fixed",
-        inset: 0,
-        zIndex: 1400,
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        p: { xs: 1.5, sm: 2.5 },
-        backgroundColor: "rgba(0, 0, 0, 0.42)",
-      }}
-    >
-      <Card
-        variant="outlined"
-        sx={{
-          width: "100%",
-          maxWidth: 678,
-          maxHeight: "92vh",
-          overflowY: "auto",
-          bgcolor: "rgba(38, 38, 38, 0.84)",
-          backdropFilter: "blur(4px)",
-          color: "#fff",
-          boxShadow: "none",
-        }}
-      >
-        <CardContent sx={{ bgcolor: "transparent", color: "inherit" }}>
-          <Stack spacing={2}>
-            {showAcceptedHint ? <Alert severity="success">Ответ принят</Alert> : null}
-            <Stack direction="row" alignItems="center" justifyContent="space-between">
-              {question.scoringMode !== "poll" && quizProgress && quizProgress.total > 0 ? (
-                <Chip
-                  label={`Вопрос ${quizProgress.index} / ${quizProgress.total}`}
-                  size="small"
-                  sx={metaChipSx}
-                />
-              ) : (
-                <Box />
-              )}
-              <IconButton
-                aria-label="Закрыть"
-                size="small"
-                onClick={closeQuestionPopup}
-                sx={{ color: "#fff" }}
-              >
-                <CloseIcon fontSize="small" />
-              </IconButton>
-            </Stack>
-            <Stack spacing={3.5} sx={{ width: "100%" }}>
-              <Stack spacing={1}>
-                <Typography
-                  variant="h4"
-                  sx={{
-                    fontWeight: 700,
-                    lineHeight: 1.2,
-                    fontSize: {
-                      xs: `${mobileQuestionFontRem}rem`,
-                      sm: `${desktopQuestionFontRem}rem`,
-                    },
-                    py: 0.5,
-                  }}
-                >
-                  {question.text}
-                </Typography>
-                <Chip
-                  label={getQuestionTypeLabel(question)}
-                  size="small"
-                  sx={questionTypeBubbleSx}
-                />
-              </Stack>
-              {question.type !== "tag_cloud" && question.type !== "ranking" && (
-                <Stack spacing={1.25} sx={{ width: "100%", alignItems: "stretch" }}>
-                  {question.options.map((option) => {
-                    const isSelected = displayedSelected.includes(option.id);
-                    return (
-                      <Button
-                        key={option.id}
-                        fullWidth
-                        variant="outlined"
-                        color="inherit"
-                        sx={optionButtonSx(isSelected)}
-                        disabled={answeredCurrentQuestion}
-                        onClick={() => toggleOption(option.id)}
-                        startIcon={
-                          <CheckCircleIcon
-                            sx={{
-                              opacity: isSelected ? 1 : 0,
-                              transition: "opacity 140ms ease",
-                            }}
-                          />
-                        }
-                      >
-                        {option.text}
-                      </Button>
-                    );
-                  })}
-                </Stack>
-              )}
-              {question.type === "ranking" && (
-                <Stack spacing={1.25}>
-                  <Typography variant="body2" color="text.secondary">
-                    {rankingHint ||
-                      (question.rankingKind === "jury"
-                        ? "Расставьте варианты от лучшего к худшему."
-                        : "Расставьте варианты от лучшего к худшему (первый в списке — лучший).")}
-                  </Typography>
-                  {(answeredCurrentQuestion
-                    ? (submittedAnswers[question.id] ?? [])
-                    : rankOrder
-                  ).map((id, idx) => {
-                    const option = question.options.find((o) => o.id === id);
-                    if (!option) return null;
-                    const tierPts =
-                      question.rankingKind === "jury"
-                        ? question.rankingPointsByRank?.[idx]
-                        : undefined;
-                    return (
-                      <Stack
-                        key={id}
-                        ref={(node) => {
-                          if (node) rankRowRefs.current.set(id, node);
-                          else rankRowRefs.current.delete(id);
-                        }}
-                        direction="row"
-                        spacing={1}
-                        alignItems="center"
-                        sx={{ width: "100%" }}
-                      >
-                        <Typography
-                          variant="body2"
-                          sx={{ width: 28, flexShrink: 0, fontWeight: 700 }}
-                        >
-                          {idx + 1}.
-                        </Typography>
-                        <Box
-                          sx={(theme) => ({
-                            flex: 1,
-                            minWidth: 0,
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "space-between",
-                            gap: 1,
-                            borderRadius: 1,
-                            border: `1px solid ${alpha(theme.palette.divider, 0.9)}`,
-                            bgcolor:
-                              theme.palette.mode === "dark"
-                                ? alpha(theme.palette.common.white, 0.06)
-                                : alpha(theme.palette.common.black, 0.04),
-                            px: 1.5,
-                            py: 1.25,
-                          })}
-                        >
-                          <Typography
-                            sx={{
-                              flex: 1,
-                              minWidth: 0,
-                              typography: "body2",
-                              fontWeight: 500,
-                              textTransform: "uppercase",
-                              letterSpacing: 0.02,
-                              color: "text.secondary",
-                            }}
-                          >
-                            {option.text}
-                          </Typography>
-                          {tierPts != null && (
-                            <Typography
-                              variant="caption"
-                              sx={{
-                                flexShrink: 0,
-                                fontWeight: 700,
-                                color: "text.secondary",
-                                whiteSpace: "nowrap",
-                              }}
-                            >
-                              {ruBallLabel(tierPts)}
-                            </Typography>
-                          )}
-                        </Box>
-                        {!answeredCurrentQuestion && (
-                          <>
-                            <IconButton
-                              aria-label="Выше"
-                              size="small"
-                              disabled={idx === 0}
-                              onClick={() => moveRankOption(id, -1)}
-                            >
-                              <KeyboardArrowUpIcon />
-                            </IconButton>
-                            <IconButton
-                              aria-label="Ниже"
-                              size="small"
-                              disabled={idx >= rankOrder.length - 1}
-                              onClick={() => moveRankOption(id, 1)}
-                            >
-                              <KeyboardArrowDownIcon />
-                            </IconButton>
-                          </>
-                        )}
-                      </Stack>
-                    );
-                  })}
-                </Stack>
-              )}
-              {question.type === "tag_cloud" && (
-                <Stack spacing={1.5}>
-                  {(answeredCurrentQuestion
-                    ? (submittedAnswers[question.id] ?? [])
-                    : tagAnswers
-                  ).map((value, index) => (
-                    <Stack
-                      key={`tag-answer-${index}`}
-                      direction="row"
-                      spacing={1}
-                      alignItems="center"
-                    >
-                      <TextField
-                        value={value}
-                        onChange={(e) => {
-                          const nextValue = e.target.value;
-                          const limit = question.maxAnswers ?? 5;
-                          setTagAnswers((prev) => {
-                            const next = prev.map((item, i) => (i === index ? nextValue : item));
-                            const isLastField = index === next.length - 1;
-                            if (isLastField && nextValue.trim() && next.length < limit) {
-                              next.push("");
-                            }
-                            return next;
-                          });
-                        }}
-                        placeholder={`Ответ ${index + 1}`}
-                        size="small"
-                        disabled={answeredCurrentQuestion}
-                        multiline
-                        minRows={1}
-                        maxRows={3}
-                        sx={{
-                          flex: 1,
-                          "& .MuiOutlinedInput-root": {
-                            color: "#fff",
-                            "& fieldset": {
-                              borderColor: "rgba(255,255,255,0.35)",
-                            },
-                            "&:hover fieldset": {
-                              borderColor: "rgba(255,255,255,0.55)",
-                            },
-                            "&.Mui-focused fieldset": {
-                              borderColor: brandPrimaryColor,
-                              borderWidth: 2,
-                            },
-                          },
-                        }}
-                      />
-                      {!answeredCurrentQuestion && index > 0 && (
-                        <IconButton
-                          aria-label="Удалить ответ"
-                          color="inherit"
-                          onClick={() =>
-                            setTagAnswers((prev) =>
-                              prev.length <= 1 ? prev : prev.filter((_, i) => i !== index),
-                            )
-                          }
-                        >
-                          <DeleteOutlineIcon />
-                        </IconButton>
-                      )}
-                    </Stack>
-                  ))}
-                </Stack>
-              )}
-            </Stack>
-          </Stack>
-          <Box sx={{ pt: 3.5 }}>
-            {!answeredCurrentQuestion ? (
-              <Button
-                disabled={!canSubmit}
-                onClick={submit}
-                variant="contained"
-                size="large"
-                fullWidth
-                sx={{
-                  minHeight: 52,
-                  fontSize: "1.05rem",
-                  fontWeight: 700,
-                  color: playerVoteOptionTextColor,
-                  bgcolor: brandPrimaryColor,
-                  "&:hover": { bgcolor: alpha(brandPrimaryColor, 0.88) },
-                }}
-              >
-                Отправить ответ
-              </Button>
-            ) : (
-              <Alert severity="success">Ответ принят</Alert>
-            )}
-          </Box>
         </CardContent>
       </Card>
     </Box>

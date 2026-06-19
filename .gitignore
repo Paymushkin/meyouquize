@@ -10,6 +10,8 @@ deploy/env/.env.runtime
 *.sqlite-journal
 coverage
 **/.vite
+server/.test-run/
+.env.test
 media
 load/results/
-.cursor/
+e2e/.fixture-state.json

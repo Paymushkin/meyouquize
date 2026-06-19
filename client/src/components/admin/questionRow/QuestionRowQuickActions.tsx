@@ -11,7 +11,7 @@ import { IconButton, Stack, Tooltip } from "@mui/material";
 import type { MouseEvent } from "react";
 
 type Props = {
-  questionType: "single" | "multi" | "tag_cloud" | "ranking";
+  questionType: "single" | "multi" | "tag_cloud" | "ranking" | "temperature";
   questionOnProjector: boolean;
   chartsOnProjector: boolean;
   winnersOnProjector: boolean;

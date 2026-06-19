@@ -7,12 +7,14 @@ import {
   Button,
   Card,
   CardContent,
+  Checkbox,
   Dialog,
   DialogActions,
   DialogContent,
   DialogTitle,
   Container,
   Divider,
+  FormControlLabel,
   List,
   ListItemButton,
   ListItemIcon,
@@ -56,6 +58,7 @@ import ViewCarouselIcon from "@mui/icons-material/ViewCarousel";
 import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
 import EmojiEmotionsIcon from "@mui/icons-material/EmojiEmotions";
 import { AdminLoginForm } from "../components/AdminLoginForm";
+import { AdminFeedbackSection } from "../components/admin/AdminFeedbackSection";
 import { AdminBrandingSection } from "../components/admin/AdminBrandingSection";
 import { AdminGeneralSection } from "../components/admin/AdminGeneralSection";
 import {
@@ -68,6 +71,8 @@ import { AdminQuestionsSection } from "../components/admin/AdminQuestionsSection
 import { AdminResultsSection } from "../components/admin/AdminResultsSection";
 import { AdminSpeakersSection } from "../components/admin/AdminSpeakersSection";
 import { AdminBannersSection } from "../components/admin/AdminBannersSection";
+import { BrandImageUploadTile } from "../components/admin/branding/BrandImageUploadTile";
+import { ImagePreview } from "../components/admin/branding/ImagePreview";
 import { SubQuizControlsCard } from "../components/admin/SubQuizControlsCard";
 import { API_BASE, APP_ORIGIN } from "../config";
 import { randomUuid } from "../utils/randomUuid";
@@ -111,9 +116,12 @@ import { socket } from "../socket";
 import { getStringArrayOrNull } from "../utils/unknownGuards";
 import {
   buildQuestionIndexMapForSubQuiz,
+  cloneQuestionForm,
   computeFirstIncompleteSubQuizId,
   createEmptyQuestion,
   isEditorQuizMode,
+  questionAllowsOptionImages,
+  questionAllowsQuestionImage,
   normalizeTagCloudQuestionPoints,
   validateQuestionFormEntry,
   validateQuestionsForm,
@@ -140,11 +148,16 @@ import {
   getBrandThemePatchForTheme,
   type BrandThemeVisualSetters,
 } from "../features/branding/applyBrandThemeVisual";
-import { sanitizeBrandThemeId, type BrandThemeId } from "@meyouquize/shared";
+import {
+  sanitizeBrandThemeId,
+  DEFAULT_TEMPERATURE_OPTION_WEIGHTS,
+  type BrandThemeId,
+} from "@meyouquize/shared";
 import {
   getRandomizerPool,
   makeRandomizerTimestamp,
   pickRandomWinners,
+  randomizerNamesTextForPublicView,
   type RandomizerHistoryEntry,
   type RandomizerListMode,
   type RandomizerMode,
@@ -170,6 +183,7 @@ const DEFAULT_REPORT_MODULES: ReportModuleId[] = [
   "quiz_results",
   "vote_results",
   "reactions_summary",
+  "feedback_summary",
   "randomizer_summary",
   "speaker_questions_summary",
 ];
@@ -189,6 +203,7 @@ function normalizeReportModulesForAdmin(value: unknown): ReportModuleId[] {
       item === "quiz_results" ||
       item === "vote_results" ||
       item === "reactions_summary" ||
+      item === "feedback_summary" ||
       item === "randomizer_summary" ||
       item === "speaker_questions_summary"
     ) {
@@ -307,7 +322,8 @@ function parseReactionLines(text: string): string[] {
 
 function getQuestionTypeSelectValue(
   question: QuestionForm,
-): "single" | "multi" | "ranking" | "tag_cloud" | "poll" {
+): "single" | "multi" | "ranking" | "tag_cloud" | "poll" | "temperature" {
+  if (question.type === "temperature") return "temperature";
   if (
     (question.subQuizId == null || question.subQuizId === undefined) &&
     (question.type === "single" || question.type === "multi") &&
@@ -410,7 +426,7 @@ export function AdminEventPage() {
     [subQuizSheets],
   );
   const [roomQuestionsTab, setRoomQuestionsTab] = useState<
-    "quizzes" | "votes" | "reactions" | "randomizer"
+    "quizzes" | "votes" | "reactions" | "feedback" | "randomizer"
   >("quizzes");
   const [expandedSubQuizId, setExpandedSubQuizId] = useState<string | false>(false);
   const [questionForms, setQuestionForms] = useState<QuestionForm[]>([]);
@@ -476,6 +492,7 @@ export function AdminEventPage() {
   const [randomizerExcludeWinners, setRandomizerExcludeWinners] = useState(true);
   const [randomizerSelectedWinners, setRandomizerSelectedWinners] = useState<string[]>([]);
   const [randomizerCurrentWinners, setRandomizerCurrentWinners] = useState<string[]>([]);
+  const [randomizerAnimationPool, setRandomizerAnimationPool] = useState<string[]>([]);
   const [randomizerHistory, setRandomizerHistory] = useState<RandomizerHistoryEntry[]>([]);
   const [randomizerRunId, setRandomizerRunId] = useState(0);
   const [reportTitle, setReportTitle] = useState("Отчет мероприятия");
@@ -489,6 +506,10 @@ export function AdminEventPage() {
   const [reportRandomizerRunIds, setReportRandomizerRunIds] = useState<string[]>([]);
   const [reportReactionsWidgetIds, setReportReactionsWidgetIds] = useState<string[]>([]);
   const [reportSpeakerQuestionIds, setReportSpeakerQuestionIds] = useState<string[]>([]);
+  const [reportFeedbackFormIds, setReportFeedbackFormIds] = useState<string[]>([]);
+  const [availableFeedbackForms, setAvailableFeedbackForms] = useState<
+    Array<{ id: string; title: string }>
+  >([]);
   const [reportPublished, setReportPublished] = useState(false);
   const [randomizerIsRunning, setRandomizerIsRunning] = useState(false);
   const randomizerRunTimerRef = useRef<number | null>(null);
@@ -528,6 +549,11 @@ export function AdminEventPage() {
     if (Array.isArray(payload.randomizerCurrentWinners)) {
       setRandomizerCurrentWinners(
         payload.randomizerCurrentWinners.filter((item): item is string => typeof item === "string"),
+      );
+    }
+    if (Array.isArray(payload.randomizerAnimationPool)) {
+      setRandomizerAnimationPool(
+        payload.randomizerAnimationPool.filter((item): item is string => typeof item === "string"),
       );
     }
     if (Array.isArray(payload.randomizerHistory)) {
@@ -585,6 +611,11 @@ export function AdminEventPage() {
     if (Array.isArray(payload.reportSpeakerQuestionIds)) {
       setReportSpeakerQuestionIds(
         payload.reportSpeakerQuestionIds.filter((item): item is string => typeof item === "string"),
+      );
+    }
+    if (Array.isArray(payload.reportFeedbackFormIds)) {
+      setReportFeedbackFormIds(
+        payload.reportFeedbackFormIds.filter((item): item is string => typeof item === "string"),
       );
     }
     if (typeof payload.reportPublished === "boolean") {
@@ -688,6 +719,12 @@ export function AdminEventPage() {
     setProjectorJoinQrText,
     projectorJoinQrTextColor,
     setProjectorJoinQrTextColor,
+    projectorJoinQrOverlaySizePx,
+    setProjectorJoinQrOverlaySizePx,
+    projectorJoinQrOverlayInsetPx,
+    setProjectorJoinQrOverlayInsetPx,
+    projectorJoinQrOverlayCorner,
+    setProjectorJoinQrOverlayCorner,
   } = useProjectorJoinQrAdminSettings();
   const [brandPrimaryColor, setBrandPrimaryColor] = useState("#7c5acb");
   const [brandAccentColor, setBrandAccentColor] = useState("#1976d2");
@@ -757,6 +794,7 @@ export function AdminEventPage() {
   }, [brandBodyBackgroundColor]);
 
   const {
+    authChecked,
     checkSession,
     loadRoom,
     persistQuestions,
@@ -1038,6 +1076,9 @@ export function AdminEventPage() {
     setProjectorJoinQrVisible,
     setProjectorJoinQrText,
     setProjectorJoinQrTextColor,
+    setProjectorJoinQrOverlaySizePx,
+    setProjectorJoinQrOverlayInsetPx,
+    setProjectorJoinQrOverlayCorner,
     setBrandPrimaryColor,
     setBrandAccentColor,
     setBrandSurfaceColor,
@@ -1115,6 +1156,9 @@ export function AdminEventPage() {
     projectorJoinQrVisible,
     projectorJoinQrText,
     projectorJoinQrTextColor,
+    projectorJoinQrOverlaySizePx,
+    projectorJoinQrOverlayInsetPx,
+    projectorJoinQrOverlayCorner,
     showFirstCorrectAnswerer,
     firstCorrectWinnersCount,
     showEventTitleOnPlayer,
@@ -1149,6 +1193,7 @@ export function AdminEventPage() {
     randomizerExcludeWinners,
     randomizerSelectedWinners,
     randomizerCurrentWinners,
+    randomizerAnimationPool,
     randomizerHistory,
     randomizerRunId,
     reportTitle,
@@ -1160,6 +1205,7 @@ export function AdminEventPage() {
     reportRandomizerRunIds,
     reportReactionsWidgetIds,
     reportSpeakerQuestionIds,
+    reportFeedbackFormIds,
     reportPublished,
     brandPrimaryColor,
     brandAccentColor,
@@ -1172,6 +1218,7 @@ export function AdminEventPage() {
     brandPlayerBackgroundImageUrl,
     brandProjectorBackgroundImageUrl,
     brandBodyBackgroundColor,
+    brandTheme,
   });
 
   const brandThemeVisualSetters = useMemo((): BrandThemeVisualSetters => {
@@ -1299,6 +1346,36 @@ export function AdminEventPage() {
       }
     };
     void fetchParticipants();
+    return () => {
+      active = false;
+    };
+  }, [eventName, isAuth]);
+
+  useEffect(() => {
+    if (!isAuth || !eventName) return;
+    let active = true;
+    const fetchFeedbackForms = async () => {
+      try {
+        const response = await fetch(
+          `${API_BASE}/api/admin/rooms/${encodeURIComponent(eventName)}/feedback`,
+          { credentials: "include" },
+        );
+        if (!response.ok) return;
+        const items = (await response.json()) as Array<{ id?: string; title?: string }>;
+        if (!active) return;
+        setAvailableFeedbackForms(
+          items
+            .filter((item): item is { id: string; title?: string } => typeof item.id === "string")
+            .map((item) => ({
+              id: item.id,
+              title: typeof item.title === "string" ? item.title : "",
+            })),
+        );
+      } catch {
+        // ignore network errors
+      }
+    };
+    void fetchFeedbackForms();
     return () => {
       active = false;
     };
@@ -1480,11 +1557,15 @@ export function AdminEventPage() {
       setReactionWidgetStats(widgetStats);
     }
     setRandomizerMode(pv.randomizerMode === "numbers" ? "numbers" : "names");
-    setRandomizerListMode(
-      pv.randomizerListMode === "participants_only" ? "participants_only" : "free_list",
-    );
+    const loadedListMode =
+      pv.randomizerListMode === "participants_only" ? "participants_only" : "free_list";
+    setRandomizerListMode(loadedListMode);
     if (typeof pv.randomizerTitle === "string") setRandomizerTitle(pv.randomizerTitle);
-    if (typeof pv.randomizerNamesText === "string") setRandomizerNamesText(pv.randomizerNamesText);
+    if (typeof pv.randomizerNamesText === "string") {
+      setRandomizerNamesText(
+        randomizerNamesTextForPublicView(loadedListMode, pv.randomizerNamesText),
+      );
+    }
     if (typeof pv.randomizerMinNumber === "number")
       setRandomizerMinNumber(Math.trunc(pv.randomizerMinNumber));
     if (typeof pv.randomizerMaxNumber === "number")
@@ -1503,6 +1584,11 @@ export function AdminEventPage() {
     if (Array.isArray(pv.randomizerCurrentWinners)) {
       setRandomizerCurrentWinners(
         pv.randomizerCurrentWinners.filter((item): item is string => typeof item === "string"),
+      );
+    }
+    if (Array.isArray(pv.randomizerAnimationPool)) {
+      setRandomizerAnimationPool(
+        pv.randomizerAnimationPool.filter((item): item is string => typeof item === "string"),
       );
     }
     if (Array.isArray(pv.randomizerHistory)) {
@@ -1557,6 +1643,11 @@ export function AdminEventPage() {
     if (Array.isArray(pv.reportSpeakerQuestionIds)) {
       setReportSpeakerQuestionIds(
         pv.reportSpeakerQuestionIds.filter((item): item is string => typeof item === "string"),
+      );
+    }
+    if (Array.isArray(pv.reportFeedbackFormIds)) {
+      setReportFeedbackFormIds(
+        pv.reportFeedbackFormIds.filter((item): item is string => typeof item === "string"),
       );
     }
     if (typeof pv.reportPublished === "boolean") setReportPublished(pv.reportPublished);
@@ -1737,6 +1828,12 @@ export function AdminEventPage() {
     setProjectorJoinQrText,
     projectorJoinQrTextColor,
     setProjectorJoinQrTextColor,
+    projectorJoinQrOverlaySizePx,
+    setProjectorJoinQrOverlaySizePx,
+    projectorJoinQrOverlayInsetPx,
+    setProjectorJoinQrOverlayInsetPx,
+    projectorJoinQrOverlayCorner,
+    setProjectorJoinQrOverlayCorner,
     cloudQuestionColor,
     setCloudQuestionColor,
     cloudTopTagColor,
@@ -1929,6 +2026,40 @@ export function AdminEventPage() {
     });
   }
 
+  async function cloneQuestionAtIndex(globalIndex: number) {
+    const source = questionForms[globalIndex];
+    if (!source) return;
+    if (!source.id) {
+      setMessage("Сначала сохраните голосование");
+      return;
+    }
+    const prevIds = new Set(
+      questionForms.map((q) => q.id).filter((id): id is string => Boolean(id)),
+    );
+    const cloned = cloneQuestionForm(source);
+    const insertAt = globalIndex + 1;
+    const next = [...questionForms];
+    next.splice(insertAt, 0, cloned);
+    const formErr = validateQuestionsForm(next);
+    if (formErr) {
+      setMessage(formErr);
+      return;
+    }
+    setQuestionForms(next);
+    const merged = await persistQuestions(next, subQuizSheets, { suppressToast: true });
+    if (merged === false) {
+      setQuestionForms(questionForms);
+      return;
+    }
+    const newIndex = merged.questions.findIndex((q) => q.id && !prevIds.has(q.id));
+    const targetIndex = newIndex >= 0 ? newIndex : insertAt;
+    setSelectedQuestionIndex(targetIndex);
+    questionDialogSnapshotRef.current = cloneQuestionForms(merged.questions);
+    questionDialogTargetSubQuizIdRef.current = source.subQuizId ?? null;
+    setIsQuestionDialogOpen(true);
+    setMessage("Голосование скопировано");
+  }
+
   async function removeQuestion(index: number) {
     const removed = questionForms[index];
     const subQuizIdForAccordion =
@@ -2023,6 +2154,21 @@ export function AdminEventPage() {
             if (next.options.length > 0 && !next.options.some((o) => o.isCorrect)) {
               next.options = next.options.map((o, idx) => ({ ...o, isCorrect: idx === 0 }));
             }
+          }
+        } else if (patch.type === "temperature") {
+          next.editorQuizMode = false;
+          if (next.options.length < 2) {
+            next.options = DEFAULT_TEMPERATURE_OPTION_WEIGHTS.map((weight) => ({
+              text: "",
+              isCorrect: false,
+              weight,
+            }));
+          } else {
+            next.options = next.options.map((o, idx) => ({
+              ...o,
+              isCorrect: false,
+              weight: o.weight ?? DEFAULT_TEMPERATURE_OPTION_WEIGHTS[idx] ?? 50,
+            }));
           }
         }
         if (patch.type === "single" && isEditorQuizMode(next)) {
@@ -2370,6 +2516,7 @@ export function AdminEventPage() {
     ].slice(0, 200);
     const nextRunId = randomizerRunId + 1;
     setRandomizerCurrentWinners(winners);
+    setRandomizerAnimationPool(pool);
     setRandomizerSelectedWinners(nextSelected);
     setRandomizerHistory(nextHistory);
     setRandomizerRunId(nextRunId);
@@ -2387,13 +2534,17 @@ export function AdminEventPage() {
       randomizerMode,
       randomizerListMode,
       randomizerTitle,
-      randomizerNamesText: effectiveNamesText,
+      randomizerNamesText: randomizerNamesTextForPublicView(
+        randomizerListMode,
+        randomizerListMode === "participants_only" ? "" : randomizerNamesText,
+      ),
       randomizerMinNumber,
       randomizerMaxNumber,
       randomizerWinnersCount,
       randomizerExcludeWinners,
       randomizerSelectedWinners: nextSelected,
       randomizerCurrentWinners: winners,
+      randomizerAnimationPool: pool,
       randomizerHistory: nextHistory,
       randomizerRunId: nextRunId,
     });
@@ -2421,11 +2572,13 @@ export function AdminEventPage() {
     setRandomizerIsRunning(false);
     setRandomizerSelectedWinners([]);
     setRandomizerCurrentWinners([]);
+    setRandomizerAnimationPool([]);
     setRandomizerHistory([]);
     setRandomizerRunId(0);
     emitPublicViewSet({
       randomizerSelectedWinners: [],
       randomizerCurrentWinners: [],
+      randomizerAnimationPool: [],
       randomizerHistory: [],
       randomizerRunId: 0,
     });
@@ -2470,8 +2623,10 @@ export function AdminEventPage() {
     }
     setRandomizerIsRunning(false);
     setRandomizerCurrentWinners([]);
+    setRandomizerAnimationPool([]);
     emitPublicViewSet({
       randomizerCurrentWinners: [],
+      randomizerAnimationPool: [],
     });
   }, [emitPublicViewSet]);
 
@@ -2627,6 +2782,19 @@ export function AdminEventPage() {
       : current.filter((id) => id !== questionId);
     setReportSpeakerQuestionIds(next);
     emitPublicViewSet({ reportSpeakerQuestionIds: next });
+  }
+
+  function toggleReportFeedbackForm(formId: string, enabled: boolean) {
+    const all = availableFeedbackForms.map((form) => form.id);
+    const current =
+      reportFeedbackFormIds.length === 0
+        ? [...all]
+        : reportFeedbackFormIds.filter((id) => all.includes(id));
+    const next = enabled
+      ? Array.from(new Set([...current, formId]))
+      : current.filter((id) => id !== formId);
+    setReportFeedbackFormIds(next);
+    emitPublicViewSet({ reportFeedbackFormIds: next });
   }
 
   function createPlayerBanner(
@@ -3580,7 +3748,7 @@ export function AdminEventPage() {
           </Paper>
         </Box>
       ) : null}
-      {!isAuth && (
+      {!authChecked ? null : !isAuth ? (
         <Box
           sx={{
             minHeight: "100dvh",
@@ -3600,7 +3768,7 @@ export function AdminEventPage() {
             }
           />
         </Box>
-      )}
+      ) : null}
       {isAuth && room && (
         <Stack direction="row" spacing={0} alignItems="stretch">
           <Card
@@ -3732,14 +3900,19 @@ export function AdminEventPage() {
                   >
                     <Tabs
                       value={roomQuestionsTab}
-                      onChange={(_, v: "quizzes" | "votes" | "reactions" | "randomizer") =>
-                        setRoomQuestionsTab(v)
-                      }
+                      onChange={(
+                        _,
+                        v: "quizzes" | "votes" | "reactions" | "feedback" | "randomizer",
+                      ) => setRoomQuestionsTab(v)}
+                      variant="scrollable"
+                      scrollButtons="auto"
+                      allowScrollButtonsMobile
                       sx={{ borderBottom: 1, borderColor: "divider", px: 0.5 }}
                     >
                       <Tab label="Квизы" value="quizzes" />
                       <Tab label="Голосования" value="votes" />
                       <Tab label="Реакции" value="reactions" />
+                      <Tab label="Обратная связь" value="feedback" />
                       <Tab label="Рандомайзер" value="randomizer" />
                     </Tabs>
                     <Box sx={{ pt: 2, px: 0.25 }}>
@@ -4206,6 +4379,7 @@ export function AdminEventPage() {
                                   togglePlayerVisibleResultQuestionId={
                                     togglePlayerVisibleResultQuestionId
                                   }
+                                  onCloneQuestion={(g) => void cloneQuestionAtIndex(g)}
                                 />
                               ) : (
                                 <Typography
@@ -4291,6 +4465,7 @@ export function AdminEventPage() {
                                       togglePlayerVisibleResultQuestionId={
                                         togglePlayerVisibleResultQuestionId
                                       }
+                                      onCloneQuestion={(g) => void cloneQuestionAtIndex(g)}
                                     />
                                   </AccordionDetails>
                                 </Accordion>
@@ -4298,6 +4473,13 @@ export function AdminEventPage() {
                             </Stack>
                           </Stack>
                         ))}
+                      {roomQuestionsTab === "feedback" && quizId ? (
+                        <AdminFeedbackSection
+                          eventName={eventName}
+                          quizId={quizId}
+                          onlineUsersCount={onlineUsersCount}
+                        />
+                      ) : null}
                       {roomQuestionsTab === "randomizer" && (
                         <AdminRandomizerSection
                           mode={randomizerMode}
@@ -4321,10 +4503,10 @@ export function AdminEventPage() {
                             setRandomizerListMode(next);
                             emitPublicViewSet({
                               randomizerListMode: next,
-                              randomizerNamesText:
-                                next === "participants_only"
-                                  ? eventParticipantNicknames.join("\n")
-                                  : randomizerNamesText,
+                              randomizerNamesText: randomizerNamesTextForPublicView(
+                                next,
+                                next === "free_list" ? randomizerNamesText : "",
+                              ),
                             });
                           }}
                           onTitleChange={(next) => {
@@ -4616,6 +4798,9 @@ export function AdminEventPage() {
                   availableVoteQuestions={availableVoteQuestions}
                   selectedVoteQuestionIds={reportVoteQuestionIds}
                   onToggleVoteQuestion={toggleReportVoteQuestion}
+                  availableFeedbackForms={availableFeedbackForms}
+                  reportFeedbackFormIds={reportFeedbackFormIds}
+                  onToggleFeedbackForm={toggleReportFeedbackForm}
                   reportPublished={reportPublished}
                   onTogglePublished={(next) => {
                     setReportPublished(next);
@@ -4700,6 +4885,72 @@ export function AdminEventPage() {
                     fullWidth
                   />
                 )}
+                {questionForms[selectedQuestionIndex].type === "temperature" && (
+                  <TextField
+                    size="small"
+                    label="Подзаголовок"
+                    value={questionForms[selectedQuestionIndex].temperatureSubtitle ?? ""}
+                    onChange={(e) =>
+                      updateQuestion(selectedQuestionIndex, {
+                        temperatureSubtitle: e.target.value,
+                      })
+                    }
+                    helperText="Необязательно. Показывается на проекторе над шкалой."
+                    placeholder="Например: Оцените уровень вовлечённости аудитории"
+                    multiline
+                    minRows={1}
+                    maxRows={3}
+                    fullWidth
+                  />
+                )}
+                <FormControlLabel
+                  control={
+                    <Checkbox
+                      checked={Boolean(questionForms[selectedQuestionIndex].useImages)}
+                      onChange={(e) => {
+                        const checked = e.target.checked;
+                        const question = questionForms[selectedQuestionIndex];
+                        if (!checked) {
+                          updateQuestion(selectedQuestionIndex, {
+                            useImages: false,
+                            imageUrl: undefined,
+                            options: question.options.map((option) => ({
+                              ...option,
+                              imageUrl: undefined,
+                            })),
+                          });
+                          return;
+                        }
+                        updateQuestion(selectedQuestionIndex, { useImages: true });
+                      }}
+                    />
+                  }
+                  label={
+                    questionForms[selectedQuestionIndex].type === "tag_cloud"
+                      ? "Картинка у вопроса"
+                      : "Вопрос с картинками"
+                  }
+                />
+                {questionForms[selectedQuestionIndex].type === "tag_cloud" &&
+                questionForms[selectedQuestionIndex].useImages ? (
+                  <Typography variant="caption" color="text.secondary">
+                    У эталонных тегов картинки не поддерживаются.
+                  </Typography>
+                ) : null}
+                {questionAllowsQuestionImage(questionForms[selectedQuestionIndex]) ? (
+                  <>
+                    <BrandImageUploadTile
+                      title="Картинка вопроса"
+                      value={questionForms[selectedQuestionIndex].imageUrl ?? ""}
+                      uploadErrorLabel="Не удалось загрузить картинку"
+                      onUploadMedia={uploadBannerMedia}
+                      onUploaded={(url) => updateQuestion(selectedQuestionIndex, { imageUrl: url })}
+                      onClear={() => updateQuestion(selectedQuestionIndex, { imageUrl: undefined })}
+                      clearLabel="Убрать картинку вопроса"
+                      onError={(message) => setQuestionDialogError(message)}
+                    />
+                  </>
+                ) : null}
               </Stack>
               <Divider />
 
@@ -4751,6 +5002,56 @@ export function AdminEventPage() {
                           maxRows={8}
                           sx={{ flex: 1, minWidth: 0 }}
                         />
+                        {questionAllowsOptionImages(questionForms[selectedQuestionIndex]) ? (
+                          <Stack spacing={0.5} sx={{ width: 72, flexShrink: 0 }}>
+                            <Button
+                              component="label"
+                              variant="outlined"
+                              size="small"
+                              sx={{ p: 0, minWidth: 0, width: 72, height: 56, overflow: "hidden" }}
+                            >
+                              <input
+                                hidden
+                                type="file"
+                                accept="image/*"
+                                onChange={async (e) => {
+                                  const file = e.currentTarget.files?.[0];
+                                  e.currentTarget.value = "";
+                                  if (!file) return;
+                                  try {
+                                    const url = await uploadBannerMedia(file);
+                                    updateOption(selectedQuestionIndex, oIndex, { imageUrl: url });
+                                  } catch (error) {
+                                    setQuestionDialogError(
+                                      error instanceof Error
+                                        ? error.message
+                                        : "Не удалось загрузить картинку",
+                                    );
+                                  }
+                                }}
+                              />
+                              <ImagePreview
+                                label={`Вариант ${oIndex + 1}`}
+                                url={option.imageUrl ?? ""}
+                                height={56}
+                              />
+                            </Button>
+                            {option.imageUrl?.trim() ? (
+                              <Button
+                                size="small"
+                                color="inherit"
+                                sx={{ minWidth: 0, px: 0.5 }}
+                                onClick={() =>
+                                  updateOption(selectedQuestionIndex, oIndex, {
+                                    imageUrl: undefined,
+                                  })
+                                }
+                              >
+                                ×
+                              </Button>
+                            ) : null}
+                          </Stack>
+                        ) : null}
                         {questionForms[selectedQuestionIndex].type === "tag_cloud" &&
                           isEditorQuizMode(questionForms[selectedQuestionIndex]) && (
                             <TextField
@@ -4809,9 +5110,32 @@ export function AdminEventPage() {
                             sx={{ width: 118, flexShrink: 0 }}
                           />
                         )}
+                        {questionForms[selectedQuestionIndex].type === "temperature" && (
+                          <TextField
+                            type="number"
+                            size="small"
+                            label="Вес 0–100"
+                            inputProps={{
+                              min: 0,
+                              max: 100,
+                              "aria-label": `Вес варианта ${oIndex + 1}`,
+                            }}
+                            value={option.weight ?? ""}
+                            onChange={(e) => {
+                              const raw = Number(e.target.value);
+                              const weight = Number.isFinite(raw)
+                                ? Math.max(0, Math.min(100, Math.trunc(raw)))
+                                : undefined;
+                              updateOption(selectedQuestionIndex, oIndex, { weight });
+                            }}
+                            sx={{ width: 108, flexShrink: 0 }}
+                            slotProps={{ inputLabel: { shrink: true } }}
+                          />
+                        )}
                         {isEditorQuizMode(questionForms[selectedQuestionIndex]) &&
                           questionForms[selectedQuestionIndex].type !== "tag_cloud" &&
-                          questionForms[selectedQuestionIndex].type !== "ranking" && (
+                          questionForms[selectedQuestionIndex].type !== "ranking" &&
+                          questionForms[selectedQuestionIndex].type !== "temperature" && (
                             <Stack
                               direction="row"
                               spacing={0}
@@ -4903,7 +5227,8 @@ export function AdminEventPage() {
                       | "multi"
                       | "ranking"
                       | "tag_cloud"
-                      | "poll";
+                      | "poll"
+                      | "temperature";
                     if (value === "poll") {
                       updateQuestion(selectedQuestionIndex, {
                         type: "single",
@@ -4912,6 +5237,13 @@ export function AdminEventPage() {
                           ...opt,
                           isCorrect: false,
                         })),
+                      });
+                      return;
+                    }
+                    if (value === "temperature") {
+                      updateQuestion(selectedQuestionIndex, {
+                        type: "temperature",
+                        editorQuizMode: false,
                       });
                       return;
                     }
@@ -4933,6 +5265,7 @@ export function AdminEventPage() {
                   <MenuItem value="multi">Несколько правильных</MenuItem>
                   <MenuItem value="ranking">Ранжирование</MenuItem>
                   <MenuItem value="tag_cloud">Облако тегов</MenuItem>
+                  <MenuItem value="temperature">Измерение температуры</MenuItem>
                 </TextField>
                 {questionForms[selectedQuestionIndex].type === "tag_cloud" ? (
                   <TextField

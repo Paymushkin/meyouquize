@@ -1,22 +1,14 @@
-import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import CloseIcon from "@mui/icons-material/Close";
-import AccountCircleIcon from "@mui/icons-material/AccountCircle";
-import {
-  Box,
-  Dialog,
-  DialogContent,
-  DialogTitle,
-  IconButton,
-  LinearProgress,
-  Stack,
-  Typography,
-} from "@mui/material";
-import { alpha } from "@mui/material/styles";
+import { Dialog, DialogContent, DialogTitle, IconButton, Stack, Typography } from "@mui/material";
 import {
   formatPlayerResultStatValue,
+  formatTemperatureResultHeadline,
   resolveRankingMetricMode,
 } from "../../features/quizPlay/playerVisibleResultsFormat";
+import { voteResultsDialogQuestionSx } from "../../features/voteUi/voteQuestionLayout";
 import type { PlayerVisibleResultTile } from "../../pages/quiz-play/types";
+import { QuestionAssetImage } from "./QuestionAssetImage";
+import { VoteResultOptionRow } from "./VoteResultOptionRow";
 
 type Props = {
   open: boolean;
@@ -44,7 +36,8 @@ export function PlayerVoteResultsDialog(props: Props) {
     : new Set<string>();
   const rankingMetricMode = tile ? resolveRankingMetricMode(tile) : null;
   const total = tile ? tile.optionStats.reduce((sum, row) => sum + row.count, 0) : 0;
-
+  const temperatureHeadline =
+    tile?.type === "temperature" ? formatTemperatureResultHeadline(tile.temperatureValue) : null;
   return (
     <Dialog
       open={open}
@@ -80,99 +73,53 @@ export function PlayerVoteResultsDialog(props: Props) {
       </DialogTitle>
       <DialogContent sx={{ pt: 0.5, pb: 3, color: "#fff" }}>
         {tile ? (
-          <Stack spacing={1.2} sx={{ pt: 0.5 }}>
-            <Typography
-              variant="subtitle1"
-              style={{ marginBottom: "16px" }}
-              sx={{
-                fontWeight: 700,
-                fontSize: { xs: "1.3rem", sm: "1.45rem" },
-                lineHeight: 1.25,
-              }}
-            >
-              {tile.text}
-            </Typography>
+          <Stack spacing={0.75} sx={{ pt: 0.5 }}>
+            <Stack spacing={0.75} sx={{ mb: 3 }}>
+              {tile.imageUrl ? (
+                <QuestionAssetImage
+                  url={tile.imageUrl}
+                  alt={tile.text.trim() || "Вопрос"}
+                  maxHeight={140}
+                />
+              ) : null}
+              {tile.text.trim() ? (
+                <Typography variant="subtitle1" sx={voteResultsDialogQuestionSx()}>
+                  {tile.text}
+                </Typography>
+              ) : null}
+            </Stack>
+            {temperatureHeadline ? (
+              <Typography
+                variant="h5"
+                sx={{ color: playerVoteOptionTextColor, fontWeight: 700, mb: 1.5 }}
+              >
+                {temperatureHeadline}
+              </Typography>
+            ) : null}
             {tile.optionStats.map((row) => {
               const pct = total > 0 ? Math.round((row.count / total) * 100) : 0;
               const isUserAnswer = selectedIds.has(row.optionId);
               const isCorrectAnswer = correctIds.has(row.optionId);
               const canShowUserAnswer = tile.type !== "ranking";
-              const rightStatValue = formatPlayerResultStatValue(row, rankingMetricMode, pct);
+              const rightStatValue = formatPlayerResultStatValue(
+                row,
+                rankingMetricMode,
+                pct,
+                tile.type,
+              );
               return (
-                <Box key={`${tile.questionId}_${row.optionId}`}>
-                  <Stack direction="row" spacing={1} alignItems="center">
-                    <Stack
-                      spacing={0.35}
-                      sx={{
-                        minWidth: 16,
-                        alignItems: "center",
-                        justifyContent: "center",
-                        flexShrink: 0,
-                      }}
-                    >
-                      {isCorrectAnswer ? (
-                        <CheckCircleIcon
-                          sx={{ fontSize: 16, color: "#9cffac", mt: "1px", flexShrink: 0 }}
-                        />
-                      ) : null}
-                      {isUserAnswer && canShowUserAnswer ? (
-                        <AccountCircleIcon
-                          sx={{ fontSize: 16, color: "#ffd54f", mt: "1px", flexShrink: 0 }}
-                        />
-                      ) : null}
-                    </Stack>
-                    <Box sx={{ position: "relative", flex: 1 }}>
-                      <LinearProgress
-                        color="primary"
-                        variant="determinate"
-                        value={pct}
-                        sx={{
-                          position: "absolute",
-                          inset: 0,
-                          height: "100%",
-                          borderRadius: "5px",
-                          pl: "0px",
-                          pr: "0px",
-                          bgcolor: alpha(playerVoteProgressBarColor, 0.35),
-                          "& .MuiLinearProgress-bar": {
-                            backgroundColor: playerVoteProgressBarColor,
-                          },
-                        }}
-                      />
-                      <Typography
-                        variant="body2"
-                        title={row.text}
-                        sx={{
-                          position: "relative",
-                          display: "block",
-                          color: playerVoteOptionTextColor,
-                          fontWeight: 700,
-                          fontSize: "1rem",
-                          pointerEvents: "none",
-                          px: 1.25,
-                          py: 0.8,
-                          whiteSpace: "normal",
-                          overflowWrap: "anywhere",
-                          lineHeight: 1.15,
-                        }}
-                      >
-                        {row.text}
-                      </Typography>
-                    </Box>
-                    <Typography
-                      variant="body2"
-                      sx={{
-                        color: "#fff",
-                        fontWeight: 700,
-                        fontSize: "1rem",
-                        minWidth: 44,
-                        textAlign: "right",
-                      }}
-                    >
-                      {rightStatValue}
-                    </Typography>
-                  </Stack>
-                </Box>
+                <VoteResultOptionRow
+                  key={`${tile.questionId}_${row.optionId}`}
+                  text={row.text}
+                  imageUrl={row.imageUrl}
+                  pct={pct}
+                  rightStatValue={rightStatValue}
+                  isCorrectAnswer={isCorrectAnswer}
+                  isUserAnswer={isUserAnswer}
+                  canShowUserAnswer={canShowUserAnswer}
+                  playerVoteOptionTextColor={playerVoteOptionTextColor}
+                  playerVoteProgressBarColor={playerVoteProgressBarColor}
+                />
               );
             })}
           </Stack>

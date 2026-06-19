@@ -81,7 +81,7 @@ export function computeProjectorDerived(state: ProjectorSessionState): Projector
     firstCorrectWinnersShown.length > 0;
 
   const fullScreenCloud = mode === "question" && isTagCloudQuestion && !showProjectorWinnersHero;
-  const fullScreenContainer = fullScreenCloud || showEventTitleScreen;
+  const fullScreenContainer = showEventTitleScreen;
   const barQuestionCentered = mode === "question" && !!selectedQuestion && !fullScreenCloud;
 
   return {

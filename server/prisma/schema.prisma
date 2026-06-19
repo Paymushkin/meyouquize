@@ -24,6 +24,7 @@ model Quiz {
   participants Participant[]
   answers     Answer[]
   speakerQuestions SpeakerQuestion[]
+  feedbackForm     FeedbackForm[]
 }
 
 model SubQuiz {
@@ -74,8 +75,12 @@ model Question {
   rankingKind RankingKind @default(QUIZ)
   /** Для RANKING: пользовательская подсказка на экране игрока (если null — используется текст по умолчанию). */
   rankingPlayerHint String?
+  /** Для TEMPERATURE: подзаголовок на проекторе над шкалой. */
+  temperatureSubtitle String?
   /** Когда вопрос был выведен на экран для ответов (для подсчёта responseMs). */
   activatedAt DateTime?
+  /** Опциональная иллюстрация к тексту вопроса */
+  imageUrl    String?
   options     Option[]
   answers     Answer[]
 
@@ -89,8 +94,12 @@ model Option {
   question   Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
   text       String
   isCorrect  Boolean  @default(false)
+  /** Опциональная иллюстрация к тексту варианта */
+  imageUrl   String?
   /** Порядок варианта в вопросе (0 = лучший при ранжировании). Для SINGLE/MULTI задаётся при сохранении. */
   sortOrder  Int      @default(0)
+  /** Для TEMPERATURE: вес варианта на шкале 0–100. */
+  weight     Int?
 }
 
 model Participant {
@@ -103,6 +112,7 @@ model Participant {
   answers   Answer[]
   speakerQuestions SpeakerQuestion[]
   speakerQuestionReactions SpeakerQuestionReaction[]
+  feedbackResponses FeedbackResponse[]
 
   @@unique([quizId, deviceId])
   @@index([quizId])
@@ -197,6 +207,7 @@ enum QuestionType {
   MULTI
   TAG_CLOUD
   RANKING
+  TEMPERATURE
 }
 
 enum QuizStatus {
@@ -209,4 +220,39 @@ enum SpeakerQuestionStatus {
   PENDING
   APPROVED
   REJECTED
+}
+
+model FeedbackForm {
+  id                 String             @id @default(cuid())
+  quizId             String
+  quiz               Quiz               @relation(fields: [quizId], references: [id], onDelete: Cascade)
+  title              String             @default("Обратная связь")
+  isActive           Boolean            @default(false)
+  isClosed           Boolean            @default(false)
+  /** [{ id, label, options: string[5] }] */
+  scales             Json
+  commentEnabled     Boolean            @default(true)
+  commentPlaceholder String             @default("")
+  activatedAt        DateTime?
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
+  responses          FeedbackResponse[]
+
+  @@index([quizId])
+}
+
+model FeedbackResponse {
+  id             String       @id @default(cuid())
+  feedbackFormId String
+  feedbackForm   FeedbackForm @relation(fields: [feedbackFormId], references: [id], onDelete: Cascade)
+  participantId  String
+  participant    Participant  @relation(fields: [participantId], references: [id], onDelete: Cascade)
+  /** { scaleId: optionIndex 0..4 } */
+  scaleAnswers   Json
+  comment        String?
+  submittedAt    DateTime     @default(now())
+
+  @@unique([feedbackFormId, participantId])
+  @@index([feedbackFormId])
+  @@index([participantId])
 }

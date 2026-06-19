@@ -2,7 +2,11 @@ import {
   DEFAULT_PROJECTOR_JOIN_QR_TEXT,
   DEFAULT_PROJECTOR_JOIN_QR_TEXT_COLOR,
   DEFAULT_PROJECTOR_JOIN_QR_VISIBLE,
+  DEFAULT_PROJECTOR_JOIN_QR_OVERLAY_SIZE_PX,
+  DEFAULT_PROJECTOR_JOIN_QR_OVERLAY_INSET_PX,
+  DEFAULT_PROJECTOR_JOIN_QR_OVERLAY_CORNER,
   PROJECTOR_JOIN_QR_TEXT_MAX_LENGTH,
+  PROJECTOR_JOIN_QR_OVERLAY_CORNERS,
   normalizePublicViewState,
   sanitizeBrandThemeId,
   QUIZ_RESULTS_TILE_ID,
@@ -17,6 +21,7 @@ import {
   type PublicReactionWidgetStats,
   type ReportModuleId,
   type PublicViewMode,
+  type ProjectorJoinQrOverlayCorner,
   type PublicViewPatch as SharedPublicViewPatch,
   type BrandThemeId,
   type PublicViewPayload as SharedPublicViewPayload,
@@ -50,7 +55,10 @@ type BrandingKeys =
   | "brandBodyBackgroundColor"
   | "projectorJoinQrVisible"
   | "projectorJoinQrText"
-  | "projectorJoinQrTextColor";
+  | "projectorJoinQrTextColor"
+  | "projectorJoinQrOverlaySizePx"
+  | "projectorJoinQrOverlayInsetPx"
+  | "projectorJoinQrOverlayCorner";
 type PlayerUiResultKeys =
   | "playerVoteOptionTextColor"
   | "playerVoteProgressTrackColor"
@@ -104,13 +112,18 @@ export type {
   PublicBanner,
   PublicReactionWidgetStats,
   PublicViewMode,
+  ProjectorJoinQrOverlayCorner,
   ReportModuleId,
 };
 export {
   DEFAULT_PROJECTOR_JOIN_QR_TEXT,
   DEFAULT_PROJECTOR_JOIN_QR_TEXT_COLOR,
   DEFAULT_PROJECTOR_JOIN_QR_VISIBLE,
+  DEFAULT_PROJECTOR_JOIN_QR_OVERLAY_SIZE_PX,
+  DEFAULT_PROJECTOR_JOIN_QR_OVERLAY_INSET_PX,
+  DEFAULT_PROJECTOR_JOIN_QR_OVERLAY_CORNER,
   PROJECTOR_JOIN_QR_TEXT_MAX_LENGTH,
+  PROJECTOR_JOIN_QR_OVERLAY_CORNERS,
   normalizePublicViewState,
   QUIZ_RESULTS_TILE_ID,
   SPEAKER_TILE_ID,
@@ -153,6 +166,9 @@ export function toBrandingState(payload: Partial<PublicViewPayload>): BrandingSt
     projectorJoinQrVisible: view.projectorJoinQrVisible,
     projectorJoinQrText: view.projectorJoinQrText,
     projectorJoinQrTextColor: view.projectorJoinQrTextColor,
+    projectorJoinQrOverlaySizePx: view.projectorJoinQrOverlaySizePx,
+    projectorJoinQrOverlayInsetPx: view.projectorJoinQrOverlayInsetPx,
+    projectorJoinQrOverlayCorner: view.projectorJoinQrOverlayCorner,
     playerVoteOptionTextColor: view.playerVoteOptionTextColor,
     playerVoteProgressTrackColor: view.playerVoteProgressTrackColor,
     playerVoteProgressBarColor: view.playerVoteProgressBarColor,

@@ -17,6 +17,18 @@ export type RandomizerStateLike = {
   selectedWinners: string[];
 };
 
+/** Свободный список имён в publicView; участники из комнаты туда не пишем. */
+export const RANDOMIZER_FREE_LIST_NAMES_TEXT_MAX_LENGTH = 150_000;
+
+/** Текст для сохранения в publicView: в режиме «только участники» список не дублируем. */
+export function randomizerNamesTextForPublicView(
+  listMode: RandomizerListMode,
+  namesText: string,
+): string {
+  if (listMode === "participants_only") return "";
+  return namesText.slice(0, RANDOMIZER_FREE_LIST_NAMES_TEXT_MAX_LENGTH);
+}
+
 export function parseNames(linesText: string): string[] {
   return linesText
     .split("\n")
@@ -32,6 +44,24 @@ export function buildNumberRange(minNumber: number, maxNumber: number): string[]
   const out: string[] = [];
   for (let n = min; n <= max; n += 1) out.push(String(n));
   return out;
+}
+
+export type RandomizerAnimationPoolSource = {
+  randomizerMode: RandomizerMode;
+  randomizerNamesText: string;
+  randomizerMinNumber: number;
+  randomizerMaxNumber: number;
+  randomizerAnimationPool?: string[];
+};
+
+/** Пул для анимации перебора на проекторе (snapshot при запуске или список из publicView). */
+export function buildRandomizerAnimationPool(source: RandomizerAnimationPoolSource): string[] {
+  if (Array.isArray(source.randomizerAnimationPool) && source.randomizerAnimationPool.length > 0) {
+    return source.randomizerAnimationPool;
+  }
+  return source.randomizerMode === "names"
+    ? parseNames(source.randomizerNamesText)
+    : buildNumberRange(source.randomizerMinNumber, source.randomizerMaxNumber);
 }
 
 export function getRandomizerPool(state: RandomizerStateLike): string[] {

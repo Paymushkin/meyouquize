@@ -128,10 +128,7 @@ export function useResultsProjectorSession(
     dispatch({ type: "bumpLeaderboardAnim" });
   }, [leaderboardAnimKey]);
 
-  useProjectorBodyBackground(
-    state.view.projectorBackground,
-    Boolean(state.view.brandProjectorBackgroundImageUrl?.trim()),
-  );
+  useProjectorBodyBackground(state.view.projectorBackground);
 
   useEffect(() => {
     if (!import.meta.env.DEV) return;

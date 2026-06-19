@@ -18,6 +18,7 @@ import {
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import { AdminLoginForm } from "../components/AdminLoginForm";
 import { API_BASE } from "../config";
+import { useAdminAuth } from "../hooks/useAdminAuth";
 
 type DetailPayload = {
   question: { id: string; text: string; type: "single" | "multi" | "tag_cloud" | "ranking" };
@@ -41,20 +42,14 @@ type DetailPayload = {
 
 export function AdminVoteDetailPage() {
   const { eventName = "", questionId = "" } = useParams();
-  const [isAuth, setIsAuth] = useState(false);
+  const { isAuth, authChecked, checkSession } = useAdminAuth();
   const [detail, setDetail] = useState<DetailPayload | null>(null);
   const [error, setError] = useState("");
-
-  async function checkSession() {
-    const response = await fetch(`${API_BASE}/api/admin/me`, { credentials: "include" });
-    setIsAuth(response.ok);
-    return response.ok;
-  }
 
   useEffect(() => {
     document.title = "Голосование — админ";
     void checkSession();
-  }, []);
+  }, [checkSession]);
 
   useEffect(() => {
     if (!isAuth || !eventName || !questionId) return;
@@ -85,6 +80,10 @@ export function AdminVoteDetailPage() {
     return () => controller.abort();
   }, [isAuth, eventName, questionId]);
 
+  if (!authChecked) {
+    return null;
+  }
+
   if (!isAuth) {
     return (
       <Container maxWidth="sm" sx={{ py: 6 }}>
@@ -93,7 +92,7 @@ export function AdminVoteDetailPage() {
         </Typography>
         <AdminLoginForm
           onSuccess={() => {
-            setIsAuth(true);
+            void checkSession();
           }}
         />
       </Container>

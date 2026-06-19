@@ -3,14 +3,21 @@ import type {
   CloudWordCount,
   PublicViewPayload,
 } from "../publicViewContract";
+import {
+  inferQuestionUseImages,
+  optionHasTextOrImage,
+} from "../features/quizPlay/voteOptionImages";
 
 /** Голосования комнаты: вопросы с subQuizId === null не привязаны к квизу. */
 
-export type QuestionType = "single" | "multi" | "tag_cloud" | "ranking";
+export type QuestionType = "single" | "multi" | "tag_cloud" | "ranking" | "temperature";
 
 export type OptionForm = {
   text: string;
   isCorrect: boolean;
+  imageUrl?: string;
+  /** Для temperature: вес варианта 0–100. */
+  weight?: number;
 };
 
 export type QuestionForm = {
@@ -18,6 +25,9 @@ export type QuestionForm = {
   /** Привязка к квизу комнаты; null — отдельное голосование */
   subQuizId?: string | null;
   text: string;
+  imageUrl?: string;
+  /** Режим редактора/показа: картинки у вопроса и (кроме tag_cloud) у вариантов. */
+  useImages?: boolean;
   type: QuestionType;
   /** В подквизе: переключатель опрос/квиз (баллы). У голосований комнаты не используется для single/multi — правильные ответы задаются всегда (без баллов). */
   editorQuizMode: boolean;
@@ -45,13 +55,31 @@ export type QuestionForm = {
   rankingKind?: "quiz" | "jury";
   /** Для ranking: кастомная подсказка игроку; пусто = текст по умолчанию на экране ответа. */
   rankingPlayerHint?: string;
+  /** Для temperature: подзаголовок на проекторе над шкалой. */
+  temperatureSubtitle?: string;
   options: OptionForm[];
 };
+
+export function prismaQuestionTypeToFormType(type: AdminEventRoomQuestion["type"]): QuestionType {
+  switch (type) {
+    case "SINGLE":
+      return "single";
+    case "MULTI":
+      return "multi";
+    case "RANKING":
+      return "ranking";
+    case "TEMPERATURE":
+      return "temperature";
+    default:
+      return "tag_cloud";
+  }
+}
 
 export type AdminEventRoomQuestion = {
   id: string;
   text: string;
-  type: "SINGLE" | "MULTI" | "TAG_CLOUD" | "RANKING";
+  imageUrl?: string | null;
+  type: "SINGLE" | "MULTI" | "TAG_CLOUD" | "RANKING" | "TEMPERATURE";
   points: number;
   maxAnswers: number;
   isActive: boolean;
@@ -65,7 +93,15 @@ export type AdminEventRoomQuestion = {
   rankingProjectorMetric?: string;
   rankingKind?: string;
   rankingPlayerHint?: string | null;
-  options: Array<{ id: string; text: string; isCorrect: boolean; sortOrder?: number }>;
+  temperatureSubtitle?: string | null;
+  options: Array<{
+    id: string;
+    text: string;
+    isCorrect: boolean;
+    sortOrder?: number;
+    imageUrl?: string | null;
+    weight?: number | null;
+  }>;
 };
 
 export type AdminEventSubQuiz = {
@@ -167,6 +203,7 @@ export function editorQuizModeFromLoadedQuestion(
   if (q.type === "SINGLE" || q.type === "MULTI") {
     return q.options.some((o) => o.isCorrect);
   }
+  if (q.type === "TEMPERATURE") return false;
   return q.scoringMode === undefined || q.scoringMode === "QUIZ";
 }
 
@@ -181,10 +218,28 @@ export type RoomContentPayload = {
   standaloneQuestions: ReturnType<typeof toQuestionReplaceInput>[];
 };
 
+export function questionAllowsQuestionImage(q: QuestionForm): boolean {
+  return Boolean(q.useImages);
+}
+
+export function questionAllowsOptionImages(q: QuestionForm): boolean {
+  return Boolean(q.useImages) && q.type !== "tag_cloud";
+}
+
+/** Копия вопроса/голосования для вставки в комнату (без id, без ответов, неактивна). */
+export function cloneQuestionForm(source: QuestionForm): QuestionForm {
+  const cloned = JSON.parse(JSON.stringify(source)) as QuestionForm;
+  delete cloned.id;
+  cloned.isActive = false;
+  cloned.adminDone = false;
+  return cloned;
+}
+
 export function createEmptyQuestion(subQuizId: string | null = null): QuestionForm {
   return {
     subQuizId,
     text: "",
+    useImages: false,
     type: "single",
     editorQuizMode: true,
     points: 1,
@@ -219,15 +274,17 @@ function coerceMaxAnswers(raw: unknown): number | undefined {
 
 export function toQuestionReplaceInput(q: QuestionForm) {
   const scoringMode: "poll" | "quiz" =
-    q.type === "ranking" && q.rankingKind === "jury"
+    q.type === "temperature"
       ? "poll"
-      : q.type === "ranking" && q.rankingKind === "quiz"
-        ? "quiz"
-        : q.subQuizId == null || q.subQuizId === undefined
-          ? "poll"
-          : isEditorQuizMode(q)
-            ? "quiz"
-            : "poll";
+      : q.type === "ranking" && q.rankingKind === "jury"
+        ? "poll"
+        : q.type === "ranking" && q.rankingKind === "quiz"
+          ? "quiz"
+          : q.subQuizId == null || q.subQuizId === undefined
+            ? "poll"
+            : isEditorQuizMode(q)
+              ? "quiz"
+              : "poll";
   const options =
     q.type === "tag_cloud" && !isEditorQuizMode(q)
       ? []
@@ -236,11 +293,14 @@ export function toQuestionReplaceInput(q: QuestionForm) {
             .filter((o) => o.text.trim())
             .map((o) => ({ text: o.text.trim(), isCorrect: true }))
         : q.type === "ranking"
-          ? q.options.map((o) => ({ text: o.text.trim(), isCorrect: false }))
-          : q.options.map((o) => ({ text: o.text, isCorrect: o.isCorrect }));
+          ? q.options.map((o) =>
+              normalizeOptionForSave({ ...o, text: o.text.trim() }, questionAllowsOptionImages(q)),
+            )
+          : q.options.map((o) => normalizeOptionForSave(o, questionAllowsOptionImages(q)));
   return {
     id: q.id,
     text: q.text.trim(),
+    imageUrl: questionAllowsQuestionImage(q) ? q.imageUrl?.trim() || undefined : undefined,
     type: q.type,
     points: coerceQuestionPoints(q.points),
     maxAnswers: coerceMaxAnswers(q.maxAnswers),
@@ -261,11 +321,15 @@ export function toQuestionReplaceInput(q: QuestionForm) {
           rankingKind: q.rankingKind ?? "jury",
           rankingPlayerHint: q.rankingPlayerHint?.trim() || null,
         }
-      : q.type === "tag_cloud" && isEditorQuizMode(q)
+      : q.type === "temperature"
         ? {
-            rankingPointsByRank: tagCloudRankingPointsForSave(q),
+            temperatureSubtitle: q.temperatureSubtitle?.trim() || null,
           }
-        : {}),
+        : q.type === "tag_cloud" && isEditorQuizMode(q)
+          ? {
+              rankingPointsByRank: tagCloudRankingPointsForSave(q),
+            }
+          : {}),
     options,
   };
 }
@@ -324,15 +388,35 @@ function questionLabelForValidation(q: QuestionForm, index: number): string {
     const short = t.length > 48 ? `${t.slice(0, 48)}…` : t;
     return `«${short}»`;
   }
+  if (q.imageUrl?.trim()) {
+    return `№${index + 1} (с картинкой)`;
+  }
   return `№${index + 1} (без текста)`;
+}
+
+function optionHasContent(option: OptionForm): boolean {
+  return optionHasTextOrImage(option.text, option.imageUrl);
+}
+
+function normalizeOptionForSave(option: OptionForm, includeImages: boolean): OptionForm {
+  return {
+    text: option.text,
+    isCorrect: option.isCorrect,
+    imageUrl: includeImages ? option.imageUrl?.trim() || undefined : undefined,
+    ...(option.weight != null ? { weight: option.weight } : {}),
+  };
 }
 
 /** Валидация одного вопроса (те же правила, что и при полной проверке списка). */
 export function validateQuestionFormEntry(q: QuestionForm, index: number): string | null {
   const label = questionLabelForValidation(q, index);
 
-  if (!q.text.trim()) {
-    return `Заполните текст вопроса ${label}.`;
+  if (q.useImages) {
+    if (!q.text.trim() && !q.imageUrl?.trim()) {
+      return `У вопроса ${label} укажите текст или картинку.`;
+    }
+  } else if (!q.text.trim()) {
+    return `У вопроса ${label} укажите текст.`;
   }
 
   if (q.type === "tag_cloud") {
@@ -353,8 +437,10 @@ export function validateQuestionFormEntry(q: QuestionForm, index: number): strin
     if (q.options.length < 3) {
       return `Вопрос ${label}: для ранжирования нужно не меньше трёх вариантов.`;
     }
-    if (q.options.some((o) => !o.text.trim())) {
-      return `Вопрос ${label}: у каждого варианта должен быть непустой текст.`;
+    if (q.options.some((o) => !(q.useImages ? optionHasContent(o) : o.text.trim()))) {
+      return q.useImages
+        ? `Вопрос ${label}: у каждого варианта должен быть текст или картинка.`
+        : `Вопрос ${label}: у каждого варианта должен быть текст.`;
     }
     if (q.rankingPointsByRank != null && q.rankingPointsByRank.length !== q.options.length) {
       return `Вопрос ${label}: задайте балл для каждой позиции или очистите поля «только полный ответ».`;
@@ -367,11 +453,31 @@ export function validateQuestionFormEntry(q: QuestionForm, index: number): strin
     return null;
   }
 
+  if (q.type === "temperature") {
+    if (q.options.length < 2) {
+      return `Вопрос ${label}: для измерения температуры нужно минимум 2 варианта.`;
+    }
+    if (q.options.some((o) => !(q.useImages ? optionHasContent(o) : o.text.trim()))) {
+      return q.useImages
+        ? `Вопрос ${label}: у каждого варианта должен быть текст или картинка.`
+        : `Вопрос ${label}: у каждого варианта должен быть текст.`;
+    }
+    for (let i = 0; i < q.options.length; i += 1) {
+      const w = q.options[i]!.weight;
+      if (w == null || !Number.isFinite(w) || w < 0 || w > 100) {
+        return `Вопрос ${label}: у варианта ${i + 1} задайте вес от 0 до 100.`;
+      }
+    }
+    return null;
+  }
+
   if (q.options.length < 2) {
     return `Вопрос ${label}: нужно минимум 2 варианта ответа.`;
   }
-  if (q.options.some((o) => !o.text.trim())) {
-    return `Вопрос ${label}: у каждого варианта должен быть непустой текст.`;
+  if (q.options.some((o) => !(q.useImages ? optionHasContent(o) : o.text.trim()))) {
+    return q.useImages
+      ? `Вопрос ${label}: у каждого варианта должен быть текст или картинка.`
+      : `Вопрос ${label}: у каждого варианта должен быть текст.`;
   }
 
   if (!isEditorQuizMode(q)) {
@@ -452,18 +558,22 @@ export function mapLoadedRoomQuestions(
 ): QuestionForm[] {
   return questions.map((q) => {
     const kind = rankingKindFromApi(q.rankingKind);
+    const options = normalizeSingleCorrectFlags(
+      q.type,
+      q.options.map((o) => ({
+        text: o.text,
+        isCorrect: Boolean(o.isCorrect),
+        imageUrl: o.imageUrl?.trim() || undefined,
+        ...(o.weight != null ? { weight: o.weight } : {}),
+      })),
+    );
     const form: QuestionForm = {
       id: q.id,
       subQuizId,
       text: q.text,
-      type:
-        q.type === "SINGLE"
-          ? "single"
-          : q.type === "MULTI"
-            ? "multi"
-            : q.type === "RANKING"
-              ? "ranking"
-              : "tag_cloud",
+      imageUrl: q.imageUrl?.trim() || undefined,
+      useImages: inferQuestionUseImages({ imageUrl: q.imageUrl ?? undefined, options }),
+      type: prismaQuestionTypeToFormType(q.type),
       editorQuizMode: editorQuizModeFromLoadedQuestion(q, subQuizId),
       points: coerceQuestionPoints(q.points),
       maxAnswers: coerceMaxAnswers(q.maxAnswers) ?? 3,
@@ -485,10 +595,8 @@ export function mapLoadedRoomQuestions(
       rankingKind: kind,
       rankingPlayerHint:
         q.type === "RANKING" ? q.rankingPlayerHint?.trim() || defaultRankingPlayerHint(kind) : "",
-      options: normalizeSingleCorrectFlags(
-        q.type,
-        q.options.map((o) => ({ text: o.text, isCorrect: Boolean(o.isCorrect) })),
-      ),
+      temperatureSubtitle: q.type === "TEMPERATURE" ? q.temperatureSubtitle?.trim() || "" : "",
+      options,
     };
     return form.type === "tag_cloud" ? normalizeTagCloudQuestionPoints(form) : form;
   });
@@ -501,43 +609,49 @@ export function mergeServerQuestionsIntoForms(
 ): QuestionForm[] {
   return serverQuestions.map((q) => {
     const kind = rankingKindFromApi(q.rankingKind);
+    const options = normalizeSingleCorrectFlags(
+      q.type,
+      q.options.map((o) => ({
+        text: o.text,
+        isCorrect: Boolean(o.isCorrect),
+        imageUrl: o.imageUrl?.trim() || undefined,
+        ...(o.weight != null ? { weight: o.weight } : {}),
+      })),
+    );
+    const prev = mergeFrom.find((item) => item.id === q.id);
     const form: QuestionForm = {
       id: q.id,
       subQuizId,
       text: q.text,
-      type:
-        q.type === "SINGLE"
-          ? "single"
-          : q.type === "MULTI"
-            ? "multi"
-            : q.type === "RANKING"
-              ? "ranking"
-              : "tag_cloud",
+      imageUrl: q.imageUrl?.trim() || undefined,
+      useImages:
+        prev?.useImages ?? inferQuestionUseImages({ imageUrl: q.imageUrl ?? undefined, options }),
+      type: prismaQuestionTypeToFormType(q.type),
       editorQuizMode: editorQuizModeFromLoadedQuestion(q, subQuizId),
       points: coerceQuestionPoints(q.points),
       maxAnswers: coerceMaxAnswers(q.maxAnswers) ?? 3,
       isActive: q.isActive,
       adminDone: Boolean(q.adminDone),
-      showVoteCount: mergeFrom.find((item) => item.id === q.id)?.showVoteCount ?? false,
-      showQuestionTitle: mergeFrom.find((item) => item.id === q.id)?.showQuestionTitle ?? true,
+      showVoteCount: prev?.showVoteCount ?? false,
+      showQuestionTitle: prev?.showQuestionTitle ?? true,
       projectorShowFirstCorrect: q.projectorShowFirstCorrect ?? true,
       projectorFirstCorrectWinnersCount: Math.max(
         1,
         Math.min(20, Math.trunc(q.projectorFirstCorrectWinnersCount ?? 1)),
       ),
-      hiddenTagTexts: mergeFrom.find((item) => item.id === q.id)?.hiddenTagTexts ?? [],
-      injectedTagWords: mergeFrom.find((item) => item.id === q.id)?.injectedTagWords ?? [],
-      tagCountOverrides: mergeFrom.find((item) => item.id === q.id)?.tagCountOverrides ?? [],
+      hiddenTagTexts: prev?.hiddenTagTexts ?? [],
+      injectedTagWords: prev?.injectedTagWords ?? [],
+      tagCountOverrides: prev?.tagCountOverrides ?? [],
       injectedTagsInput: "",
       rankingPointsByRank: parseRankingPointsFromApi(q.rankingPointsByRank),
       rankingProjectorMetric: projectMetricFromApi(q.rankingProjectorMetric),
       rankingKind: kind,
       rankingPlayerHint:
         q.type === "RANKING" ? q.rankingPlayerHint?.trim() || defaultRankingPlayerHint(kind) : "",
-      options: normalizeSingleCorrectFlags(
-        q.type,
-        q.options.map((o) => ({ text: o.text, isCorrect: Boolean(o.isCorrect) })),
-      ),
+      temperatureSubtitle:
+        prev?.temperatureSubtitle ??
+        (q.type === "TEMPERATURE" ? q.temperatureSubtitle?.trim() || "" : ""),
+      options,
     };
     return form.type === "tag_cloud" ? normalizeTagCloudQuestionPoints(form) : form;
   });
@@ -560,6 +674,7 @@ export function mergeRoomReloadIntoState(
     if (!prev) return q;
     return {
       ...q,
+      useImages: prev.useImages ?? q.useImages,
       showVoteCount: prev.showVoteCount ?? false,
       showQuestionTitle: prev.showQuestionTitle ?? true,
       hiddenTagTexts: prev.hiddenTagTexts ?? [],

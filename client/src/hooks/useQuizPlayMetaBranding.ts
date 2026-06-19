@@ -23,6 +23,7 @@ export function useQuizPlayMetaBranding({ slug, quiz }: Params) {
   const [metaBrandAccentColor, setMetaBrandAccentColor] = useState(DEFAULT_BRAND_ACCENT);
   const [metaBrandTextColor, setMetaBrandTextColor] = useState(DEFAULT_BRAND_TEXT);
   const [metaBrandInputTextColor, setMetaBrandInputTextColor] = useState(DEFAULT_BRAND_INPUT_TEXT);
+  const [metaBrandLogoUrl, setMetaBrandLogoUrl] = useState("");
 
   useEffect(() => {
     document.title = quiz?.title?.trim() || "Квиз";
@@ -51,6 +52,7 @@ export function useQuizPlayMetaBranding({ slug, quiz }: Params) {
           brandAccentColor?: string;
           brandTextColor?: string;
           brandInputTextColor?: string;
+          brandLogoUrl?: string;
         };
         if (typeof payload.title === "string") {
           setQuizTitle(payload.title);
@@ -76,12 +78,24 @@ export function useQuizPlayMetaBranding({ slug, quiz }: Params) {
         if (typeof payload.brandInputTextColor === "string" && payload.brandInputTextColor.trim()) {
           setMetaBrandInputTextColor(payload.brandInputTextColor);
         }
+        if (typeof payload.brandLogoUrl === "string") {
+          setMetaBrandLogoUrl(payload.brandLogoUrl);
+        }
       } catch {
         // ignore network errors, socket state can still provide title later
       }
     })();
     return () => controller.abort();
   }, [slug]);
+
+  useEffect(() => {
+    if (typeof quiz?.brandPlayerBackgroundImageUrl === "string") {
+      setMetaBrandPlayerBackgroundImageUrl(quiz.brandPlayerBackgroundImageUrl);
+    }
+    if (typeof quiz?.brandLogoUrl === "string") {
+      setMetaBrandLogoUrl(quiz.brandLogoUrl);
+    }
+  }, [quiz?.brandLogoUrl, quiz?.brandPlayerBackgroundImageUrl]);
 
   const titleText = useMemo(
     () => quiz?.title?.trim() || quizTitle.trim(),
@@ -91,13 +105,17 @@ export function useQuizPlayMetaBranding({ slug, quiz }: Params) {
     () => quiz?.brandPrimaryColor?.trim() || metaBrandPrimaryColor.trim() || DEFAULT_BRAND_PRIMARY,
     [metaBrandPrimaryColor, quiz?.brandPrimaryColor],
   );
-  const brandPlayerBackgroundImageUrl = useMemo(
-    () =>
-      resolveClientAssetUrl(
-        quiz?.brandPlayerBackgroundImageUrl?.trim() || metaBrandPlayerBackgroundImageUrl.trim(),
-      ),
-    [metaBrandPlayerBackgroundImageUrl, quiz?.brandPlayerBackgroundImageUrl],
-  );
+  const brandPlayerBackgroundImageUrl = useMemo(() => {
+    const raw =
+      quiz != null
+        ? (quiz.brandPlayerBackgroundImageUrl ?? "").trim()
+        : metaBrandPlayerBackgroundImageUrl.trim();
+    return raw ? resolveClientAssetUrl(raw) : "";
+  }, [metaBrandPlayerBackgroundImageUrl, quiz]);
+  const brandLogoUrl = useMemo(() => {
+    const raw = quiz != null ? (quiz.brandLogoUrl ?? "").trim() : metaBrandLogoUrl.trim();
+    return raw ? resolveClientAssetUrl(raw) : "";
+  }, [metaBrandLogoUrl, quiz]);
   const brandBodyBackgroundColor = useMemo(
     () => quiz?.brandBodyBackgroundColor?.trim() || metaBrandBodyBackgroundColor,
     [metaBrandBodyBackgroundColor, quiz?.brandBodyBackgroundColor],
@@ -131,5 +149,6 @@ export function useQuizPlayMetaBranding({ slug, quiz }: Params) {
     formInputTextColor,
     brandPlayerBackgroundImageUrl,
     brandBodyBackgroundColor,
+    brandLogoUrl,
   };
 }

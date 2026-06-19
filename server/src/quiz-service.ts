@@ -1,12 +1,13 @@
 import {
   collectTagCloudQuizReferenceAliases,
+  computeTemperatureWeightedAverage,
   expandTagCloudSubmitLines,
   formatTagCloudReferenceAnswer,
   normalizeTagComparable,
   parseStoredTagAnswersJson,
   type PublicViewState,
-  playerUiRefsChanged,
   prunePublicViewForRoomContent,
+  publicViewRoomPruneChanged,
 } from "@meyouquize/shared";
 import {
   Prisma,
@@ -18,6 +19,8 @@ import {
   ScoringMode,
 } from "@prisma/client";
 import { prisma } from "./prisma.js";
+import { getActiveFeedbackFormPublic, getFeedbackResultsForReport } from "./feedback-service.js";
+import { cleanupUnusedQuestionMedia, collectQuestionMediaUrlsForQuiz } from "./media-cleanup.js";
 import { publicViewJsonToState, saveStoredPublicView } from "./socket/public-view-store.js";
 import { parseSelectedIds, randomSlug, randomToken } from "./utils.js";
 import {
@@ -82,6 +85,9 @@ function isStoredAnswerValidForQuestion(
   const selected = parseSelectedIds(rawSelectedOptionIds);
   if (selected.length < 1) return false;
   const allowed = new Set(question.options.map((o) => o.id));
+  if (question.type === QuestionType.TEMPERATURE) {
+    return selected.length === 1 && allowed.has(selected[0]!);
+  }
   if (question.type === QuestionType.RANKING) {
     if (selected.length !== question.options.length) return false;
     if (new Set(selected).size !== selected.length) return false;
@@ -106,7 +112,18 @@ type QuestionDashboardRow = Prisma.QuestionGetPayload<{
     rankingPointsByRank: true;
     rankingProjectorMetric: true;
     rankingKind: true;
-    options: { select: { id: true; text: true; isCorrect: true; sortOrder: true } };
+    imageUrl: true;
+    temperatureSubtitle: true;
+    options: {
+      select: {
+        id: true;
+        text: true;
+        isCorrect: true;
+        sortOrder: true;
+        imageUrl: true;
+        weight: true;
+      };
+    };
     answers: { select: { selectedOptionIds: true } };
   };
 }>;
@@ -114,7 +131,7 @@ type QuestionDashboardRow = Prisma.QuestionGetPayload<{
 export type QuestionReplaceInput = {
   id?: string;
   text: string;
-  type: "single" | "multi" | "tag_cloud" | "ranking";
+  type: "single" | "multi" | "tag_cloud" | "ranking" | "temperature";
   points: number;
   maxAnswers?: number;
   scoringMode?: "poll" | "quiz";
@@ -129,10 +146,18 @@ export type QuestionReplaceInput = {
   rankingKind?: "quiz" | "jury";
   /** Для RANKING: кастомная подсказка игроку; null/undefined = текст по умолчанию. */
   rankingPlayerHint?: string | null;
+  /** Для TEMPERATURE: подзаголовок на проекторе над шкалой. */
+  temperatureSubtitle?: string | null;
   /** Только UI админки: корзина «отработанные». */
   adminDone?: boolean;
-  options: Array<{ text: string; isCorrect: boolean }>;
+  imageUrl?: string;
+  options: Array<{ text: string; isCorrect: boolean; imageUrl?: string; weight?: number }>;
 };
+
+function normalizeStoredImageUrl(value: string | undefined | null): string | null {
+  const trimmed = typeof value === "string" ? value.trim() : "";
+  return trimmed || null;
+}
 
 function parseRankingTiersJson(value: unknown): number[] | null {
   if (value == null) return null;
@@ -226,6 +251,8 @@ function inputTypeToPrisma(t: QuestionReplaceInput["type"]): QuestionType {
       return QuestionType.TAG_CLOUD;
     case "ranking":
       return QuestionType.RANKING;
+    case "temperature":
+      return QuestionType.TEMPERATURE;
     default: {
       const _exhaustive: never = t;
       return _exhaustive;
@@ -233,7 +260,9 @@ function inputTypeToPrisma(t: QuestionReplaceInput["type"]): QuestionType {
   }
 }
 
-function prismaTypeToApi(t: QuestionType): "single" | "multi" | "tag_cloud" | "ranking" {
+function prismaTypeToApi(
+  t: QuestionType,
+): "single" | "multi" | "tag_cloud" | "ranking" | "temperature" {
   switch (t) {
     case QuestionType.SINGLE:
       return "single";
@@ -243,6 +272,8 @@ function prismaTypeToApi(t: QuestionType): "single" | "multi" | "tag_cloud" | "r
       return "tag_cloud";
     case QuestionType.RANKING:
       return "ranking";
+    case QuestionType.TEMPERATURE:
+      return "temperature";
     default: {
       const _exhaustive: never = t;
       return _exhaustive;
@@ -257,6 +288,7 @@ function pointsForReplaceQuestion(q: QuestionReplaceInput): number {
 function maxAnswersForReplaceQuestion(q: QuestionReplaceInput): number {
   if (q.type === "tag_cloud") return q.maxAnswers ?? 3;
   if (q.type === "ranking") return q.options.length;
+  if (q.type === "temperature") return 1;
   return 1;
 }
 
@@ -266,10 +298,13 @@ function optionsCreateRows(questionId: string, options: QuestionReplaceInput["op
     text: o.text,
     isCorrect: o.isCorrect,
     sortOrder: idx,
+    imageUrl: normalizeStoredImageUrl(o.imageUrl),
+    weight: o.weight ?? null,
   }));
 }
 
 function toScoringMode(q: QuestionReplaceInput, subQuizId: string | null = null): ScoringMode {
+  if (q.type === "temperature") return ScoringMode.POLL;
   if (q.type === "tag_cloud") {
     if (subQuizId != null) return ScoringMode.QUIZ;
     return q.scoringMode === "quiz" ? ScoringMode.QUIZ : ScoringMode.POLL;
@@ -285,7 +320,7 @@ function optionsForReplaceQuestion(
   if (toScoringMode(q, subQuizId) !== ScoringMode.QUIZ) return q.options;
   return q.options
     .filter((o) => o.text.trim())
-    .map((o) => ({ text: o.text.trim(), isCorrect: true }));
+    .map((o) => ({ text: o.text.trim(), isCorrect: true, imageUrl: undefined }));
 }
 
 function rankingQuestionCreateData(q: QuestionReplaceInput) {
@@ -301,6 +336,16 @@ function rankingQuestionCreateData(q: QuestionReplaceInput) {
     rankingPlayerHint:
       q.rankingPlayerHint != null && q.rankingPlayerHint.trim() !== ""
         ? q.rankingPlayerHint.trim()
+        : null,
+  };
+}
+
+function temperatureQuestionCreateData(q: QuestionReplaceInput) {
+  if (q.type !== "temperature") return {};
+  return {
+    temperatureSubtitle:
+      q.temperatureSubtitle != null && q.temperatureSubtitle.trim() !== ""
+        ? q.temperatureSubtitle.trim()
         : null,
   };
 }
@@ -321,7 +366,7 @@ export async function createQuiz(input: {
   title: string;
   questions: Array<{
     text: string;
-    type: "single" | "multi" | "tag_cloud" | "ranking";
+    type: "single" | "multi" | "tag_cloud" | "ranking" | "temperature";
     points: number;
     maxAnswers?: number;
     options: Array<{ text: string; isCorrect: boolean }>;
@@ -355,6 +400,7 @@ export async function createQuiz(input: {
         points: pointsForReplaceQuestion(q),
         maxAnswers: maxAnswersForReplaceQuestion(q),
         scoringMode: mode,
+        imageUrl: normalizeStoredImageUrl(q.imageUrl),
       },
     });
     if (q.type !== "tag_cloud") {
@@ -477,6 +523,7 @@ export async function replaceRoomContent(eventName: string, content: RoomContent
   const room = await prisma.quiz.findUnique({ where: { slug: eventName } });
   if (!room) throw new Error("Room not found");
   const roomId = room.id;
+  const mediaUrlsBeforeReplace = await collectQuestionMediaUrlsForQuiz(roomId);
   await prisma.$transaction(async (tx) => {
     const existingSubQuizzes = await tx.subQuiz.findMany({
       where: { quizId: roomId },
@@ -515,6 +562,8 @@ export async function replaceRoomContent(eventName: string, content: RoomContent
               text: opt.text,
               isCorrect: opt.isCorrect,
               sortOrder: idx,
+              imageUrl: normalizeStoredImageUrl(opt.imageUrl),
+              weight: opt.weight ?? null,
             },
           });
         }
@@ -525,6 +574,8 @@ export async function replaceRoomContent(eventName: string, content: RoomContent
               text: opt.text,
               isCorrect: opt.isCorrect,
               sortOrder: existing.length + relIdx,
+              imageUrl: normalizeStoredImageUrl(opt.imageUrl),
+              weight: opt.weight ?? null,
             })),
           });
         } else if (existing.length > options.length) {
@@ -544,6 +595,7 @@ export async function replaceRoomContent(eventName: string, content: RoomContent
         points: pointsForReplaceQuestion(q),
         maxAnswers: maxAnswersForReplaceQuestion(q),
         scoringMode: mode,
+        imageUrl: normalizeStoredImageUrl(q.imageUrl),
         projectorShowFirstCorrect: q.projectorShowFirstCorrect ?? true,
         projectorFirstCorrectWinnersCount: Math.max(
           1,
@@ -551,6 +603,7 @@ export async function replaceRoomContent(eventName: string, content: RoomContent
         ),
         adminDone: q.adminDone ?? false,
         ...rankingQuestionCreateData(q),
+        ...temperatureQuestionCreateData(q),
         ...tagCloudQuestionCreateData(q),
       };
       let targetQuestionId: string;
@@ -627,6 +680,15 @@ export async function replaceRoomContent(eventName: string, content: RoomContent
     });
   });
 
+  try {
+    await cleanupUnusedQuestionMedia(mediaUrlsBeforeReplace);
+  } catch (error) {
+    console.warn("[media-cleanup] failed after replaceRoomContent", {
+      quizId: roomId,
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
+
   const [subQuizzes, questions, roomRow] = await Promise.all([
     prisma.subQuiz.findMany({ where: { quizId: roomId }, select: { id: true } }),
     prisma.question.findMany({ where: { quizId: roomId }, select: { id: true } }),
@@ -638,7 +700,7 @@ export async function replaceRoomContent(eventName: string, content: RoomContent
     new Set(subQuizzes.map((sq) => sq.id)),
     new Set(questions.map((q) => q.id)),
   );
-  if (playerUiRefsChanged(storedView, prunedView)) {
+  if (publicViewRoomPruneChanged(storedView, prunedView)) {
     await saveStoredPublicView(roomId, prunedView);
   }
 
@@ -716,7 +778,7 @@ export async function replaceQuizQuestions(
   eventName: string,
   questions: Array<{
     text: string;
-    type: "single" | "multi" | "tag_cloud" | "ranking";
+    type: "single" | "multi" | "tag_cloud" | "ranking" | "temperature";
     points: number;
     maxAnswers?: number;
     options: Array<{ text: string; isCorrect: boolean }>;
@@ -740,13 +802,17 @@ export type QuizProgressPayload = {
 export type PlayerVisibleResultTile = {
   questionId: string;
   text: string;
-  type: "single" | "multi" | "ranking";
+  imageUrl?: string;
+  type: "single" | "multi" | "ranking" | "temperature";
   rankingProjectorMetric?: "avg_rank" | "avg_score" | "total_score";
+  temperatureValue?: number | null;
   optionStats: Array<{
     optionId: string;
     text: string;
+    imageUrl?: string;
     count: number;
     isCorrect: boolean;
+    weight?: number;
     avgRank?: number;
     avgScore?: number;
     totalScore?: number;
@@ -782,6 +848,7 @@ export async function getQuizPublicState(quizId: string) {
     quiz.id,
     view.playerVisibleResultQuestionIds ?? [],
   );
+  const activeFeedbackForm = await getActiveFeedbackFormPublic(quiz.id);
   let activeStepIndex: number | undefined;
   let activeStepTotal: number | undefined;
   if (activeQuestion?.subQuizId) {
@@ -866,10 +933,15 @@ export async function getQuizPublicState(quizId: string) {
     activeQuestions: activeQuestions.map((q) => ({
       id: q.id,
       text: q.text,
+      imageUrl: q.imageUrl ?? undefined,
       type: prismaTypeToApi(q.type),
       scoringMode: q.scoringMode === ScoringMode.POLL ? "poll" : "quiz",
       maxAnswers: q.maxAnswers,
-      options: q.options.map((o) => ({ id: o.id, text: o.text })),
+      options: q.options.map((o) => ({
+        id: o.id,
+        text: o.text,
+        imageUrl: o.imageUrl ?? undefined,
+      })),
       isClosed: q.isClosed,
       rankingKind: q.type === QuestionType.RANKING ? rankingKindToApi(q.rankingKind) : undefined,
       rankingPlayerHint:
@@ -888,10 +960,15 @@ export async function getQuizPublicState(quizId: string) {
       ? {
           id: activeQuestion.id,
           text: activeQuestion.text,
+          imageUrl: activeQuestion.imageUrl ?? undefined,
           type: prismaTypeToApi(activeQuestion.type),
           scoringMode: activeQuestion.scoringMode === ScoringMode.POLL ? "poll" : "quiz",
           maxAnswers: activeQuestion.maxAnswers,
-          options: activeQuestion.options.map((o) => ({ id: o.id, text: o.text })),
+          options: activeQuestion.options.map((o) => ({
+            id: o.id,
+            text: o.text,
+            imageUrl: o.imageUrl ?? undefined,
+          })),
           isClosed: activeQuestion.isClosed,
           stepIndex: activeStepIndex,
           stepTotal: activeStepTotal,
@@ -914,6 +991,7 @@ export async function getQuizPublicState(quizId: string) {
               : undefined,
         }
       : null,
+    activeFeedbackForm,
   };
 }
 
@@ -926,11 +1004,19 @@ async function getPlayerVisibleResultsForQuiz(
     where: {
       quizId,
       id: { in: questionIds },
-      type: { in: [QuestionType.SINGLE, QuestionType.MULTI, QuestionType.RANKING] },
+      type: {
+        in: [
+          QuestionType.SINGLE,
+          QuestionType.MULTI,
+          QuestionType.RANKING,
+          QuestionType.TEMPERATURE,
+        ],
+      },
     },
     select: {
       id: true,
       text: true,
+      imageUrl: true,
       subQuizId: true,
       type: true,
       projectorShowFirstCorrect: true,
@@ -938,7 +1024,17 @@ async function getPlayerVisibleResultsForQuiz(
       rankingPointsByRank: true,
       rankingProjectorMetric: true,
       rankingKind: true,
-      options: { select: { id: true, text: true, isCorrect: true, sortOrder: true } },
+      temperatureSubtitle: true,
+      options: {
+        select: {
+          id: true,
+          text: true,
+          isCorrect: true,
+          sortOrder: true,
+          imageUrl: true,
+          weight: true,
+        },
+      },
       answers: { select: { selectedOptionIds: true } },
     },
     orderBy: { order: "asc" },
@@ -951,19 +1047,29 @@ async function getPlayerVisibleResultsForQuiz(
       (
         item,
       ): item is NonNullable<typeof item> & {
-        type: "single" | "multi" | "ranking";
+        type: "single" | "multi" | "ranking" | "temperature";
       } => item.type !== "tag_cloud",
     )
     .map((item) => ({
       questionId: item.questionId,
       text: item.text,
-      type: item.type === "ranking" ? "ranking" : item.type,
+      imageUrl: item.imageUrl,
+      type:
+        item.type === "ranking"
+          ? "ranking"
+          : item.type === "temperature"
+            ? "temperature"
+            : item.type,
       rankingProjectorMetric: item.type === "ranking" ? item.rankingProjectorMetric : undefined,
+      temperatureValue: item.type === "temperature" ? item.temperatureValue : undefined,
+      temperatureSubtitle: item.type === "temperature" ? item.temperatureSubtitle : undefined,
       optionStats: item.optionStats.map((row) => ({
         optionId: row.optionId,
         text: row.text,
+        imageUrl: row.imageUrl,
         count: row.count,
         isCorrect: row.isCorrect,
+        weight: row.weight,
         avgRank: row.avgRank,
         avgScore: row.avgScore,
         totalScore: row.totalScore,
@@ -994,12 +1100,15 @@ function mapPerQuestion(questions: QuestionDashboardRow[]) {
     let optionStats: Array<{
       optionId: string;
       text: string;
+      imageUrl?: string;
       count: number;
       isCorrect: boolean;
+      weight?: number;
       avgRank?: number;
       avgScore?: number;
       totalScore?: number;
     }>;
+    let temperatureValue: number | null | undefined;
 
     if (q.type === QuestionType.RANKING) {
       const n = sortedOpts.length;
@@ -1051,6 +1160,7 @@ function mapPerQuestion(questions: QuestionDashboardRow[]) {
       optionStats = sortedOpts.map((o) => ({
         optionId: o.id,
         text: o.text,
+        imageUrl: o.imageUrl ?? undefined,
         count: answerCount,
         isCorrect: o.isCorrect,
         avgRank: answerCount > 0 ? sumsRank[o.id]! / answerCount : 0,
@@ -1058,6 +1168,28 @@ function mapPerQuestion(questions: QuestionDashboardRow[]) {
           answerCount > 0 && (useTiers || !isJury) ? sumsAvgScore[o.id]! / answerCount : undefined,
         totalScore: useTiers || !isJury ? sumsTotalScore[o.id]! : undefined,
       }));
+    } else if (q.type === QuestionType.TEMPERATURE) {
+      const optionCounts: Record<string, number> = {};
+      sortedOpts.forEach((o) => {
+        optionCounts[o.id] = 0;
+      });
+      q.answers.forEach((a) => {
+        const selected = parseSelectedIds(a.selectedOptionIds);
+        selected.forEach((id) => {
+          if (id in optionCounts) optionCounts[id] += 1;
+        });
+      });
+      optionStats = sortedOpts.map((o) => ({
+        optionId: o.id,
+        text: o.text,
+        imageUrl: o.imageUrl ?? undefined,
+        count: optionCounts[o.id] ?? 0,
+        isCorrect: false,
+        weight: o.weight ?? 0,
+      }));
+      temperatureValue = computeTemperatureWeightedAverage(
+        optionStats.map((row) => ({ count: row.count, weight: row.weight ?? 0 })),
+      );
     } else {
       const optionCounts: Record<string, number> = {};
       sortedOpts.forEach((o) => {
@@ -1074,6 +1206,7 @@ function mapPerQuestion(questions: QuestionDashboardRow[]) {
       optionStats = sortedOpts.map((o) => ({
         optionId: o.id,
         text: o.text,
+        imageUrl: o.imageUrl ?? undefined,
         count: optionCounts[o.id] ?? 0,
         isCorrect: isQuizTagCloud ? Boolean(o.text.trim()) : o.isCorrect,
       }));
@@ -1087,6 +1220,7 @@ function mapPerQuestion(questions: QuestionDashboardRow[]) {
     return {
       questionId: q.id,
       text: q.text,
+      imageUrl: q.imageUrl ?? undefined,
       subQuizId: q.subQuizId,
       projectorShowFirstCorrect: q.projectorShowFirstCorrect,
       projectorFirstCorrectWinnersCount: q.projectorFirstCorrectWinnersCount,
@@ -1094,8 +1228,13 @@ function mapPerQuestion(questions: QuestionDashboardRow[]) {
       rankingProjectorMetric:
         q.type === QuestionType.RANKING ? rankingMetricToApi(q.rankingProjectorMetric) : undefined,
       rankingKind: q.type === QuestionType.RANKING ? rankingKindToApi(q.rankingKind) : undefined,
+      temperatureSubtitle:
+        q.type === QuestionType.TEMPERATURE && q.temperatureSubtitle?.trim()
+          ? q.temperatureSubtitle.trim()
+          : undefined,
       optionStats,
       tagCloud,
+      ...(temperatureValue !== undefined ? { temperatureValue } : {}),
       ...(tagCloudReferenceAliases ? { tagCloudReferenceAliases } : {}),
       firstCorrectNicknames: [] as string[],
     };
@@ -1214,7 +1353,7 @@ export type SubQuizDetailedResults = {
     order: number;
     points: number;
     scoringMode: "poll" | "quiz";
-    type: "single" | "multi" | "tag_cloud" | "ranking";
+    type: "single" | "multi" | "tag_cloud" | "ranking" | "temperature";
     isActive: boolean;
   }>;
   rows: Array<{
@@ -1392,7 +1531,18 @@ export async function getDashboardResults(quizId: string): Promise<DashboardResu
         rankingPointsByRank: true,
         rankingProjectorMetric: true,
         rankingKind: true,
-        options: { select: { id: true, text: true, isCorrect: true, sortOrder: true } },
+        imageUrl: true,
+        temperatureSubtitle: true,
+        options: {
+          select: {
+            id: true,
+            text: true,
+            isCorrect: true,
+            sortOrder: true,
+            imageUrl: true,
+            weight: true,
+          },
+        },
         answers: { select: { selectedOptionIds: true } },
       },
       orderBy: { order: "asc" },
@@ -1517,7 +1667,7 @@ export type PlayerSubQuizReportQuestionRow = {
   questionId: string;
   order: number;
   text: string;
-  type: "single" | "multi" | "tag_cloud" | "ranking";
+  type: "single" | "multi" | "tag_cloud" | "ranking" | "temperature";
   scoringMode: "poll" | "quiz";
   points: number;
   scoreAwarded: number | null;
@@ -1552,7 +1702,8 @@ function participantHasAnswerForQuestion(
   if (
     type === QuestionType.SINGLE ||
     type === QuestionType.MULTI ||
-    type === QuestionType.RANKING
+    type === QuestionType.RANKING ||
+    type === QuestionType.TEMPERATURE
   ) {
     return parseSelectedIds(ans.selectedOptionIds).length > 0;
   }
@@ -1589,7 +1740,10 @@ export async function getParticipantPersonalSubQuizReport(
     where: { subQuizId: sub.id },
     orderBy: { order: "asc" },
     include: {
-      options: { orderBy: { sortOrder: "asc" }, select: { id: true, text: true, isCorrect: true } },
+      options: {
+        orderBy: { sortOrder: "asc" },
+        select: { id: true, text: true, isCorrect: true, imageUrl: true },
+      },
     },
   });
   if (questions.length === 0) {
@@ -1728,12 +1882,15 @@ export type PublicEventReport = {
       | "quiz_results"
       | "vote_results"
       | "reactions_summary"
+      | "feedback_summary"
       | "randomizer_summary"
       | "speaker_questions_summary"
     >;
     reportVoteQuestionIds: string[];
     reportQuizQuestionIds: string[];
     reportQuizSubQuizIds: string[];
+    reportFeedbackFormIds: string[];
+    reportSpeakerQuestionIds: string[];
     reportPublished: boolean;
   };
   summary: {
@@ -1778,6 +1935,25 @@ export type PublicEventReport = {
       reactions: Array<{ reaction: string; count: number }>;
     }>;
   };
+  feedback: {
+    formId: string;
+    title: string;
+    responseCount: number;
+    scaleStats: Array<{
+      scaleId: string;
+      label: string;
+      options: [string, string, string, string, string];
+      counts: number[];
+      average: number | null;
+      responseCount: number;
+    }>;
+    responses: Array<{
+      nickname: string;
+      scaleAnswers: Record<string, number>;
+      comment: string | null;
+      submittedAt: string;
+    }>;
+  }[];
   /** Таблицы результатов по участникам (только для субквизов без флага скрытия в настройках отчёта). */
   subQuizParticipantTables: SubQuizDetailedResults[];
 };
@@ -1817,28 +1993,30 @@ export async function getPublicReportBySlug(slug: string): Promise<PublicEventRe
   const view = publicViewJsonToState(quiz.publicView);
   if (!view.reportPublished) return null;
 
-  const [dash, participantsCount, answersCount, speakerStats, speakerItemsRaw] = await Promise.all([
-    getDashboardResults(quiz.id),
-    prisma.participant.count({ where: { quizId: quiz.id } }),
-    prisma.answer.count({ where: { quizId: quiz.id } }),
-    prisma.speakerQuestion.groupBy({
-      by: ["isOnScreen"],
-      where: { quizId: quiz.id },
-      _count: { _all: true },
-    }),
-    prisma.speakerQuestion.findMany({
-      where: { quizId: quiz.id },
-      orderBy: { createdAt: "desc" },
-      take: 100,
-      select: {
-        id: true,
-        speakerName: true,
-        text: true,
-        participant: { select: { nickname: true } },
-        reactions: { select: { reaction: true } },
-      },
-    }),
-  ]);
+  const [dash, participantsCount, answersCount, speakerStats, speakerItemsRaw, feedbackFormsRaw] =
+    await Promise.all([
+      getDashboardResults(quiz.id),
+      prisma.participant.count({ where: { quizId: quiz.id } }),
+      prisma.answer.count({ where: { quizId: quiz.id } }),
+      prisma.speakerQuestion.groupBy({
+        by: ["isOnScreen"],
+        where: { quizId: quiz.id },
+        _count: { _all: true },
+      }),
+      prisma.speakerQuestion.findMany({
+        where: { quizId: quiz.id },
+        orderBy: { createdAt: "desc" },
+        take: 100,
+        select: {
+          id: true,
+          speakerName: true,
+          text: true,
+          participant: { select: { nickname: true } },
+          reactions: { select: { reaction: true } },
+        },
+      }),
+      getFeedbackResultsForReport(quiz.id),
+    ]);
 
   const onScreen = speakerStats.find((row) => row.isOnScreen)?._count._all ?? 0;
   const total = speakerStats.reduce((sum, row) => sum + row._count._all, 0);
@@ -1918,6 +2096,13 @@ export async function getPublicReportBySlug(slug: string): Promise<PublicEventRe
     if (filtered) subQuizParticipantTables.push(filtered);
   }
 
+  const feedbackFormIdSet =
+    view.reportFeedbackFormIds.length > 0 ? new Set(view.reportFeedbackFormIds) : null;
+  const feedbackForms =
+    feedbackFormIdSet === null
+      ? feedbackFormsRaw
+      : feedbackFormsRaw.filter((item) => feedbackFormIdSet.has(item.formId));
+
   return {
     title: quiz.title,
     slug: quiz.slug,
@@ -1938,6 +2123,8 @@ export async function getPublicReportBySlug(slug: string): Promise<PublicEventRe
       reportVoteQuestionIds: view.reportVoteQuestionIds,
       reportQuizQuestionIds: view.reportQuizQuestionIds,
       reportQuizSubQuizIds: view.reportQuizSubQuizIds,
+      reportFeedbackFormIds: view.reportFeedbackFormIds,
+      reportSpeakerQuestionIds: view.reportSpeakerQuestionIds,
       reportPublished: view.reportPublished,
     },
     summary: {
@@ -2004,6 +2191,7 @@ export async function getPublicReportBySlug(slug: string): Promise<PublicEventRe
         items,
       };
     })(),
+    feedback: feedbackForms,
     subQuizParticipantTables,
   };
 }
@@ -2363,6 +2551,10 @@ export async function submitAnswer(payload: {
     if (normalizedTags.length > Math.max(1, question.maxAnswers)) {
       throw new Error(`Too many tags: max ${question.maxAnswers}`);
     }
+  } else if (question.type === QuestionType.TEMPERATURE) {
+    if (selected.length !== 1) {
+      throw new Error("Temperature requires exactly one option");
+    }
   } else if (selected.length < 1) {
     throw new Error("At least one option is required");
   }
@@ -2383,6 +2575,9 @@ export async function submitAnswer(payload: {
     });
     isCorrect = evaluated.isCorrect;
     scoreAwarded = evaluated.scoreAwarded;
+  } else if (question.type === QuestionType.TEMPERATURE) {
+    isCorrect = false;
+    scoreAwarded = 0;
   } else if (question.type !== QuestionType.TAG_CLOUD) {
     isCorrect = evaluateAnswer(question as QuestionWithOptions, selected);
     scoreAwarded = question.scoringMode === ScoringMode.QUIZ && isCorrect ? question.points : 0;
@@ -2442,7 +2637,7 @@ export type StandaloneVoteAdminDetail = {
   question: {
     id: string;
     text: string;
-    type: "single" | "multi" | "tag_cloud" | "ranking";
+    type: "single" | "multi" | "tag_cloud" | "ranking" | "temperature";
     rankingProjectorMetric?: "avg_rank" | "avg_score" | "total_score";
     rankingKind?: "quiz" | "jury";
   };
@@ -2450,6 +2645,7 @@ export type StandaloneVoteAdminDetail = {
   optionStats: Array<{
     optionId: string;
     text: string;
+    imageUrl?: string;
     count: number;
     isCorrect: boolean;
     avgRank?: number;
@@ -2553,6 +2749,7 @@ export async function getStandaloneVoteAdminDetail(
     optionStats = sortedOpts.map((o) => ({
       optionId: o.id,
       text: o.text,
+      imageUrl: o.imageUrl ?? undefined,
       count: answerCount,
       isCorrect: o.isCorrect,
       avgRank: answerCount > 0 ? sumsRank[o.id]! / answerCount : 0,
@@ -2573,6 +2770,7 @@ export async function getStandaloneVoteAdminDetail(
     optionStats = sortedOpts.map((o) => ({
       optionId: o.id,
       text: o.text,
+      imageUrl: o.imageUrl ?? undefined,
       count: optionCounts[o.id] ?? 0,
       isCorrect: o.isCorrect,
     }));

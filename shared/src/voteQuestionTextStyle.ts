@@ -79,3 +79,25 @@ export function voteFillOutlineColor(value: string, fallback = "#1976d2"): strin
   if (HEX6_RE.test(v)) return v;
   return parseVoteFillGradient(v)?.from ?? fallback;
 }
+
+/** Минимальная видимая заливка столбика/трека при 0% (как у обычного голосования). */
+export const VOTE_MIN_BAR_DISPLAY_PERCENT = 1.75;
+
+export const VOTE_PROGRESS_TRACK_OPACITY = 0.2;
+
+function colorToRgba(color: string, alpha: number): string {
+  const hex = voteFillOutlineColor(color, "#ffffff");
+  const safeAlpha = Math.max(0, Math.min(1, alpha));
+  const r = Number.parseInt(hex.slice(1, 3), 16);
+  const g = Number.parseInt(hex.slice(3, 5), 16);
+  const b = Number.parseInt(hex.slice(5, 7), 16);
+  return `rgba(${r}, ${g}, ${b}, ${safeAlpha})`;
+}
+
+/** Фон трека прогресс-бара: корректно для hex и gradient (берётся начальный цвет). */
+export function voteProgressTrackBackground(
+  trackColor: string,
+  opacity = VOTE_PROGRESS_TRACK_OPACITY,
+): string {
+  return colorToRgba(trackColor, opacity);
+}

@@ -19,6 +19,7 @@ import {
 } from "@mui/material";
 import { AdminLoginForm } from "../components/AdminLoginForm";
 import { API_BASE } from "../config";
+import { useAdminAuth } from "../hooks/useAdminAuth";
 
 type Room = {
   id: string;
@@ -29,7 +30,7 @@ type Room = {
 };
 
 export function AdminRoomsPage() {
-  const [isAuth, setIsAuth] = useState(false);
+  const { isAuth, authChecked, checkSession } = useAdminAuth();
   const [rooms, setRooms] = useState<Room[]>([]);
   const [eventName, setEventName] = useState("");
   const [title, setTitle] = useState("");
@@ -43,14 +44,6 @@ export function AdminRoomsPage() {
       .replace(/^-+|-+$/g, "");
     if (normalized.length >= 3) return normalized.slice(0, 60);
     return `quiz-${Date.now().toString().slice(-6)}`;
-  }
-
-  async function checkSession() {
-    const response = await fetch(`${API_BASE}/api/admin/me`, {
-      credentials: "include",
-    });
-    setIsAuth(response.ok);
-    return response.ok;
   }
 
   async function loadRooms() {
@@ -113,8 +106,9 @@ export function AdminRoomsPage() {
       <Typography variant="h4" gutterBottom>
         Админка: комнаты
       </Typography>
-      {!isAuth && <AdminLoginForm onSuccess={() => checkSession().then(() => loadRooms())} />}
-      {isAuth && (
+      {!authChecked ? null : !isAuth ? (
+        <AdminLoginForm onSuccess={() => checkSession().then(() => loadRooms())} />
+      ) : (
         <Stack spacing={3}>
           <Card variant="outlined">
             <CardContent>
@@ -159,7 +153,9 @@ export function AdminRoomsPage() {
               <Typography variant="h6" gutterBottom>
                 Комнаты
               </Typography>
-              {rooms.length === 0 && <Typography color="text.secondary">Пока комнат нет.</Typography>}
+              {rooms.length === 0 && (
+                <Typography color="text.secondary">Пока комнат нет.</Typography>
+              )}
               {rooms.length > 0 && (
                 <Table size="small">
                   <TableHead>

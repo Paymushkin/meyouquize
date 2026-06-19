@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { type PublicViewState } from "@meyouquize/shared";
-import { buildNumberRange, parseNames } from "../features/randomizer/randomizerLogic";
+import { buildRandomizerAnimationPool } from "../features/randomizer/randomizerLogic";
 
 export const RANDOMIZER_ROLL_DURATION_MS = 3000;
 export const RANDOMIZER_WINNER_HOLD_MS = 1000;
@@ -13,9 +13,7 @@ function setArrayItem<T>(items: T[], index: number, value: T): T[] {
 }
 
 function buildPool(view: PublicViewState): string[] {
-  return view.randomizerMode === "names"
-    ? parseNames(view.randomizerNamesText)
-    : buildNumberRange(view.randomizerMinNumber, view.randomizerMaxNumber);
+  return buildRandomizerAnimationPool(view);
 }
 
 export function useRandomizerAnimation(view: PublicViewState) {
@@ -49,7 +47,9 @@ export function useRandomizerAnimation(view: PublicViewState) {
     lastAnimatedRunIdRef.current = view.randomizerRunId;
     const fallbackPool = pool.length > 0 ? pool : finalWinners;
     const timers: number[] = [];
-    setDisplayedWinners(finalWinners.map((winner) => winner || "—"));
+    setDisplayedWinners(
+      finalWinners.map(() => fallbackPool[Math.floor(Math.random() * fallbackPool.length)] ?? "—"),
+    );
     setRollingMask(finalWinners.map(() => false));
     setRevealedMask(finalWinners.map(() => false));
     setSettlingIndex(null);

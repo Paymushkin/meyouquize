@@ -17,6 +17,7 @@ describe("report contracts", () => {
       reportRandomizerRunIds: ["current", "history:0"],
       reportReactionsWidgetIds: ["w1"],
       reportSpeakerQuestionIds: ["sq1"],
+      reportFeedbackFormIds: ["f1", "f2"],
     });
     expect(parsed.success).toBe(true);
   });
@@ -42,6 +43,7 @@ describe("report contracts", () => {
         reportVoteQuestionIds: ["q-vote-1"],
         reportQuizQuestionIds: ["q1"],
         reportQuizSubQuizIds: ["sq1"],
+        reportFeedbackFormIds: ["f1"],
         reportPublished: true,
       },
       summary: {
@@ -105,6 +107,54 @@ describe("report contracts", () => {
         onScreen: 2,
         items: [],
       },
+      feedback: [
+        {
+          formId: "f1",
+          title: "Обратная связь",
+          responseCount: 2,
+          scaleStats: [
+            {
+              scaleId: "s1",
+              label: "Как вам мероприятие?",
+              options: ["😞", "😐", "🙂", "😊", "🤩"],
+              counts: [0, 0, 1, 1, 0],
+              average: 3.5,
+              responseCount: 2,
+            },
+          ],
+          responses: [
+            {
+              nickname: "Анна",
+              scaleAnswers: { s1: 3 },
+              comment: "Отлично!",
+              submittedAt: new Date().toISOString(),
+            },
+          ],
+        },
+        {
+          formId: "f2",
+          title: "После перерыва",
+          responseCount: 1,
+          scaleStats: [
+            {
+              scaleId: "s2",
+              label: "Оценка спикера",
+              options: ["😞", "😐", "🙂", "😊", "🤩"],
+              counts: [0, 0, 0, 1, 0],
+              average: 4,
+              responseCount: 1,
+            },
+          ],
+          responses: [
+            {
+              nickname: "Борис",
+              scaleAnswers: { s2: 3 },
+              comment: null,
+              submittedAt: new Date().toISOString(),
+            },
+          ],
+        },
+      ],
       subQuizParticipantTables: [],
     };
 

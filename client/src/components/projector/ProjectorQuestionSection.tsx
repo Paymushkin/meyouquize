@@ -1,8 +1,13 @@
 import { useMemo } from "react";
 import { Fade, Stack, Typography } from "@mui/material";
 import { voteQuestionTextTypographyStyle, type PublicViewState } from "@meyouquize/shared";
+import {
+  buildProjectorQuestionTitleTypographySx,
+  projectorQuestionTitleFontSizeSx,
+} from "../../features/voteUi/voteQuestionLayout";
 import type { ProjectorQuestionResult } from "../../types/projectorDashboard";
 import { ProjectorFirstCorrectHero } from "./ProjectorFirstCorrectHero";
+import { ProjectorSideBySideContent } from "./ProjectorSideBySideContent";
 import { QuestionChart } from "./QuestionChart";
 
 export type ProjectorQuestionSectionProps = {
@@ -24,18 +29,6 @@ export function ProjectorQuestionSection(props: ProjectorQuestionSectionProps) {
     firstCorrectWinnersShown,
   } = props;
   const questionLength = selectedQuestion.text.trim().length;
-  const longTextPenalty = Math.min(1.35, Math.max(0, (questionLength - 70) / 160));
-  const optionsCountPenalty =
-    selectedQuestion.optionStats.length > 6
-      ? Math.min(0.45, (selectedQuestion.optionStats.length - 6) * 0.08)
-      : 0;
-  const questionTitleFontScale = 1.5;
-  const desktopQuestionFontRem =
-    Math.max(1.85, 3.05 - longTextPenalty - optionsCountPenalty) * questionTitleFontScale;
-  const mobileQuestionFontRem = Math.max(
-    1.6 * questionTitleFontScale,
-    desktopQuestionFontRem - 0.35 * questionTitleFontScale,
-  );
   const waitingForFirstWinner =
     view.showFirstCorrectAnswerer &&
     !showProjectorWinnersHero &&
@@ -48,45 +41,83 @@ export function ProjectorQuestionSection(props: ProjectorQuestionSectionProps) {
     () => voteQuestionTextTypographyStyle(view.voteQuestionTextColor),
     [view.voteQuestionTextColor],
   );
+  const questionTitleTypographySx = useMemo(
+    () =>
+      buildProjectorQuestionTitleTypographySx({
+        fontSize: projectorQuestionTitleFontSizeSx(
+          questionLength,
+          selectedQuestion.optionStats.length,
+        ),
+        questionColorSx: questionTextSx,
+        fontFamily: view.brandFontFamily,
+      }),
+    [questionLength, questionTextSx, selectedQuestion.optionStats.length, view.brandFontFamily],
+  );
+
+  const projectorQuestionImageSx = {
+    width: { xs: 200, sm: 320, md: 440, lg: 520 },
+    maxWidth: { xs: "48%", md: "52%" },
+    maxHeight: { xs: "38vh", md: "52vh" },
+  } as const;
+
+  const questionTitleBlock = (
+    <ProjectorSideBySideContent
+      imageUrl={selectedQuestion.imageUrl}
+      alt={selectedQuestion.text.trim() || "Вопрос"}
+      spacing={3}
+      imageSx={projectorQuestionImageSx}
+    >
+      {selectedQuestion.text.trim() ? (
+        <Typography
+          variant="h3"
+          align="left"
+          sx={{
+            ...questionTitleTypographySx,
+            mb: 0,
+            px: 0,
+            pt: 0,
+          }}
+        >
+          {selectedQuestion.text}
+        </Typography>
+      ) : null}
+    </ProjectorSideBySideContent>
+  );
 
   const tagCloudHeader = useMemo(() => {
     if (!isTagCloudQuestion || view.questionRevealStage !== "options") return undefined;
     return (
-      <Typography
-        variant="h3"
-        align="left"
-        sx={{
-          fontWeight: 700,
-          whiteSpace: "pre-wrap",
-          wordBreak: "break-word",
-          bgcolor: "transparent",
-          boxShadow: "none",
-          fontSize: {
-            xs: `${mobileQuestionFontRem}rem`,
-            md: `${desktopQuestionFontRem}rem`,
-          },
-          ...questionTextSx,
-          fontFamily: view.brandFontFamily,
-          textAlign: "left",
-          width: "100%",
-          maxWidth: "min(1280px, 100%)",
-          px: fullScreenCloud ? 2 : 0,
-          pt: fullScreenCloud ? 1 : 0,
-          pb: fullScreenCloud ? 1 : 1.5,
-        }}
-      >
-        {selectedQuestion.text}
-      </Typography>
+      <Stack spacing={1.5} sx={{ width: "100%" }}>
+        <ProjectorSideBySideContent
+          imageUrl={selectedQuestion.imageUrl}
+          alt={selectedQuestion.text.trim() || "Вопрос"}
+          spacing={3}
+          imageSx={projectorQuestionImageSx}
+        >
+          {selectedQuestion.text.trim() ? (
+            <Typography
+              variant="h3"
+              align="left"
+              sx={{
+                ...questionTitleTypographySx,
+                px: 0,
+                pt: 0,
+                pb: view.questionRevealStage === "options" ? 1 : 1.5,
+              }}
+            >
+              {selectedQuestion.text}
+            </Typography>
+          ) : null}
+        </ProjectorSideBySideContent>
+      </Stack>
     );
   }, [
-    desktopQuestionFontRem,
     fullScreenCloud,
     isTagCloudQuestion,
-    mobileQuestionFontRem,
+    questionTitleTypographySx,
+    selectedQuestion.imageUrl,
     selectedQuestion.text,
-    view.brandFontFamily,
     view.questionRevealStage,
-    questionTextSx,
   ]);
 
   return (
@@ -155,30 +186,9 @@ export function ProjectorQuestionSection(props: ProjectorQuestionSectionProps) {
       ) : (
         <>
           {!isTagCloudQuestion && (
-            <Typography
-              variant="h3"
-              align="left"
-              sx={{
-                fontWeight: 700,
-                mb: 0,
-                whiteSpace: "pre-wrap",
-                wordBreak: "break-word",
-                bgcolor: "transparent",
-                boxShadow: "none",
-                fontSize: {
-                  xs: `${mobileQuestionFontRem}rem`,
-                  md: `${desktopQuestionFontRem}rem`,
-                },
-                textAlign: "left",
-                px: fullScreenCloud ? 2 : 0,
-                pt: fullScreenCloud ? 2 : 0,
-                ...questionTextSx,
-                fontFamily: view.brandFontFamily,
-                width: "100%",
-              }}
-            >
-              {selectedQuestion.text}
-            </Typography>
+            <Stack spacing={1.5} sx={{ width: "100%" }}>
+              {questionTitleBlock}
+            </Stack>
           )}
           <Fade
             in

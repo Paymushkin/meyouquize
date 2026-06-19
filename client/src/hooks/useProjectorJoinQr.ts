@@ -6,32 +6,41 @@ type Params = {
   slug: string;
   showEventTitleScreen: boolean;
   projectorJoinQrVisible: boolean;
+  overlaySizePx: number;
 };
 
-export function useProjectorJoinQr(params: Params) {
-  const { slug, showEventTitleScreen, projectorJoinQrVisible } = params;
-  const [joinQrDataUrl, setJoinQrDataUrl] = useState("");
-  const showJoinQrBlock = showEventTitleScreen && projectorJoinQrVisible;
-  const joinUrl = buildPlayerJoinUrl(slug);
+function useQrDataUrl(url: string, enabled: boolean, sizePx: number) {
+  const [dataUrl, setDataUrl] = useState("");
 
   useEffect(() => {
-    if (!showJoinQrBlock || !joinUrl) {
-      setJoinQrDataUrl("");
+    if (!enabled || !url) {
+      setDataUrl("");
       return;
     }
     let cancelled = false;
-    void QRCode.toDataURL(joinUrl, { margin: 1, width: 420 }).then(
+    void QRCode.toDataURL(url, { margin: 1, width: sizePx }).then(
       (nextDataUrl) => {
-        if (!cancelled) setJoinQrDataUrl(nextDataUrl);
+        if (!cancelled) setDataUrl(nextDataUrl);
       },
       () => {
-        if (!cancelled) setJoinQrDataUrl("");
+        if (!cancelled) setDataUrl("");
       },
     );
     return () => {
       cancelled = true;
     };
-  }, [joinUrl, showJoinQrBlock]);
+  }, [enabled, sizePx, url]);
 
-  return { showJoinQrBlock, joinQrDataUrl };
+  return dataUrl;
+}
+
+export function useProjectorJoinQr(params: Params) {
+  const { slug, showEventTitleScreen, projectorJoinQrVisible, overlaySizePx } = params;
+  const joinUrl = buildPlayerJoinUrl(slug);
+  const showJoinQrBlock = showEventTitleScreen && projectorJoinQrVisible;
+  const showJoinQrOverlay = !showEventTitleScreen && projectorJoinQrVisible && Boolean(slug);
+  const joinQrDataUrl = useQrDataUrl(joinUrl, showJoinQrBlock, 420);
+  const joinQrOverlayDataUrl = useQrDataUrl(joinUrl, showJoinQrOverlay, overlaySizePx);
+
+  return { showJoinQrBlock, showJoinQrOverlay, joinQrDataUrl, joinQrOverlayDataUrl };
 }

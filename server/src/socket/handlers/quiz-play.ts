@@ -18,6 +18,7 @@ import {
   submitAnswer,
   updateParticipantNickname,
 } from "../../quiz-service.js";
+import { hasParticipantSubmittedFeedback } from "../../feedback-service.js";
 import {
   broadcastDashboardResultsNow,
   scheduleDashboardResultsBroadcast,
@@ -69,7 +70,17 @@ export function registerQuizPlayHandlers(socket: EnrichedSocket, io: Server) {
       await socket.join(quizPlayerRoom(joined.quizId));
       socket.emit("quiz:joined", { ok: true });
       socket.emit("player:answers", answersMap);
-      socket.emit("state:quiz", { ...state, myTotalScore, mySubQuizScores });
+      const feedbackSubmitted = await hasParticipantSubmittedFeedback(
+        joined.quizId,
+        joined.participantId,
+      );
+      socket.emit("player:feedback-status", { submitted: feedbackSubmitted });
+      socket.emit("state:quiz", {
+        ...state,
+        myTotalScore,
+        mySubQuizScores,
+        feedbackSubmitted,
+      });
       trialLog("quiz_join_ok", {
         quizId: joined.quizId,
         participantId: joined.participantId,
@@ -82,7 +93,12 @@ export function registerQuizPlayHandlers(socket: EnrichedSocket, io: Server) {
         ...trialSocketPayload(socket.id),
         error: trialErrorMessage(error, "Join failed"),
       });
-      fail(socket, error instanceof Error ? error.message : "Join failed");
+      const message = error instanceof Error ? error.message : "Join failed";
+      if (message === "Ник уже используется в этой комнате") {
+        fail(socket, { code: "NICKNAME_TAKEN", message });
+      } else {
+        fail(socket, message);
+      }
     }
   });
 
@@ -153,7 +169,12 @@ export function registerQuizPlayHandlers(socket: EnrichedSocket, io: Server) {
       if (!state) throw new Error("Quiz not found");
       await broadcastQuizPublicState(io, payload.quizId, state);
     } catch (error) {
-      fail(socket, error instanceof Error ? error.message : "Update nickname failed");
+      const message = error instanceof Error ? error.message : "Update nickname failed";
+      if (message === "Ник уже используется в этой комнате") {
+        fail(socket, { code: "NICKNAME_TAKEN", message });
+      } else {
+        fail(socket, message);
+      }
     }
   });
 

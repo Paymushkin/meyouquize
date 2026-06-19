@@ -23,6 +23,7 @@ import {
 import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
 import KeyboardArrowDownIcon from "@mui/icons-material/KeyboardArrowDown";
 import KeyboardArrowUpIcon from "@mui/icons-material/KeyboardArrowUp";
+import { FeedbackPopupCard } from "../components/quiz/FeedbackPopupCard";
 import { SpeakerQuestionsDialog } from "../components/quiz/SpeakerQuestionsDialog";
 import { PlayerVoteResultsDialog } from "../components/quiz/PlayerVoteResultsDialog";
 import { PlayerQuizReportDialog } from "../components/quiz/PlayerQuizReportDialog";
@@ -35,22 +36,28 @@ import { useQuizPlayCompletion } from "../hooks/useQuizPlayCompletion";
 import { useQuizPlayScrollLock } from "../hooks/useQuizPlayScrollLock";
 import { useQuizPlaySocket } from "../hooks/useQuizPlaySocket";
 import { useQuizPlayMetaBranding } from "../hooks/useQuizPlayMetaBranding";
+import { useQuizPlayFeedback } from "../hooks/useQuizPlayFeedback";
 import { useQuizPlayQuestionFlow } from "../hooks/useQuizPlayQuestionFlow";
 import { useBrandFont } from "../hooks/useBrandFont";
 import { useEventFavicon } from "../hooks/useEventFavicon";
 import { socket } from "../socket";
 import { getNickname, getOrCreateDeviceId, randomNickname, setNickname } from "../storage";
 import { resolveClientAssetUrl } from "../utils/resolveClientAssetUrl";
-import { buildBrandBackground } from "../features/branding/brandVisual";
 import { buildPlayerTilesOrder, getVisiblePlayerBanners } from "../features/quizPlay/tiles";
+import { QuestionPopupCard } from "../components/quiz/QuestionPopupCard";
+import { PlayerViewportBackground } from "../components/quiz/PlayerViewportBackground";
 import {
   buildQuizPlayContainerSx,
   CompletionOverlay,
   EventTitleBlock,
   JoinCard,
+  JOIN_SCREEN_MAIN_SX,
+  JOIN_SCREEN_STACK_SX,
+  buildBrandOutlinedButtonSx,
+  buildBrandPrimaryContainedButtonSx,
+  buildJoinNicknameInputSx,
   PlayerIdentityBar,
   PlayerTilesGrid,
-  QuestionPopupCard,
   ReactionsDock,
   RestoreJoinPendingBlock,
 } from "./quiz-play/QuizPlayBrandingBlocks";
@@ -123,6 +130,7 @@ export function QuizPlayPage() {
   const [submittedQuestionIds, setSubmittedQuestionIds] = useState<string[]>([]);
   const [playerAnswersHydrated, setPlayerAnswersHydrated] = useState(false);
   const [error, setError] = useState("");
+  const [nicknameError, setNicknameError] = useState("");
   const [connectionStatus, setConnectionStatus] = useState<"online" | "reconnecting" | "offline">(
     "reconnecting",
   );
@@ -190,17 +198,60 @@ export function QuizPlayPage() {
     displayedSelected,
     displayedQuizProgress,
     acceptedQuestionId,
+    pendingSubmitPayloadRef,
   } = useQuizPlayQuestionFlow({
     quiz,
     submittedQuestionIds,
     submittedAnswers,
     playerAnswersHydrated,
   });
+  const {
+    shouldShowFeedbackPopup,
+    scaleAnswers,
+    comment,
+    setComment,
+    selectScaleOption,
+    closeFeedbackPopup,
+    canSubmitFeedback,
+    submitFeedback,
+    submitting: feedbackSubmitting,
+    submittedFlash: feedbackSubmittedFlash,
+  } = useQuizPlayFeedback({
+    quizId: quiz?.id,
+    activeFeedbackForm: quiz?.activeFeedbackForm,
+    feedbackSubmittedFromState: quiz?.feedbackSubmitted,
+    joined,
+  });
   const handleParticipantMissing = useCallback(() => {
     if (!slug) return;
     const safeNick = (nickname || "").trim() || "Игрок";
     emitJoinWithLog(slug, "restore", safeNick);
   }, [nickname, slug]);
+
+  const handleJoinFailed = useCallback(() => {
+    if (!slug) return;
+    try {
+      localStorage.removeItem(getRoomJoinKey(slug));
+    } catch {
+      // ignore storage errors in private mode
+    }
+    setRestoreJoinPending(false);
+    setJoined(false);
+    setNicknameError("Такое имя уже занято");
+  }, [slug]);
+
+  const handleJoinSuccess = useCallback(() => {
+    if (slug) {
+      try {
+        localStorage.setItem(getRoomJoinKey(slug), "1");
+      } catch {
+        // ignore storage errors in private mode
+      }
+    }
+    setError("");
+    setNicknameError("");
+    handleQuizJoined();
+  }, [slug, handleQuizJoined]);
 
   useEffect(() => {
     if (!slug) return;
@@ -228,6 +279,7 @@ export function QuizPlayPage() {
     selectedRef,
     rankOrderRef,
     tagAnswersRef,
+    pendingSubmitPayloadRef,
     setQuiz,
     setSelected,
     setRankOrder,
@@ -241,7 +293,8 @@ export function QuizPlayPage() {
     setConnectionStatus,
     setSpeakerQuestions,
     onParticipantMissing: handleParticipantMissing,
-    onQuizJoined: handleQuizJoined,
+    onQuizJoined: handleJoinSuccess,
+    onJoinFailed: handleJoinFailed,
   });
 
   useEffect(() => {
@@ -286,6 +339,7 @@ export function QuizPlayPage() {
     formInputTextColor,
     brandPlayerBackgroundImageUrl,
     brandBodyBackgroundColor,
+    brandLogoUrl,
   } = useQuizPlayMetaBranding({
     slug,
     quiz,
@@ -359,15 +413,15 @@ export function QuizPlayPage() {
 
   function join() {
     const trimmed = nickname.trim();
+    setNicknameError("");
     if (!trimmed) {
-      setError("Введите имя или используйте случайное");
+      setNicknameError("Введите имя или используйте случайное");
       nicknameInputRef.current?.focus();
       return;
     }
+    setRestoreJoinPending(false);
     emitJoinWithLog(slug, "manual", trimmed);
-    localStorage.setItem(getRoomJoinKey(slug), "1");
     persistNickname(trimmed);
-    setError("");
   }
 
   function editNickname() {
@@ -512,10 +566,6 @@ export function QuizPlayPage() {
   const playerVoteOptionTextColor = quiz?.playerVoteOptionTextColor?.trim() || "#ffffff";
   const playerVoteProgressBarColor = quiz?.playerVoteProgressBarColor?.trim() || "#F3F722";
   const brandFontFamily = quiz?.brandFontFamily?.trim() || "Jost, Arial, sans-serif";
-  const brandLogoUrl = resolveClientAssetUrl(quiz?.brandLogoUrl?.trim() ?? "");
-  const brandBackground = buildBrandBackground({
-    backgroundImageUrl: brandPlayerBackgroundImageUrl,
-  });
   useBrandFont(brandFontFamily, quiz?.brandFontUrl);
   useEventFavicon(brandLogoUrl);
   const tileOrder = useMemo(
@@ -607,227 +657,266 @@ export function QuizPlayPage() {
     prevRankRowTopsRef.current = nextTops;
   }, [rankOrder, nonQuizActiveQuestion, answeredCurrentQuestion]);
 
+  const isJoinScreen = !bootLoading && !joined && !restoreJoinPending;
+
   return (
-    <Container
-      maxWidth="md"
-      sx={buildQuizPlayContainerSx({ brandBackground, brandFontFamily, hasActiveQuestion })}
-    >
-      {bootLoading ? (
-        <Box
-          sx={{
-            flex: 1,
-            minHeight: "100dvh",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-          }}
-        >
-          <CircularProgress size={46} />
-        </Box>
-      ) : null}
-      {!bootLoading ? (
-        <>
-          {joined ? (
-            <PlayerIdentityBar
-              nickname={nickname}
-              formBackgroundColor={formBackgroundColor}
-              formTextColor={formTextColor}
-              connectionChip={connectionChip}
-              onNicknameClick={editNickname}
-            />
-          ) : null}
-          {joined && quiz?.reactionSession?.isActive ? (
-            <ReactionsDock
-              reactions={reactionMeta}
-              onToggleReaction={toggleReaction}
-              brandPrimaryColor={brandPrimaryColor}
-            />
-          ) : null}
-          {(!joined || shouldShowEventTitle) && !(restoreJoinPending && !joined) ? (
-            <EventTitleBlock
-              joined={joined}
-              shouldShowEventTitle={shouldShowEventTitle}
-              restoreJoinPending={restoreJoinPending}
-              hasActiveQuestion={hasActiveQuestion}
-              brandLogoUrl={brandLogoUrl}
-              titleText={titleText}
-            />
-          ) : null}
-          {joined ? (
-            <PlayerTilesGrid
-              tileOrder={tileOrder}
-              visibleBannerById={visibleBannerById}
-              speakerTileVisible={speakerTileVisible}
-              onSpeakerOpen={() => setSpeakerDialogOpen(true)}
-              speakerTileBackgroundColor={speakerTileBackgroundColor}
-              speakerTileTextColor={speakerTileTextColor}
-              brandPrimaryColor={brandPrimaryColor}
-              speakerTileText={speakerTileText}
-              programTileText={programTileText}
-              programTileBackgroundColor={programTileBackgroundColor}
-              programTileTextColor={programTileTextColor}
-              programTileLinkUrl={programTileLinkUrl}
-              programTileVisible={programTileVisible}
-              playerQuizResultsTilesBySubQuizId={playerQuizResultsTilesBySubQuizId}
-              onOpenQuizReport={(subQuizId) => {
-                setQuizReportSubQuizId(subQuizId);
-                setQuizReportOpen(true);
-              }}
+    <>
+      <PlayerViewportBackground
+        backgroundColor={brandBodyBackgroundColor}
+        backgroundImageUrl={brandPlayerBackgroundImageUrl}
+      />
+      <Container
+        maxWidth="md"
+        sx={buildQuizPlayContainerSx({
+          brandFontFamily,
+          hasActiveQuestion,
+          isJoinScreen,
+        })}
+      >
+        {bootLoading ? (
+          <Box
+            sx={{
+              flex: 1,
+              minHeight: "100dvh",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
+            <CircularProgress size={46} />
+          </Box>
+        ) : null}
+        {!bootLoading ? (
+          <>
+            {joined ? (
+              <PlayerIdentityBar
+                nickname={nickname}
+                formBackgroundColor={formBackgroundColor}
+                formTextColor={formTextColor}
+                connectionChip={connectionChip}
+                onNicknameClick={editNickname}
+              />
+            ) : null}
+            {joined && quiz?.reactionSession?.isActive ? (
+              <ReactionsDock
+                reactions={reactionMeta}
+                onToggleReaction={toggleReaction}
+                brandPrimaryColor={brandPrimaryColor}
+              />
+            ) : null}
+            {!(restoreJoinPending && !joined) && (isJoinScreen || shouldShowEventTitle) ? (
+              <EventTitleBlock
+                joined={joined}
+                isJoinScreen={isJoinScreen}
+                shouldShowEventTitle={shouldShowEventTitle}
+                restoreJoinPending={restoreJoinPending}
+                hasActiveQuestion={hasActiveQuestion}
+                brandLogoUrl={brandLogoUrl}
+                titleText={titleText}
+              />
+            ) : null}
+            {joined ? (
+              <PlayerTilesGrid
+                tileOrder={tileOrder}
+                visibleBannerById={visibleBannerById}
+                speakerTileVisible={speakerTileVisible}
+                onSpeakerOpen={() => setSpeakerDialogOpen(true)}
+                speakerTileBackgroundColor={speakerTileBackgroundColor}
+                speakerTileTextColor={speakerTileTextColor}
+                brandPrimaryColor={brandPrimaryColor}
+                speakerTileText={speakerTileText}
+                programTileText={programTileText}
+                programTileBackgroundColor={programTileBackgroundColor}
+                programTileTextColor={programTileTextColor}
+                programTileLinkUrl={programTileLinkUrl}
+                programTileVisible={programTileVisible}
+                playerQuizResultsTilesBySubQuizId={playerQuizResultsTilesBySubQuizId}
+                onOpenQuizReport={(subQuizId) => {
+                  setQuizReportSubQuizId(subQuizId);
+                  setQuizReportOpen(true);
+                }}
+                playerVoteOptionTextColor={playerVoteOptionTextColor}
+                playerVoteProgressBarColor={playerVoteProgressBarColor}
+                visibleResultTiles={visibleResultTiles}
+                onSelectQuestion={setResultsDialogQuestionId}
+              />
+            ) : null}
+            {!joined && !restoreJoinPending && (
+              <Box sx={JOIN_SCREEN_MAIN_SX}>
+                <Stack sx={JOIN_SCREEN_STACK_SX}>
+                  {error && !nicknameError ? (
+                    <Alert severity="error" sx={{ mb: 0 }}>
+                      {error}
+                    </Alert>
+                  ) : null}
+                  <JoinCard
+                    formBackgroundColor={formBackgroundColor}
+                    formTextColor={formTextColor}
+                    formInputTextColor={formInputTextColor}
+                    nickname={nickname}
+                    nicknameError={nicknameError}
+                    nicknameInputRef={nicknameInputRef}
+                    onNicknameChange={(value) => {
+                      setNicknameError("");
+                      setNick(value);
+                    }}
+                    onRandomNickname={() => {
+                      setNicknameError("");
+                      setNick(randomNickname());
+                    }}
+                    onJoin={join}
+                  />
+                </Stack>
+              </Box>
+            )}
+            {!joined && restoreJoinPending && <RestoreJoinPendingBlock />}
+            <PlayerVoteResultsDialog
+              open={Boolean(selectedResultTile)}
+              tile={selectedResultTile}
               playerVoteOptionTextColor={playerVoteOptionTextColor}
               playerVoteProgressBarColor={playerVoteProgressBarColor}
-              visibleResultTiles={visibleResultTiles}
-              onSelectQuestion={setResultsDialogQuestionId}
+              submittedAnswersByQuestionId={submittedAnswers}
+              onClose={() => setResultsDialogQuestionId(null)}
             />
-          ) : null}
-          {!joined && !restoreJoinPending && (
-            <JoinCard
+            {quiz?.id && quizReportSubQuizId ? (
+              <PlayerQuizReportDialog
+                open={quizReportOpen}
+                quizId={quiz.id}
+                subQuizId={quizReportSubQuizId}
+                brandPrimaryColor={brandPrimaryColor}
+                onClose={() => {
+                  setQuizReportOpen(false);
+                  setQuizReportSubQuizId("");
+                }}
+              />
+            ) : null}
+            {joined &&
+              nonQuizActiveQuestion &&
+              !showSubQuizCompleteCard &&
+              !shouldHideAnsweredPopup &&
+              !shouldHideAnsweredUntilHydrated &&
+              !shouldHideDismissedPopup && (
+                <QuestionPopupCard
+                  brandPrimaryColor={brandPrimaryColor}
+                  playerVoteOptionTextColor={playerVoteOptionTextColor}
+                  question={nonQuizActiveQuestion}
+                  quizProgress={displayedQuizProgress}
+                  displayedSelected={displayedSelected}
+                  answeredCurrentQuestion={answeredCurrentQuestion}
+                  showAcceptedHint={Boolean(acceptedQuestionId) && !answeredCurrentQuestion}
+                  submittedAnswers={submittedAnswers}
+                  rankOrder={rankOrder}
+                  rankRowRefs={rankRowRefs}
+                  moveRankOption={moveRankOption}
+                  toggleOption={toggleOption}
+                  closeQuestionPopup={closeQuestionPopup}
+                  tagAnswers={tagAnswers}
+                  setTagAnswers={setTagAnswers}
+                  canSubmit={canSubmit}
+                  submit={submit}
+                  ruBallLabel={ruBallLabel}
+                />
+              )}
+            {joined && shouldShowFeedbackPopup && quiz?.activeFeedbackForm ? (
+              <FeedbackPopupCard
+                brandPrimaryColor={brandPrimaryColor}
+                playerVoteOptionTextColor={playerVoteOptionTextColor}
+                form={quiz.activeFeedbackForm}
+                scaleAnswers={scaleAnswers}
+                comment={comment}
+                onCommentChange={setComment}
+                onSelectOption={selectScaleOption}
+                onClose={closeFeedbackPopup}
+                canSubmit={canSubmitFeedback}
+                submitting={feedbackSubmitting}
+                onSubmit={submitFeedback}
+                submittedFlash={feedbackSubmittedFlash}
+              />
+            ) : null}
+            {joined && showSubQuizCompleteCard && (
+              <CompletionOverlay
+                brandPrimaryColor={brandPrimaryColor}
+                scoreLine={completionScoreLine}
+                compact
+                onClose={() => setFinalCompletionDismissed(true)}
+              />
+            )}
+            {joined && showFinishedCompletionCard && (
+              <CompletionOverlay
+                brandPrimaryColor={brandPrimaryColor}
+                message="Спасибо за участие!"
+                scoreLine={completionScoreLine}
+                onClose={() => setFinalCompletionDismissed(true)}
+              />
+            )}
+            {joined && !!error ? (
+              <Box sx={{ mt: 2 }}>
+                <Alert severity="error">{error}</Alert>
+              </Box>
+            ) : null}
+            <SpeakerQuestionsDialog
+              open={speakerDialogOpen}
+              speakerQuestions={speakerQuestions}
+              speakerName={speakerName}
+              speakerQuestionText={speakerQuestionText}
               formBackgroundColor={formBackgroundColor}
               formTextColor={formTextColor}
               formInputTextColor={formInputTextColor}
-              nickname={nickname}
-              nicknameInputRef={nicknameInputRef}
-              onNicknameChange={setNick}
-              onRandomNickname={() => setNick(randomNickname())}
-              onJoin={join}
+              onClose={() => setSpeakerDialogOpen(false)}
+              onSpeakerNameChange={setSpeakerName}
+              onSpeakerQuestionTextChange={setSpeakerQuestionText}
+              onSubmit={submitSpeakerQuestion}
+              onReact={reactSpeakerQuestion}
             />
-          )}
-          {!joined && restoreJoinPending && <RestoreJoinPendingBlock />}
-          <PlayerVoteResultsDialog
-            open={Boolean(selectedResultTile)}
-            tile={selectedResultTile}
-            playerVoteOptionTextColor={playerVoteOptionTextColor}
-            playerVoteProgressBarColor={playerVoteProgressBarColor}
-            submittedAnswersByQuestionId={submittedAnswers}
-            onClose={() => setResultsDialogQuestionId(null)}
-          />
-          {quiz?.id && quizReportSubQuizId ? (
-            <PlayerQuizReportDialog
-              open={quizReportOpen}
-              quizId={quiz.id}
-              subQuizId={quizReportSubQuizId}
-              brandPrimaryColor={brandPrimaryColor}
-              onClose={() => {
-                setQuizReportOpen(false);
-                setQuizReportSubQuizId("");
+            <Dialog
+              open={nicknameDialogOpen}
+              onClose={() => setNicknameDialogOpen(false)}
+              fullWidth
+              maxWidth="xs"
+              PaperProps={{
+                sx: PLAYER_DIALOG_PAPER_SX,
               }}
-            />
-          ) : null}
-          {joined &&
-            nonQuizActiveQuestion &&
-            !showSubQuizCompleteCard &&
-            !shouldHideAnsweredPopup &&
-            !shouldHideAnsweredUntilHydrated &&
-            !shouldHideDismissedPopup && (
-              <QuestionPopupCard
-                brandPrimaryColor={brandPrimaryColor}
-                playerVoteOptionTextColor={playerVoteOptionTextColor}
-                question={nonQuizActiveQuestion}
-                quizProgress={displayedQuizProgress}
-                displayedSelected={displayedSelected}
-                answeredCurrentQuestion={answeredCurrentQuestion}
-                showAcceptedHint={Boolean(acceptedQuestionId) && !answeredCurrentQuestion}
-                submittedAnswers={submittedAnswers}
-                rankOrder={rankOrder}
-                rankRowRefs={rankRowRefs}
-                moveRankOption={moveRankOption}
-                toggleOption={toggleOption}
-                closeQuestionPopup={closeQuestionPopup}
-                tagAnswers={tagAnswers}
-                setTagAnswers={setTagAnswers}
-                canSubmit={canSubmit}
-                submit={submit}
-                ruBallLabel={ruBallLabel}
-              />
-            )}
-          {joined && showSubQuizCompleteCard && (
-            <CompletionOverlay
-              brandPrimaryColor={brandPrimaryColor}
-              scoreLine={completionScoreLine}
-              compact
-              onClose={() => setFinalCompletionDismissed(true)}
-            />
-          )}
-          {joined && showFinishedCompletionCard && (
-            <CompletionOverlay
-              brandPrimaryColor={brandPrimaryColor}
-              message="Спасибо за участие!"
-              scoreLine={completionScoreLine}
-              onClose={() => setFinalCompletionDismissed(true)}
-            />
-          )}
-          {!!error && (
-            <Box sx={{ mt: 2 }}>
-              <Alert severity="error">{error}</Alert>
-            </Box>
-          )}
-          <SpeakerQuestionsDialog
-            open={speakerDialogOpen}
-            speakerQuestions={speakerQuestions}
-            speakerName={speakerName}
-            speakerQuestionText={speakerQuestionText}
-            onClose={() => setSpeakerDialogOpen(false)}
-            onSpeakerNameChange={setSpeakerName}
-            onSpeakerQuestionTextChange={setSpeakerQuestionText}
-            onSubmit={submitSpeakerQuestion}
-            onReact={reactSpeakerQuestion}
-          />
-          <Dialog
-            open={nicknameDialogOpen}
-            onClose={() => setNicknameDialogOpen(false)}
-            fullWidth
-            maxWidth="xs"
-            PaperProps={{
-              sx: PLAYER_DIALOG_PAPER_SX,
-            }}
-          >
-            <DialogTitle sx={PLAYER_DIALOG_TITLE_SX}>Изменить имя</DialogTitle>
-            <DialogContent sx={PLAYER_DIALOG_CONTENT_SX}>
-              <TextField
-                autoFocus
-                margin="dense"
-                fullWidth
-                value={nicknameDraft}
-                onChange={(e) => setNicknameDraft(e.target.value)}
-                placeholder="Введите новое имя"
-                sx={{
-                  "& .MuiOutlinedInput-root": {
-                    color: "#fff",
-                    "& fieldset": { borderColor: "rgba(255,255,255,0.45)" },
-                    "&:hover fieldset": { borderColor: "rgba(255,255,255,0.72)" },
-                    "&.Mui-focused fieldset": { borderColor: brandPrimaryColor },
-                  },
-                }}
-              />
-            </DialogContent>
-            <DialogActions sx={{ px: 3, pb: 2, pt: 0.5, justifyContent: "space-between" }}>
-              <Button
-                color="error"
-                variant="outlined"
-                onClick={logoutFromProfile}
-                sx={{ borderColor: "rgba(255, 120, 120, 0.85)", color: "#ff9e9e" }}
-              >
-                Выйти
-              </Button>
-              <Stack direction="row" spacing={1}>
-                <Button onClick={() => setNicknameDialogOpen(false)} sx={{ color: "#ffffff" }}>
-                  Отмена
-                </Button>
+            >
+              <DialogTitle sx={PLAYER_DIALOG_TITLE_SX}>Изменить имя</DialogTitle>
+              <DialogContent sx={PLAYER_DIALOG_CONTENT_SX}>
+                <TextField
+                  autoFocus
+                  margin="dense"
+                  fullWidth
+                  value={nicknameDraft}
+                  onChange={(e) => setNicknameDraft(e.target.value)}
+                  placeholder="Введите новое имя"
+                  sx={buildJoinNicknameInputSx(formBackgroundColor, formInputTextColor)}
+                />
+              </DialogContent>
+              <DialogActions sx={{ px: 3, pb: 2, pt: 0.5, justifyContent: "space-between" }}>
                 <Button
-                  variant="contained"
-                  onClick={submitNicknameUpdate}
-                  sx={{
-                    bgcolor: brandPrimaryColor,
-                    color: "#111",
-                    "&:hover": { bgcolor: brandPrimaryColor, filter: "brightness(0.94)" },
-                  }}
+                  variant="outlined"
+                  onClick={logoutFromProfile}
+                  sx={buildBrandOutlinedButtonSx(formInputTextColor)}
                 >
-                  Сохранить
+                  Выйти
                 </Button>
-              </Stack>
-            </DialogActions>
-          </Dialog>
-        </>
-      ) : null}
-    </Container>
+                <Stack direction="row" spacing={1}>
+                  <Button
+                    onClick={() => setNicknameDialogOpen(false)}
+                    sx={{ color: formInputTextColor }}
+                  >
+                    Отмена
+                  </Button>
+                  <Button
+                    variant="contained"
+                    onClick={submitNicknameUpdate}
+                    sx={buildBrandPrimaryContainedButtonSx(formBackgroundColor, formTextColor)}
+                  >
+                    Сохранить
+                  </Button>
+                </Stack>
+              </DialogActions>
+            </Dialog>
+          </>
+        ) : null}
+      </Container>
+    </>
   );
 }

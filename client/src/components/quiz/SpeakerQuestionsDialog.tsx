@@ -11,8 +11,13 @@ import {
   TextField,
   Typography,
 } from "@mui/material";
+import { alpha } from "@mui/material/styles";
 import CloseIcon from "@mui/icons-material/Close";
 import type { SpeakerQuestionsPayload } from "../../types/speakerQuestions";
+import {
+  buildBrandPrimaryContainedButtonSx,
+  buildJoinNicknameInputSx,
+} from "../../pages/quiz-play/QuizPlayBrandingBlocks";
 import {
   PLAYER_DIALOG_CONTENT_SX,
   PLAYER_DIALOG_PAPER_SX,
@@ -20,6 +25,21 @@ import {
 } from "./playerDialogStyles";
 
 const DEFAULT_SPEAKER_REACTIONS = ["👍", "🔥", "👏", "❤️"];
+
+function buildPlayerDialogTextFieldSx(focusColor: string, inputTextColor: string) {
+  return {
+    ...buildJoinNicknameInputSx(focusColor, inputTextColor),
+    "& .MuiInputLabel-root": {
+      color: alpha(inputTextColor, 0.72),
+    },
+    "& .MuiInputLabel-root.Mui-focused": {
+      color: inputTextColor,
+    },
+    "& .MuiSelect-icon": {
+      color: alpha(inputTextColor, 0.72),
+    },
+  };
+}
 
 function speakerQuestionLabel(speakerName: string): string {
   return speakerName === "Все спикеры"
@@ -32,6 +52,9 @@ type Props = {
   speakerQuestions: SpeakerQuestionsPayload | null;
   speakerName: string;
   speakerQuestionText: string;
+  formBackgroundColor: string;
+  formTextColor: string;
+  formInputTextColor: string;
   onClose: () => void;
   onSpeakerNameChange: (next: string) => void;
   onSpeakerQuestionTextChange: (next: string) => void;
@@ -44,6 +67,9 @@ export function SpeakerQuestionsDialog({
   speakerQuestions,
   speakerName,
   speakerQuestionText,
+  formBackgroundColor,
+  formTextColor,
+  formInputTextColor,
   onClose,
   onSpeakerNameChange,
   onSpeakerQuestionTextChange,
@@ -53,6 +79,7 @@ export function SpeakerQuestionsDialog({
   const reactions = speakerQuestions?.settings.reactions ?? DEFAULT_SPEAKER_REACTIONS;
   const items = speakerQuestions?.items ?? [];
   const hasItems = items.length > 0;
+  const textFieldSx = buildPlayerDialogTextFieldSx(formBackgroundColor, formInputTextColor);
 
   return (
     <Dialog
@@ -78,6 +105,7 @@ export function SpeakerQuestionsDialog({
             size="small"
             value={speakerName}
             onChange={(e) => onSpeakerNameChange(e.target.value)}
+            sx={textFieldSx}
           >
             <MenuItem value="Все спикеры">Все спикеры</MenuItem>
             {(speakerQuestions?.settings.speakers ?? []).map((name) => (
@@ -94,8 +122,14 @@ export function SpeakerQuestionsDialog({
             maxRows={4}
             value={speakerQuestionText}
             onChange={(e) => onSpeakerQuestionTextChange(e.target.value)}
+            sx={textFieldSx}
           />
-          <Button variant="contained" onClick={onSubmit} disabled={!speakerQuestionText.trim()}>
+          <Button
+            variant="contained"
+            onClick={onSubmit}
+            disabled={!speakerQuestionText.trim()}
+            sx={buildBrandPrimaryContainedButtonSx(formBackgroundColor, formTextColor)}
+          >
             Отправить вопрос
           </Button>
           {hasItems ? (

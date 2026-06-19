@@ -19,10 +19,14 @@ import {
   patchSubQuizTitleSchema,
   replaceRoomContentSchema,
   updateRoomSchema,
+  upsertFeedbackFormSchema,
 } from "./schemas.js";
 import { isAdminTokenValid } from "./admin-session-cache.js";
 import { registerSocketHandlers } from "./socket/register-handlers.js";
-import { broadcastDashboardResultsNow } from "./socket/dashboard-results.js";
+import {
+  broadcastDashboardResultsNow,
+  broadcastProjectorRoomSync,
+} from "./socket/dashboard-results.js";
 import { getSocketIo, setSocketIo } from "./socket/io-holder.js";
 import { attachSocketIoRedisAdapter } from "./socket/redis-io-adapter.js";
 import { isPrivateNetworkViteDevPort } from "./cors-allow.js";
@@ -47,6 +51,14 @@ import {
   updateRoomTitle,
   updateSubQuizTitle,
 } from "./quiz-service.js";
+import {
+  createFeedbackForm,
+  getFeedbackFormById,
+  getQuizIdByEventName,
+  listFeedbackFormsByQuizId,
+  listFeedbackResultsByQuizId,
+  updateFeedbackFormConfig,
+} from "./feedback-service.js";
 import { renderPublicReportPdf } from "./report-pdf.js";
 import { resetDemoQuizToDefault } from "./demo-seed.js";
 
@@ -463,6 +475,10 @@ export function buildApp() {
     }
     try {
       const room = await replaceRoomContent(eventName, parsed.data);
+      const io = getSocketIo();
+      if (io && room.id) {
+        await broadcastProjectorRoomSync(io, room.id);
+      }
       return res.json(room);
     } catch (error) {
       return res.status(404).json({ error: error instanceof Error ? error.message : "Not found" });
@@ -555,6 +571,69 @@ export function buildApp() {
     },
   );
 
+  app.get("/api/admin/rooms/:eventName/feedback", adminAuthMiddleware, async (req, res) => {
+    const eventName = Array.isArray(req.params.eventName)
+      ? req.params.eventName[0]
+      : req.params.eventName;
+    const quizId = await getQuizIdByEventName(eventName);
+    if (!quizId) return res.status(404).json({ error: "Room not found" });
+    const forms = await listFeedbackFormsByQuizId(quizId);
+    return res.json(forms);
+  });
+
+  app.post("/api/admin/rooms/:eventName/feedback", adminAuthMiddleware, async (req, res) => {
+    const eventName = Array.isArray(req.params.eventName)
+      ? req.params.eventName[0]
+      : req.params.eventName;
+    const parsed = upsertFeedbackFormSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ error: "Invalid payload" });
+    }
+    const quizId = await getQuizIdByEventName(eventName);
+    if (!quizId) return res.status(404).json({ error: "Room not found" });
+    try {
+      const form = await createFeedbackForm(quizId, parsed.data);
+      return res.status(201).json(form);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Create failed";
+      return res.status(400).json({ error: message });
+    }
+  });
+
+  app.put("/api/admin/rooms/:eventName/feedback/:formId", adminAuthMiddleware, async (req, res) => {
+    const eventName = Array.isArray(req.params.eventName)
+      ? req.params.eventName[0]
+      : req.params.eventName;
+    const formId = Array.isArray(req.params.formId) ? req.params.formId[0] : req.params.formId;
+    const parsed = upsertFeedbackFormSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ error: "Invalid payload" });
+    }
+    const quizId = await getQuizIdByEventName(eventName);
+    if (!quizId) return res.status(404).json({ error: "Room not found" });
+    const existing = await getFeedbackFormById(formId);
+    if (!existing || existing.quizId !== quizId) {
+      return res.status(404).json({ error: "Feedback form not found" });
+    }
+    try {
+      const form = await updateFeedbackFormConfig(formId, parsed.data);
+      return res.json(form);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Save failed";
+      return res.status(400).json({ error: message });
+    }
+  });
+
+  app.get("/api/admin/rooms/:eventName/feedback/results", adminAuthMiddleware, async (req, res) => {
+    const eventName = Array.isArray(req.params.eventName)
+      ? req.params.eventName[0]
+      : req.params.eventName;
+    const quizId = await getQuizIdByEventName(eventName);
+    if (!quizId) return res.status(404).json({ error: "Room not found" });
+    const results = await listFeedbackResultsByQuizId(quizId);
+    return res.json(results);
+  });
+
   app.get("/api/quiz/:quizId/state", async (req, res) => {
     const quizId = Array.isArray(req.params.quizId) ? req.params.quizId[0] : req.params.quizId;
     const state = await getQuizPublicState(quizId);
@@ -594,6 +673,7 @@ export function buildApp() {
       playerVoteProgressBarColor: view.playerVoteProgressBarColor,
       brandPlayerBackgroundImageUrl: view.brandPlayerBackgroundImageUrl,
       brandBodyBackgroundColor: view.brandBodyBackgroundColor,
+      brandLogoUrl: view.brandLogoUrl,
     });
   });
 

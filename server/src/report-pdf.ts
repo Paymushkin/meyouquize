@@ -75,6 +75,34 @@ async function renderSimplePdf(report: PublicEventReport): Promise<Buffer> {
       report.voteQuestions.slice(0, 20).forEach((question, index) => {
         doc.fontSize(11).text(`${index + 1}. ${question.text}`);
       });
+      doc.moveDown();
+    }
+
+    if (report.config.reportModules.includes("feedback_summary") && report.feedback.length > 0) {
+      report.feedback.forEach((form, formIndex) => {
+        if (form.responseCount <= 0) return;
+        if (formIndex > 0) doc.moveDown();
+        doc.fontSize(14).text(form.title || "Обратная связь");
+        doc.fontSize(11).text(`Ответов: ${form.responseCount}`);
+        form.scaleStats.forEach((stat) => {
+          doc.moveDown(0.2);
+          doc.fontSize(12).text(stat.label);
+          stat.options.forEach((label, idx) => {
+            doc.fontSize(10).text(`  ${label}: ${stat.counts[idx] ?? 0}`);
+          });
+          if (stat.average != null) {
+            doc.fontSize(10).text(`  Среднее: ${stat.average}`);
+          }
+        });
+        const withComments = form.responses.filter((row) => row.comment);
+        if (withComments.length > 0) {
+          doc.moveDown();
+          doc.fontSize(12).text("Комментарии");
+          withComments.slice(0, 30).forEach((row, index) => {
+            doc.fontSize(10).text(`${index + 1}. [${row.nickname}] ${row.comment}`);
+          });
+        }
+      });
     }
 
     doc.end();

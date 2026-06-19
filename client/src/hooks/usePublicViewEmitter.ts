@@ -1,4 +1,8 @@
-import { sanitizeExternalHttpUrl } from "@meyouquize/shared";
+import {
+  sanitizeBrandThemeId,
+  sanitizeExternalHttpUrl,
+  type BrandThemeId,
+} from "@meyouquize/shared";
 import { useCallback } from "react";
 import { socket } from "../socket";
 import type {
@@ -8,10 +12,11 @@ import type {
   PublicViewSetPatch,
 } from "../publicViewContract";
 import type { ReactionWidget } from "../components/admin/AdminReactionsSection";
-import type {
-  RandomizerHistoryEntry,
-  RandomizerListMode,
-  RandomizerMode,
+import {
+  randomizerNamesTextForPublicView,
+  type RandomizerHistoryEntry,
+  type RandomizerListMode,
+  type RandomizerMode,
 } from "../features/randomizer/randomizerLogic";
 
 type QuestionViewState = {
@@ -31,6 +36,17 @@ function playerBannersForEmit(banners: PublicBanner[]): PublicBanner[] {
       linkUrl: sanitizeExternalHttpUrl(item.linkUrl),
     }))
     .filter((item) => item.id && item.linkUrl && item.backgroundUrl);
+}
+
+/** Явное значение из patch, в т.ч. `""` для сброса (в отличие от `??`). */
+function patchStringField(
+  patch: PublicViewSetPatch,
+  key: keyof PublicViewSetPatch,
+  current: string,
+): string {
+  if (!Object.prototype.hasOwnProperty.call(patch, key)) return current;
+  const value = patch[key];
+  return typeof value === "string" ? value : current;
 }
 
 type UsePublicViewEmitterParams = {
@@ -93,6 +109,7 @@ type UsePublicViewEmitterParams = {
   randomizerExcludeWinners: boolean;
   randomizerSelectedWinners: string[];
   randomizerCurrentWinners: string[];
+  randomizerAnimationPool: string[];
   randomizerHistory: RandomizerHistoryEntry[];
   randomizerRunId: number;
   reportTitle: string;
@@ -102,6 +119,7 @@ type UsePublicViewEmitterParams = {
     | "quiz_results"
     | "vote_results"
     | "reactions_summary"
+    | "feedback_summary"
     | "randomizer_summary"
     | "speaker_questions_summary"
   >;
@@ -112,6 +130,7 @@ type UsePublicViewEmitterParams = {
   reportRandomizerRunIds: string[];
   reportReactionsWidgetIds: string[];
   reportSpeakerQuestionIds: string[];
+  reportFeedbackFormIds: string[];
   reportPublished: boolean;
   brandPrimaryColor: string;
   brandAccentColor: string;
@@ -124,9 +143,13 @@ type UsePublicViewEmitterParams = {
   brandPlayerBackgroundImageUrl: string;
   brandProjectorBackgroundImageUrl: string;
   brandBodyBackgroundColor: string;
+  brandTheme: BrandThemeId;
   projectorJoinQrVisible: boolean;
   projectorJoinQrText: string;
   projectorJoinQrTextColor: string;
+  projectorJoinQrOverlaySizePx: number;
+  projectorJoinQrOverlayInsetPx: number;
+  projectorJoinQrOverlayCorner: import("@meyouquize/shared").ProjectorJoinQrOverlayCorner;
 };
 
 export function usePublicViewEmitter(params: UsePublicViewEmitterParams) {
@@ -189,6 +212,7 @@ export function usePublicViewEmitter(params: UsePublicViewEmitterParams) {
     randomizerExcludeWinners,
     randomizerSelectedWinners,
     randomizerCurrentWinners,
+    randomizerAnimationPool,
     randomizerHistory,
     randomizerRunId,
     reportTitle,
@@ -200,6 +224,7 @@ export function usePublicViewEmitter(params: UsePublicViewEmitterParams) {
     reportRandomizerRunIds,
     reportReactionsWidgetIds,
     reportSpeakerQuestionIds,
+    reportFeedbackFormIds,
     reportPublished,
     brandPrimaryColor,
     brandAccentColor,
@@ -212,9 +237,13 @@ export function usePublicViewEmitter(params: UsePublicViewEmitterParams) {
     brandPlayerBackgroundImageUrl,
     brandProjectorBackgroundImageUrl,
     brandBodyBackgroundColor,
+    brandTheme,
     projectorJoinQrVisible,
     projectorJoinQrText,
     projectorJoinQrTextColor,
+    projectorJoinQrOverlaySizePx,
+    projectorJoinQrOverlayInsetPx,
+    projectorJoinQrOverlayCorner,
   } = params;
 
   const getQuestionViewState = useCallback(
@@ -314,13 +343,17 @@ export function usePublicViewEmitter(params: UsePublicViewEmitterParams) {
         randomizerMode: patch.randomizerMode ?? randomizerMode,
         randomizerListMode: patch.randomizerListMode ?? randomizerListMode,
         randomizerTitle: patch.randomizerTitle ?? randomizerTitle,
-        randomizerNamesText: patch.randomizerNamesText ?? randomizerNamesText,
+        randomizerNamesText: randomizerNamesTextForPublicView(
+          patch.randomizerListMode ?? randomizerListMode,
+          patch.randomizerNamesText ?? randomizerNamesText,
+        ),
         randomizerMinNumber: patch.randomizerMinNumber ?? randomizerMinNumber,
         randomizerMaxNumber: patch.randomizerMaxNumber ?? randomizerMaxNumber,
         randomizerWinnersCount: patch.randomizerWinnersCount ?? randomizerWinnersCount,
         randomizerExcludeWinners: patch.randomizerExcludeWinners ?? randomizerExcludeWinners,
         randomizerSelectedWinners: patch.randomizerSelectedWinners ?? randomizerSelectedWinners,
         randomizerCurrentWinners: patch.randomizerCurrentWinners ?? randomizerCurrentWinners,
+        randomizerAnimationPool: patch.randomizerAnimationPool ?? randomizerAnimationPool,
         randomizerHistory: patch.randomizerHistory ?? randomizerHistory,
         randomizerRunId: patch.randomizerRunId ?? randomizerRunId,
         reportTitle: patch.reportTitle ?? reportTitle,
@@ -333,23 +366,42 @@ export function usePublicViewEmitter(params: UsePublicViewEmitterParams) {
         reportRandomizerRunIds: patch.reportRandomizerRunIds ?? reportRandomizerRunIds,
         reportReactionsWidgetIds: patch.reportReactionsWidgetIds ?? reportReactionsWidgetIds,
         reportSpeakerQuestionIds: patch.reportSpeakerQuestionIds ?? reportSpeakerQuestionIds,
+        reportFeedbackFormIds: patch.reportFeedbackFormIds ?? reportFeedbackFormIds,
         reportPublished: patch.reportPublished ?? reportPublished,
         brandPrimaryColor: patch.brandPrimaryColor ?? brandPrimaryColor,
         brandAccentColor: patch.brandAccentColor ?? brandAccentColor,
         brandSurfaceColor: patch.brandSurfaceColor ?? brandSurfaceColor,
         brandTextColor: patch.brandTextColor ?? brandTextColor,
         brandInputTextColor: patch.brandInputTextColor ?? brandInputTextColor,
-        brandFontFamily: patch.brandFontFamily ?? brandFontFamily,
-        brandFontUrl: patch.brandFontUrl ?? brandFontUrl,
-        brandLogoUrl: patch.brandLogoUrl ?? brandLogoUrl,
-        brandPlayerBackgroundImageUrl:
-          patch.brandPlayerBackgroundImageUrl ?? brandPlayerBackgroundImageUrl,
-        brandProjectorBackgroundImageUrl:
-          patch.brandProjectorBackgroundImageUrl ?? brandProjectorBackgroundImageUrl,
-        brandBodyBackgroundColor: patch.brandBodyBackgroundColor ?? brandBodyBackgroundColor,
+        brandFontFamily: patchStringField(patch, "brandFontFamily", brandFontFamily),
+        brandFontUrl: patchStringField(patch, "brandFontUrl", brandFontUrl),
+        brandLogoUrl: patchStringField(patch, "brandLogoUrl", brandLogoUrl),
+        brandPlayerBackgroundImageUrl: patchStringField(
+          patch,
+          "brandPlayerBackgroundImageUrl",
+          brandPlayerBackgroundImageUrl,
+        ),
+        brandProjectorBackgroundImageUrl: patchStringField(
+          patch,
+          "brandProjectorBackgroundImageUrl",
+          brandProjectorBackgroundImageUrl,
+        ),
+        brandBodyBackgroundColor: patchStringField(
+          patch,
+          "brandBodyBackgroundColor",
+          brandBodyBackgroundColor,
+        ),
+        brandTheme:
+          patch.brandTheme !== undefined ? sanitizeBrandThemeId(patch.brandTheme) : brandTheme,
         projectorJoinQrVisible: patch.projectorJoinQrVisible ?? projectorJoinQrVisible,
         projectorJoinQrText: patch.projectorJoinQrText ?? projectorJoinQrText,
         projectorJoinQrTextColor: patch.projectorJoinQrTextColor ?? projectorJoinQrTextColor,
+        projectorJoinQrOverlaySizePx:
+          patch.projectorJoinQrOverlaySizePx ?? projectorJoinQrOverlaySizePx,
+        projectorJoinQrOverlayInsetPx:
+          patch.projectorJoinQrOverlayInsetPx ?? projectorJoinQrOverlayInsetPx,
+        projectorJoinQrOverlayCorner:
+          patch.projectorJoinQrOverlayCorner ?? projectorJoinQrOverlayCorner,
       };
       socket.emit("admin:results:view:set", nextPayload);
     },
@@ -411,6 +463,7 @@ export function usePublicViewEmitter(params: UsePublicViewEmitterParams) {
       randomizerExcludeWinners,
       randomizerSelectedWinners,
       randomizerCurrentWinners,
+      randomizerAnimationPool,
       randomizerHistory,
       randomizerRunId,
       reportTitle,
@@ -422,6 +475,7 @@ export function usePublicViewEmitter(params: UsePublicViewEmitterParams) {
       reportRandomizerRunIds,
       reportReactionsWidgetIds,
       reportSpeakerQuestionIds,
+      reportFeedbackFormIds,
       reportPublished,
       brandPrimaryColor,
       brandAccentColor,
@@ -434,9 +488,13 @@ export function usePublicViewEmitter(params: UsePublicViewEmitterParams) {
       brandPlayerBackgroundImageUrl,
       brandProjectorBackgroundImageUrl,
       brandBodyBackgroundColor,
+      brandTheme,
       projectorJoinQrVisible,
       projectorJoinQrText,
       projectorJoinQrTextColor,
+      projectorJoinQrOverlaySizePx,
+      projectorJoinQrOverlayInsetPx,
+      projectorJoinQrOverlayCorner,
     ],
   );
 

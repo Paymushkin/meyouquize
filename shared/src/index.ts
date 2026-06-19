@@ -3,7 +3,7 @@ import { sanitizeBrandThemeId } from "./brandThemes.js";
 import { sanitizeVoteOptionBorderColor } from "./voteOptionBorderColor.js";
 import { sanitizeVoteFillColor, sanitizeVoteQuestionTextColor } from "./voteQuestionTextStyle.js";
 
-export type QuestionType = "single" | "multi" | "tag_cloud" | "ranking";
+export type QuestionType = "single" | "multi" | "tag_cloud" | "ranking" | "temperature";
 export type QuizStatus = "draft" | "live" | "finished";
 export const SPEAKER_TILE_ID = "speaker_tile";
 export const PROGRAM_TILE_ID = "program_tile";
@@ -55,6 +55,9 @@ export function withQuizResultsTileLast(tileIds: string[]): string[] {
 export interface OptionInput {
   text: string;
   isCorrect: boolean;
+  imageUrl?: string;
+  /** Для temperature: вес варианта 0–100. */
+  weight?: number;
 }
 
 export interface QuestionInput {
@@ -62,6 +65,7 @@ export interface QuestionInput {
   type: QuestionType;
   points: number;
   maxAnswers?: number;
+  imageUrl?: string;
   options: OptionInput[];
 }
 
@@ -102,6 +106,7 @@ export type ReportModuleId =
   | "quiz_results"
   | "vote_results"
   | "reactions_summary"
+  | "feedback_summary"
   | "randomizer_summary"
   | "speaker_questions_summary";
 
@@ -229,6 +234,12 @@ export interface PublicViewState {
   /** Проектор: подпись рядом с QR-кодом входа */
   projectorJoinQrText: string;
   projectorJoinQrTextColor: string;
+  /** Проектор: размер компактного QR на экранах контента (px) */
+  projectorJoinQrOverlaySizePx: number;
+  /** Проектор: отступ компактного QR от края экрана (px) */
+  projectorJoinQrOverlayInsetPx: number;
+  /** Проектор: угол размещения компактного QR */
+  projectorJoinQrOverlayCorner: ProjectorJoinQrOverlayCorner;
   /** Рандомайзер: режим выбора (имена/числа) */
   randomizerMode: RandomizerMode;
   /** Рандомайзер: источник списка имён */
@@ -249,6 +260,11 @@ export interface PublicViewState {
   randomizerSelectedWinners: string[];
   /** Рандомайзер: победители последнего запуска */
   randomizerCurrentWinners: string[];
+  /**
+   * Рандомайзер: snapshot пула для анимации перебора на проекторе
+   * (нужен в режиме «только участники», когда randomizerNamesText пуст).
+   */
+  randomizerAnimationPool: string[];
   /** Рандомайзер: история запусков */
   randomizerHistory: RandomizerHistoryEntry[];
   /** Рандомайзер: счётчик запусков (триггер анимации на проекторе) */
@@ -277,6 +293,8 @@ export interface PublicViewState {
   reportReactionsWidgetIds: string[];
   /** Отчет: какие вопросы спикерам показывать (id). Пусто = все (в пределах лимита на сервере). */
   reportSpeakerQuestionIds: string[];
+  /** Отчет: какие формы обратной связи показывать (id). Пусто = все с ответами. */
+  reportFeedbackFormIds: string[];
   /** Отчет: опубликован ли отчет по публичной ссылке */
   reportPublished: boolean;
   /** Бренд: базовый акцентный цвет интерфейса */
@@ -320,6 +338,38 @@ export const DEFAULT_PROJECTOR_JOIN_QR_VISIBLE = true;
 export const PROJECTOR_JOIN_QR_TEXT_MAX_LENGTH = 200;
 export const DEFAULT_PROJECTOR_JOIN_QR_TEXT = "Сканируйте QR-код, чтобы войти в ивент";
 export const DEFAULT_PROJECTOR_JOIN_QR_TEXT_COLOR = "#ffffff";
+
+export type ProjectorJoinQrOverlayCorner =
+  | "top_right"
+  | "top_left"
+  | "bottom_right"
+  | "bottom_left";
+
+export const DEFAULT_PROJECTOR_JOIN_QR_OVERLAY_SIZE_PX = 150;
+export const DEFAULT_PROJECTOR_JOIN_QR_OVERLAY_INSET_PX = 30;
+export const DEFAULT_PROJECTOR_JOIN_QR_OVERLAY_CORNER: ProjectorJoinQrOverlayCorner = "top_right";
+
+export const PROJECTOR_JOIN_QR_OVERLAY_CORNERS: ProjectorJoinQrOverlayCorner[] = [
+  "top_right",
+  "top_left",
+  "bottom_right",
+  "bottom_left",
+];
+
+function sanitizeProjectorJoinQrOverlayCorner(
+  value: unknown,
+  fallback: ProjectorJoinQrOverlayCorner,
+): ProjectorJoinQrOverlayCorner {
+  if (
+    value === "top_right" ||
+    value === "top_left" ||
+    value === "bottom_right" ||
+    value === "bottom_left"
+  ) {
+    return value;
+  }
+  return fallback;
+}
 
 export const DEFAULT_PUBLIC_VIEW_STATE: PublicViewState = {
   mode: "title",
@@ -383,6 +433,9 @@ export const DEFAULT_PUBLIC_VIEW_STATE: PublicViewState = {
   projectorJoinQrVisible: DEFAULT_PROJECTOR_JOIN_QR_VISIBLE,
   projectorJoinQrText: DEFAULT_PROJECTOR_JOIN_QR_TEXT,
   projectorJoinQrTextColor: DEFAULT_PROJECTOR_JOIN_QR_TEXT_COLOR,
+  projectorJoinQrOverlaySizePx: DEFAULT_PROJECTOR_JOIN_QR_OVERLAY_SIZE_PX,
+  projectorJoinQrOverlayInsetPx: DEFAULT_PROJECTOR_JOIN_QR_OVERLAY_INSET_PX,
+  projectorJoinQrOverlayCorner: DEFAULT_PROJECTOR_JOIN_QR_OVERLAY_CORNER,
   randomizerMode: "names",
   randomizerListMode: "free_list",
   randomizerTitle: "Рандомайзер",
@@ -393,6 +446,7 @@ export const DEFAULT_PUBLIC_VIEW_STATE: PublicViewState = {
   randomizerExcludeWinners: true,
   randomizerSelectedWinners: [],
   randomizerCurrentWinners: [],
+  randomizerAnimationPool: [],
   randomizerHistory: [],
   randomizerRunId: 0,
   reportTitle: "Отчет мероприятия",
@@ -402,6 +456,7 @@ export const DEFAULT_PUBLIC_VIEW_STATE: PublicViewState = {
     "quiz_results",
     "vote_results",
     "reactions_summary",
+    "feedback_summary",
     "randomizer_summary",
     "speaker_questions_summary",
   ],
@@ -412,6 +467,7 @@ export const DEFAULT_PUBLIC_VIEW_STATE: PublicViewState = {
   reportRandomizerRunIds: [],
   reportReactionsWidgetIds: [],
   reportSpeakerQuestionIds: [],
+  reportFeedbackFormIds: [],
   reportPublished: false,
   brandPrimaryColor: "#7c5acb",
   brandAccentColor: "#1976d2",
@@ -727,6 +783,7 @@ function sanitizeReportModules(
     "quiz_results",
     "vote_results",
     "reactions_summary",
+    "feedback_summary",
     "randomizer_summary",
     "speaker_questions_summary",
   ]);
@@ -1028,6 +1085,20 @@ export function normalizePublicViewState(
       value?.projectorJoinQrTextColor,
       base.projectorJoinQrTextColor,
     ),
+    projectorJoinQrOverlaySizePx: clampInt(
+      value?.projectorJoinQrOverlaySizePx ?? base.projectorJoinQrOverlaySizePx,
+      48,
+      480,
+    ),
+    projectorJoinQrOverlayInsetPx: clampInt(
+      value?.projectorJoinQrOverlayInsetPx ?? base.projectorJoinQrOverlayInsetPx,
+      0,
+      200,
+    ),
+    projectorJoinQrOverlayCorner: sanitizeProjectorJoinQrOverlayCorner(
+      value?.projectorJoinQrOverlayCorner,
+      base.projectorJoinQrOverlayCorner,
+    ),
     randomizerMode: value?.randomizerMode === "numbers" ? "numbers" : base.randomizerMode,
     randomizerListMode:
       value?.randomizerListMode === "participants_only"
@@ -1037,10 +1108,17 @@ export function normalizePublicViewState(
       typeof value?.randomizerTitle === "string"
         ? value.randomizerTitle.trim().slice(0, 120)
         : base.randomizerTitle,
-    randomizerNamesText:
-      typeof value?.randomizerNamesText === "string"
-        ? value.randomizerNamesText.slice(0, 15000)
-        : base.randomizerNamesText,
+    randomizerNamesText: (() => {
+      const listMode =
+        value?.randomizerListMode === "participants_only"
+          ? "participants_only"
+          : base.randomizerListMode;
+      if (listMode === "participants_only") return "";
+      if (typeof value?.randomizerNamesText === "string") {
+        return value.randomizerNamesText.slice(0, 150_000);
+      }
+      return base.randomizerNamesText;
+    })(),
     randomizerMinNumber: clampInt(
       value?.randomizerMinNumber ?? base.randomizerMinNumber,
       -1000000,
@@ -1074,6 +1152,13 @@ export function normalizePublicViewState(
           .filter((winner) => winner.length > 0)
           .slice(0, 500)
       : [...base.randomizerCurrentWinners],
+    randomizerAnimationPool: Array.isArray(value?.randomizerAnimationPool)
+      ? value.randomizerAnimationPool
+          .filter((item): item is string => typeof item === "string")
+          .map((item) => item.trim())
+          .filter((item) => item.length > 0)
+          .slice(0, 10000)
+      : [...base.randomizerAnimationPool],
     randomizerHistory: sanitizeRandomizerHistory(value?.randomizerHistory),
     randomizerRunId: clampInt(value?.randomizerRunId ?? base.randomizerRunId, 0, 1000000000),
     reportTitle:
@@ -1130,6 +1215,13 @@ export function normalizePublicViewState(
           .filter((id) => id.length > 0)
           .slice(0, 400)
       : [...base.reportSpeakerQuestionIds],
+    reportFeedbackFormIds: Array.isArray(value?.reportFeedbackFormIds)
+      ? value.reportFeedbackFormIds
+          .filter((id): id is string => typeof id === "string")
+          .map((id) => id.trim())
+          .filter((id) => id.length > 0)
+          .slice(0, 200)
+      : [...base.reportFeedbackFormIds],
     reportPublished:
       typeof value?.reportPublished === "boolean" ? value.reportPublished : base.reportPublished,
     brandPrimaryColor: sanitizeHex6(value?.brandPrimaryColor, base.brandPrimaryColor),
@@ -1204,10 +1296,21 @@ export {
   sanitizeVoteQuestionTextColor,
   voteFillOutlineColor,
   voteProgressBarFillStyle,
+  voteProgressTrackBackground,
   voteQuestionTextTypographyStyle,
   VOTE_FILL_GRADIENT_RE,
+  VOTE_MIN_BAR_DISPLAY_PERCENT,
+  VOTE_PROGRESS_TRACK_OPACITY,
   VOTE_QUESTION_TEXT_GRADIENT_RE,
 } from "./voteQuestionTextStyle.js";
+
+export {
+  inferQuestionUseImages,
+  optionHasImage,
+  optionHasTextOrImage,
+  optionImageUrl,
+  questionHasOptionImages,
+} from "./voteOptionContent.js";
 
 export type { BrandThemeId, BrandThemeVisualState } from "./brandThemes.js";
 export {
@@ -1251,5 +1354,17 @@ export {
   prunePlayerUiRefsForRoom,
   prunePublicViewForRoomContent,
   playerUiRefsChanged,
+  publicViewRoomPruneChanged,
   type PlayerUiRefsSlice,
+  type PublicViewRoomPruneSlice,
 } from "./prunePlayerUiRefs.js";
+export {
+  computeTemperatureWeightedAverage,
+  clampTemperatureScaleValue,
+  roundTemperatureScaleValue,
+  formatTemperatureScaleValue,
+  formatTemperatureScaleLabel,
+  DEFAULT_TEMPERATURE_OPTION_WEIGHTS,
+  TEMPERATURE_SCALE_MIN,
+  TEMPERATURE_SCALE_MAX,
+} from "./temperatureVote.js";

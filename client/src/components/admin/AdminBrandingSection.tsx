@@ -1,6 +1,6 @@
 import { type Dispatch, type SetStateAction } from "react";
 import { Card, CardContent, Stack, Typography } from "@mui/material";
-import type { PublicViewSetPatch } from "../../publicViewContract";
+import type { PublicViewSetPatch, ProjectorJoinQrOverlayCorner } from "../../publicViewContract";
 import { BrandFontsSection } from "./branding/BrandFontsSection";
 import { BrandImagesSection } from "./branding/BrandImagesSection";
 import { BrandPlayerUiResultsSection } from "./branding/BrandPlayerUiResultsSection";
@@ -38,6 +38,12 @@ type Props = {
     setProjectorJoinQrText: (value: string) => void;
     projectorJoinQrTextColor: string;
     setProjectorJoinQrTextColor: (value: string) => void;
+    projectorJoinQrOverlaySizePx: number;
+    setProjectorJoinQrOverlaySizePx: (value: number) => void;
+    projectorJoinQrOverlayInsetPx: number;
+    setProjectorJoinQrOverlayInsetPx: (value: number) => void;
+    projectorJoinQrOverlayCorner: ProjectorJoinQrOverlayCorner;
+    setProjectorJoinQrOverlayCorner: (value: ProjectorJoinQrOverlayCorner) => void;
   };
   cloudQuestionColor: string;
   setCloudQuestionColor: (value: string) => void;

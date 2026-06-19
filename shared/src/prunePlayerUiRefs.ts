@@ -89,15 +89,38 @@ export function prunePlayerUiRefsForRoom(
 
 export type PublicViewWithPlayerUi = PlayerUiRefsSlice & Record<string, unknown>;
 
-export function prunePublicViewForRoomContent<T extends PlayerUiRefsSlice>(
+export type PublicViewRoomPruneSlice = PlayerUiRefsSlice & {
+  mode?: string;
+  questionId?: string;
+  questionRevealStage?: string;
+};
+
+export function prunePublicViewForRoomContent<T extends PublicViewRoomPruneSlice>(
   view: T,
   validSubQuizIds: ReadonlySet<string>,
   validQuestionIds: ReadonlySet<string>,
 ): T {
-  return {
+  const pruned: T = {
     ...view,
     ...prunePlayerUiRefsForRoom(view, validSubQuizIds, validQuestionIds),
   };
+  const questionId = typeof pruned.questionId === "string" ? pruned.questionId.trim() : "";
+  if (pruned.mode === "question" && questionId && !validQuestionIds.has(questionId)) {
+    return {
+      ...pruned,
+      mode: "title",
+      questionId: undefined,
+      questionRevealStage: "options",
+    };
+  }
+  return pruned;
+}
+
+export function publicViewRoomPruneChanged(
+  before: PublicViewRoomPruneSlice,
+  after: PublicViewRoomPruneSlice,
+): boolean {
+  return JSON.stringify(before) !== JSON.stringify(after);
 }
 
 export function playerUiRefsChanged(before: PlayerUiRefsSlice, after: PlayerUiRefsSlice): boolean {

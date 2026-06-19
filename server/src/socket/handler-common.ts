@@ -18,6 +18,7 @@ export type SocketErrorCode =
   | "NOT_FOUND"
   | "INVALID_PAYLOAD"
   | "RATE_LIMITED"
+  | "NICKNAME_TAKEN"
   | "INTERNAL";
 
 export type SocketErrorPayload = {
@@ -30,6 +31,7 @@ function inferSocketErrorCode(message: string): SocketErrorCode {
   if (message === "Forbidden") return "FORBIDDEN";
   if (message === "Not joined") return "NOT_JOINED";
   if (message === "Already answered this question") return "ALREADY_ANSWERED";
+  if (message === "Ник уже используется в этой комнате") return "NICKNAME_TAKEN";
   if (message === "Question not found" || message === "Quiz not found") return "NOT_FOUND";
   if (message.toLowerCase().includes("payload")) return "INVALID_PAYLOAD";
   if (message.toLowerCase().includes("too many")) return "RATE_LIMITED";

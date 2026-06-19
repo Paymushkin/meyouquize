@@ -8,10 +8,23 @@ type Props = {
   onUploadMedia: (file: File) => Promise<string>;
   onUploaded: (url: string) => void;
   onError: (message: string) => void;
+  /** Сброс до состояния без изображения (пустой URL). */
+  onClear?: () => void;
+  clearLabel?: string;
 };
 
 export function BrandImageUploadTile(props: Props) {
-  const { title, value, uploadErrorLabel, onUploadMedia, onUploaded, onError } = props;
+  const {
+    title,
+    value,
+    uploadErrorLabel,
+    onUploadMedia,
+    onUploaded,
+    onError,
+    onClear,
+    clearLabel = "Сбросить",
+  } = props;
+  const hasImage = !!value.trim();
 
   return (
     <Stack spacing={0.5} sx={{ width: "100%" }}>
@@ -41,6 +54,16 @@ export function BrandImageUploadTile(props: Props) {
         />
         <ImagePreview label={title} url={value} height={150} />
       </Button>
+      {hasImage && onClear ? (
+        <Button
+          size="small"
+          color="inherit"
+          onClick={onClear}
+          sx={{ alignSelf: "flex-start", px: 0 }}
+        >
+          {clearLabel}
+        </Button>
+      ) : null}
     </Stack>
   );
 }

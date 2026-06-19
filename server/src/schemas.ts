@@ -3,6 +3,8 @@ import {
   isValidVoteFillColor,
   isValidVoteOptionBorderColor,
   isValidVoteQuestionTextColor,
+  optionHasImage,
+  optionHasTextOrImage,
   PROJECTOR_JOIN_QR_TEXT_MAX_LENGTH,
 } from "@meyouquize/shared";
 
@@ -32,11 +34,19 @@ const clientAssetUrlSchema = z.string().trim().min(1).max(1000).refine(isSafeCli
 const optionalExternalHttpUrlSchema = z.union([externalHttpUrlSchema, z.literal("")]).optional();
 const optionalClientAssetUrlSchema = z.union([clientAssetUrlSchema, z.literal("")]).optional();
 
+const optionInputSchema = z.object({
+  text: z.string(),
+  isCorrect: z.boolean(),
+  imageUrl: optionalClientAssetUrlSchema,
+  weight: z.number().int().min(0).max(100).optional(),
+});
+
 const questionSchema = z
   .object({
     id: z.string().min(1).optional(),
-    text: z.string().min(1),
-    type: z.enum(["single", "multi", "tag_cloud", "ranking"]),
+    text: z.string(),
+    imageUrl: optionalClientAssetUrlSchema,
+    type: z.enum(["single", "multi", "tag_cloud", "ranking", "temperature"]),
     points: z.coerce.number().int().min(1).max(10_000).default(1),
     maxAnswers: z.coerce.number().int().min(1).max(5).optional(),
     scoringMode: z.enum(["poll", "quiz"]).optional(),
@@ -46,15 +56,18 @@ const questionSchema = z
     rankingProjectorMetric: z.enum(["avg_rank", "avg_score", "total_score"]).optional(),
     rankingKind: z.enum(["quiz", "jury"]).optional(),
     rankingPlayerHint: z.string().trim().max(300).nullable().optional(),
+    temperatureSubtitle: z.string().trim().max(300).nullable().optional(),
     adminDone: z.boolean().optional(),
-    options: z.array(
-      z.object({
-        text: z.string().min(1),
-        isCorrect: z.boolean(),
-      }),
-    ),
+    options: z.array(optionInputSchema),
   })
   .superRefine((value, ctx) => {
+    if (!optionHasTextOrImage(value.text, value.imageUrl)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "У вопроса должен быть текст или картинка",
+        path: ["text"],
+      });
+    }
     if (value.type === "tag_cloud") {
       const sm = value.scoringMode ?? "poll";
       if (sm === "quiz") {
@@ -75,6 +88,16 @@ const questionSchema = z
             code: z.ZodIssueCode.custom,
             message: "Число баллов по тегам должно совпадать с числом эталонных тегов",
             path: ["rankingPointsByRank"],
+          });
+        }
+      }
+      for (let idx = 0; idx < value.options.length; idx += 1) {
+        const opt = value.options[idx]!;
+        if (optionHasImage(opt.imageUrl)) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: "Для облака тегов картинки у вариантов не поддерживаются",
+            path: ["options", idx, "imageUrl"],
           });
         }
       }
@@ -111,7 +134,54 @@ const questionSchema = z
           });
         }
       }
+      for (let idx = 0; idx < value.options.length; idx += 1) {
+        const opt = value.options[idx]!;
+        if (!optionHasTextOrImage(opt.text, opt.imageUrl)) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: "У варианта должен быть текст или картинка",
+            path: ["options", idx, "text"],
+          });
+        }
+      }
       return;
+    }
+    if (value.type === "temperature") {
+      if (value.options.length < 2) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "Для измерения температуры нужно не меньше двух вариантов",
+          path: ["options"],
+        });
+      }
+      for (let idx = 0; idx < value.options.length; idx += 1) {
+        const opt = value.options[idx]!;
+        if (!optionHasTextOrImage(opt.text, opt.imageUrl)) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: "У варианта должен быть текст или картинка",
+            path: ["options", idx, "text"],
+          });
+        }
+        if (opt.weight == null || !Number.isFinite(opt.weight)) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: "У каждого варианта температуры задайте вес 0–100",
+            path: ["options", idx, "weight"],
+          });
+        }
+      }
+      return;
+    }
+    for (let idx = 0; idx < value.options.length; idx += 1) {
+      const opt = value.options[idx]!;
+      if (!optionHasTextOrImage(opt.text, opt.imageUrl)) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "У варианта должен быть текст или картинка",
+          path: ["options", idx, "text"],
+        });
+      }
     }
     if (value.options.length < 2) {
       ctx.addIssue({
@@ -417,16 +487,22 @@ export const setPublicViewSchema = z.object({
     .string()
     .regex(/^#([0-9a-fA-F]{6})$/)
     .optional(),
+  projectorJoinQrOverlaySizePx: z.number().int().min(48).max(480).optional(),
+  projectorJoinQrOverlayInsetPx: z.number().int().min(0).max(200).optional(),
+  projectorJoinQrOverlayCorner: z
+    .enum(["top_right", "top_left", "bottom_right", "bottom_left"])
+    .optional(),
   randomizerMode: z.enum(["names", "numbers"]).optional(),
   randomizerListMode: z.enum(["participants_only", "free_list"]).optional(),
   randomizerTitle: z.string().trim().max(120).optional(),
-  randomizerNamesText: z.string().max(15000).optional(),
+  randomizerNamesText: z.string().max(150_000).optional(),
   randomizerMinNumber: z.number().int().min(-1000000).max(1000000).optional(),
   randomizerMaxNumber: z.number().int().min(-1000000).max(1000000).optional(),
   randomizerWinnersCount: z.number().int().min(1).max(500).optional(),
   randomizerExcludeWinners: z.boolean().optional(),
   randomizerSelectedWinners: z.array(z.string().trim().min(1).max(120)).max(10000).optional(),
   randomizerCurrentWinners: z.array(z.string().trim().min(1).max(120)).max(500).optional(),
+  randomizerAnimationPool: z.array(z.string().trim().min(1).max(120)).max(10000).optional(),
   randomizerHistory: z
     .array(
       z.object({
@@ -447,6 +523,7 @@ export const setPublicViewSchema = z.object({
         "quiz_results",
         "vote_results",
         "reactions_summary",
+        "feedback_summary",
         "randomizer_summary",
         "speaker_questions_summary",
       ]),
@@ -466,6 +543,7 @@ export const setPublicViewSchema = z.object({
     .optional(),
   reportReactionsWidgetIds: z.array(z.string().trim().min(1).max(80)).max(200).optional(),
   reportSpeakerQuestionIds: z.array(z.string().trim().min(1).max(80)).max(400).optional(),
+  reportFeedbackFormIds: z.array(z.string().trim().min(1).max(80)).max(200).optional(),
   reportPublished: z.boolean().optional(),
   brandPrimaryColor: z
     .string()
@@ -594,6 +672,42 @@ export const stopReactionSessionSchema = z.object({
 export const toggleReactionSchema = z.object({
   quizId: z.string().min(1),
   reactionType: z.string().trim().min(1).max(16),
+});
+
+const feedbackScaleOptionSchema = z.string().trim().min(1).max(40);
+
+export const feedbackScaleSchema = z.object({
+  id: z.string().trim().min(1).max(80),
+  label: z.string().trim().min(1).max(200),
+  options: z.tuple([
+    feedbackScaleOptionSchema,
+    feedbackScaleOptionSchema,
+    feedbackScaleOptionSchema,
+    feedbackScaleOptionSchema,
+    feedbackScaleOptionSchema,
+  ]),
+});
+
+export const upsertFeedbackFormSchema = z.object({
+  title: z.string().trim().min(1).max(200),
+  scales: z.array(feedbackScaleSchema).min(1).max(10),
+  commentEnabled: z.boolean(),
+  commentPlaceholder: z.string().trim().max(300).optional(),
+});
+
+export const feedbackFormActionSchema = z.object({
+  quizId: z.string().min(1),
+  formId: z.string().min(1),
+});
+
+export const feedbackQuizIdSchema = z.object({
+  quizId: z.string().min(1),
+});
+
+export const submitFeedbackSchema = z.object({
+  quizId: z.string().min(1),
+  scaleAnswers: z.record(z.string().trim().min(1).max(80), z.number().int().min(0).max(4)),
+  comment: z.string().trim().max(2000).optional(),
 });
 
 /** Закрыть все вопросы сабквиза и убрать активный вопрос с экрана (финальный экран у игроков через state без FINISHED комнаты). */

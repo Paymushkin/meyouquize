@@ -53,6 +53,9 @@ type Props = {
   availableVoteQuestions: Array<{ id: string; text: string }>;
   selectedVoteQuestionIds: string[];
   onToggleVoteQuestion: (questionId: string, enabled: boolean) => void;
+  availableFeedbackForms: Array<{ id: string; title: string }>;
+  reportFeedbackFormIds: string[];
+  onToggleFeedbackForm: (formId: string, enabled: boolean) => void;
   reportPublished: boolean;
   onTogglePublished: (next: boolean) => void;
   publicReportUrl: string;
@@ -65,6 +68,7 @@ const MODULE_LABELS: Record<ReportModuleId, string> = {
   quiz_results: "Результаты квизов",
   vote_results: "Результаты голосований",
   reactions_summary: "Реакции аудитории",
+  feedback_summary: "Обратная связь",
   randomizer_summary: "Итоги рандомайзера",
   speaker_questions_summary: "Вопросы спикерам",
 };
@@ -75,6 +79,7 @@ const ALL_MODULES: ReportModuleId[] = [
   "quiz_results",
   "vote_results",
   "reactions_summary",
+  "feedback_summary",
   "randomizer_summary",
   "speaker_questions_summary",
 ];
@@ -116,6 +121,9 @@ export function AdminReportSection(props: Props) {
     availableVoteQuestions,
     selectedVoteQuestionIds,
     onToggleVoteQuestion,
+    availableFeedbackForms,
+    reportFeedbackFormIds,
+    onToggleFeedbackForm,
     reportPublished,
     onTogglePublished,
     publicReportUrl,
@@ -139,6 +147,12 @@ export function AdminReportSection(props: Props) {
     reportSpeakerQuestionIds.length === 0
       ? speakerAllIds
       : reportSpeakerQuestionIds.filter((id) => speakerAllIds.includes(id));
+
+  const feedbackAllIds = availableFeedbackForms.map((form) => form.id);
+  const feedbackEffective =
+    reportFeedbackFormIds.length === 0
+      ? feedbackAllIds
+      : reportFeedbackFormIds.filter((id) => feedbackAllIds.includes(id));
 
   return (
     <Card variant="outlined">
@@ -429,6 +443,44 @@ export function AdminReportSection(props: Props) {
                                   />
                                 }
                                 label={widget.title?.trim() || "Виджет без названия"}
+                              />
+                            );
+                          })
+                        )}
+                      </Stack>
+                    </Box>
+                  )}
+
+                  {checked && moduleId === "feedback_summary" && (
+                    <Box
+                      sx={{
+                        ml: { xs: 0, sm: 5 },
+                        borderLeft: "2px solid",
+                        borderColor: "divider",
+                        pl: 1.5,
+                      }}
+                    >
+                      <Stack spacing={0.75}>
+                        <Typography variant="subtitle2">Какие формы показывать</Typography>
+                        {availableFeedbackForms.length === 0 ? (
+                          <Typography variant="body2" color="text.secondary">
+                            Форм обратной связи пока нет — создайте их во вкладке «Обратная связь»
+                          </Typography>
+                        ) : (
+                          availableFeedbackForms.map((form) => {
+                            const formChecked = feedbackEffective.includes(form.id);
+                            return (
+                              <FormControlLabel
+                                key={form.id}
+                                control={
+                                  <Checkbox
+                                    checked={formChecked}
+                                    onChange={(e) =>
+                                      onToggleFeedbackForm(form.id, e.target.checked)
+                                    }
+                                  />
+                                }
+                                label={form.title.trim() || "Без названия"}
                               />
                             );
                           })

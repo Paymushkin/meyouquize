@@ -110,6 +110,43 @@ describe("useRandomizerAnimation", () => {
     expect(state.focusedWinner).toBe("Петя");
   });
 
+  it("при одном победителе крутит имена из animation pool", () => {
+    let latest: Snapshot | null = null;
+    const onState = vi.fn((state: Snapshot) => {
+      latest = state;
+    });
+    const { rerender } = render(
+      <HookHarness
+        view={makeView({
+          randomizerNamesText: "",
+          randomizerAnimationPool: ["Ира", "Оля", "Петя", "Коля"],
+          randomizerCurrentWinners: ["Оля"],
+          randomizerRunId: 0,
+        })}
+        onState={onState}
+      />,
+    );
+
+    rerender(
+      <HookHarness
+        view={makeView({
+          randomizerNamesText: "",
+          randomizerAnimationPool: ["Ира", "Оля", "Петя", "Коля"],
+          randomizerCurrentWinners: ["Оля"],
+          randomizerRunId: 1,
+        })}
+        onState={onState}
+      />,
+    );
+
+    act(() => {
+      vi.advanceTimersByTime(160);
+    });
+    const state = getSnapshot(latest);
+    expect(state.rollingMask[0]).toBe(true);
+    expect(["Ира", "Оля", "Петя", "Коля"]).toContain(state.focusedWinner);
+  });
+
   it("очищает состояние когда winners пустой", () => {
     let latest: Snapshot | null = null;
     const onState = vi.fn((state: Snapshot) => {

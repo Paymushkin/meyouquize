@@ -80,6 +80,11 @@ type Params = {
   setProjectorJoinQrVisible: (value: boolean) => void;
   setProjectorJoinQrText: (value: string) => void;
   setProjectorJoinQrTextColor: (value: string) => void;
+  setProjectorJoinQrOverlaySizePx: (value: number) => void;
+  setProjectorJoinQrOverlayInsetPx: (value: number) => void;
+  setProjectorJoinQrOverlayCorner: (
+    value: import("@meyouquize/shared").ProjectorJoinQrOverlayCorner,
+  ) => void;
   setShowFirstCorrectAnswerer: (value: boolean) => void;
   setFirstCorrectWinnersCount: (value: number) => void;
   setSpeakerQuestionsPayload: (value: SpeakerQuestionsPayload | null) => void;
@@ -142,6 +147,9 @@ export function useAdminEventSocket<TQuestion extends QuestionFormPatchable>(
     setProjectorJoinQrVisible,
     setProjectorJoinQrText,
     setProjectorJoinQrTextColor,
+    setProjectorJoinQrOverlaySizePx,
+    setProjectorJoinQrOverlayInsetPx,
+    setProjectorJoinQrOverlayCorner,
     setShowFirstCorrectAnswerer,
     setFirstCorrectWinnersCount,
     setSpeakerQuestionsPayload,
@@ -201,6 +209,9 @@ export function useAdminEventSocket<TQuestion extends QuestionFormPatchable>(
       setProjectorJoinQrVisible(nextBranding.projectorJoinQrVisible);
       setProjectorJoinQrText(nextBranding.projectorJoinQrText);
       setProjectorJoinQrTextColor(nextBranding.projectorJoinQrTextColor);
+      setProjectorJoinQrOverlaySizePx(nextBranding.projectorJoinQrOverlaySizePx);
+      setProjectorJoinQrOverlayInsetPx(nextBranding.projectorJoinQrOverlayInsetPx);
+      setProjectorJoinQrOverlayCorner(nextBranding.projectorJoinQrOverlayCorner);
     },
     [
       setProjectorBackground,
@@ -238,6 +249,9 @@ export function useAdminEventSocket<TQuestion extends QuestionFormPatchable>(
       setProjectorJoinQrVisible,
       setProjectorJoinQrText,
       setProjectorJoinQrTextColor,
+      setProjectorJoinQrOverlaySizePx,
+      setProjectorJoinQrOverlayInsetPx,
+      setProjectorJoinQrOverlayCorner,
     ],
   );
 
