@@ -3,6 +3,7 @@ import { SpeakerQuestionStatus } from "@prisma/client";
 import { mergePublicViewState } from "@meyouquize/shared";
 import {
   adminSpeakerQuestionDeleteSchema,
+  speakerQuestionDeleteSchema,
   adminSpeakerSettingsSchema,
   adminSpeakerQuestionScreenSchema,
   adminSpeakerQuestionUpdateSchema,
@@ -36,6 +37,7 @@ type SpeakerQuestionWire = {
   status: "PENDING" | "APPROVED" | "REJECTED";
   userVisible: boolean;
   isOnScreen: boolean;
+  isMine: boolean;
   reactionCounts: Record<string, number>;
   myReactions: string[];
   createdAt: string;
@@ -105,6 +107,7 @@ async function buildSpeakerQuestionsPayload(
       status: row.status,
       userVisible: row.isVisibleToUsers,
       isOnScreen: row.isOnScreen,
+      isMine: participantId != null && row.participantId === participantId,
       reactionCounts: reactionCountsByQuestion.get(row.id) ?? {},
       myReactions: myReactionsByQuestion.get(row.id) ?? [],
       createdAt: row.createdAt.toISOString(),
@@ -312,6 +315,38 @@ export function registerSpeakerQuestionsHandlers(socket: EnrichedSocket, io: Ser
       await broadcastSpeakerQuestions(io, payload.quizId, socket.id);
     } catch (error) {
       fail(socket, error instanceof Error ? error.message : "React speaker question failed");
+    }
+  });
+
+  socket.on("speaker:question:delete", async (raw: unknown) => {
+    try {
+      const payload = speakerQuestionDeleteSchema.parse(raw);
+      if (!socket.data.participantId) throw new Error("Not joined");
+      const question = await prisma.speakerQuestion.findUnique({
+        where: { id: payload.speakerQuestionId },
+        select: { id: true, quizId: true, participantId: true },
+      });
+      if (!question || question.quizId !== payload.quizId) throw new Error("Question not found");
+      if (question.participantId !== socket.data.participantId) {
+        throw new Error("Можно удалить только свой вопрос");
+      }
+      await prisma.$transaction(async (tx) => {
+        await tx.speakerQuestionReaction.deleteMany({
+          where: { speakerQuestionId: payload.speakerQuestionId },
+        });
+        await tx.speakerQuestion.delete({
+          where: { id: payload.speakerQuestionId },
+        });
+      });
+      const result = await buildSpeakerQuestionsPayload(
+        payload.quizId,
+        socket.data.participantId,
+        "player",
+      );
+      socket.emit("speaker:questions:update", result);
+      await broadcastSpeakerQuestions(io, payload.quizId, socket.id);
+    } catch (error) {
+      fail(socket, error instanceof Error ? error.message : "Delete speaker question failed");
     }
   });
 

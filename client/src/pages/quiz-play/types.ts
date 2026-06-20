@@ -67,6 +67,7 @@ export type PlayerVisibleResultTile = {
   type: "single" | "multi" | "ranking" | "temperature";
   rankingProjectorMetric?: "avg_rank" | "avg_score" | "total_score";
   temperatureValue?: number | null;
+  temperatureSubtitle?: string | null;
   optionStats: PlayerVisibleResultOptionStat[];
 };
 

@@ -25,6 +25,9 @@ describe("resolveRankingMetricMode", () => {
 describe("formatTemperatureResultHeadline", () => {
   it("formats headline or returns null", () => {
     expect(formatTemperatureResultHeadline(42)).toBe("Итог: 42 / 100");
+    expect(formatTemperatureResultHeadline(42, "Уровень вовлечённости аудитории")).toBe(
+      "Уровень вовлечённости аудитории: 42 / 100",
+    );
     expect(formatTemperatureResultHeadline(null)).toBeNull();
   });
 });

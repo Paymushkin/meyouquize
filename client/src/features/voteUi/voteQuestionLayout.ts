@@ -101,7 +101,7 @@ export function voteResultsDialogQuestionSx(): SxProps<Theme> {
     fontWeight: 700,
     fontSize: { xs: "1.3rem", sm: "1.45rem" },
     lineHeight: 1.25,
-    mb: VOTE_RESULTS_DIALOG_QUESTION_MB,
+    pb: VOTE_RESULTS_DIALOG_QUESTION_MB,
   };
 }
 

@@ -21,7 +21,7 @@ function swallowIpcDisconnectError(err: NodeJS.ErrnoException) {
 function attachClusterWorkerErrorGuards() {
   if (!cluster.isWorker || !cluster.worker) return;
   cluster.worker.prependListener("error", swallowIpcDisconnectError);
-  process.prependListener("error", swallowIpcDisconnectError);
+  process.on("error", swallowIpcDisconnectError);
   process.on("disconnect", () => {
     process.exit(0);
   });

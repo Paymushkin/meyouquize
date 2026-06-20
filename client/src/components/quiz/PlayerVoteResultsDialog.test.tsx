@@ -50,4 +50,26 @@ describe("PlayerVoteResultsDialog", () => {
     fireEvent.click(screen.getByLabelText("Закрыть"));
     expect(onClose).toHaveBeenCalled();
   });
+
+  it("shows temperature subtitle from admin as result headline", () => {
+    render(
+      <PlayerVoteResultsDialog
+        open
+        tile={{
+          questionId: "q-temp",
+          text: "Температура зала",
+          type: "temperature",
+          temperatureValue: 25,
+          temperatureSubtitle: "Оцените уровень вовлечённости аудитории",
+          optionStats: [{ optionId: "o1", text: "1", count: 1, isCorrect: false }],
+        }}
+        playerVoteOptionTextColor="#ffffff"
+        playerVoteProgressBarColor="#1976d2"
+        submittedAnswersByQuestionId={{}}
+        onClose={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByText("Оцените уровень вовлечённости аудитории: 25 / 100")).toBeTruthy();
+  });
 });

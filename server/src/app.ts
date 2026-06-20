@@ -476,7 +476,7 @@ export function buildApp() {
     try {
       const room = await replaceRoomContent(eventName, parsed.data);
       const io = getSocketIo();
-      if (io && room.id) {
+      if (io && room?.id) {
         await broadcastProjectorRoomSync(io, room.id);
       }
       return res.json(room);

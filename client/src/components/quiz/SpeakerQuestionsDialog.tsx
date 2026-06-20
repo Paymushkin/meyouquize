@@ -1,4 +1,8 @@
+import { useEffect, useMemo, useState } from "react";
+import DeleteOutlineOutlinedIcon from "@mui/icons-material/DeleteOutlineOutlined";
+import CloseIcon from "@mui/icons-material/Close";
 import {
+  Box,
   Button,
   Chip,
   Dialog,
@@ -8,12 +12,17 @@ import {
   IconButton,
   MenuItem,
   Stack,
+  Tab,
+  Tabs,
   TextField,
   Typography,
 } from "@mui/material";
 import { alpha } from "@mui/material/styles";
-import CloseIcon from "@mui/icons-material/Close";
-import type { SpeakerQuestionsPayload } from "../../types/speakerQuestions";
+import type { SpeakerQuestionItem, SpeakerQuestionsPayload } from "../../types/speakerQuestions";
+import {
+  filterActualSpeakerQuestions,
+  filterMySpeakerQuestions,
+} from "../../features/speakerQuestions/playerSpeakerQuestionsLists";
 import {
   buildBrandPrimaryContainedButtonSx,
   buildJoinNicknameInputSx,
@@ -22,9 +31,12 @@ import {
   PLAYER_DIALOG_CONTENT_SX,
   PLAYER_DIALOG_PAPER_SX,
   PLAYER_DIALOG_TITLE_SX,
+  buildPlayerDialogTabsSx,
 } from "./playerDialogStyles";
 
 const DEFAULT_SPEAKER_REACTIONS = ["👍", "🔥", "👏", "❤️"];
+
+type QuestionsTab = "actual" | "mine";
 
 function buildPlayerDialogTextFieldSx(focusColor: string, inputTextColor: string) {
   return {
@@ -41,10 +53,69 @@ function buildPlayerDialogTextFieldSx(focusColor: string, inputTextColor: string
   };
 }
 
+const ALL_SPEAKERS_TARGET = "Все спикеры";
+const ALL_SPEAKERS_TARGET_LABEL = "Всем спикерам";
+
 function speakerQuestionLabel(speakerName: string): string {
-  return speakerName === "Все спикеры"
-    ? "Вопрос ко всем спикерам"
-    : `Вопрос к спикеру: ${speakerName}`;
+  if (speakerName === ALL_SPEAKERS_TARGET) return "Для всех спикеров";
+  return `Для: ${speakerName}`;
+}
+
+function SpeakerQuestionRow(props: {
+  item: SpeakerQuestionItem;
+  reactions: string[];
+  showReactions: boolean;
+  showDelete: boolean;
+  onReact: (questionId: string, reaction: string) => void;
+  onDelete: (questionId: string) => void;
+}) {
+  const { item, reactions, showReactions, showDelete, onReact, onDelete } = props;
+
+  return (
+    <Stack spacing={1.5} sx={{ py: 0.25 }}>
+      <Stack direction="row" alignItems="flex-start" justifyContent="space-between" spacing={1}>
+        <Typography variant="caption" color="text.secondary" sx={{ flex: 1 }}>
+          {speakerQuestionLabel(item.speakerName)}
+        </Typography>
+        {showDelete ? (
+          <IconButton
+            size="small"
+            aria-label="Удалить вопрос"
+            onClick={() => onDelete(item.id)}
+            sx={{ color: alpha("#fff", 0.72), mt: -0.5 }}
+          >
+            <DeleteOutlineOutlinedIcon fontSize="small" />
+          </IconButton>
+        ) : null}
+      </Stack>
+      <Typography variant="body1" sx={{ fontSize: "1rem", lineHeight: 1.4 }}>
+        {item.text}
+      </Typography>
+      {showReactions ? (
+        <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
+          {reactions.map((reaction) => {
+            const isSelected = (item.myReactions ?? []).includes(reaction);
+            const count = item.reactionCounts?.[reaction] ?? 0;
+            return (
+              <Chip
+                key={`${item.id}_${reaction}`}
+                size="small"
+                clickable
+                variant="filled"
+                label={count > 0 ? `${reaction} ${count}` : reaction}
+                onClick={() => onReact(item.id, reaction)}
+                sx={{
+                  bgcolor: "transparent",
+                  color: "#fff",
+                  border: isSelected ? "1px solid rgba(255,255,255,0.95)" : "none",
+                }}
+              />
+            );
+          })}
+        </Stack>
+      ) : null}
+    </Stack>
+  );
 }
 
 type Props = {
@@ -60,6 +131,7 @@ type Props = {
   onSpeakerQuestionTextChange: (next: string) => void;
   onSubmit: () => void;
   onReact: (questionId: string, reaction: string) => void;
+  onDelete: (questionId: string) => void;
 };
 
 export function SpeakerQuestionsDialog({
@@ -75,11 +147,36 @@ export function SpeakerQuestionsDialog({
   onSpeakerQuestionTextChange,
   onSubmit,
   onReact,
+  onDelete,
 }: Props) {
   const reactions = speakerQuestions?.settings.reactions ?? DEFAULT_SPEAKER_REACTIONS;
-  const items = speakerQuestions?.items ?? [];
-  const hasItems = items.length > 0;
+  const actualItems = useMemo(
+    () => filterActualSpeakerQuestions(speakerQuestions?.items ?? []),
+    [speakerQuestions?.items],
+  );
+  const mineItems = useMemo(
+    () => filterMySpeakerQuestions(speakerQuestions?.items ?? []),
+    [speakerQuestions?.items],
+  );
+  const showMineTab = mineItems.length > 0;
+  const showQuestionsSection = actualItems.length > 0 || mineItems.length > 0;
+  const [tab, setTab] = useState<QuestionsTab>("actual");
   const textFieldSx = buildPlayerDialogTextFieldSx(formBackgroundColor, formInputTextColor);
+
+  useEffect(() => {
+    if (!open) return;
+    if (actualItems.length > 0) {
+      setTab("actual");
+      return;
+    }
+    if (mineItems.length > 0) setTab("mine");
+  }, [open, actualItems.length, mineItems.length]);
+
+  useEffect(() => {
+    if (!showMineTab && tab === "mine") setTab("actual");
+  }, [showMineTab, tab]);
+
+  const visibleItems = tab === "mine" ? mineItems : actualItems;
 
   return (
     <Dialog
@@ -107,7 +204,7 @@ export function SpeakerQuestionsDialog({
             onChange={(e) => onSpeakerNameChange(e.target.value)}
             sx={textFieldSx}
           >
-            <MenuItem value="Все спикеры">Все спикеры</MenuItem>
+            <MenuItem value={ALL_SPEAKERS_TARGET}>{ALL_SPEAKERS_TARGET_LABEL}</MenuItem>
             {(speakerQuestions?.settings.speakers ?? []).map((name) => (
               <MenuItem key={name} value={name}>
                 {name}
@@ -132,43 +229,46 @@ export function SpeakerQuestionsDialog({
           >
             Отправить вопрос
           </Button>
-          {hasItems ? (
+          {showQuestionsSection ? (
             <>
               <Divider />
-              <Typography variant="subtitle2">Актуальные вопросы</Typography>
+              {showMineTab ? (
+                <Tabs
+                  value={tab}
+                  onChange={(_, next: QuestionsTab) => setTab(next)}
+                  variant="fullWidth"
+                  sx={buildPlayerDialogTabsSx(formBackgroundColor)}
+                >
+                  <Tab value="actual" label="Актуальные вопросы" />
+                  <Tab value="mine" label="Мои вопросы" />
+                </Tabs>
+              ) : (
+                <Typography variant="subtitle2" sx={{ color: formBackgroundColor }}>
+                  Актуальные вопросы
+                </Typography>
+              )}
               <Stack spacing={0.75}>
-                {items.map((item, idx, arr) => (
-                  <Stack key={item.id} spacing={1.5} sx={{ py: 0.25 }}>
-                    <Typography variant="caption" color="text.secondary">
-                      {speakerQuestionLabel(item.speakerName)}
-                    </Typography>
-                    <Typography variant="body1" sx={{ fontSize: "1rem", lineHeight: 1.4 }}>
-                      {item.text}
-                    </Typography>
-                    <Stack direction="row" spacing={1}>
-                      {reactions.map((reaction) => {
-                        const isSelected = (item.myReactions ?? []).includes(reaction);
-                        const count = item.reactionCounts?.[reaction] ?? 0;
-                        return (
-                          <Chip
-                            key={`${item.id}_${reaction}`}
-                            size="small"
-                            clickable
-                            variant="filled"
-                            label={count > 0 ? `${reaction} ${count}` : reaction}
-                            onClick={() => onReact(item.id, reaction)}
-                            sx={{
-                              bgcolor: "transparent",
-                              color: "#fff",
-                              border: isSelected ? "1px solid rgba(255,255,255,0.95)" : "none",
-                            }}
-                          />
-                        );
-                      })}
-                    </Stack>
-                    {idx < arr.length - 1 ? <Divider /> : null}
-                  </Stack>
-                ))}
+                {visibleItems.length === 0 ? (
+                  <Typography variant="body2" sx={{ color: alpha("#fff", 0.65), py: 0.5 }}>
+                    {tab === "actual"
+                      ? "Пока нет одобренных вопросов."
+                      : "У вас пока нет вопросов."}
+                  </Typography>
+                ) : (
+                  visibleItems.map((item, idx, arr) => (
+                    <Box key={item.id}>
+                      <SpeakerQuestionRow
+                        item={item}
+                        reactions={reactions}
+                        showReactions={tab === "actual"}
+                        showDelete={tab === "mine" && Boolean(item.isMine)}
+                        onReact={onReact}
+                        onDelete={onDelete}
+                      />
+                      {idx < arr.length - 1 ? <Divider sx={{ mt: 1.5 }} /> : null}
+                    </Box>
+                  ))
+                )}
               </Stack>
             </>
           ) : null}

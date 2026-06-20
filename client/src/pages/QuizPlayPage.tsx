@@ -53,7 +53,6 @@ import {
   JoinCard,
   JOIN_SCREEN_MAIN_SX,
   JOIN_SCREEN_STACK_SX,
-  buildBrandOutlinedButtonSx,
   buildBrandPrimaryContainedButtonSx,
   buildJoinNicknameInputSx,
   PlayerIdentityBar,
@@ -448,30 +447,6 @@ export function QuizPlayPage() {
     setNicknameDialogOpen(false);
   }
 
-  function logoutFromProfile() {
-    if (!slug) return;
-    const confirmed = window.confirm("Выйти из профиля на этом устройстве?");
-    if (!confirmed) return;
-    try {
-      localStorage.removeItem(getRoomJoinKey(slug));
-      localStorage.removeItem(getRoomNickKey(slug));
-    } catch {
-      // ignore storage errors in private mode
-    }
-    setNicknameDialogOpen(false);
-    setQuiz(null);
-    setJoined(false);
-    setRestoreJoinPending(false);
-    setSubmittedAnswers({});
-    setSubmittedQuestionIds([]);
-    setPlayerAnswersHydrated(false);
-    resetQuestionFlow();
-    setError("");
-    setSpeakerQuestions(null);
-    setSpeakerDialogOpen(false);
-    socket.disconnect();
-  }
-
   function submitSpeakerQuestion() {
     if (!quiz?.id || !speakerQuestionText.trim()) return;
     socket.emit("speaker:question:create", {
@@ -488,6 +463,14 @@ export function QuizPlayPage() {
       quizId: quiz.id,
       speakerQuestionId: questionId,
       reaction,
+    });
+  }
+
+  function deleteSpeakerQuestion(questionId: string) {
+    if (!quiz?.id) return;
+    socket.emit("speaker:question:delete", {
+      quizId: quiz.id,
+      speakerQuestionId: questionId,
     });
   }
 
@@ -867,6 +850,7 @@ export function QuizPlayPage() {
               onSpeakerQuestionTextChange={setSpeakerQuestionText}
               onSubmit={submitSpeakerQuestion}
               onReact={reactSpeakerQuestion}
+              onDelete={deleteSpeakerQuestion}
             />
             <Dialog
               open={nicknameDialogOpen}
@@ -891,27 +875,18 @@ export function QuizPlayPage() {
               </DialogContent>
               <DialogActions sx={{ px: 3, pb: 2, pt: 0.5, justifyContent: "space-between" }}>
                 <Button
-                  variant="outlined"
-                  onClick={logoutFromProfile}
-                  sx={buildBrandOutlinedButtonSx(formInputTextColor)}
+                  onClick={() => setNicknameDialogOpen(false)}
+                  sx={{ color: formInputTextColor }}
                 >
-                  Выйти
+                  Отмена
                 </Button>
-                <Stack direction="row" spacing={1}>
-                  <Button
-                    onClick={() => setNicknameDialogOpen(false)}
-                    sx={{ color: formInputTextColor }}
-                  >
-                    Отмена
-                  </Button>
-                  <Button
-                    variant="contained"
-                    onClick={submitNicknameUpdate}
-                    sx={buildBrandPrimaryContainedButtonSx(formBackgroundColor, formTextColor)}
-                  >
-                    Сохранить
-                  </Button>
-                </Stack>
+                <Button
+                  variant="contained"
+                  onClick={submitNicknameUpdate}
+                  sx={buildBrandPrimaryContainedButtonSx(formBackgroundColor, formTextColor)}
+                >
+                  Сохранить
+                </Button>
               </DialogActions>
             </Dialog>
           </>

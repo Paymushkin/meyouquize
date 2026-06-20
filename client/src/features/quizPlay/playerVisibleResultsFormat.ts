@@ -15,9 +15,14 @@ export function resolveRankingMetricMode(tile: PlayerVisibleResultTile): Ranking
   return requested !== "avg_rank" && !hasTierStats ? "avg_rank" : requested;
 }
 
-export function formatTemperatureResultHeadline(value: number | null | undefined): string | null {
+export function formatTemperatureResultHeadline(
+  value: number | null | undefined,
+  subtitle?: string | null,
+): string | null {
   const label = formatTemperatureScaleLabel(value);
-  return label ? `Итог: ${label}` : null;
+  if (!label) return null;
+  const prefix = subtitle?.trim() || "Итог";
+  return `${prefix}: ${label}`;
 }
 
 export function formatPlayerResultStatValue(

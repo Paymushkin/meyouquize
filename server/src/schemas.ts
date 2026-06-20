@@ -620,10 +620,12 @@ export const adminSpeakerQuestionUpdateSchema = z.object({
   text: z.string().trim().min(3).max(500),
 });
 
-export const adminSpeakerQuestionDeleteSchema = z.object({
+export const speakerQuestionDeleteSchema = z.object({
   quizId: z.string().min(1),
   speakerQuestionId: z.string().min(1),
 });
+
+export const adminSpeakerQuestionDeleteSchema = speakerQuestionDeleteSchema;
 
 export const adminSpeakerSettingsSchema = z.object({
   quizId: z.string().min(1),

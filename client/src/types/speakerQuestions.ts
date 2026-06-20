@@ -17,6 +17,7 @@ export type SpeakerQuestionItem = {
   status: "PENDING" | "APPROVED" | "REJECTED";
   userVisible: boolean;
   isOnScreen: boolean;
+  isMine?: boolean;
   reactionCounts?: Record<string, number>;
   myReactions?: string[];
   createdAt: string;

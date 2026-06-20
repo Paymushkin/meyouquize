@@ -37,7 +37,9 @@ export function PlayerVoteResultsDialog(props: Props) {
   const rankingMetricMode = tile ? resolveRankingMetricMode(tile) : null;
   const total = tile ? tile.optionStats.reduce((sum, row) => sum + row.count, 0) : 0;
   const temperatureHeadline =
-    tile?.type === "temperature" ? formatTemperatureResultHeadline(tile.temperatureValue) : null;
+    tile?.type === "temperature"
+      ? formatTemperatureResultHeadline(tile.temperatureValue, tile.temperatureSubtitle)
+      : null;
   return (
     <Dialog
       open={open}
@@ -90,8 +92,13 @@ export function PlayerVoteResultsDialog(props: Props) {
             </Stack>
             {temperatureHeadline ? (
               <Typography
-                variant="h5"
-                sx={{ color: playerVoteOptionTextColor, fontWeight: 700, mb: 1.5 }}
+                variant="body1"
+                sx={{
+                  color: playerVoteOptionTextColor,
+                  fontWeight: 400,
+                  fontSize: "0.95rem",
+                  mb: 1.5,
+                }}
               >
                 {temperatureHeadline}
               </Typography>
