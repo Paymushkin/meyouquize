@@ -35,11 +35,7 @@ const DEFAULT_REACTIONS = ["👍", "👏", "🔥", "🤔"] as const;
 /** Горизонтальные отступы контента вопроса на проекторе (голосование, облако тегов). */
 const PROJECTOR_QUESTION_CONTENT_PX = { xs: 3, sm: 5, md: 8, lg: 10, xl: 12 } as const;
 
-function speakerTargetLabel(speakerName: string): string {
-  return speakerName === "Все спикеры" ? "кому: всем спикерам" : `кому: ${speakerName}`;
-}
-
-/** Проектор: заголовок ивента, лидерборд, вопрос (облако / голосование / герой «первые верные»). */
+import { speakerTargetLabel } from "./results/speakerTargetLabel";
 export function ResultsPage() {
   const { slug = "" } = useParams();
   const p = useResultsProjectorSession(slug);

@@ -31,4 +31,17 @@ describe("publicViewJsonToState", () => {
     expect(state.programTileVisible).toBe(true);
     expect(state.programTileLinkUrl).toBe("https://example.com/agenda");
   });
+
+  it("merges speaker tile extras from partial json", () => {
+    const state = publicViewJsonToState({
+      mode: "title",
+      speakerTileVisible: false,
+      speakerTileTextColor: "#ffffff",
+      programTileBackgroundColor: "#000000",
+      programTileTextColor: "#eeeeee",
+    });
+    expect(state.speakerTileVisible).toBe(false);
+    expect(state.speakerTileTextColor).toBe("#ffffff");
+    expect(state.programTileBackgroundColor).toBe("#000000");
+  });
 });

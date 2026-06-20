@@ -277,7 +277,6 @@ export function useQuizPlayQuestionFlow(params: Params) {
     onQuestionSubmitted,
     onQuizJoined,
     closeQuestionPopup,
-    pendingSubmitPayloadRef,
     resetQuestionFlow,
     answeredCurrentQuestion,
     shouldHideAnsweredPopup,

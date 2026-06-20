@@ -1,5 +1,15 @@
 import { defineConfig } from "vitest/config";
 
+/** Pure modules with unit tests — excludes DB-heavy services (quiz-service, app, feedback CRUD). */
+const SERVER_PURE_COVERAGE_INCLUDE = [
+  "src/scoring.ts",
+  "src/profanity.ts",
+  "src/reactions-service.ts",
+  "src/reaction-widget-stats.ts",
+  "src/cors-allow.ts",
+  "src/socket/submit-rate-limit.ts",
+];
+
 export default defineConfig({
   test: {
     projects: [
@@ -36,13 +46,13 @@ export default defineConfig({
       provider: "v8",
       reporter: ["text", "html", "lcov"],
       reportsDirectory: "./coverage",
-      include: ["src/**/*.ts"],
+      include: SERVER_PURE_COVERAGE_INCLUDE,
       exclude: ["src/**/*.test.ts", "src/index.ts"],
       thresholds: {
-        lines: 20,
-        branches: 50,
-        functions: 18,
-        statements: 20,
+        lines: 70,
+        branches: 55,
+        functions: 65,
+        statements: 70,
       },
     },
   },

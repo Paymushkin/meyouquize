@@ -44,6 +44,14 @@ jobs:
       - name: Unit tests and coverage
         run: npm run test:coverage
 
+      - name: Upload coverage to Codecov
+        if: github.event_name == 'push' || github.event_name == 'pull_request'
+        uses: codecov/codecov-action@v4
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          fail_ci_if_error: false
+          files: shared/coverage/lcov.info,server/coverage/lcov.info,client/coverage/lcov.info
+
       - name: Build
         run: npm run build
 
