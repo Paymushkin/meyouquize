@@ -578,7 +578,7 @@ export function QuestionChart(props: QuestionChartProps) {
   } as const;
 
   const barRows = question.type === "ranking" ? rankingBlock.rows : voteRows;
-  const hasOptionImages = questionHasOptionImages(optionsRows);
+  const hasOptionImages = questionHasOptionImages(question.optionStats);
   const rankingStatHeader = question.type === "ranking" ? rankingBlock.statColumnTitle : null;
   const answersCount = barRows.length;
   const longestAnswerLength = barRows.reduce((max, row) => Math.max(max, row.text.length), 0);

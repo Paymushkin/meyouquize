@@ -18,7 +18,7 @@ describe("questionHasOptionImages", () => {
   });
 
   it("returns false when no images", () => {
-    expect(questionHasOptionImages([{ text: "A" }, { text: "B" }])).toBe(false);
+    expect(questionHasOptionImages([{ imageUrl: "" }, { imageUrl: null }])).toBe(false);
   });
 });
 

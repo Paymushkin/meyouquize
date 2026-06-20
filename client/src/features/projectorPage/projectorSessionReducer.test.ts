@@ -1,3 +1,4 @@
+import { DEFAULT_PUBLIC_VIEW_STATE } from "@meyouquize/shared";
 import { describe, expect, it } from "vitest";
 import { projectorSessionReducer, initialProjectorSessionState } from "./projectorSessionReducer";
 
@@ -22,7 +23,12 @@ describe("projectorSessionReducer", () => {
   it("merges public view and title", () => {
     const next = projectorSessionReducer(initialProjectorSessionState, {
       type: "publicView",
-      payload: { mode: "question", questionId: "q1", title: "  Event  " },
+      payload: {
+        ...DEFAULT_PUBLIC_VIEW_STATE,
+        mode: "question",
+        questionId: "q1",
+        title: "  Event  ",
+      },
     });
     expect(next.view.mode).toBe("question");
     expect(next.view.questionId).toBe("q1");

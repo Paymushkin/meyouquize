@@ -202,6 +202,7 @@ describe("toQuestionReplaceInput", () => {
       }),
     );
     expect(payload.type).toBe("temperature");
+    if (payload.type !== "temperature") throw new Error("expected temperature question");
     expect(payload.temperatureSubtitle).toBe("Уровень тревоги");
     expect(payload.scoringMode).toBe("poll");
   });
