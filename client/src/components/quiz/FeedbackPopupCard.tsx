@@ -86,7 +86,7 @@ export function FeedbackPopupCard(props: Props) {
         sx={{
           width: "100%",
           maxWidth: 678,
-          maxHeight: "92vh",
+          maxHeight: "80vh",
           overflowY: "auto",
           bgcolor: "rgba(38, 38, 38, 0.84)",
           backdropFilter: "blur(4px)",
