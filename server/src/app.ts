@@ -674,6 +674,8 @@ export function buildApp() {
       brandPlayerBackgroundImageUrl: view.brandPlayerBackgroundImageUrl,
       brandBodyBackgroundColor: view.brandBodyBackgroundColor,
       brandLogoUrl: view.brandLogoUrl,
+      brandFontFamily: view.brandFontFamily,
+      brandFontUrl: view.brandFontUrl,
     });
   });
 

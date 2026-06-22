@@ -88,6 +88,7 @@ type EventTitleBlockProps = {
   restoreJoinPending: boolean;
   hasActiveQuestion: boolean;
   brandLogoUrl: string;
+  brandFontFamily: string;
   titleText: string;
 };
 
@@ -99,6 +100,7 @@ export function EventTitleBlock(props: EventTitleBlockProps) {
     restoreJoinPending,
     hasActiveQuestion,
     brandLogoUrl,
+    brandFontFamily,
     titleText,
   } = props;
   const safeBrandLogoUrl = sanitizeClientAssetUrl(brandLogoUrl);
@@ -161,14 +163,14 @@ export function EventTitleBlock(props: EventTitleBlockProps) {
             sx={
               isJoinScreen
                 ? {
-                    ...playerEventTitleSx(),
+                    ...playerEventTitleSx(brandFontFamily),
                     fontWeight: 800,
-                    fontSize: "clamp(2rem, 7vw, 3.5rem)",
+                    fontSize: "clamp(1.75rem, 6vw, 3rem)",
                     lineHeight: 1.08,
                     letterSpacing: 0.4,
                     mb: 0,
                   }
-                : playerEventTitleSx()
+                : playerEventTitleSx(brandFontFamily)
             }
           >
             {titleText}
@@ -544,6 +546,7 @@ const JOIN_CARD_CONTENT_SX: SxProps<Theme> = {
 export function buildJoinNicknameInputSx(
   focusColor: string,
   formTextColor: string,
+  brandFontFamily?: string,
 ): SxProps<Theme> {
   const outlineSx = {
     color: formTextColor,
@@ -558,10 +561,38 @@ export function buildJoinNicknameInputSx(
       borderColor: focusColor,
     },
   };
+  const fontSx: SxProps<Theme> = brandFontFamily
+    ? {
+        fontFamily: brandFontFamily,
+        fontStyle: "normal",
+        "& .MuiOutlinedInput-input": {
+          fontFamily: brandFontFamily,
+          fontStyle: "normal",
+        },
+        "& .MuiSelect-select": {
+          fontFamily: brandFontFamily,
+          fontStyle: "normal",
+        },
+        "& .MuiInputBase-input::placeholder": {
+          fontFamily: brandFontFamily,
+          fontStyle: "normal",
+          opacity: 1,
+        },
+        "& input::placeholder, & textarea::placeholder": {
+          fontFamily: brandFontFamily,
+          fontStyle: "normal",
+          opacity: 1,
+        },
+      }
+    : {};
   return {
     minHeight: 56,
     ...outlineSx,
-    "& .MuiOutlinedInput-root": outlineSx,
+    ...fontSx,
+    "& .MuiOutlinedInput-root": {
+      ...outlineSx,
+      ...(brandFontFamily ? { fontFamily: brandFontFamily, fontStyle: "normal" } : {}),
+    },
   };
 }
 
@@ -785,6 +816,7 @@ type JoinCardProps = {
   formBackgroundColor: string;
   formTextColor: string;
   formInputTextColor: string;
+  brandFontFamily: string;
   nickname: string;
   nicknameError?: string;
   nicknameInputRef: RefObject<HTMLInputElement | null>;
@@ -798,6 +830,7 @@ export function JoinCard(props: JoinCardProps) {
     formBackgroundColor,
     formTextColor,
     formInputTextColor,
+    brandFontFamily,
     nickname,
     nicknameError,
     nicknameInputRef,
@@ -819,7 +852,11 @@ export function JoinCard(props: JoinCardProps) {
                 placeholder="Введите имя или используйте случайное"
                 fullWidth
                 error={Boolean(nicknameError)}
-                sx={buildJoinNicknameInputSx(formBackgroundColor, formInputTextColor)}
+                sx={buildJoinNicknameInputSx(
+                  formBackgroundColor,
+                  formInputTextColor,
+                  brandFontFamily,
+                )}
               />
               <Button
                 variant="outlined"

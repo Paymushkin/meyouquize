@@ -23,35 +23,20 @@ import {
   filterActualSpeakerQuestions,
   filterMySpeakerQuestions,
 } from "../../features/speakerQuestions/playerSpeakerQuestionsLists";
-import {
-  buildBrandPrimaryContainedButtonSx,
-  buildJoinNicknameInputSx,
-} from "../../pages/quiz-play/QuizPlayBrandingBlocks";
+import { buildBrandPrimaryContainedButtonSx } from "../../pages/quiz-play/QuizPlayBrandingBlocks";
 import {
   PLAYER_DIALOG_CONTENT_SX,
-  PLAYER_DIALOG_PAPER_SX,
   PLAYER_DIALOG_TITLE_SX,
+  buildPlayerDialogPaperSx,
+  buildPlayerDialogFieldLabelSx,
+  buildPlayerDialogSelectMenuProps,
   buildPlayerDialogTabsSx,
+  buildPlayerDialogTextFieldSx,
 } from "./playerDialogStyles";
 
 const DEFAULT_SPEAKER_REACTIONS = ["👍", "🔥", "👏", "❤️"];
 
 type QuestionsTab = "actual" | "mine";
-
-function buildPlayerDialogTextFieldSx(focusColor: string, inputTextColor: string) {
-  return {
-    ...buildJoinNicknameInputSx(focusColor, inputTextColor),
-    "& .MuiInputLabel-root": {
-      color: alpha(inputTextColor, 0.72),
-    },
-    "& .MuiInputLabel-root.Mui-focused": {
-      color: inputTextColor,
-    },
-    "& .MuiSelect-icon": {
-      color: alpha(inputTextColor, 0.72),
-    },
-  };
-}
 
 const ALL_SPEAKERS_TARGET = "Все спикеры";
 const ALL_SPEAKERS_TARGET_LABEL = "Всем спикерам";
@@ -126,6 +111,7 @@ type Props = {
   formBackgroundColor: string;
   formTextColor: string;
   formInputTextColor: string;
+  brandFontFamily: string;
   onClose: () => void;
   onSpeakerNameChange: (next: string) => void;
   onSpeakerQuestionTextChange: (next: string) => void;
@@ -142,6 +128,7 @@ export function SpeakerQuestionsDialog({
   formBackgroundColor,
   formTextColor,
   formInputTextColor,
+  brandFontFamily,
   onClose,
   onSpeakerNameChange,
   onSpeakerQuestionTextChange,
@@ -161,7 +148,17 @@ export function SpeakerQuestionsDialog({
   const showMineTab = mineItems.length > 0;
   const showQuestionsSection = actualItems.length > 0 || mineItems.length > 0;
   const [tab, setTab] = useState<QuestionsTab>("actual");
-  const textFieldSx = buildPlayerDialogTextFieldSx(formBackgroundColor, formInputTextColor);
+  const textFieldSx = buildPlayerDialogTextFieldSx(
+    formBackgroundColor,
+    formInputTextColor,
+    brandFontFamily,
+  );
+  const fieldLabelSx = buildPlayerDialogFieldLabelSx(formInputTextColor, brandFontFamily);
+  const selectMenuProps = buildPlayerDialogSelectMenuProps(
+    brandFontFamily,
+    formBackgroundColor,
+    formTextColor,
+  );
 
   useEffect(() => {
     if (!open) return;
@@ -185,7 +182,7 @@ export function SpeakerQuestionsDialog({
       fullWidth
       maxWidth="sm"
       PaperProps={{
-        sx: PLAYER_DIALOG_PAPER_SX,
+        sx: buildPlayerDialogPaperSx(brandFontFamily),
       }}
     >
       <DialogTitle sx={PLAYER_DIALOG_TITLE_SX}>
@@ -195,32 +192,47 @@ export function SpeakerQuestionsDialog({
         </IconButton>
       </DialogTitle>
       <DialogContent sx={PLAYER_DIALOG_CONTENT_SX}>
-        <Stack spacing={1} sx={{ pt: 0.5 }}>
-          <TextField
-            select
-            label="Кому вопрос"
-            size="small"
-            value={speakerName}
-            onChange={(e) => onSpeakerNameChange(e.target.value)}
-            sx={textFieldSx}
-          >
-            <MenuItem value={ALL_SPEAKERS_TARGET}>{ALL_SPEAKERS_TARGET_LABEL}</MenuItem>
-            {(speakerQuestions?.settings.speakers ?? []).map((name) => (
-              <MenuItem key={name} value={name}>
-                {name}
-              </MenuItem>
-            ))}
-          </TextField>
-          <TextField
-            label="Ваш вопрос"
-            size="small"
-            multiline
-            minRows={2}
-            maxRows={4}
-            value={speakerQuestionText}
-            onChange={(e) => onSpeakerQuestionTextChange(e.target.value)}
-            sx={textFieldSx}
-          />
+        <Stack spacing={1.5}>
+          <Stack spacing={0.75}>
+            <Typography component="label" sx={fieldLabelSx}>
+              Кому вопрос
+            </Typography>
+            <TextField
+              select
+              hiddenLabel
+              size="small"
+              value={speakerName}
+              onChange={(e) => onSpeakerNameChange(e.target.value)}
+              sx={textFieldSx}
+              slotProps={{
+                select: {
+                  MenuProps: selectMenuProps,
+                },
+              }}
+            >
+              <MenuItem value={ALL_SPEAKERS_TARGET}>{ALL_SPEAKERS_TARGET_LABEL}</MenuItem>
+              {(speakerQuestions?.settings.speakers ?? []).map((name) => (
+                <MenuItem key={name} value={name}>
+                  {name}
+                </MenuItem>
+              ))}
+            </TextField>
+          </Stack>
+          <Stack spacing={0.75}>
+            <Typography component="label" sx={fieldLabelSx}>
+              Ваш вопрос
+            </Typography>
+            <TextField
+              hiddenLabel
+              size="small"
+              multiline
+              minRows={2}
+              maxRows={4}
+              value={speakerQuestionText}
+              onChange={(e) => onSpeakerQuestionTextChange(e.target.value)}
+              sx={textFieldSx}
+            />
+          </Stack>
           <Button
             variant="contained"
             onClick={onSubmit}
@@ -237,7 +249,7 @@ export function SpeakerQuestionsDialog({
                   value={tab}
                   onChange={(_, next: QuestionsTab) => setTab(next)}
                   variant="fullWidth"
-                  sx={buildPlayerDialogTabsSx(formBackgroundColor)}
+                  sx={buildPlayerDialogTabsSx(formBackgroundColor, brandFontFamily)}
                 >
                   <Tab value="actual" label="Актуальные вопросы" />
                   <Tab value="mine" label="Мои вопросы" />

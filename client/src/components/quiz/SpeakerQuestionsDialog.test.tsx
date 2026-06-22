@@ -27,6 +27,7 @@ function renderDialog(
     formBackgroundColor: "#F3F722",
     formTextColor: "#000000",
     formInputTextColor: "#ffffff",
+    brandFontFamily: "Jost, Arial, sans-serif",
     onClose: vi.fn(),
     onSpeakerNameChange: vi.fn(),
     onSpeakerQuestionTextChange: vi.fn(),

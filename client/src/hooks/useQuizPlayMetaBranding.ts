@@ -24,6 +24,8 @@ export function useQuizPlayMetaBranding({ slug, quiz }: Params) {
   const [metaBrandTextColor, setMetaBrandTextColor] = useState(DEFAULT_BRAND_TEXT);
   const [metaBrandInputTextColor, setMetaBrandInputTextColor] = useState(DEFAULT_BRAND_INPUT_TEXT);
   const [metaBrandLogoUrl, setMetaBrandLogoUrl] = useState("");
+  const [metaBrandFontFamily, setMetaBrandFontFamily] = useState("");
+  const [metaBrandFontUrl, setMetaBrandFontUrl] = useState("");
 
   useEffect(() => {
     document.title = quiz?.title?.trim() || "Квиз";
@@ -53,6 +55,8 @@ export function useQuizPlayMetaBranding({ slug, quiz }: Params) {
           brandTextColor?: string;
           brandInputTextColor?: string;
           brandLogoUrl?: string;
+          brandFontFamily?: string;
+          brandFontUrl?: string;
         };
         if (typeof payload.title === "string") {
           setQuizTitle(payload.title);
@@ -81,6 +85,12 @@ export function useQuizPlayMetaBranding({ slug, quiz }: Params) {
         if (typeof payload.brandLogoUrl === "string") {
           setMetaBrandLogoUrl(payload.brandLogoUrl);
         }
+        if (typeof payload.brandFontFamily === "string" && payload.brandFontFamily.trim()) {
+          setMetaBrandFontFamily(payload.brandFontFamily);
+        }
+        if (typeof payload.brandFontUrl === "string") {
+          setMetaBrandFontUrl(payload.brandFontUrl);
+        }
       } catch {
         // ignore network errors, socket state can still provide title later
       }
@@ -95,7 +105,18 @@ export function useQuizPlayMetaBranding({ slug, quiz }: Params) {
     if (typeof quiz?.brandLogoUrl === "string") {
       setMetaBrandLogoUrl(quiz.brandLogoUrl);
     }
-  }, [quiz?.brandLogoUrl, quiz?.brandPlayerBackgroundImageUrl]);
+    if (typeof quiz?.brandFontFamily === "string" && quiz.brandFontFamily.trim()) {
+      setMetaBrandFontFamily(quiz.brandFontFamily);
+    }
+    if (typeof quiz?.brandFontUrl === "string") {
+      setMetaBrandFontUrl(quiz.brandFontUrl);
+    }
+  }, [
+    quiz?.brandFontFamily,
+    quiz?.brandFontUrl,
+    quiz?.brandLogoUrl,
+    quiz?.brandPlayerBackgroundImageUrl,
+  ]);
 
   const titleText = useMemo(
     () => quiz?.title?.trim() || quizTitle.trim(),
@@ -139,6 +160,14 @@ export function useQuizPlayMetaBranding({ slug, quiz }: Params) {
       DEFAULT_BRAND_INPUT_TEXT,
     [metaBrandInputTextColor, quiz?.brandInputTextColor],
   );
+  const brandFontFamily = useMemo(
+    () => quiz?.brandFontFamily?.trim() || metaBrandFontFamily.trim() || "Jost, Arial, sans-serif",
+    [metaBrandFontFamily, quiz?.brandFontFamily],
+  );
+  const brandFontUrl = useMemo(
+    () => quiz?.brandFontUrl?.trim() || metaBrandFontUrl.trim() || "",
+    [metaBrandFontUrl, quiz?.brandFontUrl],
+  );
 
   return {
     titleText,
@@ -150,5 +179,7 @@ export function useQuizPlayMetaBranding({ slug, quiz }: Params) {
     brandPlayerBackgroundImageUrl,
     brandBodyBackgroundColor,
     brandLogoUrl,
+    brandFontFamily,
+    brandFontUrl,
   };
 }

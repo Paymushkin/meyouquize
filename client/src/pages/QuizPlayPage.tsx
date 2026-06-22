@@ -29,8 +29,9 @@ import { PlayerVoteResultsDialog } from "../components/quiz/PlayerVoteResultsDia
 import { PlayerQuizReportDialog } from "../components/quiz/PlayerQuizReportDialog";
 import {
   PLAYER_DIALOG_CONTENT_SX,
-  PLAYER_DIALOG_PAPER_SX,
   PLAYER_DIALOG_TITLE_SX,
+  buildPlayerDialogPaperSx,
+  buildPlayerDialogTextFieldSx,
 } from "../components/quiz/playerDialogStyles";
 import { useQuizPlayCompletion } from "../hooks/useQuizPlayCompletion";
 import { useQuizPlayScrollLock } from "../hooks/useQuizPlayScrollLock";
@@ -54,7 +55,6 @@ import {
   JOIN_SCREEN_MAIN_SX,
   JOIN_SCREEN_STACK_SX,
   buildBrandPrimaryContainedButtonSx,
-  buildJoinNicknameInputSx,
   PlayerIdentityBar,
   PlayerTilesGrid,
   ReactionsDock,
@@ -339,6 +339,8 @@ export function QuizPlayPage() {
     brandPlayerBackgroundImageUrl,
     brandBodyBackgroundColor,
     brandLogoUrl,
+    brandFontFamily,
+    brandFontUrl,
   } = useQuizPlayMetaBranding({
     slug,
     quiz,
@@ -548,8 +550,7 @@ export function QuizPlayPage() {
   ]);
   const playerVoteOptionTextColor = quiz?.playerVoteOptionTextColor?.trim() || "#ffffff";
   const playerVoteProgressBarColor = quiz?.playerVoteProgressBarColor?.trim() || "#F3F722";
-  const brandFontFamily = quiz?.brandFontFamily?.trim() || "Jost, Arial, sans-serif";
-  useBrandFont(brandFontFamily, quiz?.brandFontUrl);
+  useBrandFont(brandFontFamily, brandFontUrl);
   useEventFavicon(brandLogoUrl);
   const tileOrder = useMemo(
     () => buildPlayerTilesOrder(quiz?.playerTilesOrder, visiblePlayerBanners),
@@ -695,6 +696,7 @@ export function QuizPlayPage() {
                 restoreJoinPending={restoreJoinPending}
                 hasActiveQuestion={hasActiveQuestion}
                 brandLogoUrl={brandLogoUrl}
+                brandFontFamily={brandFontFamily}
                 titleText={titleText}
               />
             ) : null}
@@ -736,6 +738,7 @@ export function QuizPlayPage() {
                     formBackgroundColor={formBackgroundColor}
                     formTextColor={formTextColor}
                     formInputTextColor={formInputTextColor}
+                    brandFontFamily={brandFontFamily}
                     nickname={nickname}
                     nicknameError={nicknameError}
                     nicknameInputRef={nicknameInputRef}
@@ -845,6 +848,7 @@ export function QuizPlayPage() {
               formBackgroundColor={formBackgroundColor}
               formTextColor={formTextColor}
               formInputTextColor={formInputTextColor}
+              brandFontFamily={brandFontFamily}
               onClose={() => setSpeakerDialogOpen(false)}
               onSpeakerNameChange={setSpeakerName}
               onSpeakerQuestionTextChange={setSpeakerQuestionText}
@@ -858,7 +862,7 @@ export function QuizPlayPage() {
               fullWidth
               maxWidth="xs"
               PaperProps={{
-                sx: PLAYER_DIALOG_PAPER_SX,
+                sx: buildPlayerDialogPaperSx(brandFontFamily),
               }}
             >
               <DialogTitle sx={PLAYER_DIALOG_TITLE_SX}>Изменить имя</DialogTitle>
@@ -870,7 +874,11 @@ export function QuizPlayPage() {
                   value={nicknameDraft}
                   onChange={(e) => setNicknameDraft(e.target.value)}
                   placeholder="Введите новое имя"
-                  sx={buildJoinNicknameInputSx(formBackgroundColor, formInputTextColor)}
+                  sx={buildPlayerDialogTextFieldSx(
+                    formBackgroundColor,
+                    formInputTextColor,
+                    brandFontFamily,
+                  )}
                 />
               </DialogContent>
               <DialogActions sx={{ px: 3, pb: 2, pt: 0.5, justifyContent: "space-between" }}>

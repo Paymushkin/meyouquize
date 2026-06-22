@@ -83,13 +83,14 @@ export function playerPopupQuestionTitleSx(textLength: number): SxProps<Theme> {
   };
 }
 
-export function playerEventTitleSx(): SxProps<Theme> {
+export function playerEventTitleSx(brandFontFamily?: string): SxProps<Theme> {
   return {
     width: "100%",
     fontWeight: 400,
     fontStyle: "normal",
+    ...(brandFontFamily ? { fontFamily: brandFontFamily } : {}),
     letterSpacing: 0.2,
-    fontSize: "clamp(1.6rem, 4.8vw, 2.8rem)",
+    fontSize: "clamp(1.4rem, 4.2vw, 2.45rem)",
     lineHeight: PLAYER_EVENT_TITLE_LINE_HEIGHT,
     whiteSpace: "pre-line",
     mb: 4,
