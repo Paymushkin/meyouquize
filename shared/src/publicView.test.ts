@@ -75,6 +75,29 @@ describe("normalizePublicViewState", () => {
     });
     expect(state.questionId).toBe("q-1");
   });
+
+  it("keeps tag cloud manual map by question id", () => {
+    const state = normalizePublicViewState({
+      tagCloudManualByQuestionId: {
+        "q-1": {
+          hiddenTagTexts: ["скрытый"],
+          injectedTagWords: [{ text: "врач", count: 10 }],
+          tagCountOverrides: [{ text: "синий", count: 3 }],
+        },
+        "": {
+          hiddenTagTexts: ["ignored"],
+          injectedTagWords: [],
+          tagCountOverrides: [],
+        },
+      },
+    });
+    expect(state.tagCloudManualByQuestionId["q-1"]).toEqual({
+      hiddenTagTexts: ["скрытый"],
+      injectedTagWords: [{ text: "врач", count: 10 }],
+      tagCountOverrides: [{ text: "синий", count: 3 }],
+    });
+    expect(state.tagCloudManualByQuestionId[""]).toBeUndefined();
+  });
 });
 
 describe("mergePublicViewState", () => {

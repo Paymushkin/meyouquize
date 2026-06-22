@@ -7,6 +7,11 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 export default defineConfig({
   plugins: [react()],
+  resolve: {
+    alias: {
+      "@meyouquize/shared": path.resolve(__dirname, "../shared/src/index.ts"),
+    },
+  },
   server: {
     host: true,
     /**

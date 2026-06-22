@@ -111,6 +111,14 @@ export type ReportModuleId =
   | "speaker_questions_summary";
 
 export type CloudWordCount = { text: string; count: number };
+
+export type TagCloudQuestionManualState = {
+  hiddenTagTexts: string[];
+  injectedTagWords: CloudWordCount[];
+  tagCountOverrides: CloudWordCount[];
+};
+
+export type TagCloudManualByQuestionId = Record<string, TagCloudQuestionManualState>;
 export type PublicBanner = {
   id: string;
   linkUrl: string;
@@ -147,6 +155,8 @@ export interface PublicViewState {
   hiddenTagTexts: string[];
   injectedTagWords: CloudWordCount[];
   tagCountOverrides: CloudWordCount[];
+  /** Ручные теги облака по questionId (сохраняются на сервере между перезапусками). */
+  tagCloudManualByQuestionId: TagCloudManualByQuestionId;
   projectorBackground: string;
   cloudQuestionColor: string;
   cloudTagColors: string[];
@@ -382,6 +392,7 @@ export const DEFAULT_PUBLIC_VIEW_STATE: PublicViewState = {
   hiddenTagTexts: [],
   injectedTagWords: [],
   tagCountOverrides: [],
+  tagCloudManualByQuestionId: {},
   projectorBackground: "#7c5acb",
   cloudQuestionColor: "#1f1f1f",
   cloudTagColors: ["#1f1f1f", "#1976d2", "#2e7d32", "#ef6c00", "#6a1b9a"],
@@ -639,6 +650,41 @@ function sanitizeCloudWords(
       text: item.text.trim().slice(0, 120),
       count: clampInt(item.count, minCount, 100000),
     }));
+}
+
+function sanitizeHiddenTagTexts(items: string[] | undefined): string[] {
+  if (!Array.isArray(items)) return [];
+  return items
+    .filter((item) => typeof item === "string" && item.trim().length > 0)
+    .map((item) => item.trim().slice(0, 120));
+}
+
+function sanitizeTagCloudQuestionManualState(value: unknown): TagCloudQuestionManualState | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const row = value as Partial<TagCloudQuestionManualState>;
+  const hiddenTagTexts = sanitizeHiddenTagTexts(row.hiddenTagTexts);
+  const injectedTagWords = sanitizeCloudWords(row.injectedTagWords, 1);
+  const tagCountOverrides = sanitizeCloudWords(row.tagCountOverrides, 0);
+  if (
+    hiddenTagTexts.length === 0 &&
+    injectedTagWords.length === 0 &&
+    tagCountOverrides.length === 0
+  ) {
+    return null;
+  }
+  return { hiddenTagTexts, injectedTagWords, tagCountOverrides };
+}
+
+export function sanitizeTagCloudManualByQuestionId(value: unknown): TagCloudManualByQuestionId {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return {};
+  const out: TagCloudManualByQuestionId = {};
+  for (const [key, raw] of Object.entries(value)) {
+    const questionId = key.trim().slice(0, 80);
+    if (!questionId) continue;
+    const state = sanitizeTagCloudQuestionManualState(raw);
+    if (state) out[questionId] = state;
+  }
+  return out;
 }
 
 function sanitizeHex6(value: string | undefined, fallback: string): string {
@@ -916,6 +962,9 @@ export function normalizePublicViewState(
       : [...base.hiddenTagTexts],
     injectedTagWords: sanitizeCloudWords(value?.injectedTagWords, 1),
     tagCountOverrides: sanitizeCloudWords(value?.tagCountOverrides, 0),
+    tagCloudManualByQuestionId: sanitizeTagCloudManualByQuestionId(
+      value?.tagCloudManualByQuestionId ?? base.tagCloudManualByQuestionId,
+    ),
     projectorBackground: sanitizeHex6(value?.projectorBackground, base.projectorBackground),
     cloudQuestionColor: sanitizeHex6(value?.cloudQuestionColor, base.cloudQuestionColor),
     cloudTagColors: sanitizePalette(value?.cloudTagColors, base.cloudTagColors),

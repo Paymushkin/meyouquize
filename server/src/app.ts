@@ -17,6 +17,7 @@ import {
   patchQuestionAdminDoneSchema,
   patchQuestionProjectorSchema,
   patchSubQuizTitleSchema,
+  patchTagCloudManualSchema,
   replaceRoomContentSchema,
   updateRoomSchema,
   upsertFeedbackFormSchema,
@@ -47,6 +48,7 @@ import {
   getSubQuizDetailedResults,
   patchQuestionAdminDone,
   patchQuestionProjectorSettings,
+  patchTagCloudManualByQuestionId,
   replaceRoomContent,
   updateRoomTitle,
   updateSubQuizTitle,
@@ -422,6 +424,31 @@ export function buildApp() {
         .json({ error: message });
     }
   });
+
+  app.patch(
+    "/api/admin/rooms/:eventName/tag-cloud-manual",
+    adminAuthMiddleware,
+    async (req, res) => {
+      const eventName = Array.isArray(req.params.eventName)
+        ? req.params.eventName[0]
+        : req.params.eventName;
+      const parsed = patchTagCloudManualSchema.safeParse(req.body);
+      if (!parsed.success) {
+        const first = parsed.error.issues[0];
+        const where = first?.path?.length ? first.path.join(".") : "payload";
+        const message = first?.message ?? "Invalid payload";
+        return res.status(400).json({ error: `${where}: ${message}` });
+      }
+      try {
+        await patchTagCloudManualByQuestionId(eventName, parsed.data.tagCloudManualByQuestionId);
+        const room = await getRoomByEventName(eventName);
+        return res.json(room);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "Not found";
+        return res.status(message === "Room not found" ? 404 : 400).json({ error: message });
+      }
+    },
+  );
 
   app.patch(
     "/api/admin/rooms/:eventName/sub-quizzes/:subQuizId",

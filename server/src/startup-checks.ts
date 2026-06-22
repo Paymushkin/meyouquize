@@ -2,7 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { PrismaClient, type Prisma } from "@prisma/client";
-import { normalizePublicViewState } from "@meyouquize/shared";
+import { normalizePublicViewState, sanitizeTagCloudManualByQuestionId } from "@meyouquize/shared";
 import { env } from "./env.js";
 import { prisma } from "./prisma.js";
 
@@ -65,12 +65,18 @@ export async function resetProjectorViewOnStartup() {
         ? row.publicView
         : {};
     const normalized = normalizePublicViewState(rawView);
+    const rawManual = (rawView as Record<string, unknown>).tagCloudManualByQuestionId;
+    const tagCloudManualByQuestionId =
+      Object.keys(normalized.tagCloudManualByQuestionId).length > 0
+        ? normalized.tagCloudManualByQuestionId
+        : sanitizeTagCloudManualByQuestionId(rawManual);
     if (normalized.mode === "title" && normalized.questionId === undefined) continue;
     await prisma.quiz.update({
       where: { id: row.id },
       data: {
         publicView: {
           ...normalized,
+          tagCloudManualByQuestionId,
           mode: "title",
           questionId: undefined,
         } as unknown as Prisma.InputJsonValue,

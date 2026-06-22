@@ -345,6 +345,30 @@ export const setPublicViewSchema = z.object({
     )
     .max(300)
     .optional(),
+  tagCloudManualByQuestionId: z
+    .record(
+      z.string().min(1).max(80),
+      z.object({
+        hiddenTagTexts: z.array(z.string().min(1).max(120)).max(300),
+        injectedTagWords: z
+          .array(
+            z.object({
+              text: z.string().min(1).max(120),
+              count: z.number().int().min(1).max(100000),
+            }),
+          )
+          .max(300),
+        tagCountOverrides: z
+          .array(
+            z.object({
+              text: z.string().min(1).max(120),
+              count: z.number().int().min(0).max(100000),
+            }),
+          )
+          .max(300),
+      }),
+    )
+    .optional(),
   projectorBackground: z
     .string()
     .regex(/^#([0-9a-fA-F]{6})$/)
@@ -721,4 +745,32 @@ export const closeSubQuizSchema = z.object({
 export const startSubQuizAutoSchema = z.object({
   quizId: z.string().min(1),
   subQuizId: z.string().min(1),
+});
+
+const tagCloudQuestionManualSchema = z.object({
+  hiddenTagTexts: z.array(z.string().min(1).max(120)).max(300),
+  injectedTagWords: z
+    .array(
+      z.object({
+        text: z.string().min(1).max(120),
+        count: z.number().int().min(1).max(100000),
+      }),
+    )
+    .max(300),
+  tagCountOverrides: z
+    .array(
+      z.object({
+        text: z.string().min(1).max(120),
+        count: z.number().int().min(0).max(100000),
+      }),
+    )
+    .max(300),
+});
+
+export const patchTagCloudManualSchema = z.object({
+  tagCloudManualByQuestionId: z
+    .record(z.string().min(1).max(80), tagCloudQuestionManualSchema)
+    .refine((value) => Object.keys(value).length > 0, {
+      message: "tagCloudManualByQuestionId must not be empty",
+    }),
 });

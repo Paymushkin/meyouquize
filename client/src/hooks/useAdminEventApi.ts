@@ -19,7 +19,8 @@ import {
   type SubQuizSheet,
 } from "../admin/adminEventForm";
 import { API_BASE } from "../config";
-import { readCloudManualFromStorage } from "../publicViewContract";
+import { mergeCloudManualSources, readCloudManualFromPublicView } from "../features/tagCloudAdmin";
+import { readCloudManualFromStorage, type CloudManualStateByQuestion } from "../publicViewContract";
 import { socket } from "../socket";
 import { parseApiErrorMessage } from "../utils/apiError";
 
@@ -86,7 +87,10 @@ export function useAdminEventApi(params: Params) {
     });
     if (!response.ok) return;
     const data = (await response.json()) as AdminEventRoom;
-    const cloudManual = readCloudManualFromStorage(cloudManualStorageKey);
+    const cloudManual = mergeCloudManualSources(
+      readCloudManualFromPublicView(data.publicView),
+      readCloudManualFromStorage(cloudManualStorageKey),
+    );
     const sheets: SubQuizSheet[] = data.subQuizzes.map((s) => ({
       id: s.id,
       title: s.title,
@@ -160,7 +164,10 @@ export function useAdminEventApi(params: Params) {
       }
       lastPersistQuestionsErrorRef.current = null;
       const updatedRoom = (await response.json()) as AdminEventRoom;
-      const cloudManual = readCloudManualFromStorage(cloudManualStorageKey);
+      const cloudManual = mergeCloudManualSources(
+        readCloudManualFromPublicView(updatedRoom.publicView),
+        readCloudManualFromStorage(cloudManualStorageKey),
+      );
       const merged = mergeRoomReloadIntoState(
         updatedRoom,
         { sheets, questions: normalizedQuestions },
@@ -320,11 +327,40 @@ export function useAdminEventApi(params: Params) {
     [eventName, setMessage, setRoom],
   );
 
+  const persistTagCloudManual = useCallback(
+    async (manual: CloudManualStateByQuestion): Promise<boolean> => {
+      if (Object.keys(manual).length === 0) return true;
+      try {
+        const response = await fetch(
+          `${API_BASE}/api/admin/rooms/${encodeURIComponent(eventName)}/tag-cloud-manual`,
+          {
+            method: "PATCH",
+            credentials: "include",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({ tagCloudManualByQuestionId: manual }),
+          },
+        );
+        if (!response.ok) {
+          setMessage("Не удалось сохранить ручные теги облака");
+          return false;
+        }
+        const updatedRoom = (await response.json()) as AdminEventRoom;
+        setRoom(updatedRoom);
+        return true;
+      } catch {
+        setMessage("Не удалось сохранить ручные теги облака");
+        return false;
+      }
+    },
+    [eventName, setMessage, setRoom],
+  );
+
   return {
     authChecked,
     checkSession,
     loadRoom,
     persistQuestions,
+    persistTagCloudManual,
     lastPersistQuestionsErrorRef,
     patchQuestionProjectorSettings,
     patchQuestionAdminDone,

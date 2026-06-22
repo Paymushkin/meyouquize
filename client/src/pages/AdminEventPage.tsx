@@ -100,9 +100,11 @@ import {
   type PublicViewMode,
 } from "../publicViewContract";
 import {
+  buildCloudManualFromQuestions,
   buildTagResultsDisplayOrder,
   mergeInjectedTagWords,
   parseInjectedTagLines,
+  readCloudManualFromPublicView,
   setTagCountOverrideRow,
   toggleHiddenTagText,
 } from "../features/tagCloudAdmin";
@@ -798,6 +800,7 @@ export function AdminEventPage() {
     checkSession,
     loadRoom,
     persistQuestions,
+    persistTagCloudManual,
     lastPersistQuestionsErrorRef,
     patchQuestionProjectorSettings,
     patchQuestionAdminDone,
@@ -820,6 +823,13 @@ export function AdminEventPage() {
   const autoSaveQuestions = useCallback(async () => {
     await persistQuestions(questionForms, subQuizSheets);
   }, [persistQuestions, questionForms, subQuizSheets]);
+
+  const persistCloudManualSnapshot = useCallback(
+    (forms: QuestionForm[]) => {
+      void persistTagCloudManual(buildCloudManualFromQuestions(forms));
+    },
+    [persistTagCloudManual],
+  );
 
   /** Синхронно до размонтирования диалога: иначе эффект персиста при `false` стирает LS, а отложенный setTimeout не успевает. */
   const pinExpandedSubQuiz = useCallback(
@@ -1435,6 +1445,22 @@ export function AdminEventPage() {
     }
     const qid = typeof pv.questionId === "string" ? pv.questionId : undefined;
     if (qid) setQuestionForms((prev) => patchQuestionsFromPublicView(prev, pv));
+    const cloudManual = readCloudManualFromPublicView(pv);
+    if (Object.keys(cloudManual).length > 0) {
+      setQuestionForms((prev) =>
+        prev.map((question) => {
+          if (!question.id) return question;
+          const entry = cloudManual[question.id];
+          if (!entry) return question;
+          return {
+            ...question,
+            hiddenTagTexts: entry.hiddenTagTexts,
+            injectedTagWords: entry.injectedTagWords,
+            tagCountOverrides: entry.tagCountOverrides,
+          };
+        }),
+      );
+    }
     const b = toBrandingState(pv);
     setProjectorBackground(b.projectorBackground);
     setCloudQuestionColor(b.cloudQuestionColor);
@@ -3449,9 +3475,13 @@ export function AdminEventPage() {
   function toggleTagVisibility(questionIndex: number, tagText: string) {
     const question = questionForms[questionIndex];
     const nextHidden = toggleHiddenTagText(question.hiddenTagTexts ?? [], tagText);
-    setQuestionForms((prev) =>
-      prev.map((q, idx) => (idx === questionIndex ? { ...q, hiddenTagTexts: nextHidden } : q)),
-    );
+    setQuestionForms((prev) => {
+      const next = prev.map((q, idx) =>
+        idx === questionIndex ? { ...q, hiddenTagTexts: nextHidden } : q,
+      );
+      persistCloudManualSnapshot(next);
+      return next;
+    });
     if (
       !quizId ||
       publicViewMode !== "question" ||
@@ -3478,11 +3508,13 @@ export function AdminEventPage() {
       return;
     }
     const nextWords = mergeInjectedTagWords(question.injectedTagWords ?? [], parsed);
-    setQuestionForms((prev) =>
-      prev.map((q, idx) =>
+    setQuestionForms((prev) => {
+      const next = prev.map((q, idx) =>
         idx === questionIndex ? { ...q, injectedTagWords: nextWords, injectedTagsInput: "" } : q,
-      ),
-    );
+      );
+      persistCloudManualSnapshot(next);
+      return next;
+    });
     if (
       !quizId ||
       publicViewMode !== "question" ||
@@ -3509,11 +3541,13 @@ export function AdminEventPage() {
       tagText,
       nextCount,
     );
-    setQuestionForms((prev) =>
-      prev.map((q, idx) =>
+    setQuestionForms((prev) => {
+      const next = prev.map((q, idx) =>
         idx === questionIndex ? { ...q, tagCountOverrides: nextOverrides } : q,
-      ),
-    );
+      );
+      persistCloudManualSnapshot(next);
+      return next;
+    });
     if (
       !quizId ||
       publicViewMode !== "question" ||

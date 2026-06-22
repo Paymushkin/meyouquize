@@ -229,6 +229,7 @@ export function ProjectorQuestionSection(props: ProjectorQuestionSectionProps) {
                 voteProgressTrackColor={view.voteProgressTrackColor}
                 voteProgressBarColor={view.voteProgressBarColor}
                 brandPrimaryColor={view.brandPrimaryColor}
+                brandFontFamily={view.brandFontFamily}
                 cloudHeader={tagCloudHeader}
               />
             </Stack>

@@ -75,6 +75,7 @@ export type QuestionChartProps = {
   voteProgressTrackColor?: string;
   voteProgressBarColor?: string;
   brandPrimaryColor?: string;
+  brandFontFamily?: string;
   /** Заголовок вопроса внутри блока облака (вместо отдельной строки над областью чарта) */
   cloudHeader?: ReactNode;
 };
@@ -102,10 +103,11 @@ export function QuestionChart(props: QuestionChartProps) {
     voteProgressTrackColor = "#e3e3e3",
     voteProgressBarColor = "#1976d2",
     brandPrimaryColor = "#1976d2",
+    brandFontFamily,
     cloudHeader,
   } = props;
   const theme = useTheme();
-  const cloudFontFamily = resolveMuiFontFamily(theme);
+  const cloudFontFamily = brandFontFamily?.trim() || resolveMuiFontFamily(theme);
   const [layoutWords, setLayoutWords] = useState<ProjectorLayoutWord[]>([]);
   const [cloudSize, setCloudSize] = useState({ width: 920, height: 440 });
   const cloudContainerRef = useRef<HTMLDivElement | null>(null);

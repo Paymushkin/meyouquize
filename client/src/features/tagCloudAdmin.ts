@@ -1,4 +1,5 @@
-import type { CloudWordCount } from "@meyouquize/shared";
+import { sanitizeTagCloudManualByQuestionId, type CloudWordCount } from "@meyouquize/shared";
+import type { CloudManualStateByQuestion } from "../publicViewContract";
 
 /**
  * Парсит многострочный ввод вида «слово 10» / «слово: 5» в список пар text/count.
@@ -21,7 +22,10 @@ export function parseInjectedTagLines(value: string): CloudWordCount[] {
 }
 
 /** Сливает распарсенные строки с уже сохранёнными injected-словами (суммирует count по text). */
-export function mergeInjectedTagWords(existing: CloudWordCount[], parsed: CloudWordCount[]): CloudWordCount[] {
+export function mergeInjectedTagWords(
+  existing: CloudWordCount[],
+  parsed: CloudWordCount[],
+): CloudWordCount[] {
   const nextWords = [...existing];
   parsed.forEach((item) => {
     const idx = nextWords.findIndex((w) => w.text === item.text);
@@ -32,7 +36,9 @@ export function mergeInjectedTagWords(existing: CloudWordCount[], parsed: CloudW
 }
 
 export function toggleHiddenTagText(hidden: string[], tagText: string): string[] {
-  return hidden.includes(tagText) ? hidden.filter((item) => item !== tagText) : [...hidden, tagText];
+  return hidden.includes(tagText)
+    ? hidden.filter((item) => item !== tagText)
+    : [...hidden, tagText];
 }
 
 export function setTagCountOverrideRow(
@@ -65,4 +71,47 @@ export function buildTagResultsDisplayOrder(params: {
     .map(([text, count]) => ({ text, count }))
     .sort((a, b) => b.count - a.count || a.text.localeCompare(b.text, "ru"))
     .map((item) => item.text);
+}
+
+type CloudManualQuestionFields = {
+  id?: string;
+  hiddenTagTexts?: string[];
+  injectedTagWords?: CloudWordCount[];
+  tagCountOverrides?: CloudWordCount[];
+};
+
+export function buildCloudManualFromQuestions(
+  questions: CloudManualQuestionFields[],
+): CloudManualStateByQuestion {
+  const payload: CloudManualStateByQuestion = {};
+  questions.forEach((question) => {
+    if (!question.id) return;
+    const hiddenTagTexts = question.hiddenTagTexts ?? [];
+    const injectedTagWords = question.injectedTagWords ?? [];
+    const tagCountOverrides = question.tagCountOverrides ?? [];
+    if (
+      hiddenTagTexts.length === 0 &&
+      injectedTagWords.length === 0 &&
+      tagCountOverrides.length === 0
+    ) {
+      return;
+    }
+    payload[question.id] = { hiddenTagTexts, injectedTagWords, tagCountOverrides };
+  });
+  return payload;
+}
+
+/** Серверный снимок приоритетнее локального кэша в localStorage. */
+export function mergeCloudManualSources(
+  server: CloudManualStateByQuestion,
+  local: CloudManualStateByQuestion,
+): CloudManualStateByQuestion {
+  return { ...local, ...server };
+}
+
+export function readCloudManualFromPublicView(publicView: unknown): CloudManualStateByQuestion {
+  if (!publicView || typeof publicView !== "object" || Array.isArray(publicView)) return {};
+  const manual = (publicView as { tagCloudManualByQuestionId?: unknown })
+    .tagCloudManualByQuestionId;
+  return sanitizeTagCloudManualByQuestionId(manual);
 }

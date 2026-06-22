@@ -1,5 +1,14 @@
 const QUIZ_RESULTS_TILE_ID = "quiz_results_tile";
 
+type TagCloudManualByQuestionId = Record<
+  string,
+  {
+    hiddenTagTexts: string[];
+    injectedTagWords: Array<{ text: string; count: number }>;
+    tagCountOverrides: Array<{ text: string; count: number }>;
+  }
+>;
+
 function isQuizResultsTileId(tileId: string): boolean {
   return tileId === QUIZ_RESULTS_TILE_ID || tileId.startsWith(`${QUIZ_RESULTS_TILE_ID}:`);
 }
@@ -93,7 +102,21 @@ export type PublicViewRoomPruneSlice = PlayerUiRefsSlice & {
   mode?: string;
   questionId?: string;
   questionRevealStage?: string;
+  tagCloudManualByQuestionId?: TagCloudManualByQuestionId;
 };
+
+function pruneTagCloudManualByQuestionId(
+  manual: TagCloudManualByQuestionId | undefined,
+  validQuestionIds: ReadonlySet<string>,
+): TagCloudManualByQuestionId {
+  if (!manual) return {};
+  const out: TagCloudManualByQuestionId = {};
+  for (const [questionId, state] of Object.entries(manual)) {
+    if (!validQuestionIds.has(questionId)) continue;
+    out[questionId] = state;
+  }
+  return out;
+}
 
 export function prunePublicViewForRoomContent<T extends PublicViewRoomPruneSlice>(
   view: T,
@@ -103,6 +126,10 @@ export function prunePublicViewForRoomContent<T extends PublicViewRoomPruneSlice
   const pruned: T = {
     ...view,
     ...prunePlayerUiRefsForRoom(view, validSubQuizIds, validQuestionIds),
+    tagCloudManualByQuestionId: pruneTagCloudManualByQuestionId(
+      view.tagCloudManualByQuestionId,
+      validQuestionIds,
+    ),
   };
   const questionId = typeof pruned.questionId === "string" ? pruned.questionId.trim() : "";
   if (pruned.mode === "question" && questionId && !validQuestionIds.has(questionId)) {

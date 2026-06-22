@@ -5,7 +5,9 @@ import {
   formatTagCloudReferenceAnswer,
   normalizeTagComparable,
   parseStoredTagAnswersJson,
+  sanitizeTagCloudManualByQuestionId,
   type PublicViewState,
+  type TagCloudManualByQuestionId,
   prunePublicViewForRoomContent,
   publicViewRoomPruneChanged,
 } from "@meyouquize/shared";
@@ -21,7 +23,11 @@ import {
 import { prisma } from "./prisma.js";
 import { getActiveFeedbackFormPublic, getFeedbackResultsForReport } from "./feedback-service.js";
 import { cleanupUnusedQuestionMedia, collectQuestionMediaUrlsForQuiz } from "./media-cleanup.js";
-import { publicViewJsonToState, saveStoredPublicView } from "./socket/public-view-store.js";
+import {
+  getStoredPublicView,
+  publicViewJsonToState,
+  saveStoredPublicView,
+} from "./socket/public-view-store.js";
 import { parseSelectedIds, randomSlug, randomToken } from "./utils.js";
 import {
   buildTagCloudReferenceTags,
@@ -457,6 +463,24 @@ const roomInclude = {
     orderBy: { order: "asc" as const },
   },
 } satisfies Prisma.QuizInclude;
+
+export async function patchTagCloudManualByQuestionId(
+  eventName: string,
+  manual: TagCloudManualByQuestionId,
+) {
+  const room = await prisma.quiz.findUnique({ where: { slug: eventName }, select: { id: true } });
+  if (!room) throw new Error("Room not found");
+  const prev = await getStoredPublicView(room.id);
+  const tagCloudManualByQuestionId = sanitizeTagCloudManualByQuestionId(manual);
+  if (Object.keys(tagCloudManualByQuestionId).length === 0) {
+    throw new Error("tagCloudManualByQuestionId is empty");
+  }
+  await saveStoredPublicView(room.id, {
+    ...prev,
+    tagCloudManualByQuestionId,
+  });
+  return room.id;
+}
 
 export async function getRoomByEventName(eventName: string) {
   return prisma.quiz.findUnique({
