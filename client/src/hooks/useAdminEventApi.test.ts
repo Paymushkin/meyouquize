@@ -15,7 +15,6 @@ vi.mock("../socket", () => ({ socket: mockSocket }));
 function makeParams() {
   return {
     eventName: "demo-room",
-    cloudManualStorageKey: "cloud-manual-test",
     lastSavedSnapshotRef: { current: "" },
     setIsAuth: vi.fn(),
     setRoom: vi.fn(),

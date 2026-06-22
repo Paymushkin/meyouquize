@@ -1,5 +1,11 @@
 import type { BrandThemeId } from "./brandThemes.js";
 import { sanitizeBrandThemeId } from "./brandThemes.js";
+import {
+  migrateLegacyTagCloudManualIntoMap,
+  withProjectorTagCloudFields,
+  type TagCloudManualByQuestionId,
+  type TagCloudQuestionManualState,
+} from "./tagCloudManual.js";
 import { sanitizeVoteOptionBorderColor } from "./voteOptionBorderColor.js";
 import { sanitizeVoteFillColor, sanitizeVoteQuestionTextColor } from "./voteQuestionTextStyle.js";
 
@@ -112,13 +118,14 @@ export type ReportModuleId =
 
 export type CloudWordCount = { text: string; count: number };
 
-export type TagCloudQuestionManualState = {
-  hiddenTagTexts: string[];
-  injectedTagWords: CloudWordCount[];
-  tagCountOverrides: CloudWordCount[];
-};
-
-export type TagCloudManualByQuestionId = Record<string, TagCloudQuestionManualState>;
+export type { TagCloudQuestionManualState, TagCloudManualByQuestionId } from "./tagCloudManual.js";
+export {
+  EMPTY_TAG_CLOUD_QUESTION_MANUAL,
+  hasTagCloudManualContent,
+  migrateLegacyTagCloudManualIntoMap,
+  resolveTagCloudManualForQuestion,
+  withProjectorTagCloudFields,
+} from "./tagCloudManual.js";
 export type PublicBanner = {
   id: string;
   linkUrl: string;
@@ -962,8 +969,20 @@ export function normalizePublicViewState(
       : [...base.hiddenTagTexts],
     injectedTagWords: sanitizeCloudWords(value?.injectedTagWords, 1),
     tagCountOverrides: sanitizeCloudWords(value?.tagCountOverrides, 0),
-    tagCloudManualByQuestionId: sanitizeTagCloudManualByQuestionId(
-      value?.tagCloudManualByQuestionId ?? base.tagCloudManualByQuestionId,
+    tagCloudManualByQuestionId: migrateLegacyTagCloudManualIntoMap(
+      sanitizeTagCloudManualByQuestionId(
+        value?.tagCloudManualByQuestionId ?? base.tagCloudManualByQuestionId,
+      ),
+      {
+        questionId: typeof value?.questionId === "string" ? value.questionId : undefined,
+        hiddenTagTexts: Array.isArray(value?.hiddenTagTexts) ? value.hiddenTagTexts : undefined,
+        injectedTagWords: Array.isArray(value?.injectedTagWords)
+          ? value.injectedTagWords
+          : undefined,
+        tagCountOverrides: Array.isArray(value?.tagCountOverrides)
+          ? value.tagCountOverrides
+          : undefined,
+      },
     ),
     projectorBackground: sanitizeHex6(value?.projectorBackground, base.projectorBackground),
     cloudQuestionColor: sanitizeHex6(value?.cloudQuestionColor, base.cloudQuestionColor),
@@ -1381,7 +1400,7 @@ export function mergePublicViewState(
   if (nextMode !== "question") {
     merged.questionId = undefined;
     merged.questionRevealStage = "options";
-    return merged;
+    return withProjectorTagCloudFields(merged);
   }
 
   /** Явный непустой id в патче перезаписывает; иначе оставляем merged.questionId из normalize({ ...prev, ...patch }). */
@@ -1396,7 +1415,7 @@ export function mergePublicViewState(
   ) {
     merged.questionRevealStage = "options";
   }
-  return merged;
+  return withProjectorTagCloudFields(merged);
 }
 
 export {

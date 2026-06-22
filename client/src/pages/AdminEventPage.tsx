@@ -101,6 +101,7 @@ import {
 } from "../publicViewContract";
 import {
   buildCloudManualFromQuestions,
+  applyCloudManualToQuestions,
   buildTagResultsDisplayOrder,
   mergeInjectedTagWords,
   parseInjectedTagLines,
@@ -757,7 +758,6 @@ export function AdminEventPage() {
   /** В каком подквизе открыт редактор вопроса — задаётся при открытии, после сохранения по нему раскрываем аккордеон. */
   const questionDialogTargetSubQuizIdRef = useRef<string | null>(null);
   const cloudManualSyncRef = useRef("");
-  const cloudManualStorageKey = `mq_cloud_manual_${eventName}`;
   const syncedSubQuizIdsKeyRef = useRef("");
   const questionFormsRef = useRef<QuestionForm[]>([]);
   questionFormsRef.current = questionForms;
@@ -808,7 +808,6 @@ export function AdminEventPage() {
     saveSubQuizTitle: saveSubQuizTitleApi,
   } = useAdminEventApi({
     eventName,
-    cloudManualStorageKey,
     lastSavedSnapshotRef,
     setIsAuth,
     setRoom,
@@ -823,13 +822,6 @@ export function AdminEventPage() {
   const autoSaveQuestions = useCallback(async () => {
     await persistQuestions(questionForms, subQuizSheets);
   }, [persistQuestions, questionForms, subQuizSheets]);
-
-  const persistCloudManualSnapshot = useCallback(
-    (forms: QuestionForm[]) => {
-      void persistTagCloudManual(buildCloudManualFromQuestions(forms));
-    },
-    [persistTagCloudManual],
-  );
 
   /** Синхронно до размонтирования диалога: иначе эффект персиста при `false` стирает LS, а отложенный setTimeout не успевает. */
   const pinExpandedSubQuiz = useCallback(
@@ -1231,6 +1223,24 @@ export function AdminEventPage() {
     brandTheme,
   });
 
+  const persistCloudManualSnapshot = useCallback(
+    (forms: QuestionForm[]) => {
+      void (async () => {
+        const ok = await persistTagCloudManual(buildCloudManualFromQuestions(forms));
+        if (!ok || publicViewMode !== "question" || !publicViewQuestionId) return;
+        const question = forms.find((q) => q.id === publicViewQuestionId);
+        if (!question) return;
+        emitPublicViewSet({
+          mode: "question",
+          questionId: publicViewQuestionId,
+          showVoteCount: question.showVoteCount ?? false,
+          showQuestionTitle: question.showQuestionTitle ?? true,
+        });
+      })();
+    },
+    [emitPublicViewSet, persistTagCloudManual, publicViewMode, publicViewQuestionId],
+  );
+
   const brandThemeVisualSetters = useMemo((): BrandThemeVisualSetters => {
     return {
       setProjectorBackground,
@@ -1309,19 +1319,6 @@ export function AdminEventPage() {
     reactionsWidgetsResyncDoneRef.current = quizId;
     setMessage("Виджеты реакций восстановлены после перезапуска");
   }, [emitPublicViewSet, quizId, reactionWidgets, room?.publicView, setMessage]);
-
-  useEffect(() => {
-    const payload: CloudManualStateByQuestion = {};
-    questionForms.forEach((q) => {
-      if (!q.id) return;
-      payload[q.id] = {
-        hiddenTagTexts: q.hiddenTagTexts ?? [],
-        injectedTagWords: q.injectedTagWords ?? [],
-        tagCountOverrides: q.tagCountOverrides ?? [],
-      };
-    });
-    localStorage.setItem(cloudManualStorageKey, JSON.stringify(payload));
-  }, [cloudManualStorageKey, questionForms]);
 
   useEffect(() => {
     checkSession().then((ok) => {
@@ -1447,19 +1444,7 @@ export function AdminEventPage() {
     if (qid) setQuestionForms((prev) => patchQuestionsFromPublicView(prev, pv));
     const cloudManual = readCloudManualFromPublicView(pv);
     if (Object.keys(cloudManual).length > 0) {
-      setQuestionForms((prev) =>
-        prev.map((question) => {
-          if (!question.id) return question;
-          const entry = cloudManual[question.id];
-          if (!entry) return question;
-          return {
-            ...question,
-            hiddenTagTexts: entry.hiddenTagTexts,
-            injectedTagWords: entry.injectedTagWords,
-            tagCountOverrides: entry.tagCountOverrides,
-          };
-        }),
-      );
+      setQuestionForms((prev) => applyCloudManualToQuestions(prev, cloudManual));
     }
     const b = toBrandingState(pv);
     setProjectorBackground(b.projectorBackground);
@@ -1698,9 +1683,8 @@ export function AdminEventPage() {
     if (!question) return;
     const signature = JSON.stringify({
       qid: publicViewQuestionId,
-      hidden: question.hiddenTagTexts ?? [],
-      injected: question.injectedTagWords ?? [],
-      overrides: question.tagCountOverrides ?? [],
+      showVoteCount: question.showVoteCount ?? false,
+      showQuestionTitle: question.showQuestionTitle ?? true,
     });
     if (cloudManualSyncRef.current === signature) return;
     cloudManualSyncRef.current = signature;
@@ -1709,9 +1693,6 @@ export function AdminEventPage() {
       questionId: publicViewQuestionId,
       showVoteCount: question.showVoteCount ?? false,
       showQuestionTitle: question.showQuestionTitle ?? true,
-      hiddenTagTexts: question.hiddenTagTexts ?? [],
-      injectedTagWords: question.injectedTagWords ?? [],
-      tagCountOverrides: question.tagCountOverrides ?? [],
     });
   }, [
     cloudAnimationStrength,
@@ -3289,9 +3270,6 @@ export function AdminEventPage() {
       showVoteCount: next,
       showCorrectOption: question.showCorrectOption ?? false,
       showQuestionTitle: question.showQuestionTitle ?? true,
-      hiddenTagTexts: question.hiddenTagTexts ?? [],
-      injectedTagWords: question.injectedTagWords ?? [],
-      tagCountOverrides: question.tagCountOverrides ?? [],
     });
   }
 
@@ -3313,9 +3291,6 @@ export function AdminEventPage() {
       showVoteCount: question.showVoteCount ?? false,
       showCorrectOption: next,
       showQuestionTitle: question.showQuestionTitle ?? true,
-      hiddenTagTexts: question.hiddenTagTexts ?? [],
-      injectedTagWords: question.injectedTagWords ?? [],
-      tagCountOverrides: question.tagCountOverrides ?? [],
     });
   }
 
@@ -3337,9 +3312,6 @@ export function AdminEventPage() {
       showVoteCount: question.showVoteCount ?? false,
       showCorrectOption: question.showCorrectOption ?? false,
       showQuestionTitle: next,
-      hiddenTagTexts: question.hiddenTagTexts ?? [],
-      injectedTagWords: question.injectedTagWords ?? [],
-      tagCountOverrides: question.tagCountOverrides ?? [],
     });
   }
 
@@ -3482,22 +3454,6 @@ export function AdminEventPage() {
       persistCloudManualSnapshot(next);
       return next;
     });
-    if (
-      !quizId ||
-      publicViewMode !== "question" ||
-      !question?.id ||
-      publicViewQuestionId !== question.id
-    )
-      return;
-    emitPublicViewSet({
-      mode: "question",
-      questionId: question.id,
-      showVoteCount: question.showVoteCount ?? false,
-      showQuestionTitle: question.showQuestionTitle ?? true,
-      hiddenTagTexts: nextHidden,
-      injectedTagWords: question.injectedTagWords ?? [],
-      tagCountOverrides: question.tagCountOverrides ?? [],
-    });
   }
 
   function applyInjectedTagList(questionIndex: number) {
@@ -3515,22 +3471,6 @@ export function AdminEventPage() {
       persistCloudManualSnapshot(next);
       return next;
     });
-    if (
-      !quizId ||
-      publicViewMode !== "question" ||
-      !question?.id ||
-      publicViewQuestionId !== question.id
-    )
-      return;
-    emitPublicViewSet({
-      mode: "question",
-      questionId: question.id,
-      showVoteCount: question.showVoteCount ?? false,
-      showQuestionTitle: question.showQuestionTitle ?? true,
-      hiddenTagTexts: question.hiddenTagTexts ?? [],
-      injectedTagWords: nextWords,
-      tagCountOverrides: question.tagCountOverrides ?? [],
-    });
     setMessage("Список ответов добавлен");
   }
 
@@ -3547,22 +3487,6 @@ export function AdminEventPage() {
       );
       persistCloudManualSnapshot(next);
       return next;
-    });
-    if (
-      !quizId ||
-      publicViewMode !== "question" ||
-      !question?.id ||
-      publicViewQuestionId !== question.id
-    )
-      return;
-    emitPublicViewSet({
-      mode: "question",
-      questionId: question.id,
-      showVoteCount: question.showVoteCount ?? false,
-      showQuestionTitle: question.showQuestionTitle ?? true,
-      hiddenTagTexts: question.hiddenTagTexts ?? [],
-      injectedTagWords: question.injectedTagWords ?? [],
-      tagCountOverrides: nextOverrides,
     });
   }
 

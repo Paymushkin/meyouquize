@@ -177,6 +177,53 @@ describe("submitAnswer", () => {
     expect(JSON.parse(answer!.selectedOptionIds)).toContain("alpha");
   });
 
+  it("caps responseMs when question was activated longer than INT4 can store", async () => {
+    const slug = uniqueSlug("stale-activation");
+    await createRoom({ eventName: slug, title: `Room ${slug}` });
+    await replaceRoomContent(slug, {
+      subQuizzes: [
+        {
+          title: "Quiz",
+          sortOrder: 0,
+          questions: [
+            {
+              text: "Stale",
+              type: "single",
+              points: 1,
+              scoringMode: "quiz",
+              options: [
+                { text: "A", isCorrect: true },
+                { text: "B", isCorrect: false },
+              ],
+            },
+          ],
+        },
+      ],
+      standaloneQuestions: [],
+    });
+    const room = await getRoomByEventName(slug);
+    const question = room!.questions[0]!;
+    const aId = question.options.find((o) => o.text === "A")!.id;
+    await activateQuestion(room!.id, question.id);
+    await prisma.question.update({
+      where: { id: question.id },
+      data: { activatedAt: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) },
+    });
+    const player = await joinPlayer(slug, "Frank", "dev-stale");
+
+    await submitAnswer({
+      quizId: room!.id,
+      questionId: question.id,
+      optionIds: [aId],
+      participantId: player.participantId,
+    });
+
+    const answer = await prisma.answer.findFirst({
+      where: { questionId: question.id, participantId: player.participantId },
+    });
+    expect(answer?.responseMs).toBe(2_147_483_647);
+  });
+
   it("rejects duplicate submission for the same question", async () => {
     const slug = uniqueSlug("dup-answer");
     await createRoom({ eventName: slug, title: `Room ${slug}` });

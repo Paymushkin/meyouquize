@@ -98,6 +98,19 @@ describe("normalizePublicViewState", () => {
     });
     expect(state.tagCloudManualByQuestionId[""]).toBeUndefined();
   });
+
+  it("migrates legacy top-level tag fields into manual map", () => {
+    const state = normalizePublicViewState({
+      mode: "question",
+      questionId: "q-1",
+      injectedTagWords: [{ text: "legacy", count: 4 }],
+    });
+    expect(state.tagCloudManualByQuestionId["q-1"]).toEqual({
+      hiddenTagTexts: [],
+      injectedTagWords: [{ text: "legacy", count: 4 }],
+      tagCountOverrides: [],
+    });
+  });
 });
 
 describe("mergePublicViewState", () => {
@@ -122,6 +135,23 @@ describe("mergePublicViewState", () => {
     expect(next.mode).toBe("title");
     expect(next.questionId).toBeUndefined();
     expect(next.questionRevealStage).toBe("options");
+  });
+
+  it("projects manual tag cloud fields for active question", () => {
+    const prev = normalizePublicViewState({
+      mode: "question",
+      questionId: "q-1",
+      tagCloudManualByQuestionId: {
+        "q-1": {
+          hiddenTagTexts: ["скрытый"],
+          injectedTagWords: [{ text: "врач", count: 2 }],
+          tagCountOverrides: [],
+        },
+      },
+    });
+    const next = mergePublicViewState(prev, { showVoteCount: true });
+    expect(next.injectedTagWords).toEqual([{ text: "врач", count: 2 }]);
+    expect(next.hiddenTagTexts).toEqual(["скрытый"]);
   });
 });
 

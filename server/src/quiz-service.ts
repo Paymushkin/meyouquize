@@ -42,6 +42,15 @@ import { getReactionSessionPublic } from "./reactions-service.js";
 
 type QuestionWithOptions = Prisma.QuestionGetPayload<{ include: { options: true } }>;
 
+/** Postgres INTEGER (INT4) max; поле Answer.responseMs не вмещает больше. */
+const RESPONSE_MS_INT4_MAX = 2_147_483_647;
+
+/** Мс от активации вопроса до ответа; ограничено вместимостью INT4 в БД. */
+export function computeResponseMs(nowMs: number, activatedAt: Date | null | undefined): number {
+  const activatedAtMs = activatedAt?.getTime() ?? nowMs;
+  return Math.min(Math.max(0, nowMs - activatedAtMs), RESPONSE_MS_INT4_MAX);
+}
+
 function normalizeTag(value: string) {
   return value
     .toLowerCase()
@@ -2485,9 +2494,7 @@ export async function submitAnswer(payload: {
     });
   }
 
-  const nowMs = Date.now();
-  const activatedAtMs = question.activatedAt?.getTime() ?? nowMs;
-  const responseMs = Math.max(0, nowMs - activatedAtMs);
+  const responseMs = computeResponseMs(Date.now(), question.activatedAt);
 
   if (question.type === QuestionType.RANKING) {
     const ranked = payload.rankedOptionIds ?? [];

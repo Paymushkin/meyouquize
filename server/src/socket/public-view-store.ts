@@ -81,6 +81,9 @@ export async function saveStoredPublicView(quizId: string, view: PublicViewState
   const extras = extractProgramTileExtras(view);
   const toSave = {
     ...normalized,
+    hiddenTagTexts: [],
+    injectedTagWords: [],
+    tagCountOverrides: [],
     ...(extras.speakerTileVisible !== undefined
       ? { speakerTileVisible: extras.speakerTileVisible }
       : {}),

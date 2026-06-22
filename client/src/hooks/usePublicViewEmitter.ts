@@ -293,9 +293,6 @@ export function usePublicViewEmitter(params: UsePublicViewEmitterParams) {
         hiddenTagTexts: patch.hiddenTagTexts ?? questionState.hiddenTagTexts,
         injectedTagWords: patch.injectedTagWords ?? questionState.injectedTagWords,
         tagCountOverrides: patch.tagCountOverrides ?? questionState.tagCountOverrides,
-        ...(patch.tagCloudManualByQuestionId !== undefined
-          ? { tagCloudManualByQuestionId: patch.tagCloudManualByQuestionId }
-          : {}),
         projectorBackground: patch.projectorBackground ?? projectorBackground,
         cloudQuestionColor: patch.cloudQuestionColor ?? cloudQuestionColor,
         cloudTagColors: patch.cloudTagColors ?? cloudTagColors,

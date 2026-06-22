@@ -185,15 +185,3 @@ export function readBrandingFromStorage(storageKey: string): BrandingState | nul
     return null;
   }
 }
-
-export function readCloudManualFromStorage(storageKey: string): CloudManualStateByQuestion {
-  try {
-    const raw = localStorage.getItem(storageKey);
-    if (!raw) return {};
-    const parsed = JSON.parse(raw) as CloudManualStateByQuestion;
-    if (!parsed || typeof parsed !== "object") return {};
-    return parsed;
-  } catch {
-    return {};
-  }
-}

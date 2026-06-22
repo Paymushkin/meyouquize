@@ -19,14 +19,13 @@ import {
   type SubQuizSheet,
 } from "../admin/adminEventForm";
 import { API_BASE } from "../config";
-import { mergeCloudManualSources, readCloudManualFromPublicView } from "../features/tagCloudAdmin";
-import { readCloudManualFromStorage, type CloudManualStateByQuestion } from "../publicViewContract";
+import { readCloudManualFromPublicView } from "../features/tagCloudAdmin";
+import type { CloudManualStateByQuestion } from "../publicViewContract";
 import { socket } from "../socket";
 import { parseApiErrorMessage } from "../utils/apiError";
 
 type Params = {
   eventName: string;
-  cloudManualStorageKey: string;
   lastSavedSnapshotRef: MutableRefObject<string>;
   setIsAuth: (value: boolean) => void;
   setRoom: Dispatch<SetStateAction<AdminEventRoom | null>>;
@@ -41,7 +40,6 @@ type Params = {
 export function useAdminEventApi(params: Params) {
   const {
     eventName,
-    cloudManualStorageKey,
     lastSavedSnapshotRef,
     setIsAuth,
     setRoom,
@@ -87,10 +85,7 @@ export function useAdminEventApi(params: Params) {
     });
     if (!response.ok) return;
     const data = (await response.json()) as AdminEventRoom;
-    const cloudManual = mergeCloudManualSources(
-      readCloudManualFromPublicView(data.publicView),
-      readCloudManualFromStorage(cloudManualStorageKey),
-    );
+    const cloudManual = readCloudManualFromPublicView(data.publicView);
     const sheets: SubQuizSheet[] = data.subQuizzes.map((s) => ({
       id: s.id,
       title: s.title,
@@ -105,7 +100,6 @@ export function useAdminEventApi(params: Params) {
     lastSavedSnapshotRef.current = serializeRoomContent(sheets, flat);
     setSelectedQuestionIndex(0);
   }, [
-    cloudManualStorageKey,
     eventName,
     lastSavedSnapshotRef,
     setQuestionForms,
@@ -164,10 +158,7 @@ export function useAdminEventApi(params: Params) {
       }
       lastPersistQuestionsErrorRef.current = null;
       const updatedRoom = (await response.json()) as AdminEventRoom;
-      const cloudManual = mergeCloudManualSources(
-        readCloudManualFromPublicView(updatedRoom.publicView),
-        readCloudManualFromStorage(cloudManualStorageKey),
-      );
+      const cloudManual = readCloudManualFromPublicView(updatedRoom.publicView);
       const merged = mergeRoomReloadIntoState(
         updatedRoom,
         { sheets, questions: normalizedQuestions },
@@ -183,15 +174,7 @@ export function useAdminEventApi(params: Params) {
       if (!suppressToast) setMessage("");
       return merged;
     },
-    [
-      cloudManualStorageKey,
-      eventName,
-      lastSavedSnapshotRef,
-      setMessage,
-      setQuestionForms,
-      setRoom,
-      setSubQuizSheets,
-    ],
+    [eventName, lastSavedSnapshotRef, setMessage, setQuestionForms, setRoom, setSubQuizSheets],
   );
 
   /** Частичный PATCH настроек проектора (в т.ч. метрика ранжирования) — без PUT replace (ответы не удаляются). */

@@ -440,8 +440,15 @@ export function buildApp() {
         return res.status(400).json({ error: `${where}: ${message}` });
       }
       try {
-        await patchTagCloudManualByQuestionId(eventName, parsed.data.tagCloudManualByQuestionId);
+        const quizId = await patchTagCloudManualByQuestionId(
+          eventName,
+          parsed.data.tagCloudManualByQuestionId,
+        );
         const room = await getRoomByEventName(eventName);
+        const io = getSocketIo();
+        if (io && quizId) {
+          await broadcastProjectorRoomSync(io, quizId);
+        }
         return res.json(room);
       } catch (error) {
         const message = error instanceof Error ? error.message : "Not found";

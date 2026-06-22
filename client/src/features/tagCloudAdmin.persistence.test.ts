@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
+  applyCloudManualToQuestions,
   buildCloudManualFromQuestions,
-  mergeCloudManualSources,
   readCloudManualFromPublicView,
 } from "./tagCloudAdmin";
 
@@ -21,31 +21,27 @@ describe("tagCloudAdmin persistence helpers", () => {
     });
   });
 
-  it("prefers server manual over local cache", () => {
+  it("applies server manual map to question forms", () => {
     expect(
-      mergeCloudManualSources(
+      applyCloudManualToQuestions(
+        [{ id: "q-1" }, { id: "q-2", injectedTagWords: [{ text: "старый", count: 1 }] }],
         {
           "q-1": {
-            hiddenTagTexts: [],
+            hiddenTagTexts: ["скрытый"],
             injectedTagWords: [{ text: "сервер", count: 2 }],
             tagCountOverrides: [],
           },
         },
-        {
-          "q-1": {
-            hiddenTagTexts: [],
-            injectedTagWords: [{ text: "локально", count: 1 }],
-            tagCountOverrides: [],
-          },
-        },
       ),
-    ).toEqual({
-      "q-1": {
-        hiddenTagTexts: [],
+    ).toEqual([
+      {
+        id: "q-1",
+        hiddenTagTexts: ["скрытый"],
         injectedTagWords: [{ text: "сервер", count: 2 }],
         tagCountOverrides: [],
       },
-    });
+      { id: "q-2", injectedTagWords: [{ text: "старый", count: 1 }] },
+    ]);
   });
 
   it("reads manual map from public view payload", () => {

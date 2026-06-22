@@ -1,4 +1,6 @@
+import { resolveTagCloudManualForQuestion } from "@meyouquize/shared";
 import type { PublicViewPayload } from "../../publicViewContract";
+import { readCloudManualFromPublicView } from "../tagCloudAdmin";
 
 type PatchableQuestion = {
   id?: string;
@@ -16,6 +18,8 @@ export function patchQuestionsFromPublicView<TQuestion extends PatchableQuestion
 ): TQuestion[] {
   const questionId = typeof publicView.questionId === "string" ? publicView.questionId : undefined;
   if (!questionId) return questions;
+  const manual = readCloudManualFromPublicView(publicView);
+  const resolved = resolveTagCloudManualForQuestion(manual, questionId);
   return questions.map((q) =>
     q.id === questionId
       ? {
@@ -32,15 +36,9 @@ export function patchQuestionsFromPublicView<TQuestion extends PatchableQuestion
             (typeof publicView.showQuestionTitle === "boolean"
               ? publicView.showQuestionTitle
               : q.showQuestionTitle) ?? true,
-          hiddenTagTexts: Array.isArray(publicView.hiddenTagTexts)
-            ? (publicView.hiddenTagTexts as string[])
-            : (q.hiddenTagTexts ?? []),
-          injectedTagWords: Array.isArray(publicView.injectedTagWords)
-            ? (publicView.injectedTagWords as Array<{ text: string; count: number }>)
-            : (q.injectedTagWords ?? []),
-          tagCountOverrides: Array.isArray(publicView.tagCountOverrides)
-            ? (publicView.tagCountOverrides as Array<{ text: string; count: number }>)
-            : (q.tagCountOverrides ?? []),
+          hiddenTagTexts: resolved.hiddenTagTexts,
+          injectedTagWords: resolved.injectedTagWords,
+          tagCountOverrides: resolved.tagCountOverrides,
         }
       : q,
   );

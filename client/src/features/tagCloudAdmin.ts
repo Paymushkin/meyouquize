@@ -80,6 +80,24 @@ type CloudManualQuestionFields = {
   tagCountOverrides?: CloudWordCount[];
 };
 
+/** Применяет серверную карту ручных тегов ко всем question forms. */
+export function applyCloudManualToQuestions<T extends CloudManualQuestionFields>(
+  questions: T[],
+  manual: CloudManualStateByQuestion,
+): T[] {
+  return questions.map((question) => {
+    if (!question.id) return question;
+    const entry = manual[question.id];
+    if (!entry) return question;
+    return {
+      ...question,
+      hiddenTagTexts: entry.hiddenTagTexts,
+      injectedTagWords: entry.injectedTagWords,
+      tagCountOverrides: entry.tagCountOverrides,
+    };
+  });
+}
+
 export function buildCloudManualFromQuestions(
   questions: CloudManualQuestionFields[],
 ): CloudManualStateByQuestion {
@@ -99,14 +117,6 @@ export function buildCloudManualFromQuestions(
     payload[question.id] = { hiddenTagTexts, injectedTagWords, tagCountOverrides };
   });
   return payload;
-}
-
-/** Серверный снимок приоритетнее локального кэша в localStorage. */
-export function mergeCloudManualSources(
-  server: CloudManualStateByQuestion,
-  local: CloudManualStateByQuestion,
-): CloudManualStateByQuestion {
-  return { ...local, ...server };
 }
 
 export function readCloudManualFromPublicView(publicView: unknown): CloudManualStateByQuestion {
