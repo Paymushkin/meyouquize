@@ -164,7 +164,6 @@ export function EventTitleBlock(props: EventTitleBlockProps) {
               isJoinScreen
                 ? {
                     ...playerEventTitleSx(brandFontFamily),
-                    fontWeight: 800,
                     fontSize: "clamp(1.75rem, 6vw, 3rem)",
                     lineHeight: 1.08,
                     letterSpacing: 0.4,
