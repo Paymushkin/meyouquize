@@ -1,8 +1,7 @@
 import { useEffect } from "react";
 import { Box, CssBaseline, ThemeProvider } from "@mui/material";
 import { brandTheme } from "../../theme/brandTheme";
-
-const BODY_CLASS = "mq-brand-bg";
+import { useBodyBrandBackground } from "../../hooks/useBodyBrandBackground";
 
 interface BrandPageLayoutProps {
   children: React.ReactNode;
@@ -10,13 +9,7 @@ interface BrandPageLayoutProps {
 }
 
 export function BrandPageLayout({ children, documentTitle }: BrandPageLayoutProps) {
-  useEffect(() => {
-    document.body.classList.add(BODY_CLASS);
-    return () => {
-      document.body.classList.remove(BODY_CLASS);
-    };
-  }, []);
-
+  useBodyBrandBackground({ backgroundColor: "#000000" });
   useEffect(() => {
     if (!documentTitle) return;
     const previous = document.title;

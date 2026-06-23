@@ -1,8 +1,0 @@
-/** Дополнительное скрытие декора body на проекторе (основные правила — в main.tsx). */
-body.mq-projector-body-bg::before,
-body.mq-projector-body-bg::after,
-body.mq-projector-brand-bg::before,
-body.mq-projector-brand-bg::after {
-  content: none !important;
-  display: none !important;
-}

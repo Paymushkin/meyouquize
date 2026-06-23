@@ -39,7 +39,9 @@
     "load:walkthrough": "bash load/run.sh walkthrough",
     "load:peak": "bash load/run.sh peak",
     "load:soak": "bash load/run.sh soak",
-    "load:socket:artillery": "npx artillery run load/artillery-socket.yml"
+    "load:socket:artillery": "npx artillery run load/artillery-socket.yml",
+    "install:chromium": "npx playwright install chromium",
+    "install:pdf": "bash deploy/scripts/install-pdf-chromium.sh"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.1",

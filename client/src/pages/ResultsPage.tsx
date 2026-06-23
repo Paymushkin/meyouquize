@@ -13,7 +13,6 @@ import { ProjectorViewportBackground } from "../components/projector/ProjectorVi
 import { useBrandFont } from "../hooks/useBrandFont";
 import { useEventFavicon } from "../hooks/useEventFavicon";
 import { resolveClientAssetUrl } from "../utils/resolveClientAssetUrl";
-import "../styles/adminProjectorBody.css";
 
 type ReactionBurst = {
   id: string;

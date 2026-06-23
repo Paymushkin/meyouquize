@@ -40,6 +40,7 @@ import { useQuizPlayMetaBranding } from "../hooks/useQuizPlayMetaBranding";
 import { useQuizPlayFeedback } from "../hooks/useQuizPlayFeedback";
 import { useQuizPlayQuestionFlow } from "../hooks/useQuizPlayQuestionFlow";
 import { useBrandFont } from "../hooks/useBrandFont";
+import { useBodyBrandBackground } from "../hooks/useBodyBrandBackground";
 import { useEventFavicon } from "../hooks/useEventFavicon";
 import { socket } from "../socket";
 import { getNickname, getOrCreateDeviceId, randomNickname, setNickname } from "../storage";
@@ -584,29 +585,11 @@ export function QuizPlayPage() {
     () => visibleResultTiles.find((item) => item.questionId === resultsDialogQuestionId) ?? null,
     [resultsDialogQuestionId, visibleResultTiles],
   );
-  useEffect(() => {
-    const prevBgColor = document.body.style.backgroundColor;
-    const prevBgImage = document.body.style.backgroundImage;
-    const prevBgAttachment = document.body.style.backgroundAttachment;
-    const prevOverflowX = document.body.style.overflowX;
-    const hadPlayerBrandClass = document.body.classList.contains("mq-player-brand-bg");
-    const root = document.getElementById("root");
-    const prevRootBg = root?.style.backgroundColor ?? "";
-    document.body.style.backgroundColor = brandBodyBackgroundColor;
-    document.body.style.backgroundImage = "none";
-    document.body.style.backgroundAttachment = "";
-    document.body.style.overflowX = "";
-    document.body.classList.add("mq-player-brand-bg");
-    if (root) root.style.backgroundColor = "transparent";
-    return () => {
-      document.body.style.backgroundColor = prevBgColor;
-      document.body.style.backgroundImage = prevBgImage;
-      document.body.style.backgroundAttachment = prevBgAttachment;
-      document.body.style.overflowX = prevOverflowX;
-      if (!hadPlayerBrandClass) document.body.classList.remove("mq-player-brand-bg");
-      if (root) root.style.backgroundColor = prevRootBg;
-    };
-  }, [brandBodyBackgroundColor]);
+  useBodyBrandBackground({
+    backgroundColor: brandBodyBackgroundColor,
+    clearRootBackground: true,
+    resetOverflowX: true,
+  });
 
   useLayoutEffect(() => {
     if (

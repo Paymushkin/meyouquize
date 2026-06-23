@@ -503,25 +503,18 @@ export function AdminQuestionsSection(props: Props) {
                               );
                               return (
                                 <Stack spacing={0.5}>
-                                  {displayedTags.length === 0 ? (
-                                    <Typography variant="caption" color="text.secondary">
-                                      Пока нет ответов
-                                    </Typography>
-                                  ) : (
-                                    <Button
-                                      size="small"
-                                      variant="text"
-                                      onClick={() => openTagResultsDialog(g)}
-                                      sx={{ alignSelf: "flex-start", px: 0.5 }}
-                                    >
-                                      Открыть список результатов ({displayedTags.length})
-                                    </Button>
-                                  )}
+                                  <Button
+                                    size="small"
+                                    variant="text"
+                                    onClick={() => openTagResultsDialog(g)}
+                                    sx={{ alignSelf: "flex-start", px: 0.5 }}
+                                  >
+                                    Открыть список результатов ({displayedTags.length})
+                                  </Button>
                                 </Stack>
                               );
                             }
                             if (question.type === "ranking") {
-                              const answered = (result?.optionStats[0]?.count ?? 0) > 0;
                               const stats = result?.optionStats ?? [];
                               const metric = question.rankingProjectorMetric ?? "avg_score";
                               const hasTierStats = stats.some(
@@ -547,14 +540,6 @@ export function AdminQuestionsSection(props: Props) {
                                   liveOption,
                                 };
                               });
-                              if (!answered) {
-                                return (
-                                  <Typography variant="caption" color="text.secondary">
-                                    Пока нет ответов
-                                  </Typography>
-                                );
-                              }
-
                               if (mode === "avg_rank") {
                                 const avgs = rows
                                   .map((r) => r.liveOption?.avgRank)
@@ -708,11 +693,7 @@ export function AdminQuestionsSection(props: Props) {
                                     <Typography variant="caption" sx={{ fontWeight: 700 }}>
                                       {tempLabel}
                                     </Typography>
-                                  ) : (
-                                    <Typography variant="caption" color="text.secondary">
-                                      Пока нет ответов
-                                    </Typography>
-                                  )}
+                                  ) : null}
                                   {bars.map((option) => {
                                     const percent =
                                       totalVotes > 0

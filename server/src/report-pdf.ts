@@ -1,9 +1,33 @@
+import fs from "node:fs";
+import path from "node:path";
+import { createRequire } from "node:module";
+import type { Request } from "express";
 import PDFDocument from "pdfkit";
 import type { PublicEventReport } from "./quiz-service.js";
+import { buildReportPdfHtml } from "./report-pdf-html.js";
+
+const require = createRequire(import.meta.url);
+const PDF_FONT_NAME = "DejaVuSans";
+
+function resolvePdfKitFontPath(): string {
+  const pkgPath = require.resolve("dejavu-fonts-ttf/package.json");
+  const fontPath = path.join(path.dirname(pkgPath), "ttf", "DejaVuSans.ttf");
+  if (!fs.existsSync(fontPath)) {
+    throw new Error(`DejaVuSans.ttf not found at ${fontPath}`);
+  }
+  return fontPath;
+}
+
+function createPdfDocument() {
+  const doc = new PDFDocument({ size: "A4", margin: 40 });
+  doc.registerFont(PDF_FONT_NAME, resolvePdfKitFontPath());
+  doc.font(PDF_FONT_NAME);
+  return doc;
+}
 
 async function renderSimplePdf(report: PublicEventReport): Promise<Buffer> {
   return await new Promise<Buffer>((resolve, reject) => {
-    const doc = new PDFDocument({ size: "A4", margin: 40 });
+    const doc = createPdfDocument();
     const chunks: Buffer[] = [];
     doc.on("data", (chunk: Buffer) => chunks.push(Buffer.from(chunk)));
     doc.on("end", () => resolve(Buffer.concat(chunks)));
@@ -74,6 +98,15 @@ async function renderSimplePdf(report: PublicEventReport): Promise<Buffer> {
       doc.fontSize(14).text("Результаты голосований");
       report.voteQuestions.slice(0, 20).forEach((question, index) => {
         doc.fontSize(11).text(`${index + 1}. ${question.text}`);
+        if (question.type === "tag_cloud" && question.tagCloud.length > 0) {
+          question.tagCloud.slice(0, 15).forEach((tag) => {
+            doc.fontSize(10).text(`  ${tag.text} ${tag.count}`);
+          });
+        } else if (question.optionStats.length > 0) {
+          question.optionStats.slice(0, 8).forEach((option) => {
+            doc.fontSize(10).text(`  ${option.text} ${option.count}`);
+          });
+        }
       });
       doc.moveDown();
     }
@@ -109,20 +142,123 @@ async function renderSimplePdf(report: PublicEventReport): Promise<Buffer> {
   });
 }
 
-async function renderPdfFromPage(pageUrl: string): Promise<Buffer> {
+/** Origin страницы отчёта для Playwright: сначала из прокси-заголовков запроса. */
+export function resolveReportPdfPageOrigin(
+  req: Pick<Request, "get" | "secure">,
+  clientOrigins: string[],
+): string {
+  const forwardedProto = req.get("x-forwarded-proto")?.split(",")[0]?.trim();
+  const forwardedHost = req.get("x-forwarded-host")?.split(",")[0]?.trim();
+  if (forwardedHost) {
+    const proto = forwardedProto || "https";
+    return `${proto}://${forwardedHost}`.replace(/\/+$/, "");
+  }
+
+  const host = req.get("host")?.trim();
+  if (host && !/^127\.0\.0\.1:\d+$/.test(host) && !/^localhost:\d+$/i.test(host)) {
+    const proto = forwardedProto || (req.secure ? "https" : "http");
+    return `${proto}://${host}`.replace(/\/+$/, "");
+  }
+
+  const originHeader = req.get("origin")?.trim().replace(/\/+$/, "");
+  if (originHeader && clientOrigins.includes(originHeader)) {
+    return originHeader;
+  }
+
+  return clientOrigins[0]?.replace(/\/+$/, "") || "http://localhost:5173";
+}
+
+function resolveSystemChromiumPaths(): string[] {
+  const fromEnv = [
+    process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH,
+    process.env.CHROMIUM_PATH,
+  ].filter((value): value is string => Boolean(value?.trim()));
+
+  const candidates = [
+    ...fromEnv,
+    "/usr/bin/chromium",
+    "/usr/bin/chromium-browser",
+    "/snap/bin/chromium",
+    "/usr/bin/google-chrome-stable",
+    "/usr/bin/google-chrome",
+  ];
+
+  return [...new Set(candidates)].filter((candidate) => fs.existsSync(candidate));
+}
+
+async function launchPdfBrowser() {
   const { chromium } = await import("playwright");
-  const browser = await chromium.launch({
-    headless: true,
-    channel: "chrome",
-    args: ["--no-sandbox", "--disable-setuid-sandbox"],
-  });
+  const baseArgs = ["--no-sandbox", "--disable-setuid-sandbox", "--disable-dev-shm-usage"];
+  const errors: string[] = [];
+
+  let executablePath: string | undefined;
+  try {
+    executablePath = chromium.executablePath();
+  } catch (error) {
+    errors.push(`executablePath: ${error instanceof Error ? error.message : String(error)}`);
+  }
+
+  const attempts: Array<Record<string, unknown>> = [];
+  for (const systemPath of resolveSystemChromiumPaths()) {
+    attempts.push({ headless: true, executablePath: systemPath, args: baseArgs });
+  }
+  if (executablePath) {
+    attempts.push({ headless: true, executablePath, args: baseArgs });
+  }
+  attempts.push({ headless: true, args: baseArgs });
+  attempts.push({ headless: true, channel: "chrome", args: baseArgs });
+  attempts.push({ headless: true, channel: "msedge", args: baseArgs });
+
+  for (const options of attempts) {
+    try {
+      return await chromium.launch(options);
+    } catch (error) {
+      errors.push(error instanceof Error ? error.message : String(error));
+    }
+  }
+  throw new Error(
+    `Playwright browser launch failed (${errors.join(" | ")}). Run: bash deploy/scripts/install-pdf-chromium.sh`,
+  );
+}
+
+async function renderPdfFromHtml(html: string): Promise<Buffer> {
+  const browser = await launchPdfBrowser();
   try {
     const page = await browser.newPage({
       viewport: { width: 1440, height: 2200 },
     });
     await page.emulateMedia({ media: "screen" });
-    await page.goto(pageUrl, { waitUntil: "networkidle", timeout: 45_000 });
-    await page.waitForSelector("body", { timeout: 15_000 });
+    await page.setContent(html, { waitUntil: "load", timeout: 60_000 });
+    await page.waitForSelector('[data-report-pdf-ready="1"]', { timeout: 15_000 });
+    await page.evaluate(async () => {
+      await document.fonts.ready;
+    });
+    await page.waitForTimeout(250);
+    const pdf = await page.pdf({
+      format: "A4",
+      printBackground: true,
+      preferCSSPageSize: true,
+      margin: { top: "0", right: "0", bottom: "0", left: "0" },
+    });
+    return Buffer.from(pdf);
+  } finally {
+    await browser.close();
+  }
+}
+
+async function renderPdfFromPage(pageUrl: string): Promise<Buffer> {
+  const browser = await launchPdfBrowser();
+  try {
+    const page = await browser.newPage({
+      viewport: { width: 1440, height: 2200 },
+    });
+    await page.emulateMedia({ media: "screen" });
+    await page.goto(pageUrl, { waitUntil: "load", timeout: 60_000 });
+    await page.waitForSelector('[data-report-pdf-ready="1"]', { timeout: 30_000 });
+    await page.evaluate(async () => {
+      await document.fonts.ready;
+    });
+    await page.waitForTimeout(300);
     const pdf = await page.pdf({
       format: "A4",
       printBackground: true,
@@ -137,10 +273,40 @@ async function renderPdfFromPage(pageUrl: string): Promise<Buffer> {
 
 export async function renderPublicReportPdf(
   report: PublicEventReport,
-  options?: { pageUrl?: string },
+  options?: { pageUrl?: string; assetOrigin?: string },
 ): Promise<Buffer> {
-  if (options?.pageUrl) {
-    return renderPdfFromPage(options.pageUrl);
+  const failures: string[] = [];
+
+  try {
+    return await renderPdfFromHtml(
+      buildReportPdfHtml(report, { assetOrigin: options?.assetOrigin }),
+    );
+  } catch (htmlError) {
+    const message = htmlError instanceof Error ? htmlError.message : String(htmlError);
+    failures.push(`html: ${message}`);
+    console.error("[report-pdf] HTML render failed", { error: message });
   }
-  return renderSimplePdf(report);
+
+  if (options?.pageUrl) {
+    try {
+      return await renderPdfFromPage(options.pageUrl);
+    } catch (pageError) {
+      const message = pageError instanceof Error ? pageError.message : String(pageError);
+      failures.push(`page: ${message}`);
+      console.error("[report-pdf] page URL render failed", {
+        pageUrl: options.pageUrl,
+        error: message,
+      });
+    }
+  }
+
+  try {
+    return await renderSimplePdf(report);
+  } catch (simpleError) {
+    const message = simpleError instanceof Error ? simpleError.message : String(simpleError);
+    failures.push(`simple: ${message}`);
+    throw new Error(
+      `All PDF render paths failed (${failures.join(" | ")}). Run: npm run install:pdf`,
+    );
+  }
 }

@@ -23,11 +23,7 @@ export function TemperatureQuestionLivePreview({ temperatureValue, bars }: Props
         <Typography variant="caption" sx={{ fontWeight: 700 }}>
           Температура: {label}
         </Typography>
-      ) : (
-        <Typography variant="caption" color="text.secondary">
-          Пока нет ответов
-        </Typography>
-      )}
+      ) : null}
       {bars.map((option) => {
         const percent = totalVotes > 0 ? Math.round((option.count / totalVotes) * 100) : 0;
         return (

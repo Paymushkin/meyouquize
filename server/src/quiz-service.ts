@@ -1905,6 +1905,7 @@ export type PublicEventReport = {
     brandSurfaceColor: string;
     brandTextColor: string;
     brandFontFamily: string;
+    brandFontUrl: string;
     brandLogoUrl: string;
     brandProjectorBackgroundImageUrl: string;
     brandBodyBackgroundColor: string;
@@ -2148,6 +2149,7 @@ export async function getPublicReportBySlug(slug: string): Promise<PublicEventRe
       brandSurfaceColor: view.brandSurfaceColor,
       brandTextColor: view.brandTextColor,
       brandFontFamily: view.brandFontFamily,
+      brandFontUrl: view.brandFontUrl,
       brandLogoUrl: view.brandLogoUrl,
       brandProjectorBackgroundImageUrl: view.brandProjectorBackgroundImageUrl,
       brandBodyBackgroundColor: view.brandBodyBackgroundColor,

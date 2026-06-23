@@ -82,20 +82,11 @@ const theme = createTheme({
             border: "56px solid rgba(180, 155, 245, 0.32)",
             zIndex: 0,
           },
-          "&.mq-player-brand-bg::before, &.mq-player-brand-bg::after, &.mq-admin-brand-bg::before, &.mq-admin-brand-bg::after, &.mq-projector-body-bg::before, &.mq-projector-body-bg::after":
-            {
-              content: "none",
-              display: "none",
-            },
-          "&.mq-projector-body-bg": {
+          "&.mq-no-body-decor": {
             backgroundImage: "none",
             backgroundAttachment: "scroll",
           },
-          "&.mq-brand-bg": {
-            backgroundColor: "#000000",
-            backgroundImage: "none",
-          },
-          "&.mq-brand-bg::before, &.mq-brand-bg::after": {
+          "&.mq-no-body-decor::before, &.mq-no-body-decor::after": {
             content: "none",
             display: "none",
           },

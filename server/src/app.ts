@@ -61,7 +61,7 @@ import {
   listFeedbackResultsByQuizId,
   updateFeedbackFormConfig,
 } from "./feedback-service.js";
-import { renderPublicReportPdf } from "./report-pdf.js";
+import { renderPublicReportPdf, resolveReportPdfPageOrigin } from "./report-pdf.js";
 import { resetDemoQuizToDefault } from "./demo-seed.js";
 
 const ADMIN_COOKIE = "mq_admin";
@@ -724,22 +724,22 @@ export function buildApp() {
     const slug = Array.isArray(req.params.slug) ? req.params.slug[0] : req.params.slug;
     const report = await getPublicReportBySlug(slug);
     if (!report) return res.status(404).json({ error: "Not found" });
-    const clientOrigin = env.clientOrigins[0]?.replace(/\/+$/, "") || "http://localhost:5173";
+    const clientOrigin = resolveReportPdfPageOrigin(req, env.clientOrigins);
     const pageUrl = `${clientOrigin}/report/${encodeURIComponent(slug)}?pdf=1`;
     try {
-      const pdf = await renderPublicReportPdf(report, { pageUrl });
+      const pdf = await renderPublicReportPdf(report, { pageUrl, assetOrigin: clientOrigin });
       res.setHeader("Content-Type", "application/pdf");
       res.setHeader("Content-Disposition", `attachment; filename="report-${slug}.pdf"`);
       return res.send(pdf);
     } catch (error) {
-      console.error("[public-report.pdf] browser render failed", {
+      console.error("[public-report.pdf] render failed", {
         slug,
         pageUrl,
         error: error instanceof Error ? error.message : String(error),
       });
       return res.status(500).json({
         error:
-          "Не удалось сформировать PDF в браузерном режиме. Проверьте CLIENT_ORIGIN и установленный Chromium для Playwright.",
+          "Не удалось сформировать PDF отчёта. На сервере выполните: npm run install:pdf (или bash deploy/scripts/install-pdf-chromium.sh)",
       });
     }
   });

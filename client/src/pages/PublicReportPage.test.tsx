@@ -65,6 +65,5 @@ describe("PublicReportPage", () => {
 
     expect(await screen.findByText("Отчет демо")).toBeTruthy();
     expect(await screen.findByText("Итоги участия")).toBeTruthy();
-    expect(await screen.findByText("Скачать PDF")).toBeTruthy();
   });
 });

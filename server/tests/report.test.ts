@@ -1,9 +1,24 @@
 import { describe, expect, it } from "vitest";
 import { setPublicViewSchema } from "../src/schemas.js";
-import { renderPublicReportPdf } from "../src/report-pdf.js";
+import { renderPublicReportPdf, resolveReportPdfPageOrigin } from "../src/report-pdf.js";
 import type { PublicEventReport } from "../src/quiz-service.js";
 
 describe("report contracts", () => {
+  it("resolves pdf page origin from forwarded headers", () => {
+    const origin = resolveReportPdfPageOrigin(
+      {
+        get(name: string) {
+          if (name === "x-forwarded-host") return "meyou.site";
+          if (name === "x-forwarded-proto") return "https";
+          return undefined;
+        },
+        secure: true,
+      },
+      ["http://localhost:5173"],
+    );
+    expect(origin).toBe("https://meyou.site");
+  });
+
   it("accepts report fields in setPublicViewSchema", () => {
     const parsed = setPublicViewSchema.safeParse({
       quizId: "quiz-1",
@@ -33,6 +48,7 @@ describe("report contracts", () => {
         brandSurfaceColor: "#ffffff",
         brandTextColor: "#1f1f1f",
         brandFontFamily: "Jost, Arial, sans-serif",
+        brandFontUrl: "",
         brandLogoUrl: "",
         brandProjectorBackgroundImageUrl: "",
         brandBodyBackgroundColor: "#000000",

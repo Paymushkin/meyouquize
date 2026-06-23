@@ -115,6 +115,7 @@ import {
 import { useAdminEventSocket } from "../hooks/useAdminEventSocket";
 import { useAdminEventApi } from "../hooks/useAdminEventApi";
 import { useAdminBrandingProps } from "../hooks/useAdminBrandingProps";
+import { useBodyBrandBackground } from "../hooks/useBodyBrandBackground";
 import { useProjectorJoinQrAdminSettings } from "../hooks/useProjectorJoinQrAdminSettings";
 import { usePublicViewEmitter } from "../hooks/usePublicViewEmitter";
 import { useSpeakerQuestionsAdminActions } from "../hooks/useSpeakerQuestionsAdminActions";
@@ -786,36 +787,11 @@ export function AdminEventPage() {
   /** Чтобы не вызывать removeItem(localStorage) на первом кадре, пока эффект не восстановил раскрытие из LS. */
   const isFirstExpandedPersistEffect = useRef(true);
 
-  useEffect(() => {
-    const root = document.getElementById("root");
-    const prevBodyBg = document.body.style.backgroundColor;
-    const prevBodyImg = document.body.style.backgroundImage;
-    const prevBodyAtt = document.body.style.backgroundAttachment;
-    const prevOverflowX = document.body.style.overflowX;
-    const prevRootBg = root?.style.backgroundColor ?? "";
-    const hadPlayerBrandClass = document.body.classList.contains("mq-player-brand-bg");
-    const hadAdminBrandClass = document.body.classList.contains("mq-admin-brand-bg");
-    const nextBodyBg = brandBodyBackgroundColor?.trim() || ADMIN_BODY_BG_FALLBACK;
-
-    document.body.style.backgroundColor = nextBodyBg;
-    document.body.style.backgroundImage = "none";
-    document.body.style.backgroundAttachment = "";
-    document.body.style.overflowX = "";
-    document.body.classList.add("mq-admin-brand-bg");
-    document.body.classList.remove("mq-player-brand-bg");
-    if (root) root.style.backgroundColor = "transparent";
-
-    return () => {
-      document.body.style.backgroundColor = prevBodyBg;
-      document.body.style.backgroundImage = prevBodyImg;
-      document.body.style.backgroundAttachment = prevBodyAtt;
-      document.body.style.overflowX = prevOverflowX;
-      if (root) root.style.backgroundColor = prevRootBg;
-      if (hadAdminBrandClass) document.body.classList.add("mq-admin-brand-bg");
-      else document.body.classList.remove("mq-admin-brand-bg");
-      if (hadPlayerBrandClass) document.body.classList.add("mq-player-brand-bg");
-    };
-  }, [brandBodyBackgroundColor]);
+  useBodyBrandBackground({
+    backgroundColor: brandBodyBackgroundColor?.trim() || ADMIN_BODY_BG_FALLBACK,
+    clearRootBackground: true,
+    resetOverflowX: true,
+  });
 
   const {
     authChecked,

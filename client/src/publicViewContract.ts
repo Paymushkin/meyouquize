@@ -8,6 +8,7 @@ import {
   PROJECTOR_JOIN_QR_TEXT_MAX_LENGTH,
   PROJECTOR_JOIN_QR_OVERLAY_CORNERS,
   normalizePublicViewState,
+  resolveBannerUniqueClicks,
   sanitizeBrandThemeId,
   QUIZ_RESULTS_TILE_ID,
   SPEAKER_TILE_ID,
