@@ -46,6 +46,7 @@ type Props = {
   subQuizzesForReport: Array<{ id: string; title: string }>;
   brandPrimaryColor: string;
   playerVoteOptionTextColor: string;
+  bannerClickCounts: Record<string, number>;
   tilesOrder: string[];
   onMoveTileUp: (id: string) => void;
   onMoveTileDown: (id: string) => void;
@@ -76,6 +77,7 @@ export function AdminBannersSection({
   subQuizzesForReport,
   brandPrimaryColor,
   playerVoteOptionTextColor,
+  bannerClickCounts,
   tilesOrder,
   onMoveTileUp,
   onMoveTileDown,
@@ -163,6 +165,7 @@ export function AdminBannersSection({
 
       <TilesOrderList
         tiles={state.orderedTiles}
+        bannerClickCounts={bannerClickCounts}
         editor={{
           editingId: state.editingId,
           editLinkUrl: state.editLinkUrl,

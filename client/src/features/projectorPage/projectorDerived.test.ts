@@ -65,4 +65,40 @@ describe("computeProjectorDerived", () => {
     expect(derived.showEventTitleScreen).toBe(true);
     expect(derived.selectedQuestion).toBeUndefined();
   });
+
+  it("applies option vote count overrides from tagCloudManualByQuestionId", () => {
+    const derived = computeProjectorDerived({
+      ...initialProjectorSessionState,
+      questions: [
+        {
+          questionId: "q-1",
+          text: "Vote",
+          type: "single",
+          optionStats: [
+            { optionId: "o1", text: "A", count: 2, isCorrect: true },
+            { optionId: "o2", text: "B", count: 5, isCorrect: false },
+          ],
+        },
+      ],
+      view: {
+        ...DEFAULT_PUBLIC_VIEW_STATE,
+        mode: "question",
+        questionId: "q-1",
+        tagCloudManualByQuestionId: {
+          "q-1": {
+            hiddenTagTexts: [],
+            injectedTagWords: [],
+            tagCountOverrides: [],
+            optionVoteCountOverrides: [{ text: "o2", count: 99 }],
+          },
+        },
+      },
+    });
+    expect(derived.selectedQuestion?.optionStats.find((row) => row.optionId === "o2")?.count).toBe(
+      99,
+    );
+    expect(derived.selectedQuestion?.optionStats.find((row) => row.optionId === "o1")?.count).toBe(
+      2,
+    );
+  });
 });

@@ -4,6 +4,7 @@ import {
   createRoom,
   getPublicReportBySlug,
   getRoomByEventName,
+  patchTagCloudManualByQuestionId,
   replaceRoomContent,
   setQuestionEnabled,
   submitAnswer,
@@ -66,5 +67,55 @@ describe("public report", () => {
     expect(report?.summary.participantsCount).toBe(1);
     expect(report?.summary.answersCount).toBe(1);
     expect(report?.quizQuestions.length).toBeGreaterThan(0);
+  });
+
+  it("applies manual vote count overrides in report results", async () => {
+    const slug = uniqueSlug("report-manual");
+    await createRoom({ eventName: slug, title: `Manual ${slug}` });
+    await replaceRoomContent(slug, {
+      subQuizzes: [],
+      standaloneQuestions: [
+        {
+          text: "Vote",
+          type: "single",
+          points: 0,
+          scoringMode: "poll",
+          options: [
+            { text: "Да", isCorrect: false },
+            { text: "Нет", isCorrect: false },
+          ],
+        },
+      ],
+    });
+    const room = await getRoomByEventName(slug);
+    const question = room!.questions[0]!;
+    const yesId = question.options.find((o) => o.text === "Да")!.id;
+    await activateQuestion(room!.id, question.id);
+    const player = await joinPlayer(slug, "Voter", "dev-rp-manual");
+    await submitAnswer({
+      quizId: room!.id,
+      questionId: question.id,
+      optionIds: [yesId],
+      participantId: player.participantId,
+    });
+
+    await patchTagCloudManualByQuestionId(slug, {
+      [question.id]: {
+        hiddenTagTexts: [],
+        injectedTagWords: [],
+        tagCountOverrides: [],
+        optionVoteCountOverrides: [{ text: yesId, count: 42 }],
+      },
+    });
+
+    await saveStoredPublicView(room!.id, {
+      ...DEFAULT_PUBLIC_VIEW_STATE,
+      reportPublished: true,
+    });
+
+    const report = await getPublicReportBySlug(slug);
+    expect(report).not.toBeNull();
+    const voteQuestion = report!.voteQuestions.find((row) => row.questionId === question.id);
+    expect(voteQuestion?.optionStats.find((row) => row.optionId === yesId)?.count).toBe(42);
   });
 });

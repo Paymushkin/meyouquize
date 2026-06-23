@@ -32,6 +32,7 @@
     "prisma:migrate": "npm run prisma:migrate -w server",
     "prisma:migrate:deploy": "npm run prisma:migrate:deploy -w server",
     "load:smoke": "bash load/run.sh smoke",
+    "load:300-vote-40s": "bash load/run.sh players-300-vote-40s",
     "load:nominal": "bash load/run.sh nominal",
     "load:nominal-ui": "bash load/run.sh nominal-ui",
     "load:nominal-admin": "bash load/run.sh nominal-admin",

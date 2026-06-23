@@ -1,4 +1,10 @@
-import { resolveProjectorLeaderboardRows, type PublicViewState } from "@meyouquize/shared";
+import {
+  resolveProjectorLeaderboardRows,
+  applyOptionVoteCountOverrides,
+  computeTemperatureWeightedAverage,
+  resolveTagCloudManualForQuestion,
+  type PublicViewState,
+} from "@meyouquize/shared";
 import type { ProjectorLeader, ProjectorQuestionResult } from "../../types/projectorDashboard";
 import type { ProjectorSessionState } from "./projectorSessionReducer";
 
@@ -25,10 +31,12 @@ export function computeProjectorDerived(state: ProjectorSessionState): Projector
     leaderboardSubQuizId,
   } = view;
 
-  const selectedQuestion =
+  const rawSelectedQuestion =
     mode === "question" && publicQuestionId
       ? questions.find((q) => q.questionId === publicQuestionId)
       : undefined;
+
+  const selectedQuestion = applyProjectorOptionVoteOverrides(rawSelectedQuestion, view);
 
   const leaderboardRows = resolveProjectorLeaderboardRows(
     leaderboardsBySubQuiz,
@@ -95,6 +103,35 @@ export function computeProjectorDerived(state: ProjectorSessionState): Projector
     fullScreenCloud,
     fullScreenContainer,
     barQuestionCentered,
+  };
+}
+
+function applyProjectorOptionVoteOverrides(
+  question: ProjectorQuestionResult | undefined,
+  view: PublicViewState,
+): ProjectorQuestionResult | undefined {
+  if (!question) return undefined;
+  const manual = resolveTagCloudManualForQuestion(
+    view.tagCloudManualByQuestionId,
+    question.questionId,
+  );
+  if (manual.optionVoteCountOverrides.length === 0) return question;
+
+  const optionStats = applyOptionVoteCountOverrides(
+    question.optionStats,
+    manual.optionVoteCountOverrides,
+  );
+  if (question.type !== "temperature") {
+    return { ...question, optionStats };
+  }
+
+  const temperatureValue = computeTemperatureWeightedAverage(
+    optionStats.map((row) => ({ count: row.count, weight: row.weight ?? 0 })),
+  );
+  return {
+    ...question,
+    optionStats,
+    temperatureValue: temperatureValue ?? undefined,
   };
 }
 

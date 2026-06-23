@@ -18,6 +18,7 @@ import {
   prunePlayerUiRefsForRoom,
   type CloudWordCount,
   type PublicBanner,
+  type PublicBannerClickStats,
   type PublicReactionWidgetStats,
   type ReportModuleId,
   type PublicViewMode,
@@ -74,6 +75,7 @@ export type CloudManualStateByQuestion = Record<
     hiddenTagTexts: string[];
     injectedTagWords: CloudWordCount[];
     tagCountOverrides: CloudWordCount[];
+    optionVoteCountOverrides: CloudWordCount[];
   }
 >;
 
@@ -110,6 +112,7 @@ export type PublicViewSetPatch = SharedPublicViewPatch & {
 export type {
   CloudWordCount,
   PublicBanner,
+  PublicBannerClickStats,
   PublicReactionWidgetStats,
   PublicViewMode,
   ProjectorJoinQrOverlayCorner,
@@ -125,6 +128,7 @@ export {
   PROJECTOR_JOIN_QR_TEXT_MAX_LENGTH,
   PROJECTOR_JOIN_QR_OVERLAY_CORNERS,
   normalizePublicViewState,
+  resolveBannerUniqueClicks,
   QUIZ_RESULTS_TILE_ID,
   SPEAKER_TILE_ID,
   withQuizResultsTileLast,

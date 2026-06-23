@@ -347,6 +347,13 @@ function QuestionBarChart({
   rows: Array<{ text: string; count: number; isCorrect?: boolean }>;
 }) {
   const total = rows.reduce((acc, row) => acc + row.count, 0);
+  if (rows.length === 0) {
+    return (
+      <Typography variant="body2" color="text.secondary" sx={{ mt: 0.75 }}>
+        Пока нет ответов
+      </Typography>
+    );
+  }
   return (
     <Stack spacing={0.75} sx={{ mt: 0.75 }}>
       {rows.map((row, index) => (
@@ -386,6 +393,83 @@ function QuestionBarChart({
         </Stack>
       ))}
     </Stack>
+  );
+}
+
+function TagCloudReportWords({ tags }: { tags: Array<{ text: string; count: number }> }) {
+  const sorted = [...tags]
+    .sort((a, b) => b.count - a.count || a.text.localeCompare(b.text, "ru"))
+    .slice(0, 50);
+
+  if (sorted.length === 0) {
+    return (
+      <Typography variant="body2" color="text.secondary" sx={{ mt: 0.75 }}>
+        Пока нет ответов
+      </Typography>
+    );
+  }
+
+  return (
+    <Box
+      sx={{
+        mt: 0.75,
+        display: "flex",
+        flexWrap: "wrap",
+        gap: 0.75,
+        alignItems: "flex-start",
+      }}
+    >
+      {sorted.map((item) => (
+        <Box
+          key={item.text}
+          component="span"
+          sx={{
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 0.5,
+            px: 1,
+            py: 0.4,
+            borderRadius: 1,
+            border: "1px solid",
+            borderColor: "divider",
+            bgcolor: "action.hover",
+            fontSize: "0.875rem",
+            lineHeight: 1.35,
+            maxWidth: "100%",
+            whiteSpace: "pre-wrap",
+            wordBreak: "break-word",
+          }}
+        >
+          <Box component="span">{item.text}</Box>
+          <Box component="span" sx={{ fontWeight: 700 }}>
+            {item.count}
+          </Box>
+        </Box>
+      ))}
+    </Box>
+  );
+}
+
+function ReportQuestionResults({
+  question,
+}: {
+  question: {
+    type: string;
+    optionStats: Array<{ text: string; count: number; isCorrect?: boolean }>;
+    tagCloud: Array<{ text: string; count: number }>;
+  };
+}) {
+  if (question.type === "tag_cloud") {
+    return <TagCloudReportWords tags={question.tagCloud} />;
+  }
+  return (
+    <QuestionBarChart
+      rows={question.optionStats.slice(0, 8).map((item) => ({
+        text: item.text,
+        count: item.count,
+        isCorrect: item.isCorrect,
+      }))}
+    />
   );
 }
 
@@ -484,7 +568,6 @@ export function PublicReportPage() {
     { subQuizId: string; title: string; questions: PublicReportPayload["quizQuestions"] }
   >();
   for (const question of payload!.quizQuestions) {
-    if (question.type === "tag_cloud") continue;
     const sid = question.subQuizId;
     if (!sid) continue;
     const prev = bySubQuizId.get(sid);
@@ -522,9 +605,7 @@ export function PublicReportPage() {
       : payload!.randomizer.currentWinners.length > 0
         ? [{ timestamp: "", winners: payload!.randomizer.currentWinners }]
         : [];
-  const voteQuestionsCount = payload!.voteQuestions.filter(
-    (question) => question.type !== "tag_cloud",
-  ).length;
+  const voteQuestionsCount = payload!.voteQuestions.length;
 
   return (
     <Container
@@ -645,10 +726,7 @@ export function PublicReportPage() {
                     lineHeight: 1,
                   }}
                 >
-                  {
-                    payload!.quizQuestions.filter((question) => question.type !== "tag_cloud")
-                      .length
-                  }
+                  {payload!.quizQuestions.length}
                 </Box>
               </Stack>
               <Stack spacing={2}>
@@ -665,13 +743,7 @@ export function PublicReportPage() {
                       {group.questions.slice(0, 20).map((question) => (
                         <Box key={question.questionId} className="report-question">
                           <Typography fontWeight={700}>{question.text}</Typography>
-                          <QuestionBarChart
-                            rows={question.optionStats.slice(0, 8).map((item) => ({
-                              text: item.text,
-                              count: item.count,
-                              isCorrect: item.isCorrect,
-                            }))}
-                          />
+                          <ReportQuestionResults question={question} />
                         </Box>
                       ))}
                     </Stack>
@@ -722,38 +794,26 @@ export function PublicReportPage() {
                     lineHeight: 1,
                   }}
                 >
-                  {
-                    payload!.voteQuestions.filter((question) => question.type !== "tag_cloud")
-                      .length
-                  }
+                  {payload!.voteQuestions.length}
                 </Box>
               </Stack>
               <Stack spacing={1.25}>
-                {payload!.voteQuestions
-                  .filter((question) => question.type !== "tag_cloud")
-                  .slice(0, 20)
-                  .map((question) => (
-                    <Box
-                      key={question.questionId}
-                      className="report-question"
-                      sx={{
-                        border: "1px dashed",
-                        borderColor: "divider",
-                        borderRadius: 1.5,
-                        px: 1.5,
-                        py: 1.25,
-                      }}
-                    >
-                      <Typography fontWeight={700}>{question.text}</Typography>
-                      <QuestionBarChart
-                        rows={question.optionStats.slice(0, 8).map((item) => ({
-                          text: item.text,
-                          count: item.count,
-                          isCorrect: item.isCorrect,
-                        }))}
-                      />
-                    </Box>
-                  ))}
+                {payload!.voteQuestions.slice(0, 20).map((question) => (
+                  <Box
+                    key={question.questionId}
+                    className="report-question"
+                    sx={{
+                      border: "1px dashed",
+                      borderColor: "divider",
+                      borderRadius: 1.5,
+                      px: 1.5,
+                      py: 1.25,
+                    }}
+                  >
+                    <Typography fontWeight={700}>{question.text}</Typography>
+                    <ReportQuestionResults question={question} />
+                  </Box>
+                ))}
               </Stack>
             </CardContent>
           </Card>

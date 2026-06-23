@@ -200,6 +200,7 @@ type PlayerTilesGridProps = {
   playerVoteProgressBarColor: string;
   visibleResultTiles: NonNullable<QuizState["playerVisibleResults"]>;
   onSelectQuestion: (questionId: string) => void;
+  onBannerClick: (bannerId: string) => void;
 };
 
 export function PlayerTilesGrid(props: PlayerTilesGridProps) {
@@ -223,6 +224,7 @@ export function PlayerTilesGrid(props: PlayerTilesGridProps) {
     playerVoteProgressBarColor,
     visibleResultTiles,
     onSelectQuestion,
+    onBannerClick,
   } = props;
 
   return (
@@ -399,6 +401,7 @@ export function PlayerTilesGrid(props: PlayerTilesGridProps) {
             href={safeBannerLinkUrl}
             target="_blank"
             rel="noopener noreferrer"
+            onClick={() => onBannerClick(banner.id)}
             sx={{
               gridColumn:
                 banner.size === "1x1" ? "span 1" : banner.size === "full" ? "1 / -1" : "span 2",

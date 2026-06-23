@@ -700,6 +700,11 @@ export const toggleReactionSchema = z.object({
   reactionType: z.string().trim().min(1).max(16),
 });
 
+export const bannerClickSchema = z.object({
+  quizId: z.string().min(1),
+  bannerId: z.string().trim().min(1).max(80),
+});
+
 const feedbackScaleOptionSchema = z.string().trim().min(1).max(40);
 
 export const feedbackScaleSchema = z.object({
@@ -765,6 +770,14 @@ const tagCloudQuestionManualSchema = z.object({
       }),
     )
     .max(300),
+  optionVoteCountOverrides: z
+    .array(
+      z.object({
+        text: z.string().min(1).max(80),
+        count: z.number().int().min(0).max(100000),
+      }),
+    )
+    .max(100),
 });
 
 export const patchTagCloudManualSchema = z.object({

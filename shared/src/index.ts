@@ -125,7 +125,12 @@ export {
   migrateLegacyTagCloudManualIntoMap,
   resolveTagCloudManualForQuestion,
   withProjectorTagCloudFields,
+  resolveOptionDisplayCount,
+  hasOptionVoteCountOverride,
+  applyOptionVoteCountOverrides,
+  applyQuestionResultManualDisplay,
 } from "./tagCloudManual.js";
+export { buildCloudWordsForDisplay } from "./tagCloudMerge.js";
 export type PublicBanner = {
   id: string;
   linkUrl: string;
@@ -141,6 +146,10 @@ export type PublicReactionWidget = {
 export type PublicReactionWidgetStats = {
   widgetId: string;
   counts: Record<string, number>;
+};
+export type PublicBannerClickStats = {
+  bannerId: string;
+  uniqueClicks: number;
 };
 export type RandomizerHistoryEntry = {
   timestamp: string;
@@ -201,6 +210,10 @@ export interface PublicViewState {
   showEventTitleOnPlayer: boolean;
   /** Баннеры для пользовательского интерфейса */
   playerBanners: PublicBanner[];
+  /** Уникальные клики по баннерам (для админки). */
+  playerBannerClickStats: PublicBannerClickStats[];
+  /** Участники, уже кликнувшие по баннеру (для дедупликации, только сервер/админка). */
+  playerBannerClickParticipantIds: Record<string, string[]>;
   /** id активного баннера, который показывается пользователям */
   activePlayerBannerId?: string;
   /** Текст плитки "Вопросы спикерам" у пользователя */
@@ -351,7 +364,7 @@ export type PublicViewPatch = Partial<PublicViewState> & {
   questionId?: string;
 };
 
-export const DEFAULT_PROJECTOR_JOIN_QR_VISIBLE = true;
+export const DEFAULT_PROJECTOR_JOIN_QR_VISIBLE = false;
 export const PROJECTOR_JOIN_QR_TEXT_MAX_LENGTH = 200;
 export const DEFAULT_PROJECTOR_JOIN_QR_TEXT = "Сканируйте QR-код, чтобы войти в ивент";
 export const DEFAULT_PROJECTOR_JOIN_QR_TEXT_COLOR = "#ffffff";
@@ -424,6 +437,8 @@ export const DEFAULT_PUBLIC_VIEW_STATE: PublicViewState = {
   speakerQuestionsShowReactionsOnScreen: true,
   showEventTitleOnPlayer: true,
   playerBanners: [],
+  playerBannerClickStats: [],
+  playerBannerClickParticipantIds: {},
   activePlayerBannerId: undefined,
   speakerTileText: "Вопросы спикерам",
   speakerTileBackgroundColor: "#1976d2",
@@ -672,14 +687,16 @@ function sanitizeTagCloudQuestionManualState(value: unknown): TagCloudQuestionMa
   const hiddenTagTexts = sanitizeHiddenTagTexts(row.hiddenTagTexts);
   const injectedTagWords = sanitizeCloudWords(row.injectedTagWords, 1);
   const tagCountOverrides = sanitizeCloudWords(row.tagCountOverrides, 0);
+  const optionVoteCountOverrides = sanitizeCloudWords(row.optionVoteCountOverrides, 0);
   if (
     hiddenTagTexts.length === 0 &&
     injectedTagWords.length === 0 &&
-    tagCountOverrides.length === 0
+    tagCountOverrides.length === 0 &&
+    optionVoteCountOverrides.length === 0
   ) {
     return null;
   }
-  return { hiddenTagTexts, injectedTagWords, tagCountOverrides };
+  return { hiddenTagTexts, injectedTagWords, tagCountOverrides, optionVoteCountOverrides };
 }
 
 export function sanitizeTagCloudManualByQuestionId(value: unknown): TagCloudManualByQuestionId {
@@ -783,6 +800,92 @@ function sanitizeReactionWidgets(
   return result;
 }
 
+function sanitizeBannerClickStats(
+  items: PublicBannerClickStats[] | undefined,
+): PublicBannerClickStats[] {
+  if (!Array.isArray(items)) return [];
+  const deduped = new Set<string>();
+  const result: PublicBannerClickStats[] = [];
+  for (const item of items) {
+    if (!item || typeof item.bannerId !== "string") continue;
+    const bannerId = item.bannerId.trim().slice(0, 80);
+    if (!bannerId || deduped.has(bannerId)) continue;
+    const uniqueClicks = Number.isFinite(item.uniqueClicks)
+      ? Math.max(0, Math.trunc(item.uniqueClicks))
+      : 0;
+    deduped.add(bannerId);
+    result.push({ bannerId, uniqueClicks });
+    if (result.length >= 50) break;
+  }
+  return result;
+}
+
+function sanitizeBannerClickParticipantIds(
+  value: Record<string, string[]> | undefined,
+): Record<string, string[]> {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return {};
+  const result: Record<string, string[]> = {};
+  for (const [rawBannerId, rawIds] of Object.entries(value)) {
+    const bannerId = rawBannerId.trim().slice(0, 80);
+    if (!bannerId || !Array.isArray(rawIds)) continue;
+    const ids: string[] = [];
+    const seen = new Set<string>();
+    for (const rawId of rawIds) {
+      if (typeof rawId !== "string") continue;
+      const participantId = rawId.trim().slice(0, 80);
+      if (!participantId || seen.has(participantId)) continue;
+      seen.add(participantId);
+      ids.push(participantId);
+      if (ids.length >= 10_000) break;
+    }
+    if (ids.length > 0) result[bannerId] = ids;
+  }
+  return result;
+}
+
+function pruneBannerClickData(
+  banners: PublicBanner[],
+  stats: PublicBannerClickStats[],
+  participantIds: Record<string, string[]>,
+): {
+  playerBannerClickStats: PublicBannerClickStats[];
+  playerBannerClickParticipantIds: Record<string, string[]>;
+} {
+  const bannerIds = new Set(banners.map((banner) => banner.id));
+  const prunedParticipants: Record<string, string[]> = {};
+  for (const [bannerId, ids] of Object.entries(participantIds)) {
+    if (bannerIds.has(bannerId)) prunedParticipants[bannerId] = ids;
+  }
+  const prunedStats = stats
+    .filter((row) => bannerIds.has(row.bannerId))
+    .map((row) => ({
+      bannerId: row.bannerId,
+      uniqueClicks: Math.min(
+        row.uniqueClicks,
+        prunedParticipants[row.bannerId]?.length ?? row.uniqueClicks,
+      ),
+    }));
+  for (const bannerId of bannerIds) {
+    if (prunedStats.some((row) => row.bannerId === bannerId)) continue;
+    const ids = prunedParticipants[bannerId];
+    if (ids && ids.length > 0) {
+      prunedStats.push({ bannerId, uniqueClicks: ids.length });
+    }
+  }
+  return {
+    playerBannerClickStats: prunedStats,
+    playerBannerClickParticipantIds: prunedParticipants,
+  };
+}
+
+export function resolveBannerUniqueClicks(
+  stats: PublicBannerClickStats[] | undefined,
+  bannerId: string,
+): number {
+  const row = stats?.find((item) => item.bannerId === bannerId);
+  return row?.uniqueClicks ?? 0;
+}
+
 function sanitizeReactionWidgetStats(
   items: PublicReactionWidgetStats[] | undefined,
 ): PublicReactionWidgetStats[] {
@@ -880,6 +983,11 @@ export function normalizePublicViewState(
       ? value.questionRevealStage
       : base.questionRevealStage;
   const playerBanners = sanitizeBanners(value?.playerBanners);
+  const bannerClickData = pruneBannerClickData(
+    playerBanners,
+    sanitizeBannerClickStats(value?.playerBannerClickStats),
+    sanitizeBannerClickParticipantIds(value?.playerBannerClickParticipantIds),
+  );
   const requestedActiveBannerId =
     typeof value?.activePlayerBannerId === "string" && value.activePlayerBannerId.trim()
       ? value.activePlayerBannerId.trim()
@@ -1060,6 +1168,8 @@ export function normalizePublicViewState(
         ? value.showEventTitleOnPlayer
         : base.showEventTitleOnPlayer,
     playerBanners,
+    playerBannerClickStats: bannerClickData.playerBannerClickStats,
+    playerBannerClickParticipantIds: bannerClickData.playerBannerClickParticipantIds,
     activePlayerBannerId,
     speakerTileText:
       typeof value?.speakerTileText === "string"

@@ -13,6 +13,7 @@ import {
 export type QuestionType = "single" | "multi" | "tag_cloud" | "ranking" | "temperature";
 
 export type OptionForm = {
+  id?: string;
   text: string;
   isCorrect: boolean;
   imageUrl?: string;
@@ -46,6 +47,7 @@ export type QuestionForm = {
   hiddenTagTexts?: string[];
   injectedTagWords?: CloudWordCount[];
   tagCountOverrides?: CloudWordCount[];
+  optionVoteCountOverrides?: CloudWordCount[];
   injectedTagsInput?: string;
   /** Для ranking: баллы за совпадение на каждой позиции (индекс 0 = лучшее место). null — только полный ответ даёт поле `points`. */
   rankingPointsByRank?: number[] | null;
@@ -250,6 +252,7 @@ export function createEmptyQuestion(subQuizId: string | null = null): QuestionFo
     hiddenTagTexts: [],
     injectedTagWords: [],
     tagCountOverrides: [],
+    optionVoteCountOverrides: [],
     injectedTagsInput: "",
     options: [
       /** Первый вариант по умолчанию правильный (подквиз и голосования комнаты — для подсказки/первых верных без баллов в опросе). */
@@ -561,6 +564,7 @@ export function mapLoadedRoomQuestions(
     const options = normalizeSingleCorrectFlags(
       q.type,
       q.options.map((o) => ({
+        id: o.id,
         text: o.text,
         isCorrect: Boolean(o.isCorrect),
         imageUrl: o.imageUrl?.trim() || undefined,
@@ -589,6 +593,7 @@ export function mapLoadedRoomQuestions(
       hiddenTagTexts: cloudManual[q.id]?.hiddenTagTexts ?? [],
       injectedTagWords: cloudManual[q.id]?.injectedTagWords ?? [],
       tagCountOverrides: cloudManual[q.id]?.tagCountOverrides ?? [],
+      optionVoteCountOverrides: cloudManual[q.id]?.optionVoteCountOverrides ?? [],
       injectedTagsInput: "",
       rankingPointsByRank: parseRankingPointsFromApi(q.rankingPointsByRank),
       rankingProjectorMetric: projectMetricFromApi(q.rankingProjectorMetric),
@@ -612,6 +617,7 @@ export function mergeServerQuestionsIntoForms(
     const options = normalizeSingleCorrectFlags(
       q.type,
       q.options.map((o) => ({
+        id: o.id,
         text: o.text,
         isCorrect: Boolean(o.isCorrect),
         imageUrl: o.imageUrl?.trim() || undefined,
@@ -642,6 +648,7 @@ export function mergeServerQuestionsIntoForms(
       hiddenTagTexts: prev?.hiddenTagTexts ?? [],
       injectedTagWords: prev?.injectedTagWords ?? [],
       tagCountOverrides: prev?.tagCountOverrides ?? [],
+      optionVoteCountOverrides: prev?.optionVoteCountOverrides ?? [],
       injectedTagsInput: "",
       rankingPointsByRank: parseRankingPointsFromApi(q.rankingPointsByRank),
       rankingProjectorMetric: projectMetricFromApi(q.rankingProjectorMetric),
@@ -680,6 +687,7 @@ export function mergeRoomReloadIntoState(
       hiddenTagTexts: prev.hiddenTagTexts ?? [],
       injectedTagWords: prev.injectedTagWords ?? [],
       tagCountOverrides: prev.tagCountOverrides ?? [],
+      optionVoteCountOverrides: prev.optionVoteCountOverrides ?? [],
     };
   });
   return { sheets, questions: rebuilt };

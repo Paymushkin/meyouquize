@@ -51,6 +51,10 @@ export function setTagCountOverrideRow(
   return [...without, { text: tagText, count: safeCount }];
 }
 
+export function clearCountOverrideRow(current: CloudWordCount[], key: string): CloudWordCount[] {
+  return current.filter((item) => item.text !== key);
+}
+
 /**
  * Порядок тегов для диалога результатов (как при живых данных + инжект + overrides).
  */
@@ -78,6 +82,7 @@ type CloudManualQuestionFields = {
   hiddenTagTexts?: string[];
   injectedTagWords?: CloudWordCount[];
   tagCountOverrides?: CloudWordCount[];
+  optionVoteCountOverrides?: CloudWordCount[];
 };
 
 /** Применяет серверную карту ручных тегов ко всем question forms. */
@@ -94,6 +99,7 @@ export function applyCloudManualToQuestions<T extends CloudManualQuestionFields>
       hiddenTagTexts: entry.hiddenTagTexts,
       injectedTagWords: entry.injectedTagWords,
       tagCountOverrides: entry.tagCountOverrides,
+      optionVoteCountOverrides: entry.optionVoteCountOverrides,
     };
   });
 }
@@ -107,14 +113,21 @@ export function buildCloudManualFromQuestions(
     const hiddenTagTexts = question.hiddenTagTexts ?? [];
     const injectedTagWords = question.injectedTagWords ?? [];
     const tagCountOverrides = question.tagCountOverrides ?? [];
+    const optionVoteCountOverrides = question.optionVoteCountOverrides ?? [];
     if (
       hiddenTagTexts.length === 0 &&
       injectedTagWords.length === 0 &&
-      tagCountOverrides.length === 0
+      tagCountOverrides.length === 0 &&
+      optionVoteCountOverrides.length === 0
     ) {
       return;
     }
-    payload[question.id] = { hiddenTagTexts, injectedTagWords, tagCountOverrides };
+    payload[question.id] = {
+      hiddenTagTexts,
+      injectedTagWords,
+      tagCountOverrides,
+      optionVoteCountOverrides,
+    };
   });
   return payload;
 }

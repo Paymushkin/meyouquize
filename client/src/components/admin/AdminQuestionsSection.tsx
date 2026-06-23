@@ -7,6 +7,7 @@ import FormatListNumberedIcon from "@mui/icons-material/FormatListNumbered";
 import HowToVoteIcon from "@mui/icons-material/HowToVote";
 import LeaderboardIcon from "@mui/icons-material/Leaderboard";
 import OpenInNewIcon from "@mui/icons-material/OpenInNew";
+import RestoreIcon from "@mui/icons-material/Restore";
 import {
   Box,
   Button,
@@ -27,8 +28,8 @@ import {
 import { Link as RouterLink } from "react-router-dom";
 import { isEditorQuizMode, type QuestionForm } from "../../admin/adminEventForm";
 import type { QuestionResult } from "../../admin/adminEventTypes";
-import { TemperatureQuestionLivePreview } from "./TemperatureQuestionLivePreview";
 import type { PublicViewMode } from "../../publicViewContract";
+import { hasOptionVoteCountOverride, resolveOptionDisplayCount } from "@meyouquize/shared";
 import {
   runAdminQuestionRevealResultsFlow,
   runAdminQuestionSlideshowFlow,
@@ -36,6 +37,7 @@ import {
 import { QuestionRowProjectorControls } from "./questionRow/QuestionRowProjectorControls";
 import { QuestionRowQuickActions } from "./questionRow/QuestionRowQuickActions";
 import { QuestionSettingsToolbar } from "./questionRow/QuestionSettingsToolbar";
+import { VoteCountAdjustControls } from "./VoteCountAdjustControls";
 
 type Props = {
   questionForms: QuestionForm[];
@@ -68,6 +70,9 @@ type Props = {
   updateQuestionShowCorrectOption: (globalIndex: number, next: boolean) => void;
   openTagInputDialog: (globalIndex: number) => void;
   openTagResultsDialog: (globalIndex: number) => void;
+  updateOptionVoteCountOverride: (globalIndex: number, optionId: string, nextCount: number) => void;
+  clearOptionVoteCountOverride: (globalIndex: number, optionId: string) => void;
+  resetOptionVoteCountOverrides: (globalIndex: number) => void;
   confirmResetQuestionAnswersByIndex: (globalIndex: number) => void;
   toggleQuestion: (globalIndex: number, enabled: boolean) => void;
   updateQuestionProjectorShowFirstCorrect: (globalIndex: number, next: boolean) => void;
@@ -120,6 +125,9 @@ export function AdminQuestionsSection(props: Props) {
     updateQuestionShowCorrectOption,
     openTagInputDialog,
     openTagResultsDialog,
+    updateOptionVoteCountOverride,
+    clearOptionVoteCountOverride,
+    resetOptionVoteCountOverrides,
     confirmResetQuestionAnswersByIndex,
     toggleQuestion,
     updateQuestionProjectorShowFirstCorrect,
@@ -467,9 +475,22 @@ export function AdminQuestionsSection(props: Props) {
                               <MenuItem value="total_score">Сумма баллов (по варианту)</MenuItem>
                             </TextField>
                           ) : null}
-                          <Typography variant="caption" color="text.secondary">
-                            Результаты вопроса
-                          </Typography>
+                          <Stack direction="row" alignItems="center" justifyContent="space-between">
+                            <Typography variant="caption" color="text.secondary">
+                              Результаты вопроса
+                            </Typography>
+                            {(question.optionVoteCountOverrides?.length ?? 0) > 0 ? (
+                              <Tooltip title="Восстановить все реальные результаты">
+                                <IconButton
+                                  size="small"
+                                  onClick={() => resetOptionVoteCountOverrides(g)}
+                                  aria-label="Восстановить все реальные результаты"
+                                >
+                                  <RestoreIcon fontSize="small" />
+                                </IconButton>
+                              </Tooltip>
+                            ) : null}
+                          </Stack>
                           {(() => {
                             const result = question.id
                               ? questionResults.find((item) => item.questionId === question.id)
@@ -660,31 +681,104 @@ export function AdminQuestionsSection(props: Props) {
                             }
                             if (question.type === "temperature") {
                               const stats = result?.optionStats ?? [];
+                              const overrides = question.optionVoteCountOverrides ?? [];
                               const bars = question.options.map((option, index) => {
                                 const liveOption = stats.find((item) => item.text === option.text);
+                                const optionId = option.id ?? `${qIndex}-${index}`;
+                                const liveCount = liveOption?.count ?? 0;
                                 return {
                                   key: `${qIndex}-${index}-${option.text}`,
+                                  optionId,
                                   text: option.text || `Вариант ${index + 1}`,
                                   weight: option.weight ?? liveOption?.weight,
-                                  count: liveOption?.count ?? 0,
+                                  count: resolveOptionDisplayCount(optionId, liveCount, overrides),
                                 };
                               });
+                              const totalVotes = bars.reduce(
+                                (sum, option) => sum + option.count,
+                                0,
+                              );
+                              const tempLabel =
+                                result?.temperatureValue != null
+                                  ? `Температура: ${result.temperatureValue}`
+                                  : null;
                               return (
-                                <TemperatureQuestionLivePreview
-                                  temperatureValue={result?.temperatureValue}
-                                  bars={bars}
-                                />
+                                <Stack spacing={0.8}>
+                                  {tempLabel ? (
+                                    <Typography variant="caption" sx={{ fontWeight: 700 }}>
+                                      {tempLabel}
+                                    </Typography>
+                                  ) : (
+                                    <Typography variant="caption" color="text.secondary">
+                                      Пока нет ответов
+                                    </Typography>
+                                  )}
+                                  {bars.map((option) => {
+                                    const percent =
+                                      totalVotes > 0
+                                        ? Math.round((option.count / totalVotes) * 100)
+                                        : 0;
+                                    return (
+                                      <Box key={option.key} sx={{ py: 0.25 }}>
+                                        <Stack
+                                          direction="row"
+                                          justifyContent="space-between"
+                                          sx={{ mb: 0.25 }}
+                                        >
+                                          <Typography variant="caption" color="text.primary">
+                                            {option.text}
+                                            {option.weight != null ? ` (вес ${option.weight})` : ""}
+                                          </Typography>
+                                          <VoteCountAdjustControls
+                                            count={option.count}
+                                            hasOverride={hasOptionVoteCountOverride(
+                                              overrides,
+                                              option.optionId,
+                                            )}
+                                            onDecrement={() =>
+                                              updateOptionVoteCountOverride(
+                                                g,
+                                                option.optionId,
+                                                option.count - 1,
+                                              )
+                                            }
+                                            onIncrement={() =>
+                                              updateOptionVoteCountOverride(
+                                                g,
+                                                option.optionId,
+                                                option.count + 1,
+                                              )
+                                            }
+                                            onRestore={() =>
+                                              clearOptionVoteCountOverride(g, option.optionId)
+                                            }
+                                          />
+                                        </Stack>
+                                        <LinearProgress
+                                          variant="determinate"
+                                          value={percent}
+                                          color="primary"
+                                          sx={{ height: 6, borderRadius: 99 }}
+                                        />
+                                      </Box>
+                                    );
+                                  })}
+                                </Stack>
                               );
                             }
+                            const overrides = question.optionVoteCountOverrides ?? [];
                             const bars = question.options.map((option, index) => {
                               const liveOption = result?.optionStats.find(
                                 (item) => item.text === option.text,
                               );
+                              const optionId = option.id ?? `${qIndex}-${index}`;
+                              const liveCount = liveOption?.count ?? 0;
                               return {
                                 key: `${qIndex}-${index}-${option.text}`,
+                                optionId,
                                 text: option.text || `Вариант ${index + 1}`,
                                 isCorrect: option.isCorrect,
-                                count: liveOption?.count ?? 0,
+                                count: resolveOptionDisplayCount(optionId, liveCount, overrides),
                               };
                             });
                             const totalVotes = bars.reduce((sum, option) => sum + option.count, 0);
@@ -708,7 +802,30 @@ export function AdminQuestionsSection(props: Props) {
                                         >
                                           {option.text} {option.isCorrect ? "(правильный)" : ""}
                                         </Typography>
-                                        <Typography variant="caption">{option.count}</Typography>
+                                        <VoteCountAdjustControls
+                                          count={option.count}
+                                          hasOverride={hasOptionVoteCountOverride(
+                                            overrides,
+                                            option.optionId,
+                                          )}
+                                          onDecrement={() =>
+                                            updateOptionVoteCountOverride(
+                                              g,
+                                              option.optionId,
+                                              option.count - 1,
+                                            )
+                                          }
+                                          onIncrement={() =>
+                                            updateOptionVoteCountOverride(
+                                              g,
+                                              option.optionId,
+                                              option.count + 1,
+                                            )
+                                          }
+                                          onRestore={() =>
+                                            clearOptionVoteCountOverride(g, option.optionId)
+                                          }
+                                        />
                                       </Stack>
                                       <LinearProgress
                                         variant="determinate"

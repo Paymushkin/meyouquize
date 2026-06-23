@@ -724,6 +724,10 @@ export function QuizPlayPage() {
                 playerVoteProgressBarColor={playerVoteProgressBarColor}
                 visibleResultTiles={visibleResultTiles}
                 onSelectQuestion={setResultsDialogQuestionId}
+                onBannerClick={(bannerId) => {
+                  if (!quiz?.id) return;
+                  socket.emit("banner:click", { quizId: quiz.id, bannerId });
+                }}
               />
             ) : null}
             {!joined && !restoreJoinPending && (

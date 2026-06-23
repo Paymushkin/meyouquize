@@ -6,7 +6,7 @@ describe("publicViewJsonToState", () => {
   it("returns defaults for null", () => {
     const state = publicViewJsonToState(null);
     expect(state.mode).toBe(DEFAULT_PUBLIC_VIEW_STATE.mode);
-    expect(state.projectorJoinQrVisible).toBe(true);
+    expect(state.projectorJoinQrVisible).toBe(false);
   });
 
   it("normalizes partial JSON from database", () => {

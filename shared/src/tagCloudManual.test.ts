@@ -3,18 +3,25 @@ import {
   migrateLegacyTagCloudManualIntoMap,
   resolveTagCloudManualForQuestion,
   withProjectorTagCloudFields,
+  applyQuestionResultManualDisplay,
 } from "./tagCloudManual.js";
 
 describe("resolveTagCloudManualForQuestion", () => {
   it("returns empty state for missing question id", () => {
     expect(
       resolveTagCloudManualForQuestion({
-        "q-1": { hiddenTagTexts: ["x"], injectedTagWords: [], tagCountOverrides: [] },
+        "q-1": {
+          hiddenTagTexts: ["x"],
+          injectedTagWords: [],
+          tagCountOverrides: [],
+          optionVoteCountOverrides: [],
+        },
       }),
     ).toEqual({
       hiddenTagTexts: [],
       injectedTagWords: [],
       tagCountOverrides: [],
+      optionVoteCountOverrides: [],
     });
   });
 
@@ -26,6 +33,7 @@ describe("resolveTagCloudManualForQuestion", () => {
             hiddenTagTexts: ["скрытый"],
             injectedTagWords: [{ text: "врач", count: 2 }],
             tagCountOverrides: [{ text: "синий", count: 5 }],
+            optionVoteCountOverrides: [],
           },
         },
         "q-1",
@@ -34,6 +42,7 @@ describe("resolveTagCloudManualForQuestion", () => {
       hiddenTagTexts: ["скрытый"],
       injectedTagWords: [{ text: "врач", count: 2 }],
       tagCountOverrides: [{ text: "синий", count: 5 }],
+      optionVoteCountOverrides: [],
     });
   });
 });
@@ -49,6 +58,7 @@ describe("withProjectorTagCloudFields", () => {
             hiddenTagTexts: ["x"],
             injectedTagWords: [{ text: "a", count: 1 }],
             tagCountOverrides: [],
+            optionVoteCountOverrides: [],
           },
         },
         hiddenTagTexts: ["stale"],
@@ -72,6 +82,7 @@ describe("withProjectorTagCloudFields", () => {
             hiddenTagTexts: ["скрытый"],
             injectedTagWords: [{ text: "врач", count: 3 }],
             tagCountOverrides: [],
+            optionVoteCountOverrides: [],
           },
         },
         hiddenTagTexts: [],
@@ -103,6 +114,7 @@ describe("migrateLegacyTagCloudManualIntoMap", () => {
         hiddenTagTexts: ["скрытый"],
         injectedTagWords: [{ text: "врач", count: 1 }],
         tagCountOverrides: [],
+        optionVoteCountOverrides: [],
       },
     });
   });
@@ -115,6 +127,7 @@ describe("migrateLegacyTagCloudManualIntoMap", () => {
             hiddenTagTexts: [],
             injectedTagWords: [{ text: "сервер", count: 2 }],
             tagCountOverrides: [],
+            optionVoteCountOverrides: [],
           },
         },
         {
@@ -127,7 +140,64 @@ describe("migrateLegacyTagCloudManualIntoMap", () => {
         hiddenTagTexts: [],
         injectedTagWords: [{ text: "сервер", count: 2 }],
         tagCountOverrides: [],
+        optionVoteCountOverrides: [],
       },
+    });
+  });
+});
+
+describe("applyQuestionResultManualDisplay", () => {
+  it("applies option vote count overrides for single choice", () => {
+    const row = {
+      questionId: "q-1",
+      type: "single",
+      optionStats: [
+        { optionId: "o1", text: "A", count: 2, isCorrect: true },
+        { optionId: "o2", text: "B", count: 5, isCorrect: false },
+      ],
+      tagCloud: [],
+    };
+    expect(
+      applyQuestionResultManualDisplay(row, {
+        "q-1": {
+          hiddenTagTexts: [],
+          injectedTagWords: [],
+          tagCountOverrides: [],
+          optionVoteCountOverrides: [{ text: "o2", count: 99 }],
+        },
+      }),
+    ).toMatchObject({
+      optionStats: [
+        { optionId: "o1", count: 2 },
+        { optionId: "o2", count: 99 },
+      ],
+    });
+  });
+
+  it("merges tag cloud manual adjustments", () => {
+    const row = {
+      questionId: "q-tc",
+      type: "tag_cloud",
+      optionStats: [],
+      tagCloud: [{ text: "live", count: 1 }],
+    };
+    expect(
+      applyQuestionResultManualDisplay(row, {
+        "q-tc": {
+          hiddenTagTexts: [],
+          injectedTagWords: [{ text: "manual", count: 4 }],
+          tagCountOverrides: [{ text: "live", count: 10 }],
+          optionVoteCountOverrides: [],
+        },
+      }),
+    ).toEqual({
+      questionId: "q-tc",
+      type: "tag_cloud",
+      optionStats: [],
+      tagCloud: [
+        { text: "live", count: 10 },
+        { text: "manual", count: 4 },
+      ],
     });
   });
 });

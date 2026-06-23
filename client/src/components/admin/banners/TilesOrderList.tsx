@@ -22,6 +22,7 @@ import type { BannerEditorState, BannerSize, OrderedTile } from "./types";
 
 type Props = {
   tiles: OrderedTile[];
+  bannerClickCounts: Record<string, number>;
   editor: BannerEditorState;
   onMoveUp: (id: string) => void;
   onMoveDown: (id: string) => void;
@@ -37,6 +38,7 @@ type Props = {
 
 export function TilesOrderList({
   tiles,
+  bannerClickCounts,
   editor,
   onMoveUp,
   onMoveDown,
@@ -180,6 +182,11 @@ export function TilesOrderList({
                 </Box>
                 <Stack spacing={0.5} sx={{ flex: 1, minWidth: 0 }}>
                   <Typography variant="body2">{tile.label}</Typography>
+                  {tile.kind === "banner" ? (
+                    <Typography variant="caption" color="text.secondary">
+                      Уникальных кликов: {bannerClickCounts[tile.banner.id] ?? 0}
+                    </Typography>
+                  ) : null}
                   {tile.kind === "banner" ? (
                     <Typography variant="caption" color="text.secondary">
                       Размер: {tile.size}

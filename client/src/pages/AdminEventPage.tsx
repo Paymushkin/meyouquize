@@ -68,6 +68,7 @@ import {
 import { AdminRandomizerSection } from "../components/admin/AdminRandomizerSection";
 import { AdminReportSection } from "../components/admin/AdminReportSection";
 import { AdminQuestionsSection } from "../components/admin/AdminQuestionsSection";
+import { VoteCountAdjustControls } from "../components/admin/VoteCountAdjustControls";
 import { AdminResultsSection } from "../components/admin/AdminResultsSection";
 import { AdminSpeakersSection } from "../components/admin/AdminSpeakersSection";
 import { AdminBannersSection } from "../components/admin/AdminBannersSection";
@@ -94,6 +95,7 @@ import {
   type CloudManualStateByQuestion,
   type PublicReactionWidgetStats,
   type PublicBanner,
+  type PublicBannerClickStats,
   type ReportModuleId,
   type PublicViewPayload,
   type PublicViewSetPatch,
@@ -103,6 +105,7 @@ import {
   buildCloudManualFromQuestions,
   applyCloudManualToQuestions,
   buildTagResultsDisplayOrder,
+  clearCountOverrideRow,
   mergeInjectedTagWords,
   parseInjectedTagLines,
   readCloudManualFromPublicView,
@@ -381,6 +384,22 @@ function getReactionWidgetStatsOrNull(
   return result;
 }
 
+function getBannerClickStatsOrNull(value: unknown): PublicBannerClickStats[] | null {
+  if (!Array.isArray(value)) return null;
+  const result: PublicBannerClickStats[] = [];
+  for (const item of value) {
+    if (!item || typeof item !== "object") continue;
+    const row = item as { bannerId?: unknown; uniqueClicks?: unknown };
+    if (typeof row.bannerId !== "string" || !row.bannerId.trim()) continue;
+    const uniqueClicks = Number(row.uniqueClicks);
+    result.push({
+      bannerId: row.bannerId.trim(),
+      uniqueClicks: Number.isFinite(uniqueClicks) ? Math.max(0, Math.trunc(uniqueClicks)) : 0,
+    });
+  }
+  return result;
+}
+
 function readReactionWidgetsFromStorage(storageKey: string): ReactionWidget[] {
   if (typeof window === "undefined") return [];
   try {
@@ -636,6 +655,9 @@ export function AdminEventPage() {
     useState(true);
   const [showEventTitleOnPlayer, setShowEventTitleOnPlayer] = useState(true);
   const [playerBanners, setPlayerBanners] = useState<PublicBanner[]>([]);
+  const [playerBannerClickStats, setPlayerBannerClickStats] = useState<PublicBannerClickStats[]>(
+    [],
+  );
   const [speakerTileText, setSpeakerTileText] = useState("Вопросы спикерам");
   const [speakerTileBackgroundColor, setSpeakerTileBackgroundColor] = useState("#1976d2");
   const [speakerTileTextColor, setSpeakerTileTextColor] = useState("#ffffff");
@@ -1113,6 +1135,10 @@ export function AdminEventPage() {
         (payload as { reactionsWidgetStats?: unknown }).reactionsWidgetStats,
       );
       if (widgetStats) setReactionWidgetStats(widgetStats);
+      const bannerClickStats = getBannerClickStatsOrNull(
+        (payload as { playerBannerClickStats?: unknown }).playerBannerClickStats,
+      );
+      if (bannerClickStats) setPlayerBannerClickStats(bannerClickStats);
       if (typeof payload.reactionsOverlayText === "string") {
         setReactionsOverlayText(payload.reactionsOverlayText);
       }
@@ -1567,6 +1593,12 @@ export function AdminEventPage() {
     if (widgetStats) {
       setReactionWidgetStats(widgetStats);
     }
+    const bannerClickStats = getBannerClickStatsOrNull(
+      (pv as { playerBannerClickStats?: unknown }).playerBannerClickStats,
+    );
+    if (bannerClickStats) {
+      setPlayerBannerClickStats(bannerClickStats);
+    }
     setRandomizerMode(pv.randomizerMode === "numbers" ? "numbers" : "names");
     const loadedListMode =
       pv.randomizerListMode === "participants_only" ? "participants_only" : "free_list";
@@ -1675,6 +1707,14 @@ export function AdminEventPage() {
         return acc;
       }, {}),
     [reactionWidgetStats],
+  );
+  const bannerClickCounts = useMemo(
+    () =>
+      playerBannerClickStats.reduce<Record<string, number>>((acc, row) => {
+        acc[row.bannerId] = row.uniqueClicks;
+        return acc;
+      }, {}),
+    [playerBannerClickStats],
   );
 
   useEffect(() => {
@@ -3490,6 +3530,60 @@ export function AdminEventPage() {
     });
   }
 
+  function clearTagCountOverride(questionIndex: number, tagText: string) {
+    const question = questionForms[questionIndex];
+    const nextOverrides = clearCountOverrideRow(question.tagCountOverrides ?? [], tagText);
+    setQuestionForms((prev) => {
+      const next = prev.map((q, idx) =>
+        idx === questionIndex ? { ...q, tagCountOverrides: nextOverrides } : q,
+      );
+      persistCloudManualSnapshot(next);
+      return next;
+    });
+  }
+
+  function updateOptionVoteCountOverride(
+    questionIndex: number,
+    optionId: string,
+    nextCount: number,
+  ) {
+    const question = questionForms[questionIndex];
+    const nextOverrides = setTagCountOverrideRow(
+      question.optionVoteCountOverrides ?? [],
+      optionId,
+      nextCount,
+    );
+    setQuestionForms((prev) => {
+      const next = prev.map((q, idx) =>
+        idx === questionIndex ? { ...q, optionVoteCountOverrides: nextOverrides } : q,
+      );
+      persistCloudManualSnapshot(next);
+      return next;
+    });
+  }
+
+  function clearOptionVoteCountOverride(questionIndex: number, optionId: string) {
+    const question = questionForms[questionIndex];
+    const nextOverrides = clearCountOverrideRow(question.optionVoteCountOverrides ?? [], optionId);
+    setQuestionForms((prev) => {
+      const next = prev.map((q, idx) =>
+        idx === questionIndex ? { ...q, optionVoteCountOverrides: nextOverrides } : q,
+      );
+      persistCloudManualSnapshot(next);
+      return next;
+    });
+  }
+
+  function resetOptionVoteCountOverrides(questionIndex: number) {
+    setQuestionForms((prev) => {
+      const next = prev.map((q, idx) =>
+        idx === questionIndex ? { ...q, optionVoteCountOverrides: [] } : q,
+      );
+      persistCloudManualSnapshot(next);
+      return next;
+    });
+  }
+
   function openTagInputDialog(questionIndex: number) {
     setTagInputDialogQuestionIndex(questionIndex);
   }
@@ -4049,6 +4143,15 @@ export function AdminEventPage() {
                                             }
                                             openTagInputDialog={openTagInputDialog}
                                             openTagResultsDialog={openTagResultsDialog}
+                                            updateOptionVoteCountOverride={
+                                              updateOptionVoteCountOverride
+                                            }
+                                            clearOptionVoteCountOverride={
+                                              clearOptionVoteCountOverride
+                                            }
+                                            resetOptionVoteCountOverrides={
+                                              resetOptionVoteCountOverrides
+                                            }
                                             confirmResetQuestionAnswersByIndex={
                                               confirmResetQuestionAnswersByIndex
                                             }
@@ -4311,6 +4414,9 @@ export function AdminEventPage() {
                                   updateQuestionShowCorrectOption={updateQuestionShowCorrectOption}
                                   openTagInputDialog={openTagInputDialog}
                                   openTagResultsDialog={openTagResultsDialog}
+                                  updateOptionVoteCountOverride={updateOptionVoteCountOverride}
+                                  clearOptionVoteCountOverride={clearOptionVoteCountOverride}
+                                  resetOptionVoteCountOverrides={resetOptionVoteCountOverrides}
                                   confirmResetQuestionAnswersByIndex={
                                     confirmResetQuestionAnswersByIndex
                                   }
@@ -4393,6 +4499,9 @@ export function AdminEventPage() {
                                       }
                                       openTagInputDialog={openTagInputDialog}
                                       openTagResultsDialog={openTagResultsDialog}
+                                      updateOptionVoteCountOverride={updateOptionVoteCountOverride}
+                                      clearOptionVoteCountOverride={clearOptionVoteCountOverride}
+                                      resetOptionVoteCountOverrides={resetOptionVoteCountOverrides}
                                       confirmResetQuestionAnswersByIndex={
                                         confirmResetQuestionAnswersByIndex
                                       }
@@ -4686,6 +4795,7 @@ export function AdminEventPage() {
                   subQuizzesForReport={subQuizzesForReport}
                   brandPrimaryColor={brandPrimaryColor}
                   playerVoteOptionTextColor={playerVoteOptionTextColor}
+                  bannerClickCounts={bannerClickCounts}
                   tilesOrder={playerTilesOrder}
                   onMoveTileUp={(id) => moveTile(id, -1)}
                   onMoveTileDown={(id) => moveTile(id, 1)}
@@ -5527,46 +5637,17 @@ export function AdminEventPage() {
                   >
                     {tag.text}
                   </Typography>
-                  <Stack direction="row" spacing={0.5} alignItems="center">
-                    <IconButton
-                      size="small"
-                      onClick={() =>
-                        updateTagCountOverride(
-                          tagResultsDialogQuestionIndex,
-                          tag.text,
-                          tag.count - 1,
-                        )
-                      }
-                    >
-                      <RemoveIcon fontSize="small" />
-                    </IconButton>
-                    <TextField
-                      type="number"
-                      size="small"
-                      value={tag.count}
-                      onChange={(e) =>
-                        updateTagCountOverride(
-                          tagResultsDialogQuestionIndex,
-                          tag.text,
-                          Number(e.target.value),
-                        )
-                      }
-                      inputProps={{ min: 0, step: 1 }}
-                      sx={{ width: 92 }}
-                    />
-                    <IconButton
-                      size="small"
-                      onClick={() =>
-                        updateTagCountOverride(
-                          tagResultsDialogQuestionIndex,
-                          tag.text,
-                          tag.count + 1,
-                        )
-                      }
-                    >
-                      <AddIcon fontSize="small" />
-                    </IconButton>
-                  </Stack>
+                  <VoteCountAdjustControls
+                    count={tag.count}
+                    hasOverride={overrides.some((item) => item.text === tag.text)}
+                    onDecrement={() =>
+                      updateTagCountOverride(tagResultsDialogQuestionIndex, tag.text, tag.count - 1)
+                    }
+                    onIncrement={() =>
+                      updateTagCountOverride(tagResultsDialogQuestionIndex, tag.text, tag.count + 1)
+                    }
+                    onRestore={() => clearTagCountOverride(tagResultsDialogQuestionIndex, tag.text)}
+                  />
                 </Stack>
               ));
             })()}

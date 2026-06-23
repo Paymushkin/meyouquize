@@ -1,4 +1,5 @@
 import {
+  applyQuestionResultManualDisplay,
   collectTagCloudQuizReferenceAliases,
   computeTemperatureWeightedAverage,
   expandTagCloudSubmitLines,
@@ -2169,11 +2170,11 @@ export async function getPublicReportBySlug(slug: string): Promise<PublicEventRe
     },
     leaderboard: dash.leaderboard.slice(0, 200),
     quizQuestions: quizQuestions.slice(0, 500).map((row) => ({
-      ...row,
+      ...applyQuestionResultManualDisplay(row, view.tagCloudManualByQuestionId),
       subQuizTitle: row.subQuizId ? (subQuizTitleById.get(row.subQuizId) ?? undefined) : undefined,
     })),
     voteQuestions: voteQuestions.slice(0, 500).map((row) => ({
-      ...row,
+      ...applyQuestionResultManualDisplay(row, view.tagCloudManualByQuestionId),
       subQuizTitle: row.subQuizId ? (subQuizTitleById.get(row.subQuizId) ?? undefined) : undefined,
     })),
     randomizer: (() => {

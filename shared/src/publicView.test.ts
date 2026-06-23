@@ -95,6 +95,7 @@ describe("normalizePublicViewState", () => {
       hiddenTagTexts: ["скрытый"],
       injectedTagWords: [{ text: "врач", count: 10 }],
       tagCountOverrides: [{ text: "синий", count: 3 }],
+      optionVoteCountOverrides: [],
     });
     expect(state.tagCloudManualByQuestionId[""]).toBeUndefined();
   });
@@ -109,7 +110,32 @@ describe("normalizePublicViewState", () => {
       hiddenTagTexts: [],
       injectedTagWords: [{ text: "legacy", count: 4 }],
       tagCountOverrides: [],
+      optionVoteCountOverrides: [],
     });
+  });
+
+  it("prunes banner click stats for removed banners", () => {
+    const state = normalizePublicViewState({
+      playerBanners: [
+        {
+          id: "b1",
+          linkUrl: "https://example.com",
+          backgroundUrl: "https://example.com/bg.png",
+          size: "1x1",
+          isVisible: true,
+        },
+      ],
+      playerBannerClickStats: [
+        { bannerId: "b1", uniqueClicks: 2 },
+        { bannerId: "gone", uniqueClicks: 5 },
+      ],
+      playerBannerClickParticipantIds: {
+        b1: ["p1", "p2"],
+        gone: ["p9"],
+      },
+    });
+    expect(state.playerBannerClickStats).toEqual([{ bannerId: "b1", uniqueClicks: 2 }]);
+    expect(state.playerBannerClickParticipantIds).toEqual({ b1: ["p1", "p2"] });
   });
 });
 
@@ -197,6 +223,6 @@ describe("resolveProjectorLeaderboardRows", () => {
 describe("DEFAULT_PUBLIC_VIEW_STATE", () => {
   it("has stable defaults", () => {
     expect(DEFAULT_PUBLIC_VIEW_STATE.mode).toBe("title");
-    expect(DEFAULT_PUBLIC_VIEW_STATE.projectorJoinQrVisible).toBe(true);
+    expect(DEFAULT_PUBLIC_VIEW_STATE.projectorJoinQrVisible).toBe(false);
   });
 });

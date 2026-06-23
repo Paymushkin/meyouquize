@@ -17,6 +17,7 @@ describe("tagCloudAdmin persistence helpers", () => {
         hiddenTagTexts: [],
         injectedTagWords: [{ text: "врач", count: 10 }],
         tagCountOverrides: [],
+        optionVoteCountOverrides: [],
       },
     });
   });
@@ -30,6 +31,7 @@ describe("tagCloudAdmin persistence helpers", () => {
             hiddenTagTexts: ["скрытый"],
             injectedTagWords: [{ text: "сервер", count: 2 }],
             tagCountOverrides: [],
+            optionVoteCountOverrides: [],
           },
         },
       ),
@@ -39,9 +41,25 @@ describe("tagCloudAdmin persistence helpers", () => {
         hiddenTagTexts: ["скрытый"],
         injectedTagWords: [{ text: "сервер", count: 2 }],
         tagCountOverrides: [],
+        optionVoteCountOverrides: [],
       },
       { id: "q-2", injectedTagWords: [{ text: "старый", count: 1 }] },
     ]);
+  });
+
+  it("builds manual map for option vote count overrides", () => {
+    expect(
+      buildCloudManualFromQuestions([
+        { id: "q-1", optionVoteCountOverrides: [{ text: "opt-1", count: 42 }] },
+      ]),
+    ).toEqual({
+      "q-1": {
+        hiddenTagTexts: [],
+        injectedTagWords: [],
+        tagCountOverrides: [],
+        optionVoteCountOverrides: [{ text: "opt-1", count: 42 }],
+      },
+    });
   });
 
   it("reads manual map from public view payload", () => {
@@ -60,6 +78,7 @@ describe("tagCloudAdmin persistence helpers", () => {
         hiddenTagTexts: [],
         injectedTagWords: [{ text: "врач", count: 5 }],
         tagCountOverrides: [],
+        optionVoteCountOverrides: [],
       },
     });
   });

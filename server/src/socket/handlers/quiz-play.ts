@@ -4,6 +4,7 @@ import {
   playerSubQuizReportRequestSchema,
   resetAnswersSchema,
   submitAnswerSchema,
+  bannerClickSchema,
   toggleReactionSchema,
   updateNicknameSchema,
 } from "../../schemas.js";
@@ -29,6 +30,10 @@ import type { EnrichedSocket } from "../handler-common.js";
 import { fail } from "../handler-common.js";
 import { addReaction } from "../../reactions-service.js";
 import { persistReactionWidgetCounts } from "../../reaction-widget-stats.js";
+import {
+  broadcastPublicViewToDashboard,
+  persistBannerUniqueClick,
+} from "../../banner-click-stats.js";
 import {
   trialErrorMessage,
   trialLog,
@@ -200,6 +205,24 @@ export function registerQuizPlayHandlers(socket: EnrichedSocket, io: Server) {
       await broadcastQuizPublicState(io, payload.quizId, state);
     } catch (error) {
       fail(socket, error instanceof Error ? error.message : "Toggle reaction failed");
+    }
+  });
+
+  socket.on("banner:click", async (raw: unknown) => {
+    try {
+      const payload = bannerClickSchema.parse(raw);
+      if (!socket.data.participantId) throw new Error("Not joined");
+      if (socket.data.quizId !== payload.quizId) throw new Error("Not joined");
+      const recorded = await persistBannerUniqueClick(
+        payload.quizId,
+        payload.bannerId,
+        socket.data.participantId,
+      );
+      if (recorded) {
+        await broadcastPublicViewToDashboard(io, payload.quizId);
+      }
+    } catch {
+      // Клик по баннеру не должен мешать переходу по ссылке у игрока.
     }
   });
 

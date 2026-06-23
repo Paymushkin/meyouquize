@@ -10,6 +10,7 @@ type PatchableQuestion = {
   hiddenTagTexts?: string[];
   injectedTagWords?: Array<{ text: string; count: number }>;
   tagCountOverrides?: Array<{ text: string; count: number }>;
+  optionVoteCountOverrides?: Array<{ text: string; count: number }>;
 };
 
 export function patchQuestionsFromPublicView<TQuestion extends PatchableQuestion>(
@@ -39,6 +40,7 @@ export function patchQuestionsFromPublicView<TQuestion extends PatchableQuestion
           hiddenTagTexts: resolved.hiddenTagTexts,
           injectedTagWords: resolved.injectedTagWords,
           tagCountOverrides: resolved.tagCountOverrides,
+          optionVoteCountOverrides: resolved.optionVoteCountOverrides,
         }
       : q,
   );

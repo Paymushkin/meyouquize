@@ -8,7 +8,7 @@ PROFILE_FILE="${LOAD_DIR}/profiles/${PROFILE_NAME}.json"
 
 if [[ ! -f "${PROFILE_FILE}" ]]; then
   echo "Unknown profile: ${PROFILE_NAME}"
-  echo "Available: smoke, nominal, nominal-ui, nominal-admin, nominal-admin-500, peak, soak"
+  echo "Available: smoke, players-300-vote-40s, nominal, nominal-ui, nominal-admin, nominal-admin-500, peak, soak, walkthrough, normal-200-2m, normal-join-vote-200-1m"
   exit 1
 fi
 
