@@ -8,6 +8,7 @@
     "start": "node dist/src/index.js",
     "start:test": "NODE_ENV=test TEST_DATABASE=1 CLUSTER_WORKERS=1 tsx src/index.ts",
     "build": "prisma generate && tsc -p tsconfig.build.json",
+    "postinstall": "prisma generate",
     "test": "vitest run --project unit",
     "test:unit": "vitest run --project unit",
     "test:integration": "vitest run --project integration",
