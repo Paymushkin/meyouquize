@@ -1978,7 +1978,7 @@ export type PublicEventReport = {
     scaleStats: Array<{
       scaleId: string;
       label: string;
-      options: [string, string, string, string, string];
+      options: string[];
       counts: number[];
       average: number | null;
       responseCount: number;
