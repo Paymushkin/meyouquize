@@ -97,12 +97,10 @@ export function useQuizPlayFeedback({
 
   const canSubmitFeedback = useMemo(() => {
     if (!activeFeedbackForm || feedbackSubmitted) return false;
-    return activeFeedbackForm.scales.every(
-      (scale) =>
-        typeof scaleAnswers[scale.id] === "number" &&
-        scaleAnswers[scale.id] >= 0 &&
-        scaleAnswers[scale.id] <= 4,
-    );
+    return activeFeedbackForm.scales.every((scale) => {
+      const answer = scaleAnswers[scale.id];
+      return typeof answer === "number" && answer >= 0 && answer < scale.options.length;
+    });
   }, [activeFeedbackForm, feedbackSubmitted, scaleAnswers]);
 
   const selectScaleOption = useCallback((scaleId: string, optionIndex: number) => {

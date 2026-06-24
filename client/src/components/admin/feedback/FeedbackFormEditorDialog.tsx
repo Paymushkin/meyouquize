@@ -10,6 +10,7 @@ import {
   DialogContent,
   DialogTitle,
   FormControlLabel,
+  IconButton,
   Stack,
   TextField,
 } from "@mui/material";
@@ -17,6 +18,8 @@ import { useEffect, useState } from "react";
 import {
   buildDefaultFeedbackForm,
   createEmptyScale,
+  FEEDBACK_SCALE_MAX_OPTIONS,
+  FEEDBACK_SCALE_MIN_OPTIONS,
   type FeedbackScale,
 } from "../../../types/feedback";
 
@@ -41,9 +44,13 @@ type Props = {
 export function FeedbackFormEditorDialog(props: Props) {
   const { open, mode, initialDraft, saving, readOnly = false, error, onClose, onSave } = props;
   const [draft, setDraft] = useState<FeedbackFormDraft>(initialDraft);
+  const [newOptionByScaleId, setNewOptionByScaleId] = useState<Record<string, string>>({});
 
   useEffect(() => {
-    if (open) setDraft(initialDraft);
+    if (open) {
+      setDraft(initialDraft);
+      setNewOptionByScaleId({});
+    }
   }, [open, initialDraft]);
 
   function updateScale(index: number, patch: Partial<FeedbackScale>) {
@@ -63,6 +70,31 @@ export function FeedbackFormEditorDialog(props: Props) {
         return { ...scale, options };
       }),
     }));
+  }
+
+  function removeScaleOption(scaleIndex: number, optionIndex: number) {
+    setDraft((prev) => ({
+      ...prev,
+      scales: prev.scales.map((scale, idx) => {
+        if (idx !== scaleIndex) return scale;
+        if (scale.options.length <= FEEDBACK_SCALE_MIN_OPTIONS) return scale;
+        return { ...scale, options: scale.options.filter((_, i) => i !== optionIndex) };
+      }),
+    }));
+  }
+
+  function commitNewScaleOption(scaleIndex: number) {
+    const scale = draft.scales[scaleIndex];
+    if (!scale) return;
+    const value = (newOptionByScaleId[scale.id] ?? "").trim();
+    if (!value || scale.options.length >= FEEDBACK_SCALE_MAX_OPTIONS) return;
+    setDraft((prev) => ({
+      ...prev,
+      scales: prev.scales.map((item, idx) =>
+        idx === scaleIndex ? { ...item, options: [...item.options, value] } : item,
+      ),
+    }));
+    setNewOptionByScaleId((prev) => ({ ...prev, [scale.id]: "" }));
   }
 
   return (
@@ -112,18 +144,54 @@ export function FeedbackFormEditorDialog(props: Props) {
                     <DeleteOutlineIcon />
                   </Button>
                 </Stack>
-                <Stack direction={{ xs: "column", sm: "row" }} spacing={1}>
+                <Stack direction={{ xs: "column", sm: "row" }} spacing={1} flexWrap="wrap">
                   {scale.options.map((option, optionIndex) => (
-                    <TextField
+                    <Stack
                       key={`${scale.id}-${optionIndex}`}
-                      label={`Вариант ${optionIndex + 1}`}
-                      value={option}
-                      onChange={(e) => updateScaleOption(scaleIndex, optionIndex, e.target.value)}
-                      fullWidth
-                      disabled={readOnly}
-                    />
+                      spacing={0.25}
+                      sx={{ flex: { sm: "1 1 0" }, minWidth: { sm: 100 }, maxWidth: "100%" }}
+                    >
+                      <IconButton
+                        size="small"
+                        color="error"
+                        onClick={() => removeScaleOption(scaleIndex, optionIndex)}
+                        disabled={readOnly || scale.options.length <= FEEDBACK_SCALE_MIN_OPTIONS}
+                        aria-label={`Удалить вариант ${optionIndex + 1}`}
+                        sx={{ alignSelf: "flex-start", ml: -0.5 }}
+                      >
+                        <DeleteOutlineIcon fontSize="small" />
+                      </IconButton>
+                      <TextField
+                        label={`Вариант ${optionIndex + 1}`}
+                        value={option}
+                        onChange={(e) => updateScaleOption(scaleIndex, optionIndex, e.target.value)}
+                        size="small"
+                        fullWidth
+                        disabled={readOnly}
+                      />
+                    </Stack>
                   ))}
                 </Stack>
+                {!readOnly && scale.options.length < FEEDBACK_SCALE_MAX_OPTIONS ? (
+                  <TextField
+                    label="Новый вариант (введите и нажмите Enter)"
+                    placeholder="Текст нового варианта"
+                    value={newOptionByScaleId[scale.id] ?? ""}
+                    onChange={(e) =>
+                      setNewOptionByScaleId((prev) => ({ ...prev, [scale.id]: e.target.value }))
+                    }
+                    onBlur={() => commitNewScaleOption(scaleIndex)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        commitNewScaleOption(scaleIndex);
+                      }
+                    }}
+                    size="small"
+                    fullWidth
+                    disabled={readOnly}
+                  />
+                ) : null}
               </Stack>
             </Box>
           ))}

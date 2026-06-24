@@ -74,6 +74,28 @@ export function buildProjectorQuestionTitleTypographySx(input: {
   };
 }
 
+export const FEEDBACK_SCALE_TITLE_MAX_PX = 26;
+
+export function resolveFeedbackScaleTitleFontPx(textLength: number): {
+  mobile: number;
+  desktop: number;
+} {
+  const longTextPenalty = Math.min(1, Math.max(0, (textLength - 56) / 150));
+  const desktop = Math.max(18, FEEDBACK_SCALE_TITLE_MAX_PX - longTextPenalty * 8);
+  const mobile = Math.max(16, desktop - 3);
+  return { mobile, desktop };
+}
+
+export function playerFeedbackScaleTitleSx(textLength: number): SxProps<Theme> {
+  const { mobile, desktop } = resolveFeedbackScaleTitleFontPx(textLength);
+  return {
+    fontWeight: 700,
+    lineHeight: VOTE_QUESTION_TITLE_LINE_HEIGHT,
+    fontSize: { xs: `${mobile}px`, sm: `${desktop}px` },
+    py: 0.5,
+  };
+}
+
 export function playerPopupQuestionTitleSx(textLength: number): SxProps<Theme> {
   return {
     fontWeight: 700,

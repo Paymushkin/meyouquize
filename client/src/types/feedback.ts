@@ -1,7 +1,10 @@
+export const FEEDBACK_SCALE_MIN_OPTIONS = 2;
+export const FEEDBACK_SCALE_MAX_OPTIONS = 10;
+
 export type FeedbackScale = {
   id: string;
   label: string;
-  options: [string, string, string, string, string];
+  options: string[];
 };
 
 export type FeedbackFormConfig = {

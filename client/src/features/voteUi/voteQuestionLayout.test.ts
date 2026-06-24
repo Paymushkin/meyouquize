@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
+  FEEDBACK_SCALE_TITLE_MAX_PX,
   playerQuestionTitleFontSizeSx,
+  resolveFeedbackScaleTitleFontPx,
   resolvePlayerQuestionFontRem,
   resolveProjectorQuestionFontRem,
 } from "./voteQuestionLayout";
@@ -13,6 +15,18 @@ describe("resolvePlayerQuestionFontRem", () => {
   it("shrinks size for long text", () => {
     const result = resolvePlayerQuestionFontRem(120);
     expect(result.desktop).toBeLessThan(2.25);
+    expect(result.mobile).toBeLessThan(result.desktop);
+  });
+});
+
+describe("resolveFeedbackScaleTitleFontPx", () => {
+  it("caps desktop size at 26px for short text", () => {
+    expect(resolveFeedbackScaleTitleFontPx(30)).toEqual({ mobile: 23, desktop: 26 });
+  });
+
+  it("shrinks size for long text", () => {
+    const result = resolveFeedbackScaleTitleFontPx(120);
+    expect(result.desktop).toBeLessThan(FEEDBACK_SCALE_TITLE_MAX_PX);
     expect(result.mobile).toBeLessThan(result.desktop);
   });
 });

@@ -710,13 +710,7 @@ const feedbackScaleOptionSchema = z.string().trim().min(1).max(40);
 export const feedbackScaleSchema = z.object({
   id: z.string().trim().min(1).max(80),
   label: z.string().trim().min(1).max(200),
-  options: z.tuple([
-    feedbackScaleOptionSchema,
-    feedbackScaleOptionSchema,
-    feedbackScaleOptionSchema,
-    feedbackScaleOptionSchema,
-    feedbackScaleOptionSchema,
-  ]),
+  options: z.array(feedbackScaleOptionSchema).min(2).max(10),
 });
 
 export const upsertFeedbackFormSchema = z.object({
@@ -737,7 +731,7 @@ export const feedbackQuizIdSchema = z.object({
 
 export const submitFeedbackSchema = z.object({
   quizId: z.string().min(1),
-  scaleAnswers: z.record(z.string().trim().min(1).max(80), z.number().int().min(0).max(4)),
+  scaleAnswers: z.record(z.string().trim().min(1).max(80), z.number().int().min(0).max(9)),
   comment: z.string().trim().max(2000).optional(),
 });
 

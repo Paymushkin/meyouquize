@@ -62,10 +62,23 @@ describe("parseFeedbackScales", () => {
     expect(scales[0]?.options).toEqual(["😞", "😐", "🙂", "😊", "🤩"]);
   });
 
+  it("parses scales with two to ten options", () => {
+    const scales = parseFeedbackScales([{ id: "s1", label: "X", options: ["1", "2", "3"] }]);
+    expect(scales).toHaveLength(1);
+    expect(scales[0]?.options).toEqual(["1", "2", "3"]);
+  });
+
   it("rejects invalid option counts", () => {
-    expect(parseFeedbackScales([{ id: "s1", label: "X", options: ["1", "2", "3"] }])).toHaveLength(
-      0,
-    );
+    expect(parseFeedbackScales([{ id: "s1", label: "X", options: ["1"] }])).toHaveLength(0);
+    expect(
+      parseFeedbackScales([
+        {
+          id: "s1",
+          label: "X",
+          options: ["1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11"],
+        },
+      ]),
+    ).toHaveLength(0);
   });
 });
 

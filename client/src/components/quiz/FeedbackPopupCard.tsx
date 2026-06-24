@@ -11,7 +11,7 @@ import {
   Typography,
 } from "@mui/material";
 import { alpha } from "@mui/material/styles";
-import { playerQuestionTitleFontSizeSx } from "../../features/voteUi/voteQuestionLayout";
+import { playerFeedbackScaleTitleSx } from "../../features/voteUi/voteQuestionLayout";
 import type { ActiveFeedbackForm } from "../../types/feedback";
 
 type Props = {
@@ -117,12 +117,7 @@ export function FeedbackPopupCard(props: Props) {
                     <Stack key={scale.id} spacing={1.25}>
                       <Typography
                         variant="h4"
-                        sx={{
-                          fontWeight: 700,
-                          lineHeight: 1.2,
-                          fontSize: playerQuestionTitleFontSizeSx(scale.label.trim().length),
-                          py: 0.5,
-                        }}
+                        sx={playerFeedbackScaleTitleSx(scale.label.trim().length)}
                       >
                         {scale.label}
                       </Typography>

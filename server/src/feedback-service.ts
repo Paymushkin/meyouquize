@@ -2,10 +2,13 @@ import { randomUUID } from "node:crypto";
 import type { Prisma } from "@prisma/client";
 import { prisma } from "./prisma.js";
 
+export const FEEDBACK_SCALE_MIN_OPTIONS = 2;
+export const FEEDBACK_SCALE_MAX_OPTIONS = 10;
+
 export type FeedbackScale = {
   id: string;
   label: string;
-  options: [string, string, string, string, string];
+  options: string[];
 };
 
 export type FeedbackFormConfig = {
@@ -59,7 +62,13 @@ export function parseFeedbackScales(json: unknown): FeedbackScale[] {
     const row = item as { id?: unknown; label?: unknown; options?: unknown };
     if (typeof row.id !== "string" || !row.id.trim()) continue;
     if (typeof row.label !== "string" || !row.label.trim()) continue;
-    if (!Array.isArray(row.options) || row.options.length !== 5) continue;
+    if (
+      !Array.isArray(row.options) ||
+      row.options.length < FEEDBACK_SCALE_MIN_OPTIONS ||
+      row.options.length > FEEDBACK_SCALE_MAX_OPTIONS
+    ) {
+      continue;
+    }
     const options = row.options.map((o) => (typeof o === "string" ? o.trim() : ""));
     if (options.some((o) => !o)) continue;
     scales.push({
@@ -246,7 +255,8 @@ export async function hasParticipantSubmittedFeedback(
 function validateScaleAnswers(scales: FeedbackScale[], scaleAnswers: Record<string, number>): void {
   for (const scale of scales) {
     const idx = scaleAnswers[scale.id];
-    if (typeof idx !== "number" || !Number.isInteger(idx) || idx < 0 || idx > 4) {
+    const maxIdx = scale.options.length - 1;
+    if (typeof idx !== "number" || !Number.isInteger(idx) || idx < 0 || idx > maxIdx) {
       throw new Error(`Выберите ответ для «${scale.label}»`);
     }
   }
@@ -307,16 +317,17 @@ export async function getFeedbackResultsByFormId(formId: string) {
   }
   const config = mapFormRow(form);
   const scaleStats = config.scales.map((scale) => {
-    const counts = [0, 0, 0, 0, 0];
+    const counts = Array.from({ length: scale.options.length }, () => 0);
     let sum = 0;
     let count = 0;
+    const maxIdx = scale.options.length - 1;
     for (const response of form.responses) {
       const answers =
         response.scaleAnswers && typeof response.scaleAnswers === "object"
           ? (response.scaleAnswers as Record<string, number>)
           : {};
       const idx = answers[scale.id];
-      if (typeof idx !== "number" || idx < 0 || idx > 4) continue;
+      if (typeof idx !== "number" || idx < 0 || idx > maxIdx) continue;
       counts[idx] += 1;
       sum += idx + 1;
       count += 1;
