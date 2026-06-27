@@ -122,8 +122,8 @@ export function EventTitleBlock(props: EventTitleBlockProps) {
         justifyContent: isJoinScreen ? "flex-start" : "center",
         minHeight: joined ? 0 : 0,
         width: "100%",
-        maxWidth: 520,
-        mx: "auto",
+        maxWidth: "100%",
+        boxSizing: "border-box",
         flexShrink: 0,
         ...(isJoinScreen
           ? {
