@@ -139,7 +139,13 @@ Also verify from browser:
 
 Если в браузере `WebSocket … closed before established`: обновите Caddyfile из репозитория (блок `flush_interval -1` у `reverse_proxy` для `/api` и `/socket.io`), затем `sudo systemctl reload caddy`. Проверьте, что в `.env` в `CLIENT_ORIGIN` указан **ровно** тот же origin, что в адресной строке (например `https://meyou.site`, без лишнего слэша и с тем же `www`/без `www`).
 
-## 7) Safe update sequence
+## 7) Cloudflare (рекомендуется для internet-режима)
+
+Прокси перед доменом снижает риск недоступности при DDoS и сбоях TLS до IP VPS. Пошагово: [CLOUDFLARE.md](./CLOUDFLARE.md).
+
+После включения проверка: `bash deploy/scripts/cloudflare-verify.sh meyou.site`.
+
+## 8) Safe update sequence
 
 После обновления, где в Prisma появился `directUrl`: в `deploy/env/.env.runtime` (или в `.env` для локальных команд) добавьте **`DIRECT_URL`** — прямой Postgres `:5432`; без PgBouncer скопируйте тот же URL, что и у `DATABASE_URL` (только порт/хост как у реальной БД).
 
@@ -154,6 +160,6 @@ sudo systemctl restart meyouquize
 
 Если в этом релизе менялся `deploy/caddy/Caddyfile.internet`, обновите Caddy **через `render-internet.sh`** (см. §3), затем `validate` и `reload`, а не «голый» `cp` без `DOMAIN`.
 
-## 8) Fresh VPS quickstart
+## 9) Fresh VPS quickstart
 
 Короткий пошаговый запуск на чистом VPS: [deploy/VPS_QUICKSTART.md](./VPS_QUICKSTART.md)
