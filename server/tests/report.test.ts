@@ -128,6 +128,7 @@ describe("report contracts", () => {
           formId: "f1",
           title: "Обратная связь",
           responseCount: 2,
+          openFields: [{ id: "f1-open", label: "Комментарий", placeholder: "Ваш комментарий" }],
           scaleStats: [
             {
               scaleId: "s1",
@@ -142,6 +143,7 @@ describe("report contracts", () => {
             {
               nickname: "Анна",
               scaleAnswers: { s1: 3 },
+              openFieldAnswers: { "f1-open": "Отлично!" },
               comment: "Отлично!",
               submittedAt: new Date().toISOString(),
             },
@@ -151,6 +153,7 @@ describe("report contracts", () => {
           formId: "f2",
           title: "После перерыва",
           responseCount: 1,
+          openFields: [],
           scaleStats: [
             {
               scaleId: "s2",
@@ -165,6 +168,7 @@ describe("report contracts", () => {
             {
               nickname: "Борис",
               scaleAnswers: { s2: 3 },
+              openFieldAnswers: {},
               comment: null,
               submittedAt: new Date().toISOString(),
             },

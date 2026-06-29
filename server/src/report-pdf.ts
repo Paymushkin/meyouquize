@@ -127,11 +127,24 @@ async function renderSimplePdf(report: PublicEventReport): Promise<Buffer> {
             doc.fontSize(10).text(`  Среднее: ${stat.average}`);
           }
         });
-        const withComments = form.responses.filter((row) => row.comment);
-        if (withComments.length > 0) {
+        form.openFields.forEach((field) => {
+          const rows = form.responses.filter((row) => row.openFieldAnswers[field.id]?.trim());
+          if (rows.length === 0) return;
+          doc.moveDown();
+          doc.fontSize(12).text(field.label);
+          rows.slice(0, 30).forEach((row, index) => {
+            doc
+              .fontSize(10)
+              .text(`${index + 1}. [${row.nickname}] ${row.openFieldAnswers[field.id]}`);
+          });
+        });
+        const withLegacyComments = form.responses.filter(
+          (row) => row.comment && form.openFields.length === 0,
+        );
+        if (withLegacyComments.length > 0) {
           doc.moveDown();
           doc.fontSize(12).text("Комментарии");
-          withComments.slice(0, 30).forEach((row, index) => {
+          withLegacyComments.slice(0, 30).forEach((row, index) => {
             doc.fontSize(10).text(`${index + 1}. [${row.nickname}] ${row.comment}`);
           });
         }

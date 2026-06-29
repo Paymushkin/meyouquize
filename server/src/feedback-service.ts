@@ -4,11 +4,18 @@ import { prisma } from "./prisma.js";
 
 export const FEEDBACK_SCALE_MIN_OPTIONS = 2;
 export const FEEDBACK_SCALE_MAX_OPTIONS = 10;
+export const FEEDBACK_OPEN_FIELD_MAX = 10;
 
 export type FeedbackScale = {
   id: string;
   label: string;
   options: string[];
+};
+
+export type FeedbackOpenField = {
+  id: string;
+  label: string;
+  placeholder: string;
 };
 
 export type FeedbackFormConfig = {
@@ -18,6 +25,7 @@ export type FeedbackFormConfig = {
   isActive: boolean;
   isClosed: boolean;
   scales: FeedbackScale[];
+  openFields: FeedbackOpenField[];
   commentEnabled: boolean;
   commentPlaceholder: string;
 };
@@ -26,6 +34,7 @@ export type ActiveFeedbackFormPublic = {
   id: string;
   title: string;
   scales: FeedbackScale[];
+  openFields: FeedbackOpenField[];
   commentEnabled: boolean;
   commentPlaceholder: string;
   isClosed: boolean;
@@ -35,7 +44,8 @@ export type ActiveFeedbackFormPublic = {
 export type FeedbackFormInput = {
   title: string;
   scales: FeedbackScale[];
-  commentEnabled: boolean;
+  openFields?: FeedbackOpenField[];
+  commentEnabled?: boolean;
   commentPlaceholder?: string;
 };
 
@@ -80,6 +90,83 @@ export function parseFeedbackScales(json: unknown): FeedbackScale[] {
   return scales;
 }
 
+export function parseFeedbackOpenFields(
+  json: unknown,
+  commentEnabled: boolean,
+  commentPlaceholder: string,
+): FeedbackOpenField[] {
+  const fields: FeedbackOpenField[] = [];
+  if (Array.isArray(json)) {
+    for (const item of json) {
+      if (!item || typeof item !== "object") continue;
+      const row = item as { id?: unknown; label?: unknown; placeholder?: unknown };
+      if (typeof row.id !== "string" || !row.id.trim()) continue;
+      if (typeof row.label !== "string" || !row.label.trim()) continue;
+      const placeholder = typeof row.placeholder === "string" ? row.placeholder.trim() : "";
+      fields.push({
+        id: row.id.trim().slice(0, 80),
+        label: row.label.trim().slice(0, 200),
+        placeholder: placeholder.slice(0, 300),
+      });
+    }
+  }
+  if (fields.length > 0) return fields.slice(0, FEEDBACK_OPEN_FIELD_MAX);
+  if (commentEnabled) {
+    return [
+      {
+        id: randomUUID(),
+        label: "Комментарий",
+        placeholder: (commentPlaceholder ?? "").trim().slice(0, 300),
+      },
+    ];
+  }
+  return [];
+}
+
+function parseOpenFieldAnswers(json: unknown): Record<string, string> {
+  if (!json || typeof json !== "object" || Array.isArray(json)) return {};
+  const out: Record<string, string> = {};
+  for (const [key, value] of Object.entries(json as Record<string, unknown>)) {
+    if (typeof value !== "string") continue;
+    const trimmed = value.trim();
+    if (!trimmed) continue;
+    out[key] = trimmed.slice(0, 2000);
+  }
+  return out;
+}
+
+function normalizeResponseOpenFieldAnswers(
+  openFieldAnswers: Record<string, string>,
+  comment: string | null,
+  openFields: FeedbackOpenField[],
+): Record<string, string> {
+  const normalized = { ...openFieldAnswers };
+  if (comment && comment.trim().length > 0) {
+    const legacyFieldId = openFields[0]?.id;
+    if (legacyFieldId && !normalized[legacyFieldId]) {
+      normalized[legacyFieldId] = comment.trim();
+    }
+  }
+  return normalized;
+}
+
+function resolveFeedbackOpenFields(input: FeedbackFormInput): FeedbackOpenField[] {
+  if (input.openFields) {
+    return parseFeedbackOpenFields(input.openFields, false, "");
+  }
+  return parseFeedbackOpenFields([], input.commentEnabled ?? false, input.commentPlaceholder ?? "");
+}
+
+function legacyCommentFieldsFromOpenFields(openFields: FeedbackOpenField[]): {
+  commentEnabled: boolean;
+  commentPlaceholder: string;
+} {
+  return {
+    commentEnabled: openFields.length > 0,
+    commentPlaceholder: openFields[0]?.placeholder ?? "",
+  };
+}
+
 function mapFormRow(form: {
   id: string;
   quizId: string;
@@ -87,10 +174,17 @@ function mapFormRow(form: {
   isActive: boolean;
   isClosed: boolean;
   scales: unknown;
+  openFields?: unknown;
   commentEnabled: boolean;
   commentPlaceholder: string;
 }): FeedbackFormConfig {
   const scales = parseFeedbackScales(form.scales);
+  const openFields = parseFeedbackOpenFields(
+    form.openFields,
+    form.commentEnabled,
+    form.commentPlaceholder,
+  );
+  const legacy = legacyCommentFieldsFromOpenFields(openFields);
   return {
     id: form.id,
     quizId: form.quizId,
@@ -98,8 +192,9 @@ function mapFormRow(form: {
     isActive: form.isActive,
     isClosed: form.isClosed,
     scales: scales.length > 0 ? scales : defaultFeedbackScales(),
-    commentEnabled: form.commentEnabled,
-    commentPlaceholder: form.commentPlaceholder,
+    openFields,
+    commentEnabled: legacy.commentEnabled,
+    commentPlaceholder: legacy.commentPlaceholder,
   };
 }
 
@@ -121,13 +216,16 @@ export async function createFeedbackForm(
   quizId: string,
   input: FeedbackFormInput,
 ): Promise<FeedbackFormConfig> {
+  const openFields = resolveFeedbackOpenFields(input);
+  const legacy = legacyCommentFieldsFromOpenFields(openFields);
   const form = await prisma.feedbackForm.create({
     data: {
       quizId,
       title: input.title.trim().slice(0, 200),
       scales: input.scales as unknown as Prisma.InputJsonValue,
-      commentEnabled: input.commentEnabled,
-      commentPlaceholder: (input.commentPlaceholder ?? "").trim().slice(0, 300),
+      openFields: openFields as unknown as Prisma.InputJsonValue,
+      commentEnabled: legacy.commentEnabled,
+      commentPlaceholder: legacy.commentPlaceholder,
     },
   });
   return mapFormRow(form);
@@ -144,13 +242,16 @@ export async function updateFeedbackFormConfig(
   if (existing.isActive && !existing.isClosed) {
     throw new Error("Нельзя редактировать форму, пока идёт сбор ответов");
   }
+  const openFields = resolveFeedbackOpenFields(input);
+  const legacy = legacyCommentFieldsFromOpenFields(openFields);
   const form = await prisma.feedbackForm.update({
     where: { id: formId },
     data: {
       title: input.title.trim().slice(0, 200),
       scales: input.scales as unknown as Prisma.InputJsonValue,
-      commentEnabled: input.commentEnabled,
-      commentPlaceholder: (input.commentPlaceholder ?? "").trim().slice(0, 300),
+      openFields: openFields as unknown as Prisma.InputJsonValue,
+      commentEnabled: legacy.commentEnabled,
+      commentPlaceholder: legacy.commentPlaceholder,
     },
   });
   return mapFormRow(form);
@@ -165,6 +266,7 @@ export function mapActiveFeedbackFormPublic(
     id: form.id,
     title: form.title,
     scales: form.scales,
+    openFields: form.openFields,
     commentEnabled: form.commentEnabled,
     commentPlaceholder: form.commentPlaceholder,
     isClosed: form.isClosed,
@@ -272,20 +374,41 @@ export async function submitFeedbackResponse(input: {
   quizId: string;
   participantId: string;
   scaleAnswers: Record<string, number>;
+  openFieldAnswers?: Record<string, string>;
   comment?: string;
 }): Promise<string | null> {
   const form = await getActiveFeedbackFormConfig(input.quizId);
   if (!form) throw new Error("Сбор обратной связи сейчас не активен");
   validateScaleAnswers(form.scales, input.scaleAnswers);
-  const comment =
-    input.comment && input.comment.trim().length > 0 ? input.comment.trim().slice(0, 2000) : null;
+  const allowedFieldIds = new Set(form.openFields.map((field) => field.id));
+  const openFieldAnswers: Record<string, string> = {};
+  for (const [fieldId, value] of Object.entries(input.openFieldAnswers ?? {})) {
+    if (!allowedFieldIds.has(fieldId)) {
+      throw new Error("Invalid feedback payload");
+    }
+    const trimmed = value.trim();
+    if (trimmed.length > 0) {
+      openFieldAnswers[fieldId] = trimmed.slice(0, 2000);
+    }
+  }
+  if (
+    input.comment &&
+    input.comment.trim().length > 0 &&
+    form.openFields[0] &&
+    !openFieldAnswers[form.openFields[0].id]
+  ) {
+    openFieldAnswers[form.openFields[0].id] = input.comment.trim().slice(0, 2000);
+  }
+  const legacyComment =
+    form.openFields.length === 1 ? (openFieldAnswers[form.openFields[0]!.id] ?? null) : null;
   try {
     await prisma.feedbackResponse.create({
       data: {
         feedbackFormId: form.id,
         participantId: input.participantId,
         scaleAnswers: input.scaleAnswers as unknown as Prisma.InputJsonValue,
-        comment,
+        openFieldAnswers: openFieldAnswers as unknown as Prisma.InputJsonValue,
+        comment: legacyComment,
       },
     });
   } catch (error) {
@@ -345,15 +468,27 @@ export async function getFeedbackResultsByFormId(formId: string) {
     form: config,
     responseCount: form.responses.length,
     scaleStats,
-    responses: form.responses.map((r) => ({
-      nickname: r.participant.nickname,
-      scaleAnswers:
-        r.scaleAnswers && typeof r.scaleAnswers === "object"
-          ? (r.scaleAnswers as Record<string, number>)
-          : {},
-      comment: r.comment,
-      submittedAt: r.submittedAt.toISOString(),
-    })),
+    responses: form.responses.map((r) => {
+      const openFieldAnswers = normalizeResponseOpenFieldAnswers(
+        parseOpenFieldAnswers(r.openFieldAnswers),
+        r.comment,
+        config.openFields,
+      );
+      const legacyComment =
+        config.openFields.length === 1
+          ? (openFieldAnswers[config.openFields[0]!.id] ?? null)
+          : r.comment;
+      return {
+        nickname: r.participant.nickname,
+        scaleAnswers:
+          r.scaleAnswers && typeof r.scaleAnswers === "object"
+            ? (r.scaleAnswers as Record<string, number>)
+            : {},
+        openFieldAnswers,
+        comment: legacyComment,
+        submittedAt: r.submittedAt.toISOString(),
+      };
+    }),
   };
 }
 
@@ -367,6 +502,7 @@ export type FeedbackReportItem = {
   formId: string;
   title: string;
   responseCount: number;
+  openFields: FeedbackOpenField[];
   scaleStats: Array<{
     scaleId: string;
     label: string;
@@ -378,6 +514,7 @@ export type FeedbackReportItem = {
   responses: Array<{
     nickname: string;
     scaleAnswers: Record<string, number>;
+    openFieldAnswers: Record<string, string>;
     comment: string | null;
     submittedAt: string;
   }>;
@@ -390,6 +527,7 @@ export function mapFeedbackResultsToReportItem(
     formId: results.form.id,
     title: results.form.title,
     responseCount: results.responseCount,
+    openFields: results.form.openFields,
     scaleStats: results.scaleStats.map((stat) => ({
       scaleId: stat.scaleId,
       label: stat.label,

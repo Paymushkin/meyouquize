@@ -23,7 +23,11 @@ import {
 import { useCallback, useEffect, useState } from "react";
 import { API_BASE } from "../../config";
 import { socket } from "../../socket";
-import { type FeedbackFormConfig, type FeedbackResultsPayload } from "../../types/feedback";
+import {
+  type FeedbackFormConfig,
+  type FeedbackResultsPayload,
+  hasOpenFieldAnswers,
+} from "../../types/feedback";
 import {
   defaultCreateDraft,
   draftFromFormConfig,
@@ -467,7 +471,33 @@ export function AdminFeedbackSection({ eventName, quizId, onlineUsersCount }: Pr
                                   </Box>
                                 );
                               })}
-                              {(results?.responses ?? []).some((row) => row.comment) ? (
+                              {(results?.form.openFields ?? []).map((field) => {
+                                const rows = (results?.responses ?? []).filter((row) =>
+                                  row.openFieldAnswers[field.id]?.trim(),
+                                );
+                                if (rows.length === 0) return null;
+                                return (
+                                  <Stack key={field.id} spacing={1}>
+                                    <Typography variant="subtitle2">{field.label}</Typography>
+                                    {rows.map((row) => (
+                                      <Box
+                                        key={`${field.id}-${row.nickname}-${row.submittedAt}`}
+                                        sx={{ p: 1.5, bgcolor: "action.hover", borderRadius: 1 }}
+                                      >
+                                        <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                                          {row.nickname}
+                                        </Typography>
+                                        <Typography variant="body2">
+                                          {row.openFieldAnswers[field.id]}
+                                        </Typography>
+                                      </Box>
+                                    ))}
+                                  </Stack>
+                                );
+                              })}
+                              {(results?.responses ?? []).some((row) =>
+                                hasOpenFieldAnswers(row.openFieldAnswers, row.comment),
+                              ) && (results?.form.openFields ?? []).length === 0 ? (
                                 <Stack spacing={1}>
                                   <Typography variant="subtitle2">Комментарии</Typography>
                                   {results?.responses

@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { mapFeedbackResultsToReportItem, parseFeedbackScales } from "../src/feedback-service.js";
+import {
+  mapFeedbackResultsToReportItem,
+  parseFeedbackOpenFields,
+  parseFeedbackScales,
+} from "../src/feedback-service.js";
 
 function buildMockFeedbackResults(
   formId: string,
@@ -18,6 +22,13 @@ function buildMockFeedbackResults(
           id: "s1",
           label: "Как вам?",
           options: ["😞", "😐", "🙂", "😊", "🤩"],
+        },
+      ],
+      openFields: [
+        {
+          id: "f1",
+          label: "Комментарий",
+          placeholder: "Комментарий",
         },
       ],
       commentEnabled: true,
@@ -40,6 +51,7 @@ function buildMockFeedbackResults(
             {
               nickname: "Анна",
               scaleAnswers: { s1: 2 },
+              openFieldAnswers: { f1: "Отлично" },
               comment: "Отлично",
               submittedAt: new Date().toISOString(),
             },
@@ -47,6 +59,24 @@ function buildMockFeedbackResults(
         : [],
   };
 }
+
+describe("parseFeedbackOpenFields", () => {
+  it("parses configured open fields", () => {
+    const fields = parseFeedbackOpenFields(
+      [{ id: "f1", label: "Идеи", placeholder: "Ваши идеи" }],
+      false,
+      "",
+    );
+    expect(fields).toEqual([{ id: "f1", label: "Идеи", placeholder: "Ваши идеи" }]);
+  });
+
+  it("falls back to legacy comment field", () => {
+    const fields = parseFeedbackOpenFields([], true, "Что улучшить?");
+    expect(fields).toHaveLength(1);
+    expect(fields[0]?.label).toBe("Комментарий");
+    expect(fields[0]?.placeholder).toBe("Что улучшить?");
+  });
+});
 
 describe("parseFeedbackScales", () => {
   it("parses valid scales with five options", () => {
@@ -91,10 +121,13 @@ describe("mapFeedbackResultsToReportItem", () => {
       formId: "f1",
       title: "После первого блока",
       responseCount: 2,
+      openFields: expect.arrayContaining([expect.objectContaining({ id: "f1" })]),
       scaleStats: expect.arrayContaining([
         expect.objectContaining({ scaleId: "s1", responseCount: 2 }),
       ]),
-      responses: expect.arrayContaining([expect.objectContaining({ nickname: "Анна" })]),
+      responses: expect.arrayContaining([
+        expect.objectContaining({ nickname: "Анна", openFieldAnswers: { f1: "Отлично" } }),
+      ]),
     });
   });
 

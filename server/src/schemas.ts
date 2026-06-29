@@ -713,10 +713,17 @@ export const feedbackScaleSchema = z.object({
   options: z.array(feedbackScaleOptionSchema).min(2).max(10),
 });
 
+export const feedbackOpenFieldSchema = z.object({
+  id: z.string().trim().min(1).max(80),
+  label: z.string().trim().min(1).max(200),
+  placeholder: z.string().trim().max(300).optional().default(""),
+});
+
 export const upsertFeedbackFormSchema = z.object({
   title: z.string().trim().min(1).max(200),
   scales: z.array(feedbackScaleSchema).min(1).max(10),
-  commentEnabled: z.boolean(),
+  openFields: z.array(feedbackOpenFieldSchema).max(10).optional().default([]),
+  commentEnabled: z.boolean().optional(),
   commentPlaceholder: z.string().trim().max(300).optional(),
 });
 
@@ -732,6 +739,9 @@ export const feedbackQuizIdSchema = z.object({
 export const submitFeedbackSchema = z.object({
   quizId: z.string().min(1),
   scaleAnswers: z.record(z.string().trim().min(1).max(80), z.number().int().min(0).max(9)),
+  openFieldAnswers: z
+    .record(z.string().trim().min(1).max(80), z.string().trim().max(2000))
+    .optional(),
   comment: z.string().trim().max(2000).optional(),
 });
 

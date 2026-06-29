@@ -62,6 +62,7 @@ export function registerFeedbackHandlers(socket: EnrichedSocket, io: Server) {
         quizId: payload.quizId,
         participantId: socket.data.participantId,
         scaleAnswers: payload.scaleAnswers,
+        openFieldAnswers: payload.openFieldAnswers,
         comment: payload.comment,
       });
       socket.emit("feedback:submitted", { ok: true });

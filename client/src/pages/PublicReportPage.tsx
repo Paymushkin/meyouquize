@@ -31,6 +31,7 @@ import { useBrandFont } from "../hooks/useBrandFont";
 import { useBodyBrandBackground } from "../hooks/useBodyBrandBackground";
 import { useEventFavicon } from "../hooks/useEventFavicon";
 import { leaderboardPlaceByScore, type LeaderboardItem } from "../admin/adminEventTypes";
+import { hasOpenFieldAnswers } from "../types/feedback";
 
 type PublicReportPayload = {
   title: string;
@@ -123,6 +124,7 @@ type PublicReportPayload = {
     formId: string;
     title: string;
     responseCount: number;
+    openFields: Array<{ id: string; label: string; placeholder: string }>;
     scaleStats: Array<{
       scaleId: string;
       label: string;
@@ -134,6 +136,7 @@ type PublicReportPayload = {
     responses: Array<{
       nickname: string;
       scaleAnswers: Record<string, number>;
+      openFieldAnswers: Record<string, string>;
       comment: string | null;
       submittedAt: string;
     }>;
@@ -990,7 +993,42 @@ export function PublicReportPage() {
                           />
                         </Box>
                       ))}
-                      {form.responses.some((row) => row.comment) ? (
+                      {form.openFields.map((field) => {
+                        const rows = form.responses.filter((row) =>
+                          row.openFieldAnswers[field.id]?.trim(),
+                        );
+                        if (rows.length === 0) return null;
+                        return (
+                          <Stack key={field.id} spacing={1}>
+                            <Typography variant="subtitle1" fontWeight={700}>
+                              {field.label}
+                            </Typography>
+                            {rows.slice(0, 50).map((row) => (
+                              <Box
+                                key={`${field.id}-${row.nickname}-${row.submittedAt}`}
+                                className="report-row"
+                                sx={{
+                                  border: "1px solid",
+                                  borderColor: "divider",
+                                  borderRadius: 1.5,
+                                  px: 1.25,
+                                  py: 1,
+                                }}
+                              >
+                                <Typography variant="body2" fontWeight={700}>
+                                  {row.nickname}
+                                </Typography>
+                                <Typography variant="body2">
+                                  {row.openFieldAnswers[field.id]}
+                                </Typography>
+                              </Box>
+                            ))}
+                          </Stack>
+                        );
+                      })}
+                      {form.responses.some((row) =>
+                        hasOpenFieldAnswers(row.openFieldAnswers, row.comment),
+                      ) && form.openFields.length === 0 ? (
                         <Stack spacing={1}>
                           <Typography variant="subtitle1" fontWeight={700}>
                             Комментарии

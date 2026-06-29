@@ -22,7 +22,7 @@ export function useQuizPlayFeedback({
     string | null
   >(null);
   const [scaleAnswers, setScaleAnswers] = useState<Record<string, number>>({});
-  const [comment, setComment] = useState("");
+  const [openFieldAnswers, setOpenFieldAnswers] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
   const [submittedFlash, setSubmittedFlash] = useState(false);
 
@@ -58,11 +58,11 @@ export function useQuizPlayFeedback({
       setFeedbackSubmitted(false);
       setFeedbackStatusKnown(false);
       setScaleAnswers({});
-      setComment("");
+      setOpenFieldAnswers({});
       return;
     }
     setScaleAnswers({});
-    setComment("");
+    setOpenFieldAnswers({});
     if (typeof feedbackSubmittedFromState === "boolean") {
       setFeedbackSubmitted(feedbackSubmittedFromState);
       setFeedbackStatusKnown(true);
@@ -107,6 +107,10 @@ export function useQuizPlayFeedback({
     setScaleAnswers((prev) => ({ ...prev, [scaleId]: optionIndex }));
   }, []);
 
+  const setOpenFieldAnswer = useCallback((fieldId: string, value: string) => {
+    setOpenFieldAnswers((prev) => ({ ...prev, [fieldId]: value }));
+  }, []);
+
   const closeFeedbackPopup = useCallback(() => {
     if (!activationKey) return;
     setDismissedFeedbackActivationKey(activationKey);
@@ -117,10 +121,15 @@ export function useQuizPlayFeedback({
       return;
     }
     setSubmitting(true);
+    const trimmedAnswers = Object.fromEntries(
+      Object.entries(openFieldAnswers)
+        .map(([fieldId, value]) => [fieldId, value.trim()] as const)
+        .filter(([, value]) => value.length > 0),
+    );
     socket.emit("feedback:submit", {
       quizId,
       scaleAnswers,
-      comment: comment.trim() || undefined,
+      openFieldAnswers: trimmedAnswers,
     });
   }, [
     quizId,
@@ -129,15 +138,15 @@ export function useQuizPlayFeedback({
     submitting,
     feedbackSubmitted,
     scaleAnswers,
-    comment,
+    openFieldAnswers,
   ]);
 
   return {
     shouldShowFeedbackPopup,
     feedbackSubmitted,
     scaleAnswers,
-    comment,
-    setComment,
+    openFieldAnswers,
+    setOpenFieldAnswer,
     selectScaleOption,
     closeFeedbackPopup,
     canSubmitFeedback,

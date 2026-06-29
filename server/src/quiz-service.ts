@@ -1975,6 +1975,7 @@ export type PublicEventReport = {
     formId: string;
     title: string;
     responseCount: number;
+    openFields: Array<{ id: string; label: string; placeholder: string }>;
     scaleStats: Array<{
       scaleId: string;
       label: string;
@@ -1986,6 +1987,7 @@ export type PublicEventReport = {
     responses: Array<{
       nickname: string;
       scaleAnswers: Record<string, number>;
+      openFieldAnswers: Record<string, string>;
       comment: string | null;
       submittedAt: string;
     }>;

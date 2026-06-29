@@ -208,8 +208,8 @@ export function QuizPlayPage() {
   const {
     shouldShowFeedbackPopup,
     scaleAnswers,
-    comment,
-    setComment,
+    openFieldAnswers,
+    setOpenFieldAnswer,
     selectScaleOption,
     closeFeedbackPopup,
     canSubmitFeedback,
@@ -796,8 +796,8 @@ export function QuizPlayPage() {
                 playerVoteOptionTextColor={playerVoteOptionTextColor}
                 form={quiz.activeFeedbackForm}
                 scaleAnswers={scaleAnswers}
-                comment={comment}
-                onCommentChange={setComment}
+                openFieldAnswers={openFieldAnswers}
+                onOpenFieldChange={setOpenFieldAnswer}
                 onSelectOption={selectScaleOption}
                 onClose={closeFeedbackPopup}
                 canSubmit={canSubmitFeedback}

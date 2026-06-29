@@ -19,8 +19,8 @@ type Props = {
   playerVoteOptionTextColor: string;
   form: ActiveFeedbackForm;
   scaleAnswers: Record<string, number>;
-  comment: string;
-  onCommentChange: (value: string) => void;
+  openFieldAnswers: Record<string, string>;
+  onOpenFieldChange: (fieldId: string, value: string) => void;
   onSelectOption: (scaleId: string, optionIndex: number) => void;
   onClose: () => void;
   canSubmit: boolean;
@@ -29,14 +29,30 @@ type Props = {
   submittedFlash: boolean;
 };
 
+const openFieldSx = (brandPrimaryColor: string) => ({
+  "& .MuiOutlinedInput-root": {
+    color: "#fff",
+    "& fieldset": {
+      borderColor: "rgba(255,255,255,0.35)",
+    },
+    "&:hover fieldset": {
+      borderColor: "rgba(255,255,255,0.55)",
+    },
+    "&.Mui-focused fieldset": {
+      borderColor: brandPrimaryColor,
+      borderWidth: 2,
+    },
+  },
+});
+
 export function FeedbackPopupCard(props: Props) {
   const {
     brandPrimaryColor,
     playerVoteOptionTextColor,
     form,
     scaleAnswers,
-    comment,
-    onCommentChange,
+    openFieldAnswers,
+    onOpenFieldChange,
     onSelectOption,
     onClose,
     canSubmit,
@@ -146,31 +162,25 @@ export function FeedbackPopupCard(props: Props) {
                       </Box>
                     </Stack>
                   ))}
-                  {form.commentEnabled ? (
-                    <TextField
-                      value={comment}
-                      onChange={(e) => onCommentChange(e.target.value)}
-                      placeholder={form.commentPlaceholder || "Комментарий"}
-                      multiline
-                      minRows={2}
-                      fullWidth
-                      sx={{
-                        "& .MuiOutlinedInput-root": {
-                          color: "#fff",
-                          "& fieldset": {
-                            borderColor: "rgba(255,255,255,0.35)",
-                          },
-                          "&:hover fieldset": {
-                            borderColor: "rgba(255,255,255,0.55)",
-                          },
-                          "&.Mui-focused fieldset": {
-                            borderColor: brandPrimaryColor,
-                            borderWidth: 2,
-                          },
-                        },
-                      }}
-                    />
-                  ) : null}
+                  {form.openFields.map((field) => (
+                    <Stack key={field.id} spacing={1}>
+                      <Typography
+                        variant="h5"
+                        sx={playerFeedbackScaleTitleSx(field.label.trim().length)}
+                      >
+                        {field.label}
+                      </Typography>
+                      <TextField
+                        value={openFieldAnswers[field.id] ?? ""}
+                        onChange={(e) => onOpenFieldChange(field.id, e.target.value)}
+                        placeholder={field.placeholder || "Ваш ответ"}
+                        multiline
+                        minRows={2}
+                        fullWidth
+                        sx={openFieldSx(brandPrimaryColor)}
+                      />
+                    </Stack>
+                  ))}
                 </Stack>
                 <Box sx={{ pt: 3.5 }}>
                   <Button

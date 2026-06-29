@@ -42,6 +42,7 @@ function makeForm(): ActiveFeedbackForm {
         options: ["1", "2", "3", "4", "5"],
       },
     ],
+    openFields: [],
     commentEnabled: false,
     commentPlaceholder: "",
     isClosed: false,
@@ -108,7 +109,7 @@ describe("useQuizPlayFeedback", () => {
     expect(mockSocket.emit).toHaveBeenCalledWith("feedback:submit", {
       quizId: "quiz-1",
       scaleAnswers: { "scale-1": 2 },
-      comment: undefined,
+      openFieldAnswers: {},
     });
   });
 

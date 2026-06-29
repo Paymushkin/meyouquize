@@ -4,30 +4,31 @@ import {
   Alert,
   Box,
   Button,
-  Checkbox,
   Dialog,
   DialogActions,
   DialogContent,
   DialogTitle,
-  FormControlLabel,
   IconButton,
   Stack,
   TextField,
+  Typography,
 } from "@mui/material";
 import { useEffect, useState } from "react";
 import {
   buildDefaultFeedbackForm,
+  createEmptyOpenField,
   createEmptyScale,
+  FEEDBACK_OPEN_FIELD_MAX,
   FEEDBACK_SCALE_MAX_OPTIONS,
   FEEDBACK_SCALE_MIN_OPTIONS,
+  type FeedbackOpenField,
   type FeedbackScale,
 } from "../../../types/feedback";
 
 export type FeedbackFormDraft = {
   title: string;
   scales: FeedbackScale[];
-  commentEnabled: boolean;
-  commentPlaceholder: string;
+  openFields: FeedbackOpenField[];
 };
 
 type Props = {
@@ -57,6 +58,15 @@ export function FeedbackFormEditorDialog(props: Props) {
     setDraft((prev) => ({
       ...prev,
       scales: prev.scales.map((scale, idx) => (idx === index ? { ...scale, ...patch } : scale)),
+    }));
+  }
+
+  function updateOpenField(index: number, patch: Partial<FeedbackOpenField>) {
+    setDraft((prev) => ({
+      ...prev,
+      openFields: prev.openFields.map((field, idx) =>
+        idx === index ? { ...field, ...patch } : field,
+      ),
     }));
   }
 
@@ -207,29 +217,64 @@ export function FeedbackFormEditorDialog(props: Props) {
           >
             Добавить шкалу
           </Button>
-          <FormControlLabel
-            control={
-              <Checkbox
-                checked={draft.commentEnabled}
-                onChange={(e) =>
-                  setDraft((prev) => ({ ...prev, commentEnabled: e.target.checked }))
-                }
-                disabled={readOnly}
-              />
+          <Typography variant="subtitle1" sx={{ pt: 0.5 }}>
+            Открытые поля
+          </Typography>
+          {draft.openFields.map((field, fieldIndex) => (
+            <Box
+              key={field.id}
+              sx={{
+                p: 2,
+                border: "1px solid",
+                borderColor: "divider",
+                borderRadius: 1,
+              }}
+            >
+              <Stack spacing={1.5}>
+                <Stack direction="row" spacing={1} alignItems="center">
+                  <TextField
+                    label={`Поле ${fieldIndex + 1}`}
+                    value={field.label}
+                    onChange={(e) => updateOpenField(fieldIndex, { label: e.target.value })}
+                    fullWidth
+                    disabled={readOnly}
+                  />
+                  <Button
+                    color="error"
+                    onClick={() =>
+                      setDraft((prev) => ({
+                        ...prev,
+                        openFields: prev.openFields.filter((_, idx) => idx !== fieldIndex),
+                      }))
+                    }
+                    disabled={readOnly}
+                    aria-label="Удалить открытое поле"
+                  >
+                    <DeleteOutlineIcon />
+                  </Button>
+                </Stack>
+                <TextField
+                  label="Подсказка в поле"
+                  value={field.placeholder}
+                  onChange={(e) => updateOpenField(fieldIndex, { placeholder: e.target.value })}
+                  fullWidth
+                  disabled={readOnly}
+                />
+              </Stack>
+            </Box>
+          ))}
+          <Button
+            startIcon={<AddIcon />}
+            onClick={() =>
+              setDraft((prev) => ({
+                ...prev,
+                openFields: [...prev.openFields, createEmptyOpenField("Новое поле")],
+              }))
             }
-            label="Показывать поле комментария"
-          />
-          {draft.commentEnabled ? (
-            <TextField
-              label="Placeholder комментария"
-              value={draft.commentPlaceholder}
-              onChange={(e) =>
-                setDraft((prev) => ({ ...prev, commentPlaceholder: e.target.value }))
-              }
-              fullWidth
-              disabled={readOnly}
-            />
-          ) : null}
+            disabled={readOnly || draft.openFields.length >= FEEDBACK_OPEN_FIELD_MAX}
+          >
+            Добавить открытое поле
+          </Button>
           {readOnly ? (
             <Alert severity="warning">
               Идёт сбор ответов. Закройте приём на телефонах, чтобы изменить форму.
@@ -253,17 +298,28 @@ export function FeedbackFormEditorDialog(props: Props) {
 export function draftFromFormConfig(form: {
   title: string;
   scales: FeedbackScale[];
-  commentEnabled: boolean;
-  commentPlaceholder: string;
+  openFields?: FeedbackOpenField[];
+  commentEnabled?: boolean;
+  commentPlaceholder?: string;
 }): FeedbackFormDraft {
+  const openFields =
+    form.openFields && form.openFields.length > 0
+      ? form.openFields
+      : form.commentEnabled
+        ? [createEmptyOpenField("Комментарий", form.commentPlaceholder ?? "")]
+        : [];
   return {
     title: form.title,
     scales: form.scales,
-    commentEnabled: form.commentEnabled,
-    commentPlaceholder: form.commentPlaceholder,
+    openFields,
   };
 }
 
 export function defaultCreateDraft(): FeedbackFormDraft {
-  return buildDefaultFeedbackForm();
+  const defaults = buildDefaultFeedbackForm();
+  return {
+    title: defaults.title,
+    scales: defaults.scales,
+    openFields: defaults.openFields,
+  };
 }

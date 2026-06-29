@@ -15,6 +15,13 @@ const form: ActiveFeedbackForm = {
       options: ["Bad", "OK", "Good", "Great", "Excellent"],
     },
   ],
+  openFields: [
+    {
+      id: "field-1",
+      label: "Your thoughts",
+      placeholder: "Share feedback",
+    },
+  ],
   commentEnabled: true,
   commentPlaceholder: "Your thoughts",
   isClosed: false,
@@ -28,8 +35,8 @@ describe("FeedbackPopupCard", () => {
         playerVoteOptionTextColor="#ffffff"
         form={form}
         scaleAnswers={{}}
-        comment=""
-        onCommentChange={vi.fn()}
+        openFieldAnswers={{}}
+        onOpenFieldChange={vi.fn()}
         onSelectOption={vi.fn()}
         onClose={vi.fn()}
         canSubmit={false}
@@ -40,6 +47,7 @@ describe("FeedbackPopupCard", () => {
     );
 
     expect(screen.getByText("How was the event?")).toBeTruthy();
+    expect(screen.getByText("Your thoughts")).toBeTruthy();
     expect(screen.getByRole("button", { name: "Отправить ответ" })).toHaveProperty(
       "disabled",
       true,
@@ -53,8 +61,8 @@ describe("FeedbackPopupCard", () => {
         playerVoteOptionTextColor="#ffffff"
         form={form}
         scaleAnswers={{ "scale-1": 4 }}
-        comment=""
-        onCommentChange={vi.fn()}
+        openFieldAnswers={{}}
+        onOpenFieldChange={vi.fn()}
         onSelectOption={vi.fn()}
         onClose={vi.fn()}
         canSubmit
@@ -75,8 +83,8 @@ describe("FeedbackPopupCard", () => {
         playerVoteOptionTextColor="#ffffff"
         form={form}
         scaleAnswers={{}}
-        comment=""
-        onCommentChange={vi.fn()}
+        openFieldAnswers={{}}
+        onOpenFieldChange={vi.fn()}
         onSelectOption={onSelectOption}
         onClose={vi.fn()}
         canSubmit={false}

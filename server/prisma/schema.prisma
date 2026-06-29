@@ -231,6 +231,8 @@ model FeedbackForm {
   isClosed           Boolean            @default(false)
   /** [{ id, label, options: string[5] }] */
   scales             Json
+  /** [{ id, label, placeholder }] */
+  openFields         Json               @default("[]")
   commentEnabled     Boolean            @default(true)
   commentPlaceholder String             @default("")
   activatedAt        DateTime?
@@ -248,8 +250,10 @@ model FeedbackResponse {
   participantId  String
   participant    Participant  @relation(fields: [participantId], references: [id], onDelete: Cascade)
   /** { scaleId: optionIndex 0..4 } */
-  scaleAnswers   Json
-  comment        String?
+  scaleAnswers     Json
+  /** { openFieldId: text } */
+  openFieldAnswers Json               @default("{}")
+  comment          String?
   submittedAt    DateTime     @default(now())
 
   @@unique([feedbackFormId, participantId])
