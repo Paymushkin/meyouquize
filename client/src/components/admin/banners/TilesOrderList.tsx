@@ -10,6 +10,7 @@ import {
   TextField,
   Typography,
 } from "@mui/material";
+import { sanitizeBannerLinkUrl } from "../../../utils/safeUrls";
 import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
 import ArrowUpwardIcon from "@mui/icons-material/ArrowUpward";
 import ArrowDownwardIcon from "@mui/icons-material/ArrowDownward";
@@ -200,9 +201,10 @@ export function TilesOrderList({
                   {tile.kind === "banner" ? (
                     <Typography variant="body2" noWrap>
                       <Link
-                        href={tile.banner.linkUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
+                        href={sanitizeBannerLinkUrl(tile.banner.linkUrl) || tile.banner.linkUrl}
+                        {...(sanitizeBannerLinkUrl(tile.banner.linkUrl).startsWith("mailto:")
+                          ? {}
+                          : { target: "_blank", rel: "noopener noreferrer" })}
                         underline="hover"
                       >
                         {tile.banner.linkUrl}

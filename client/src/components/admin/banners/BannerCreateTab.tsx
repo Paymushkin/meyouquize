@@ -33,7 +33,7 @@ export function BannerCreateTab({
         size="small"
         value={linkUrl}
         onChange={(e) => onChangeLinkUrl(e.target.value)}
-        placeholder="https://example.com"
+        placeholder="https://example.com или email@example.com"
         fullWidth
       />
       <TextField

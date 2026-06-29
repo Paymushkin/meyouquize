@@ -7,6 +7,7 @@ import {
   quizResultsTileIdForSubQuiz,
   resolveProjectorLeaderboardRows,
   ruBallLabel,
+  sanitizeBannerLinkUrl,
   sanitizeExternalHttpUrl,
   withQuizResultsTileLast,
 } from "./index.js";
@@ -48,6 +49,28 @@ describe("sanitizeExternalHttpUrl", () => {
   it("rejects non-http schemes", () => {
     expect(sanitizeExternalHttpUrl("javascript:alert(1)")).toBe("");
     expect(sanitizeExternalHttpUrl("ftp://files.example.com")).toBe("");
+    expect(sanitizeExternalHttpUrl("mailto:a@b.com")).toBe("");
+  });
+});
+
+describe("sanitizeBannerLinkUrl", () => {
+  it("accepts http(s) urls", () => {
+    expect(sanitizeBannerLinkUrl("https://example.com/path")).toBe("https://example.com/path");
+  });
+
+  it("normalizes bare email to mailto", () => {
+    expect(sanitizeBannerLinkUrl("supportresearchportal@alfabank.ru")).toBe(
+      "mailto:supportresearchportal@alfabank.ru",
+    );
+  });
+
+  it("accepts mailto links", () => {
+    expect(sanitizeBannerLinkUrl("mailto:support@alfabank.ru")).toBe("mailto:support@alfabank.ru");
+  });
+
+  it("rejects invalid links", () => {
+    expect(sanitizeBannerLinkUrl("javascript:alert(1)")).toBe("");
+    expect(sanitizeBannerLinkUrl("not-an-email")).toBe("");
   });
 });
 
@@ -112,6 +135,26 @@ describe("normalizePublicViewState", () => {
       tagCountOverrides: [],
       optionVoteCountOverrides: [],
     });
+  });
+
+  it("keeps banner with email link as mailto", () => {
+    const state = normalizePublicViewState({
+      playerBanners: [
+        {
+          id: "b-mail",
+          linkUrl: "supportresearchportal@alfabank.ru",
+          backgroundUrl: "/media/banner.png",
+          size: "2x1",
+          isVisible: true,
+        },
+      ],
+    });
+    expect(state.playerBanners).toEqual([
+      expect.objectContaining({
+        id: "b-mail",
+        linkUrl: "mailto:supportresearchportal@alfabank.ru",
+      }),
+    ]);
   });
 
   it("prunes banner click stats for removed banners", () => {

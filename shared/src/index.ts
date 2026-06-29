@@ -736,6 +736,46 @@ function sanitizeBrandUrl(value: string | undefined): string {
   return value.trim().slice(0, 1000);
 }
 
+const BARE_EMAIL_RE = /^[^\s@<>]+@[^\s@<>]+\.[^\s@<>]+$/;
+
+function extractMailtoAddress(mailtoUrl: string): string {
+  try {
+    const u = new URL(mailtoUrl);
+    if (u.protocol !== "mailto:") return "";
+    const raw = (u.pathname || u.href.replace(/^mailto:/i, "")).split("?")[0] ?? "";
+    return decodeURIComponent(raw).trim();
+  } catch {
+    return "";
+  }
+}
+
+/** Пустая строка, если значение не http(s), mailto: или адрес почты. */
+export function sanitizeBannerLinkUrl(value: string | undefined): string {
+  if (typeof value !== "string") return "";
+  const v = value.trim().slice(0, 1000);
+  if (!v) return "";
+
+  try {
+    const u = new URL(v);
+    if (u.protocol === "http:" || u.protocol === "https:") return v;
+    if (u.protocol === "mailto:" && BARE_EMAIL_RE.test(extractMailtoAddress(v))) {
+      return v;
+    }
+  } catch {
+    /* ignore */
+  }
+
+  if (BARE_EMAIL_RE.test(v)) {
+    return `mailto:${v}`;
+  }
+
+  return "";
+}
+
+export function isValidBannerLinkUrl(value: string): boolean {
+  return sanitizeBannerLinkUrl(value).length > 0;
+}
+
 /** Пустая строка, если значение не абсолютный http(s) URL (для Zod optionalExternalHttpUrl). */
 export function sanitizeExternalHttpUrl(value: string | undefined): string {
   if (typeof value !== "string") return "";
@@ -759,9 +799,7 @@ function sanitizeBanners(items: PublicBanner[] | undefined): PublicBanner[] {
         item.size === "1x1" ? "1x1" : item.size === "full" ? "full" : "2x1";
       return {
         id: item.id.trim().slice(0, 80),
-        linkUrl: sanitizeExternalHttpUrl(
-          typeof item.linkUrl === "string" ? item.linkUrl : undefined,
-        ),
+        linkUrl: sanitizeBannerLinkUrl(typeof item.linkUrl === "string" ? item.linkUrl : undefined),
         backgroundUrl:
           typeof item.backgroundUrl === "string" ? item.backgroundUrl.trim().slice(0, 1000) : "",
         size,

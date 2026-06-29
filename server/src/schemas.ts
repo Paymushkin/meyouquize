@@ -3,6 +3,7 @@ import {
   isValidVoteFillColor,
   isValidVoteOptionBorderColor,
   isValidVoteQuestionTextColor,
+  isValidBannerLinkUrl,
   optionHasImage,
   optionHasTextOrImage,
   PROJECTOR_JOIN_QR_TEXT_MAX_LENGTH,
@@ -24,14 +25,23 @@ function isSafeClientAssetUrl(value: string): boolean {
   return isHttpUrl(v);
 }
 
+function isBannerLinkUrl(value: string): boolean {
+  return isValidBannerLinkUrl(value);
+}
+
 const externalHttpUrlSchema = z.string().trim().min(1).max(1000).refine(isHttpUrl, {
   message: "URL must use http or https",
+});
+
+const bannerLinkUrlSchema = z.string().trim().min(1).max(1000).refine(isBannerLinkUrl, {
+  message: "Link must be http(s), mailto: or email address",
 });
 
 const clientAssetUrlSchema = z.string().trim().min(1).max(1000).refine(isSafeClientAssetUrl, {
   message: "Asset URL must be absolute http(s) or start with /",
 });
 const optionalExternalHttpUrlSchema = z.union([externalHttpUrlSchema, z.literal("")]).optional();
+const optionalBannerLinkUrlSchema = z.union([bannerLinkUrlSchema, z.literal("")]).optional();
 const optionalClientAssetUrlSchema = z.union([clientAssetUrlSchema, z.literal("")]).optional();
 
 const optionInputSchema = z.object({
@@ -438,7 +448,7 @@ export const setPublicViewSchema = z.object({
     .array(
       z.object({
         id: z.string().trim().min(1).max(80),
-        linkUrl: optionalExternalHttpUrlSchema,
+        linkUrl: optionalBannerLinkUrlSchema,
         backgroundUrl: clientAssetUrlSchema,
         size: z.enum(["2x1", "1x1", "full"]).optional(),
         isVisible: z.boolean().optional(),

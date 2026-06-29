@@ -1,3 +1,5 @@
+export { sanitizeBannerLinkUrl } from "@meyouquize/shared";
+
 export function sanitizeExternalHttpUrl(value: string | null | undefined): string {
   const raw = value?.trim();
   if (!raw) return "";

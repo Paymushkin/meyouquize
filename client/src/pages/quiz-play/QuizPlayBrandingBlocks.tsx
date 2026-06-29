@@ -31,7 +31,11 @@ import { useState, type RefObject } from "react";
 import type { QuizState, ReactionType } from "./types";
 import { PlayerVisibleResultTileCard } from "../../components/quiz/PlayerVisibleResultTileCard";
 import { resolveClientAssetUrl } from "../../utils/resolveClientAssetUrl";
-import { sanitizeClientAssetUrl, sanitizeExternalHttpUrl } from "../../utils/safeUrls";
+import {
+  sanitizeBannerLinkUrl,
+  sanitizeClientAssetUrl,
+  sanitizeExternalHttpUrl,
+} from "../../utils/safeUrls";
 
 type BannerTile = {
   id: string;
@@ -391,16 +395,16 @@ export function PlayerTilesGrid(props: PlayerTilesGridProps) {
         }
         const banner = visibleBannerById.get(tileId);
         if (!banner) return null;
-        const safeBannerLinkUrl = sanitizeExternalHttpUrl(banner.linkUrl);
+        const safeBannerLinkUrl = sanitizeBannerLinkUrl(banner.linkUrl);
         const safeBannerBackgroundUrl = sanitizeClientAssetUrl(banner.backgroundUrl);
         if (!safeBannerLinkUrl || !safeBannerBackgroundUrl) return null;
+        const bannerOpensMail = safeBannerLinkUrl.startsWith("mailto:");
         return (
           <Box
             key={banner.id}
             component="a"
             href={safeBannerLinkUrl}
-            target="_blank"
-            rel="noopener noreferrer"
+            {...(bannerOpensMail ? {} : { target: "_blank", rel: "noopener noreferrer" })}
             onClick={() => onBannerClick(banner.id)}
             sx={{
               gridColumn:

@@ -1,5 +1,6 @@
 import {
   sanitizeBrandThemeId,
+  sanitizeBannerLinkUrl,
   sanitizeExternalHttpUrl,
   type BrandThemeId,
 } from "@meyouquize/shared";
@@ -33,7 +34,7 @@ function playerBannersForEmit(banners: PublicBanner[]): PublicBanner[] {
   return banners
     .map((item) => ({
       ...item,
-      linkUrl: sanitizeExternalHttpUrl(item.linkUrl),
+      linkUrl: sanitizeBannerLinkUrl(item.linkUrl),
     }))
     .filter((item) => item.id && item.linkUrl && item.backgroundUrl);
 }

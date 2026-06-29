@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { sanitizeClientAssetUrl, sanitizeExternalHttpUrl } from "./safeUrls";
+import { sanitizeBannerLinkUrl, sanitizeClientAssetUrl, sanitizeExternalHttpUrl } from "./safeUrls";
 
 describe("sanitizeExternalHttpUrl", () => {
   it("accepts http(s) urls", () => {
@@ -8,6 +8,13 @@ describe("sanitizeExternalHttpUrl", () => {
 
   it("rejects other schemes", () => {
     expect(sanitizeExternalHttpUrl("javascript:alert(1)")).toBe("");
+    expect(sanitizeExternalHttpUrl("mailto:a@b.com")).toBe("");
+  });
+});
+
+describe("sanitizeBannerLinkUrl", () => {
+  it("normalizes bare email", () => {
+    expect(sanitizeBannerLinkUrl("user@alfabank.ru")).toBe("mailto:user@alfabank.ru");
   });
 });
 
