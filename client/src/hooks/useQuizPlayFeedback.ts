@@ -24,7 +24,6 @@ export function useQuizPlayFeedback({
   const [scaleAnswers, setScaleAnswers] = useState<Record<string, number>>({});
   const [openFieldAnswers, setOpenFieldAnswers] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
-  const [submittedFlash, setSubmittedFlash] = useState(false);
 
   useEffect(() => {
     const onStatus = (payload: { submitted?: boolean }) => {
@@ -33,7 +32,6 @@ export function useQuizPlayFeedback({
     };
     const onSubmitted = () => {
       setFeedbackSubmitted(true);
-      setSubmittedFlash(true);
       setSubmitting(false);
     };
     const onError = (payload: unknown) => {
@@ -74,15 +72,9 @@ export function useQuizPlayFeedback({
       ? `${activeFeedbackForm.id}:${activeFeedbackForm.activatedAt}`
       : (activeFeedbackForm?.id ?? null);
 
-  useEffect(() => {
-    if (!submittedFlash) return;
-    const timer = window.setTimeout(() => setSubmittedFlash(false), 2200);
-    return () => window.clearTimeout(timer);
-  }, [submittedFlash]);
-
   const shouldShowFeedbackPopup = useMemo(() => {
     if (!joined || !activeFeedbackForm || activeFeedbackForm.isClosed) return false;
-    if (feedbackSubmitted) return submittedFlash;
+    if (feedbackSubmitted) return false;
     if (activationKey && dismissedFeedbackActivationKey === activationKey) return false;
     return feedbackStatusKnown;
   }, [
@@ -92,7 +84,19 @@ export function useQuizPlayFeedback({
     activationKey,
     dismissedFeedbackActivationKey,
     feedbackStatusKnown,
-    submittedFlash,
+  ]);
+
+  const shouldDeferQuestionPopup = useMemo(() => {
+    if (!joined || !activeFeedbackForm || activeFeedbackForm.isClosed) return false;
+    if (feedbackSubmitted) return false;
+    if (activationKey && dismissedFeedbackActivationKey === activationKey) return false;
+    return true;
+  }, [
+    joined,
+    activeFeedbackForm,
+    feedbackSubmitted,
+    activationKey,
+    dismissedFeedbackActivationKey,
   ]);
 
   const canSubmitFeedback = useMemo(() => {
@@ -143,6 +147,7 @@ export function useQuizPlayFeedback({
 
   return {
     shouldShowFeedbackPopup,
+    shouldDeferQuestionPopup,
     feedbackSubmitted,
     scaleAnswers,
     openFieldAnswers,
@@ -152,6 +157,5 @@ export function useQuizPlayFeedback({
     canSubmitFeedback,
     submitFeedback,
     submitting,
-    submittedFlash,
   };
 }

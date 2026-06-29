@@ -22,7 +22,7 @@ test.describe("feedback flow", () => {
     await expect(playerPage.getByText("E2E Feedback")).toBeVisible({ timeout: 15_000 });
     await playerPage.getByRole("button", { name: "3" }).click();
     await submitAnswer(playerPage);
-    await expect(playerPage.getByText("Спасибо! Ваш отзыв отправлен.")).toBeVisible({
+    await expect(playerPage.getByRole("button", { name: "Отправить ответ" })).not.toBeVisible({
       timeout: 10_000,
     });
 

@@ -27,7 +27,6 @@ export function useQuizPlayQuestionFlow(params: Params) {
   const [selected, setSelected] = useState<string[]>([]);
   const [rankOrder, setRankOrder] = useState<string[]>([]);
   const [tagAnswers, setTagAnswers] = useState<string[]>([""]);
-  const [acceptedQuestionId, setAcceptedQuestionId] = useState<string | null>(null);
   const [dismissedQuestionId, setDismissedQuestionId] = useState<string | null>(null);
   const activeQuestionIdRef = useRef<string | null>(null);
   const activeQuestionTypeRef = useRef<
@@ -45,16 +44,13 @@ export function useQuizPlayQuestionFlow(params: Params) {
       : quiz.activeQuestion
         ? [quiz.activeQuestion]
         : [];
-    if (acceptedQuestionId) {
-      const accepted = activeList.find((q) => q.id === acceptedQuestionId);
-      if (accepted) return accepted;
-    }
+    if (activeList.length === 0) return null;
     const autoFlow = isSubQuizAutoFlow(quiz.quizProgress) || activeList.length > 1;
     if (!quiz.quizProgress || autoFlow) {
       return activeList.find((q) => !submittedQuestionIds.includes(q.id)) ?? null;
     }
     return quiz.activeQuestion;
-  }, [quiz, submittedQuestionIds, acceptedQuestionId]);
+  }, [quiz, submittedQuestionIds]);
 
   useEffect(() => {
     activeQuestionIdRef.current = nonQuizActiveQuestion?.id ?? null;
@@ -154,7 +150,7 @@ export function useQuizPlayQuestionFlow(params: Params) {
   }, [quiz, nonQuizActiveQuestion, canSubmit, tagAnswers, rankOrder, selected]);
 
   const onQuestionSubmitted = useCallback((questionId: string) => {
-    setAcceptedQuestionId(questionId);
+    setDismissedQuestionId(questionId);
     if (pendingSubmitPayloadRef.current?.questionId === questionId) {
       pendingSubmitPayloadRef.current = null;
     }
@@ -192,14 +188,11 @@ export function useQuizPlayQuestionFlow(params: Params) {
     });
   }, []);
 
-  useEffect(() => {
-    if (!acceptedQuestionId) return;
-    const timer = window.setTimeout(() => {
-      setDismissedQuestionId(acceptedQuestionId);
-      setAcceptedQuestionId(null);
-    }, 2200);
-    return () => window.clearTimeout(timer);
-  }, [acceptedQuestionId]);
+  const closeQuestionPopup = useCallback(() => {
+    const activeQuestionId = nonQuizActiveQuestion?.id;
+    if (!activeQuestionId) return;
+    setDismissedQuestionId(activeQuestionId);
+  }, [nonQuizActiveQuestion?.id]);
 
   useEffect(() => {
     const activeQuestionId = nonQuizActiveQuestion?.id;
@@ -212,29 +205,17 @@ export function useQuizPlayQuestionFlow(params: Params) {
     }
   }, [nonQuizActiveQuestion?.id, dismissedQuestionId]);
 
-  const closeQuestionPopup = useCallback(() => {
-    const activeQuestionId = nonQuizActiveQuestion?.id;
-    if (!activeQuestionId) return;
-    setDismissedQuestionId(activeQuestionId);
-    if (acceptedQuestionId === activeQuestionId) {
-      setAcceptedQuestionId(null);
-    }
-  }, [nonQuizActiveQuestion?.id, acceptedQuestionId]);
-
   const resetQuestionFlow = useCallback(() => {
     setSelected([]);
     setRankOrder([]);
     setTagAnswers([""]);
-    setAcceptedQuestionId(null);
     setDismissedQuestionId(null);
     pendingSubmitPayloadRef.current = null;
   }, []);
 
   const answeredCurrentQuestion =
     !!nonQuizActiveQuestion?.id && submittedQuestionIds.includes(nonQuizActiveQuestion.id);
-  const isShowingAcceptedInPopup =
-    !!nonQuizActiveQuestion?.id && acceptedQuestionId === nonQuizActiveQuestion.id;
-  const shouldHideAnsweredPopup = answeredCurrentQuestion && !isShowingAcceptedInPopup;
+  const shouldHideAnsweredPopup = answeredCurrentQuestion;
   const shouldHideAnsweredUntilHydrated = !playerAnswersHydrated;
   const shouldHideDismissedPopup =
     !!nonQuizActiveQuestion?.id && dismissedQuestionId === nonQuizActiveQuestion.id;
@@ -284,6 +265,5 @@ export function useQuizPlayQuestionFlow(params: Params) {
     shouldHideDismissedPopup,
     displayedSelected,
     displayedQuizProgress,
-    acceptedQuestionId,
   };
 }

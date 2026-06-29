@@ -55,11 +55,6 @@ describe("QuestionPopupCard", () => {
     expect(screen.getByText("Five")).toBeTruthy();
   });
 
-  it("shows accepted hint when provided", () => {
-    renderPopup({ showAcceptedHint: true });
-    expect(screen.getByText("Ответ принят")).toBeTruthy();
-  });
-
   it("disables submit until canSubmit is true", () => {
     renderPopup({ canSubmit: false });
     expect(screen.getByRole("button", { name: "Отправить ответ" })).toHaveProperty(

@@ -24,7 +24,7 @@ test.describe("tag cloud and ranking", () => {
     await expect(playerPage.getByText("E2E: облако тегов")).toBeVisible({ timeout: 30_000 });
     await playerPage.getByPlaceholder("Ответ 1").fill("тег-эталон");
     await submitAnswer(playerPage, "E2E: облако тегов");
-    await expect(playerPage.getByText("Ответ принят")).toBeVisible({ timeout: 10_000 });
+    await expect(playerPage.getByText("E2E: облако тегов")).not.toBeVisible({ timeout: 10_000 });
 
     await resetActivePlayerContent(adminPage);
     await playerContext.close();

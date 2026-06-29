@@ -8,7 +8,7 @@ import {
 import { joinAsPlayer, selectSingleOption, submitAnswer } from "./helpers/player";
 
 test.describe("player vote flow", () => {
-  test("join → answer single question → «Ответ принят»", async ({ browser }) => {
+  test("join → answer single question → popup closes", async ({ browser }) => {
     const adminContext = await browser.newContext();
     const adminPage = await adminContext.newPage();
     await loginAdmin(adminPage);
@@ -20,7 +20,7 @@ test.describe("player vote flow", () => {
     await expect(playerPage.getByText("E2E: выберите один")).toBeVisible({ timeout: 30_000 });
     await selectSingleOption(playerPage, "Вариант А");
     await submitAnswer(playerPage, "E2E: выберите один");
-    await expect(playerPage.getByText("Ответ принят")).toBeVisible({ timeout: 10_000 });
+    await expect(playerPage.getByText("E2E: выберите один")).not.toBeVisible({ timeout: 10_000 });
 
     await resetActivePlayerContent(adminPage);
     await playerContext.close();

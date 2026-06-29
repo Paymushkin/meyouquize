@@ -42,7 +42,6 @@ describe("FeedbackPopupCard", () => {
         canSubmit={false}
         submitting={false}
         onSubmit={vi.fn()}
-        submittedFlash={false}
       />,
     );
 
@@ -52,27 +51,6 @@ describe("FeedbackPopupCard", () => {
       "disabled",
       true,
     );
-  });
-
-  it("shows success flash after submit", () => {
-    render(
-      <FeedbackPopupCard
-        brandPrimaryColor="#7c5acb"
-        playerVoteOptionTextColor="#ffffff"
-        form={form}
-        scaleAnswers={{ "scale-1": 4 }}
-        openFieldAnswers={{}}
-        onOpenFieldChange={vi.fn()}
-        onSelectOption={vi.fn()}
-        onClose={vi.fn()}
-        canSubmit
-        submitting={false}
-        onSubmit={vi.fn()}
-        submittedFlash
-      />,
-    );
-
-    expect(screen.getByText("Спасибо! Ваш отзыв отправлен.")).toBeTruthy();
   });
 
   it("calls onSelectOption when scale option clicked", () => {
@@ -90,7 +68,6 @@ describe("FeedbackPopupCard", () => {
         canSubmit={false}
         submitting={false}
         onSubmit={vi.fn()}
-        submittedFlash={false}
       />,
     );
 

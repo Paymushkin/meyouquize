@@ -69,10 +69,12 @@ describe("useQuizPlayFeedback", () => {
     );
 
     expect(result.current.shouldShowFeedbackPopup).toBe(false);
+    expect(result.current.shouldDeferQuestionPopup).toBe(true);
 
     act(() => fireSocketEvent("player:feedback-status", { submitted: false }));
 
     expect(result.current.shouldShowFeedbackPopup).toBe(true);
+    expect(result.current.shouldDeferQuestionPopup).toBe(true);
   });
 
   it("enables submit when all scales are answered", () => {
@@ -127,5 +129,23 @@ describe("useQuizPlayFeedback", () => {
     act(() => result.current.closeFeedbackPopup());
 
     expect(result.current.shouldShowFeedbackPopup).toBe(false);
+    expect(result.current.shouldDeferQuestionPopup).toBe(false);
+  });
+
+  it("stops deferring question popup after feedback is submitted", () => {
+    const form = makeForm();
+    const { result } = renderHook(() =>
+      useQuizPlayFeedback({
+        quizId: "quiz-1",
+        activeFeedbackForm: form,
+        joined: true,
+      }),
+    );
+
+    act(() => fireSocketEvent("player:feedback-status", { submitted: false }));
+    expect(result.current.shouldDeferQuestionPopup).toBe(true);
+
+    act(() => fireSocketEvent("feedback:submitted"));
+    expect(result.current.shouldDeferQuestionPopup).toBe(false);
   });
 });

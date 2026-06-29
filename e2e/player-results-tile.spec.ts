@@ -19,7 +19,9 @@ test.describe("player results tile", () => {
     });
     await selectSingleOption(playerPage, "Да");
     await submitAnswer(playerPage, "E2E: голосование");
-    await expect(playerPage.getByText("Ответ принят")).toBeVisible({ timeout: 10_000 });
+    await expect(playerPage.getByRole("heading", { name: "E2E: голосование" })).not.toBeVisible({
+      timeout: 10_000,
+    });
 
     await toggleVoteQuestion(adminPage, false);
 

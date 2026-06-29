@@ -1,7 +1,6 @@
 import CloseIcon from "@mui/icons-material/Close";
 import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
 import {
-  Alert,
   Box,
   Button,
   Card,
@@ -28,7 +27,6 @@ export type QuestionPopupCardProps = {
   quizProgress: QuizState["quizProgress"];
   displayedSelected: string[];
   answeredCurrentQuestion: boolean;
-  showAcceptedHint?: boolean;
   submittedAnswers: Record<string, string[]>;
   rankOrder: string[];
   rankRowRefs: RefObject<Map<string, HTMLDivElement>>;
@@ -50,7 +48,6 @@ export function QuestionPopupCard(props: QuestionPopupCardProps) {
     quizProgress,
     displayedSelected,
     answeredCurrentQuestion,
-    showAcceptedHint = false,
     submittedAnswers,
     rankOrder,
     rankRowRefs,
@@ -126,7 +123,6 @@ export function QuestionPopupCard(props: QuestionPopupCardProps) {
       >
         <CardContent sx={{ bgcolor: "transparent", color: "inherit" }}>
           <Stack spacing={2}>
-            {showAcceptedHint ? <Alert severity="success">Ответ принят</Alert> : null}
             <Stack direction="row" alignItems="center" justifyContent="space-between">
               {question.scoringMode !== "poll" && quizProgress && quizProgress.total > 0 ? (
                 <Chip
@@ -259,27 +255,23 @@ export function QuestionPopupCard(props: QuestionPopupCardProps) {
             </Stack>
           </Stack>
           <Box sx={{ pt: 3.5 }}>
-            {!answeredCurrentQuestion ? (
-              <Button
-                disabled={!canSubmit}
-                onClick={submit}
-                variant="contained"
-                size="large"
-                fullWidth
-                sx={{
-                  minHeight: 52,
-                  fontSize: "1.05rem",
-                  fontWeight: 700,
-                  color: playerVoteOptionTextColor,
-                  bgcolor: brandPrimaryColor,
-                  "&:hover": { bgcolor: alpha(brandPrimaryColor, 0.88) },
-                }}
-              >
-                Отправить ответ
-              </Button>
-            ) : (
-              <Alert severity="success">Ответ принят</Alert>
-            )}
+            <Button
+              disabled={!canSubmit}
+              onClick={submit}
+              variant="contained"
+              size="large"
+              fullWidth
+              sx={{
+                minHeight: 52,
+                fontSize: "1.05rem",
+                fontWeight: 700,
+                color: playerVoteOptionTextColor,
+                bgcolor: brandPrimaryColor,
+                "&:hover": { bgcolor: alpha(brandPrimaryColor, 0.88) },
+              }}
+            >
+              Отправить ответ
+            </Button>
           </Box>
         </CardContent>
       </Card>

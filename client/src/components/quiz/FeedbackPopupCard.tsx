@@ -1,6 +1,5 @@
 import CloseIcon from "@mui/icons-material/Close";
 import {
-  Alert,
   Box,
   Button,
   Card,
@@ -26,7 +25,6 @@ type Props = {
   canSubmit: boolean;
   submitting: boolean;
   onSubmit: () => void;
-  submittedFlash: boolean;
 };
 
 const openFieldSx = (brandPrimaryColor: string) => ({
@@ -58,7 +56,6 @@ export function FeedbackPopupCard(props: Props) {
     canSubmit,
     submitting,
     onSubmit,
-    submittedFlash,
   } = props;
 
   const optionButtonSx = (isSelected: boolean) => ({
@@ -112,9 +109,6 @@ export function FeedbackPopupCard(props: Props) {
       >
         <CardContent sx={{ bgcolor: "transparent", color: "inherit" }}>
           <Stack spacing={2}>
-            {submittedFlash ? (
-              <Alert severity="success">Спасибо! Ваш отзыв отправлен.</Alert>
-            ) : null}
             <Stack direction="row" alignItems="center" justifyContent="space-between">
               <Box />
               <IconButton
@@ -126,83 +120,79 @@ export function FeedbackPopupCard(props: Props) {
                 <CloseIcon fontSize="small" />
               </IconButton>
             </Stack>
-            {!submittedFlash ? (
-              <>
-                <Stack spacing={3.5} sx={{ width: "100%" }}>
-                  {form.scales.map((scale) => (
-                    <Stack key={scale.id} spacing={1.25}>
-                      <Typography
-                        variant="h4"
-                        sx={playerFeedbackScaleTitleSx(scale.label.trim().length)}
-                      >
-                        {scale.label}
-                      </Typography>
-                      <Box
-                        sx={{
-                          display: "flex",
-                          flexWrap: "wrap",
-                          gap: 1.25,
-                          width: "100%",
-                        }}
-                      >
-                        {scale.options.map((option, optionIndex) => {
-                          const isSelected = scaleAnswers[scale.id] === optionIndex;
-                          return (
-                            <Button
-                              key={`${scale.id}-${optionIndex}`}
-                              variant="outlined"
-                              color="inherit"
-                              onClick={() => onSelectOption(scale.id, optionIndex)}
-                              sx={optionButtonSx(isSelected)}
-                            >
-                              {option}
-                            </Button>
-                          );
-                        })}
-                      </Box>
-                    </Stack>
-                  ))}
-                  {form.openFields.map((field) => (
-                    <Stack key={field.id} spacing={1}>
-                      <Typography
-                        variant="h5"
-                        sx={playerFeedbackScaleTitleSx(field.label.trim().length)}
-                      >
-                        {field.label}
-                      </Typography>
-                      <TextField
-                        value={openFieldAnswers[field.id] ?? ""}
-                        onChange={(e) => onOpenFieldChange(field.id, e.target.value)}
-                        placeholder={field.placeholder || "Ваш ответ"}
-                        multiline
-                        minRows={2}
-                        fullWidth
-                        sx={openFieldSx(brandPrimaryColor)}
-                      />
-                    </Stack>
-                  ))}
-                </Stack>
-                <Box sx={{ pt: 3.5 }}>
-                  <Button
-                    disabled={!canSubmit || submitting}
-                    onClick={onSubmit}
-                    variant="contained"
-                    size="large"
-                    fullWidth
+            <Stack spacing={3.5} sx={{ width: "100%" }}>
+              {form.scales.map((scale) => (
+                <Stack key={scale.id} spacing={1.25}>
+                  <Typography
+                    variant="h4"
+                    sx={playerFeedbackScaleTitleSx(scale.label.trim().length)}
+                  >
+                    {scale.label}
+                  </Typography>
+                  <Box
                     sx={{
-                      minHeight: 52,
-                      fontSize: "1.05rem",
-                      fontWeight: 700,
-                      color: playerVoteOptionTextColor,
-                      bgcolor: brandPrimaryColor,
-                      "&:hover": { bgcolor: alpha(brandPrimaryColor, 0.88) },
+                      display: "flex",
+                      flexWrap: "wrap",
+                      gap: 1.25,
+                      width: "100%",
                     }}
                   >
-                    Отправить ответ
-                  </Button>
-                </Box>
-              </>
-            ) : null}
+                    {scale.options.map((option, optionIndex) => {
+                      const isSelected = scaleAnswers[scale.id] === optionIndex;
+                      return (
+                        <Button
+                          key={`${scale.id}-${optionIndex}`}
+                          variant="outlined"
+                          color="inherit"
+                          onClick={() => onSelectOption(scale.id, optionIndex)}
+                          sx={optionButtonSx(isSelected)}
+                        >
+                          {option}
+                        </Button>
+                      );
+                    })}
+                  </Box>
+                </Stack>
+              ))}
+              {form.openFields.map((field) => (
+                <Stack key={field.id} spacing={1}>
+                  <Typography
+                    variant="h5"
+                    sx={playerFeedbackScaleTitleSx(field.label.trim().length)}
+                  >
+                    {field.label}
+                  </Typography>
+                  <TextField
+                    value={openFieldAnswers[field.id] ?? ""}
+                    onChange={(e) => onOpenFieldChange(field.id, e.target.value)}
+                    placeholder={field.placeholder || "Ваш ответ"}
+                    multiline
+                    minRows={2}
+                    fullWidth
+                    sx={openFieldSx(brandPrimaryColor)}
+                  />
+                </Stack>
+              ))}
+            </Stack>
+            <Box sx={{ pt: 3.5 }}>
+              <Button
+                disabled={!canSubmit || submitting}
+                onClick={onSubmit}
+                variant="contained"
+                size="large"
+                fullWidth
+                sx={{
+                  minHeight: 52,
+                  fontSize: "1.05rem",
+                  fontWeight: 700,
+                  color: playerVoteOptionTextColor,
+                  bgcolor: brandPrimaryColor,
+                  "&:hover": { bgcolor: alpha(brandPrimaryColor, 0.88) },
+                }}
+              >
+                Отправить ответ
+              </Button>
+            </Box>
           </Stack>
         </CardContent>
       </Card>

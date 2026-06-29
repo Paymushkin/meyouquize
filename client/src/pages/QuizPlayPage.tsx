@@ -197,7 +197,6 @@ export function QuizPlayPage() {
     shouldHideDismissedPopup,
     displayedSelected,
     displayedQuizProgress,
-    acceptedQuestionId,
     pendingSubmitPayloadRef,
   } = useQuizPlayQuestionFlow({
     quiz,
@@ -207,6 +206,7 @@ export function QuizPlayPage() {
   });
   const {
     shouldShowFeedbackPopup,
+    shouldDeferQuestionPopup,
     scaleAnswers,
     openFieldAnswers,
     setOpenFieldAnswer,
@@ -215,7 +215,6 @@ export function QuizPlayPage() {
     canSubmitFeedback,
     submitFeedback,
     submitting: feedbackSubmitting,
-    submittedFlash: feedbackSubmittedFlash,
   } = useQuizPlayFeedback({
     quizId: quiz?.id,
     activeFeedbackForm: quiz?.activeFeedbackForm,
@@ -766,6 +765,7 @@ export function QuizPlayPage() {
             {joined &&
               nonQuizActiveQuestion &&
               !showSubQuizCompleteCard &&
+              !shouldDeferQuestionPopup &&
               !shouldHideAnsweredPopup &&
               !shouldHideAnsweredUntilHydrated &&
               !shouldHideDismissedPopup && (
@@ -776,7 +776,6 @@ export function QuizPlayPage() {
                   quizProgress={displayedQuizProgress}
                   displayedSelected={displayedSelected}
                   answeredCurrentQuestion={answeredCurrentQuestion}
-                  showAcceptedHint={Boolean(acceptedQuestionId) && !answeredCurrentQuestion}
                   submittedAnswers={submittedAnswers}
                   rankOrder={rankOrder}
                   rankRowRefs={rankRowRefs}
@@ -803,7 +802,6 @@ export function QuizPlayPage() {
                 canSubmit={canSubmitFeedback}
                 submitting={feedbackSubmitting}
                 onSubmit={submitFeedback}
-                submittedFlash={feedbackSubmittedFlash}
               />
             ) : null}
             {joined && showSubQuizCompleteCard && (
