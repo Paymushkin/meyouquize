@@ -262,6 +262,7 @@ export function useAdminEventSocket<TQuestion extends QuestionFormPatchable>(
     socket.on("connect", () => {
       socket.emit("results:subscribe", { slug: eventName, viewer: "admin" });
       socket.emit("speaker:questions:subscribe", { slug: eventName, viewer: "admin" });
+      socket.emit("quiz:online:request");
     });
     socket.on("state:quiz", (state: ActiveState) => {
       if (state.activeQuestion?.id) setQuestionId(state.activeQuestion.id);

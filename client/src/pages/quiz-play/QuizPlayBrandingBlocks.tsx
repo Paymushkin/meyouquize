@@ -90,7 +90,7 @@ type EventTitleBlockProps = {
   joined: boolean;
   isJoinScreen?: boolean;
   shouldShowEventTitle: boolean;
-  restoreJoinPending: boolean;
+  joinPending: boolean;
   hasActiveQuestion: boolean;
   brandLogoUrl: string;
   brandFontFamily: string;
@@ -102,7 +102,7 @@ export function EventTitleBlock(props: EventTitleBlockProps) {
     joined,
     isJoinScreen = false,
     shouldShowEventTitle,
-    restoreJoinPending,
+    joinPending,
     hasActiveQuestion,
     brandLogoUrl,
     brandFontFamily,
@@ -112,7 +112,7 @@ export function EventTitleBlock(props: EventTitleBlockProps) {
   const normalizedTitleText = titleText.trim();
   const showTitle = shouldShowEventTitle && normalizedTitleText.length > 0;
   if (
-    (!joined && restoreJoinPending) ||
+    (!joined && joinPending) ||
     (joined && !shouldShowEventTitle) ||
     (!joined && !shouldShowEventTitle && !isJoinScreen) ||
     (!safeBrandLogoUrl && !showTitle)

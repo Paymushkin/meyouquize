@@ -4,6 +4,10 @@ import { expandTagCloudSubmitLines } from "@meyouquize/shared";
 import { socket } from "../socket";
 import type { QuizState } from "../pages/quiz-play/types";
 import type { SpeakerQuestionsPayload } from "../types/speakerQuestions";
+import {
+  isSocketConnectionErrorMessage,
+  socketConnectErrorMessage,
+} from "../utils/socketConnectErrorMessage";
 import { parseSocketErrorCode, parseSocketErrorMessage } from "../utils/socketError";
 
 type SubmitPayload = {
@@ -39,6 +43,8 @@ type Params = {
   onQuizJoined?: () => void;
   /** Сброс «вошёл» в localStorage при ошибке входа (занятый ник и т.п.). */
   onJoinFailed?: () => void;
+  /** Вход завершён (успех или ошибка) — снять индикатор ожидания. */
+  onJoinSettled?: () => void;
 };
 
 export function useQuizPlaySocket({
@@ -63,6 +69,7 @@ export function useQuizPlaySocket({
   onParticipantMissing,
   onQuizJoined,
   onJoinFailed,
+  onJoinSettled,
 }: Params) {
   useEffect(() => {
     if (!socket.connected) socket.connect();
@@ -148,6 +155,7 @@ export function useQuizPlaySocket({
       }
       if (code === "NICKNAME_TAKEN" || message === "Ник уже используется в этой комнате") {
         onJoinFailed?.();
+        onJoinSettled?.();
         return;
       }
       const displayMessage =
@@ -155,18 +163,15 @@ export function useQuizPlaySocket({
           ? "Не удалось войти в комнату. Проверьте имя и повторите попытку."
           : message;
       setError(displayMessage);
+      onJoinSettled?.();
     };
     const onConnectError = () => {
       setConnectionStatus("reconnecting");
-      setError(
-        "Нет соединения с сервером квиза. Проверьте, что backend доступен в вашей Wi-Fi сети.",
-      );
+      setError(socketConnectErrorMessage());
     };
     const onConnect = () => {
       setConnectionStatus("online");
-      setError((prev) =>
-        prev.includes("Нет соединения") || prev.includes("backend доступен") ? "" : prev,
-      );
+      setError((prev) => (isSocketConnectionErrorMessage(prev) ? "" : prev));
     };
     const onDisconnect = () => {
       setConnectionStatus("offline");
@@ -174,6 +179,7 @@ export function useQuizPlaySocket({
     const onJoined = () => {
       setJoined(true);
       onQuizJoined?.();
+      onJoinSettled?.();
     };
     const onPlayerAnswers = (answers: Record<string, string[]>) => {
       hydrateSubmittedAnswers(answers);
@@ -278,5 +284,6 @@ export function useQuizPlaySocket({
     onParticipantMissing,
     onQuizJoined,
     onJoinFailed,
+    onJoinSettled,
   ]);
 }

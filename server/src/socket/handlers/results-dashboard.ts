@@ -33,10 +33,17 @@ export function registerResultsDashboardHandlers(socket: EnrichedSocket, io: Ser
       socket.emit("results:dashboard", results);
       socket.emit("results:public:view", toPublicViewPayload(view, quiz.title));
       socket.emit("state:quiz", quizState);
-      emitQuizOnlineCount(io, quiz.id);
+      emitQuizOnlineCount(io, quiz.id, { immediate: true });
     } catch (error) {
       fail(socket, error instanceof Error ? error.message : "Subscribe failed");
     }
+  });
+
+  socket.on("quiz:online:request", () => {
+    const quizId = socket.data.quizId;
+    if (typeof quizId !== "string" || !quizId.trim()) return;
+    if (!socket.rooms.has(quizDashboardRoom(quizId))) return;
+    emitQuizOnlineCount(io, quizId, { immediate: true });
   });
 
   socket.on("admin:results:view:set", async (raw: unknown) => {

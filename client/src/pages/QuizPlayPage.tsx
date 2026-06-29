@@ -65,6 +65,8 @@ import type { QuizState, ReactionType } from "./quiz-play/types";
 import type { SpeakerQuestionsPayload } from "../types/speakerQuestions";
 const REACTION_WINDOW_MS = 1000;
 const REACTION_MAX_PER_WINDOW = 10;
+/** Чуть больше socket.io timeout (45s) — аварийный сброс ожидания входа. */
+const JOIN_PENDING_TIMEOUT_MS = 50_000;
 
 function getRoomJoinKey(slug: string) {
   return `mq_joined_${slug}`;
@@ -76,6 +78,16 @@ function getRoomNickKey(slug: string) {
 
 function wasRoomJoined(slug: string): boolean {
   return localStorage.getItem(getRoomJoinKey(slug)) === "1";
+}
+
+function hasPersistedNickname(slug: string): boolean {
+  const roomNickname = localStorage.getItem(getRoomNickKey(slug)) || "";
+  const persistedNick = roomNickname || getNickname() || "";
+  return persistedNick.trim().length > 0;
+}
+
+function shouldRestoreJoin(slug: string): boolean {
+  return Boolean(slug) && wasRoomJoined(slug) && hasPersistedNickname(slug);
 }
 
 function buildConnectionChip(status: "online" | "reconnecting" | "offline") {
@@ -118,13 +130,8 @@ export function QuizPlayPage() {
     return roomNickname || getNickname() || "";
   });
   const [joined, setJoined] = useState(false);
-  const [restoreJoinPending, setRestoreJoinPending] = useState(() => {
-    if (typeof window === "undefined" || !slug) return false;
-    const wasJoined = wasRoomJoined(slug);
-    const roomNickname = localStorage.getItem(getRoomNickKey(slug)) || "";
-    const persistedNick = roomNickname || getNickname() || "";
-    return wasJoined && persistedNick.trim().length > 0;
-  });
+  const [joinPending, setJoinPending] = useState(() => shouldRestoreJoin(slug));
+  const restoreJoinAttemptedRef = useRef(false);
   const [quiz, setQuiz] = useState<QuizState | null>(null);
   const [submittedAnswers, setSubmittedAnswers] = useState<Record<string, string[]>>({});
   const [submittedQuestionIds, setSubmittedQuestionIds] = useState<string[]>([]);
@@ -143,7 +150,7 @@ export function QuizPlayPage() {
   const [resultsDialogQuestionId, setResultsDialogQuestionId] = useState<string | null>(null);
   const [quizReportOpen, setQuizReportOpen] = useState(false);
   const [quizReportSubQuizId, setQuizReportSubQuizId] = useState("");
-  const [bootLoading, setBootLoading] = useState(true);
+  const [bootLoading, setBootLoading] = useState(() => shouldRestoreJoin(slug));
   const nicknameInputRef = useRef<HTMLInputElement | null>(null);
   const rankRowRefs = useRef<Map<string, HTMLDivElement>>(new Map());
   const prevRankRowTopsRef = useRef<Map<string, number>>(new Map());
@@ -224,6 +231,7 @@ export function QuizPlayPage() {
   const handleParticipantMissing = useCallback(() => {
     if (!slug) return;
     const safeNick = (nickname || "").trim() || "Игрок";
+    setJoinPending(true);
     emitJoinWithLog(slug, "restore", safeNick);
   }, [nickname, slug]);
 
@@ -234,10 +242,15 @@ export function QuizPlayPage() {
     } catch {
       // ignore storage errors in private mode
     }
-    setRestoreJoinPending(false);
+    setJoinPending(false);
     setJoined(false);
     setNicknameError("Такое имя уже занято");
   }, [slug]);
+
+  const clearJoinPending = useCallback(() => {
+    setJoinPending(false);
+    setBootLoading(false);
+  }, []);
 
   const handleJoinSuccess = useCallback(() => {
     if (slug) {
@@ -264,7 +277,7 @@ export function QuizPlayPage() {
     }
   }, [joined, slug]);
 
-  const isJoinScreen = !bootLoading && !joined && !restoreJoinPending;
+  const isJoinScreen = !bootLoading && !joined && !joinPending;
 
   const showQuestionPopup =
     joined &&
@@ -302,6 +315,7 @@ export function QuizPlayPage() {
     onParticipantMissing: handleParticipantMissing,
     onQuizJoined: handleJoinSuccess,
     onJoinFailed: handleJoinFailed,
+    onJoinSettled: clearJoinPending,
   });
 
   useEffect(() => {
@@ -319,6 +333,11 @@ export function QuizPlayPage() {
         emitJoinWithLog(slug, "restore", safeNick);
       }
     };
+    const onSocketConnect = () => {
+      if (!joined) return;
+      const safeNick = (nickname || "").trim() || "Игрок";
+      emitJoinWithLog(slug, "restore", safeNick);
+    };
     const onVisibilityChange = () => {
       reconnectAndRejoinIfNeeded();
     };
@@ -328,10 +347,12 @@ export function QuizPlayPage() {
     const onOnline = () => {
       reconnectAndRejoinIfNeeded();
     };
+    socket.on("connect", onSocketConnect);
     document.addEventListener("visibilitychange", onVisibilityChange);
     window.addEventListener("pageshow", onPageShow);
     window.addEventListener("online", onOnline);
     return () => {
+      socket.off("connect", onSocketConnect);
       document.removeEventListener("visibilitychange", onVisibilityChange);
       window.removeEventListener("pageshow", onPageShow);
       window.removeEventListener("online", onOnline);
@@ -355,60 +376,40 @@ export function QuizPlayPage() {
   });
 
   useEffect(() => {
-    if (!slug || !nickname.trim()) return;
-    const wasJoined = wasRoomJoined(slug);
-    if (!wasJoined) return;
-    setRestoreJoinPending(true);
-    emitJoinWithLog(slug, "restore", nickname.trim());
-  }, [slug, nickname]);
-
-  useEffect(() => {
-    if (joined && restoreJoinPending) {
-      setRestoreJoinPending(false);
-    }
-  }, [joined, restoreJoinPending]);
-
-  useEffect(() => {
-    if (!restoreJoinPending) return;
-    const timer = window.setTimeout(() => setRestoreJoinPending(false), 1200);
-    return () => window.clearTimeout(timer);
-  }, [restoreJoinPending]);
-
-  useEffect(() => {
-    if (!restoreJoinPending) return;
-    if (error) setRestoreJoinPending(false);
-  }, [restoreJoinPending, error]);
-
-  useEffect(() => {
-    // Fail-safe: не блокируем UI ожиданием всех сокет-событий на мобильной сети.
-    const readyForJoined = joined;
-    const readyForLogin = !joined && !restoreJoinPending;
-    if (readyForJoined || readyForLogin) {
-      setBootLoading(false);
-      return;
-    }
+    if (!slug || restoreJoinAttemptedRef.current) return;
+    if (!shouldRestoreJoin(slug)) return;
+    restoreJoinAttemptedRef.current = true;
+    const roomNickname = localStorage.getItem(getRoomNickKey(slug)) || "";
+    const persistedNick = roomNickname || getNickname() || "";
+    setJoinPending(true);
     setBootLoading(true);
-  }, [joined, restoreJoinPending]);
+    emitJoinWithLog(slug, "restore", persistedNick.trim());
+  }, [slug]);
 
   useEffect(() => {
-    if (!bootLoading) return;
+    if (!joinPending || joined) return;
     const timer = window.setTimeout(() => {
-      // Аварийный фолбэк: если сокет не восстановился, показываем UI входа вместо чёрного экрана.
-      if (!joined) {
-        setRestoreJoinPending(false);
-        setBootLoading(false);
-      }
-    }, 3500);
+      setJoinPending(false);
+      setBootLoading(false);
+      setError("Не удалось подключиться. Проверьте интернет и попробуйте снова.");
+    }, JOIN_PENDING_TIMEOUT_MS);
     return () => window.clearTimeout(timer);
-  }, [bootLoading, joined]);
+  }, [joinPending, joined]);
 
   useEffect(() => {
-    if (joined || restoreJoinPending) return;
+    if (joined) {
+      setJoinPending(false);
+      setBootLoading(false);
+    }
+  }, [joined]);
+
+  useEffect(() => {
+    if (joined || joinPending) return;
     const timer = window.setTimeout(() => {
       nicknameInputRef.current?.focus();
     }, 0);
     return () => window.clearTimeout(timer);
-  }, [joined, restoreJoinPending]);
+  }, [joined, joinPending]);
 
   const persistNickname = useCallback(
     (nextRaw: string) => {
@@ -428,7 +429,8 @@ export function QuizPlayPage() {
       nicknameInputRef.current?.focus();
       return;
     }
-    setRestoreJoinPending(false);
+    setJoinPending(true);
+    setError("");
     emitJoinWithLog(slug, "manual", trimmed);
     persistNickname(trimmed);
   }
@@ -676,12 +678,12 @@ export function QuizPlayPage() {
                 brandPrimaryColor={brandPrimaryColor}
               />
             ) : null}
-            {!(restoreJoinPending && !joined) && (isJoinScreen || shouldShowEventTitle) ? (
+            {!(joinPending && !joined) && (isJoinScreen || shouldShowEventTitle) ? (
               <EventTitleBlock
                 joined={joined}
                 isJoinScreen={isJoinScreen}
                 shouldShowEventTitle={shouldShowEventTitle}
-                restoreJoinPending={restoreJoinPending}
+                joinPending={joinPending}
                 hasActiveQuestion={hasActiveQuestion}
                 brandLogoUrl={brandLogoUrl}
                 brandFontFamily={brandFontFamily}
@@ -718,7 +720,7 @@ export function QuizPlayPage() {
                 }}
               />
             ) : null}
-            {!joined && !restoreJoinPending && (
+            {!joined && !joinPending && (
               <Box sx={JOIN_SCREEN_MAIN_SX}>
                 <Stack sx={JOIN_SCREEN_STACK_SX}>
                   {error && !nicknameError ? (
@@ -747,7 +749,7 @@ export function QuizPlayPage() {
                 </Stack>
               </Box>
             )}
-            {!joined && restoreJoinPending && <RestoreJoinPendingBlock />}
+            {!joined && joinPending && <RestoreJoinPendingBlock />}
             <PlayerVoteResultsDialog
               open={Boolean(selectedResultTile)}
               tile={selectedResultTile}

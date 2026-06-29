@@ -151,9 +151,13 @@ async function refreshQuizOnlineCount(io: Server, quizId: string) {
 }
 
 /** Количество онлайн-игроков (уникальные participantId, без админов). Дебаунс по `QUIZ_ONLINE_COUNT_DEBOUNCE_MS`. */
-export function emitQuizOnlineCount(io: Server, quizId: string): void {
+export function emitQuizOnlineCount(
+  io: Server,
+  quizId: string,
+  options?: { immediate?: boolean },
+): void {
   const ms = env.quizOnlineCountDebounceMs;
-  if (ms <= 0) {
+  if (options?.immediate || ms <= 0) {
     void refreshQuizOnlineCount(io, quizId);
     return;
   }

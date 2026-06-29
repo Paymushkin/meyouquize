@@ -30,6 +30,26 @@ if [[ -z "$LAN_IP" ]]; then
   LAN_IP="$(echo "$CLIENT_ORIGIN" | sed -E 's|https?://([^/:]+).*|\1|')"
 fi
 
+DETECTED_IP=""
+if DETECTED_IP="$(bash "$ROOT/deploy/scripts/detect-lan-ip.sh" 2>/dev/null)"; then
+  :
+else
+  DETECTED_IP=""
+fi
+
+DISPLAY_IP="$LAN_IP"
+if [[ -n "$DETECTED_IP" ]]; then
+  if [[ "$DETECTED_IP" != "$LAN_IP" ]]; then
+    echo ""
+    echo "⚠ В .env LAN_HOST=$LAN_IP, сейчас на машине $DETECTED_IP"
+  fi
+  DISPLAY_IP="$DETECTED_IP"
+  if [[ "$DETECTED_IP" =~ ^100\.(6[4-9]|[7-9][0-9]|1[01][0-9]|12[0-7])\. ]]; then
+    echo "⚠ Активен Tailscale IP ($DETECTED_IP) — телефоны в Wi‑Fi без Tailscale не откроют сайт."
+    echo "  Подключите Mac к Wi‑Fi площадки и выполните: npm run event:init"
+  fi
+fi
+
 SERVER_PID=""
 CADDY_PID=""
 cleanup() {
@@ -56,8 +76,11 @@ fi
 
 echo ""
 echo "════════════════════════════════════════════"
-echo "  Ивент:  http://${LAN_IP}/"
-echo "  Админ:  http://${LAN_IP}/admin/<slug>"
+echo "  Ивент:  http://${DISPLAY_IP}/"
+echo "  Админ:  http://${DISPLAY_IP}/admin/<slug>"
+if [[ -n "$DETECTED_IP" && "$DETECTED_IP" != "$LAN_IP" ]]; then
+  echo "  (обновите .env: npm run event:init)"
+fi
 echo "  Ctrl+C — остановить сервер и Caddy"
 echo "════════════════════════════════════════════"
 echo ""
@@ -68,7 +91,7 @@ if command -v caddy >/dev/null 2>&1; then
   CADDY_PID=$!
   wait "$CADDY_PID"
 else
-  echo "⚠ Caddy не установлен — фронт на http://${LAN_IP}:4173 (vite preview)"
+  echo "⚠ Caddy не установлен — фронт на http://${DISPLAY_IP}:4173 (vite preview)"
   echo "  Установите: brew install caddy"
   npm run preview -w client -- --host 0.0.0.0 --port 4173
 fi

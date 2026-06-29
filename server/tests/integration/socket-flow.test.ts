@@ -102,4 +102,31 @@ describe("socket integration", () => {
     const err = await waitForEvent<{ code: string; message: string }>(guest, "error:message");
     expect(err.code).toBe("FORBIDDEN");
   });
+
+  it("reports online player count to admin dashboard", async () => {
+    const { eventName } = await seedSingleChoiceQuiz(uniqueSlug("sock-online"));
+    server = await createTestServer();
+
+    const authRes = await request(server.app)
+      .post("/api/admin/auth")
+      .send({ login: "admin", password: adminPassword() });
+    const cookieHeader = adminCookieHeaderFromAuthResponse(authRes);
+
+    const player = await connectSocket(server.baseUrl);
+    sockets.push(player);
+    player.emit("quiz:join", {
+      slug: eventName,
+      nickname: "OnlinePlayer",
+      deviceId: "online-dev-1",
+    });
+    await waitForEvent<{ ok: boolean }>(player, "quiz:joined");
+
+    const admin = await connectSocket(server.baseUrl, cookieHeader);
+    sockets.push(admin);
+
+    const countPromise = waitForEvent<{ count: number }>(admin, "quiz:online:count");
+    admin.emit("results:subscribe", { slug: eventName, viewer: "admin" });
+    const countPayload = await countPromise;
+    expect(countPayload.count).toBe(1);
+  });
 });
