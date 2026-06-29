@@ -46,12 +46,13 @@ type BannerTile = {
 
 type QuizPlayContainerSxParams = {
   brandFontFamily: string;
-  hasActiveQuestion: boolean;
   isJoinScreen?: boolean;
+  joined?: boolean;
 };
 
 export function buildQuizPlayContainerSx(params: QuizPlayContainerSxParams): SxProps<Theme> {
-  const { brandFontFamily, hasActiveQuestion, isJoinScreen = false } = params;
+  const { brandFontFamily, isJoinScreen = false, joined = false } = params;
+  const allowMainScroll = joined && !isJoinScreen;
   return {
     position: "relative",
     zIndex: 1,
@@ -74,9 +75,9 @@ export function buildQuizPlayContainerSx(params: QuizPlayContainerSxParams): SxP
           xs: "calc(env(safe-area-inset-bottom, 0px) + 96px)",
           sm: 4,
         },
-    minHeight: "100vh",
-    height: hasActiveQuestion ? "auto" : "100dvh",
-    overflowY: hasActiveQuestion ? "auto" : "hidden",
+    minHeight: "100dvh",
+    height: allowMainScroll ? "auto" : "100dvh",
+    overflowY: allowMainScroll ? "auto" : "hidden",
     boxSizing: "border-box",
     display: "flex",
     flexDirection: "column",

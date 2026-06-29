@@ -9,6 +9,35 @@ export const PLAYER_DIALOG_PAPER_SX = {
   backdropFilter: "blur(4px)",
 } as const;
 
+/** Фиксированный оверлей попапа голосования/обратной связи — скролл на всём слое, не на flex-ребёнке. */
+export const PLAYER_POPUP_OVERLAY_SX = {
+  position: "fixed",
+  inset: 0,
+  overflowY: "auto",
+  WebkitOverflowScrolling: "touch",
+  overscrollBehaviorY: "contain",
+  p: { xs: 1.5, sm: 2.5 },
+  backgroundColor: "rgba(0, 0, 0, 0.85)",
+} as const;
+
+export const PLAYER_POPUP_ALIGN_SX = {
+  display: "flex",
+  flexDirection: "column",
+  minHeight: "100%",
+  boxSizing: "border-box",
+} as const;
+
+export const PLAYER_POPUP_CARD_SX = {
+  width: "100%",
+  maxWidth: 678,
+  flexShrink: 0,
+  margin: "auto",
+  bgcolor: "rgba(38, 38, 38, 0.84)",
+  backdropFilter: "blur(4px)",
+  color: "#fff",
+  boxShadow: "none",
+} as const;
+
 export const PLAYER_DIALOG_TITLE_SX = {
   display: "flex",
   alignItems: "flex-start",

@@ -1,26 +1,11 @@
 import { useEffect } from "react";
-import type { MutableRefObject } from "react";
-import type { QuizState } from "../pages/quiz-play/types";
 
 type Params = {
   joined: boolean;
-  quiz: QuizState | null;
-  subQuizCompleteOpen: boolean;
-  finalCompletionDismissed: boolean;
-  lastSubQuizProgressRef: MutableRefObject<{
-    questionId: string;
-    index: number;
-    total: number;
-  } | null>;
+  hasPlayerOverlay: boolean;
 };
 
-export function useQuizPlayScrollLock({
-  joined,
-  quiz,
-  subQuizCompleteOpen,
-  finalCompletionDismissed,
-  lastSubQuizProgressRef,
-}: Params) {
+export function useQuizPlayScrollLock({ joined, hasPlayerOverlay }: Params) {
   useEffect(() => {
     const prevBodyOverflow = document.body.style.overflowY;
     const prevBodyPosition = document.body.style.position;
@@ -29,21 +14,7 @@ export function useQuizPlayScrollLock({
     const prevHtmlOverflow = document.documentElement.style.overflowY;
     const prevHtmlOverscroll = document.documentElement.style.overscrollBehaviorY;
     const prevBodyOverscroll = document.body.style.overscrollBehaviorY;
-    const completionAfterAdmin =
-      joined &&
-      !!quiz &&
-      quiz.status !== "FINISHED" &&
-      !quiz.activeQuestion &&
-      lastSubQuizProgressRef.current !== null &&
-      lastSubQuizProgressRef.current.index === lastSubQuizProgressRef.current.total;
-    const showSubQuizComplete =
-      joined &&
-      !!quiz &&
-      quiz.status !== "FINISHED" &&
-      (subQuizCompleteOpen || completionAfterAdmin);
-    const showSubQuizCompleteCard = showSubQuizComplete && !finalCompletionDismissed;
-    const inQuestionFlow = joined && !!quiz?.activeQuestion && !showSubQuizCompleteCard;
-    const lockScroll = !joined || (joined && !inQuestionFlow);
+    const lockScroll = !joined || hasPlayerOverlay;
     const scrollY = window.scrollY;
     document.body.style.overflowY = lockScroll ? "hidden" : "auto";
     document.documentElement.style.overflowY = lockScroll ? "hidden" : "auto";
@@ -70,5 +41,5 @@ export function useQuizPlayScrollLock({
         window.scrollTo(0, scrollY);
       }
     };
-  }, [joined, quiz, subQuizCompleteOpen, finalCompletionDismissed, lastSubQuizProgressRef]);
+  }, [joined, hasPlayerOverlay]);
 }

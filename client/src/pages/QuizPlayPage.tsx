@@ -264,12 +264,20 @@ export function QuizPlayPage() {
     }
   }, [joined, slug]);
 
+  const isJoinScreen = !bootLoading && !joined && !restoreJoinPending;
+
+  const showQuestionPopup =
+    joined &&
+    !!nonQuizActiveQuestion &&
+    !showSubQuizCompleteCard &&
+    !shouldDeferQuestionPopup &&
+    !shouldHideAnsweredPopup &&
+    !shouldHideAnsweredUntilHydrated &&
+    !shouldHideDismissedPopup;
+
   useQuizPlayScrollLock({
     joined,
-    quiz,
-    subQuizCompleteOpen,
-    finalCompletionDismissed,
-    lastSubQuizProgressRef,
+    hasPlayerOverlay: showQuestionPopup || shouldShowFeedbackPopup,
   });
 
   useQuizPlaySocket({
@@ -623,8 +631,6 @@ export function QuizPlayPage() {
     prevRankRowTopsRef.current = nextTops;
   }, [rankOrder, nonQuizActiveQuestion, answeredCurrentQuestion]);
 
-  const isJoinScreen = !bootLoading && !joined && !restoreJoinPending;
-
   return (
     <>
       <PlayerViewportBackground
@@ -635,8 +641,8 @@ export function QuizPlayPage() {
         maxWidth="md"
         sx={buildQuizPlayContainerSx({
           brandFontFamily,
-          hasActiveQuestion,
           isJoinScreen,
+          joined,
         })}
       >
         {bootLoading ? (
@@ -762,33 +768,27 @@ export function QuizPlayPage() {
                 }}
               />
             ) : null}
-            {joined &&
-              nonQuizActiveQuestion &&
-              !showSubQuizCompleteCard &&
-              !shouldDeferQuestionPopup &&
-              !shouldHideAnsweredPopup &&
-              !shouldHideAnsweredUntilHydrated &&
-              !shouldHideDismissedPopup && (
-                <QuestionPopupCard
-                  brandPrimaryColor={brandPrimaryColor}
-                  playerVoteOptionTextColor={playerVoteOptionTextColor}
-                  question={nonQuizActiveQuestion}
-                  quizProgress={displayedQuizProgress}
-                  displayedSelected={displayedSelected}
-                  answeredCurrentQuestion={answeredCurrentQuestion}
-                  submittedAnswers={submittedAnswers}
-                  rankOrder={rankOrder}
-                  rankRowRefs={rankRowRefs}
-                  moveRankOption={moveRankOption}
-                  toggleOption={toggleOption}
-                  closeQuestionPopup={closeQuestionPopup}
-                  tagAnswers={tagAnswers}
-                  setTagAnswers={setTagAnswers}
-                  canSubmit={canSubmit}
-                  submit={submit}
-                  ruBallLabel={ruBallLabel}
-                />
-              )}
+            {showQuestionPopup && (
+              <QuestionPopupCard
+                brandPrimaryColor={brandPrimaryColor}
+                playerVoteOptionTextColor={playerVoteOptionTextColor}
+                question={nonQuizActiveQuestion}
+                quizProgress={displayedQuizProgress}
+                displayedSelected={displayedSelected}
+                answeredCurrentQuestion={answeredCurrentQuestion}
+                submittedAnswers={submittedAnswers}
+                rankOrder={rankOrder}
+                rankRowRefs={rankRowRefs}
+                moveRankOption={moveRankOption}
+                toggleOption={toggleOption}
+                closeQuestionPopup={closeQuestionPopup}
+                tagAnswers={tagAnswers}
+                setTagAnswers={setTagAnswers}
+                canSubmit={canSubmit}
+                submit={submit}
+                ruBallLabel={ruBallLabel}
+              />
+            )}
             {joined && shouldShowFeedbackPopup && quiz?.activeFeedbackForm ? (
               <FeedbackPopupCard
                 brandPrimaryColor={brandPrimaryColor}
