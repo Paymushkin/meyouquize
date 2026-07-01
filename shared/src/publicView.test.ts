@@ -222,6 +222,30 @@ describe("mergePublicViewState", () => {
     expect(next.injectedTagWords).toEqual([{ text: "врач", count: 2 }]);
     expect(next.hiddenTagTexts).toEqual(["скрытый"]);
   });
+
+  it("backfills banners_summary for legacy report module lists", () => {
+    const state = normalizePublicViewState({
+      reportModules: [
+        "event_header",
+        "participation_summary",
+        "quiz_results",
+        "vote_results",
+        "reactions_summary",
+        "randomizer_summary",
+        "speaker_questions_summary",
+      ],
+    });
+    expect(state.reportModules).toEqual([
+      "event_header",
+      "participation_summary",
+      "quiz_results",
+      "vote_results",
+      "reactions_summary",
+      "randomizer_summary",
+      "speaker_questions_summary",
+      "banners_summary",
+    ]);
+  });
 });
 
 describe("resolveProjectorLeaderboardRows", () => {

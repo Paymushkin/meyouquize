@@ -50,14 +50,14 @@ export default defineConfig({
     {
       command: "npx tsx e2e/scripts/start-e2e-server.ts",
       url: "http://127.0.0.1:4000/healthz",
-      reuseExistingServer: false,
+      reuseExistingServer: true,
       timeout: 120_000,
       env: testServerEnv,
     },
     {
       command: "npm run dev -w client -- --host 127.0.0.1 --port 5173",
       url: "http://127.0.0.1:5173",
-      reuseExistingServer: false,
+      reuseExistingServer: true,
       timeout: 120_000,
       env: {
         VITE_API_URL: "http://127.0.0.1:4000",

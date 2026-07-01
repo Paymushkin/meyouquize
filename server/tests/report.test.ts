@@ -176,6 +176,7 @@ describe("report contracts", () => {
         },
       ],
       subQuizParticipantTables: [],
+      banners: [],
     };
 
     const buffer = await renderPublicReportPdf(report);

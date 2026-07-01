@@ -9,6 +9,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const CLIENT_LOGIC_COVERAGE_INCLUDE = [
   "src/admin/adminEventTypes.ts",
   "src/admin/adminEventForm.ts",
+  "src/features/admin/adminQuestionFormPatch.ts",
   "src/features/admin/adminQuestionProjectorFlow.ts",
   "src/features/adminBanners/buildOrderedTiles.ts",
   "src/features/branding/brandVisual.ts",

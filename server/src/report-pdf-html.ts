@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import { createRequire } from "node:module";
 import path from "node:path";
+import type { ReportModuleId } from "@meyouquize/shared";
 import type { PublicEventReport } from "./quiz-service.js";
 
 const require = createRequire(import.meta.url);
@@ -68,6 +69,157 @@ function tagCloudRows(tags: Array<{ text: string; count: number }>, primary: str
     .join("")}</div>`;
 }
 
+type ReportPdfSectionContext = {
+  report: PublicEventReport;
+  primary: string;
+  textMuted: string;
+  generatedAt: string;
+  resolveAssetUrl: (url: string) => string;
+};
+
+function buildReportPdfSection(
+  moduleId: ReportModuleId,
+  ctx: ReportPdfSectionContext,
+): string | null {
+  const { report, primary, textMuted, generatedAt, resolveAssetUrl } = ctx;
+  const b = report.branding;
+
+  switch (moduleId) {
+    case "event_header": {
+      const logoUrl = resolveAssetUrl(b.brandLogoUrl ?? "");
+      const logo = logoUrl ? `<img class="logo" src="${escapeHtml(logoUrl)}" alt="" />` : "";
+      return `
+      <section class="card">
+        <div class="card-head split">
+          <div>
+            <h1>${escapeHtml(report.config.reportTitle || report.title)}</h1>
+            <p class="muted">Событие: ${escapeHtml(report.title)}</p>
+            <p class="muted">Сформирован: ${escapeHtml(generatedAt)}</p>
+          </div>
+          ${logo}
+        </div>
+      </section>`;
+    }
+    case "participation_summary": {
+      const participationStats = [
+        { label: "Участников", value: report.summary.participantsCount },
+        { label: "Голосований", value: report.voteQuestions.length },
+        { label: "Вопросов спикерам", value: report.speakerQuestions.total },
+        { label: "Квизов", value: report.summary.subQuizzesCount },
+      ].filter((item) => item.value > 0);
+      if (participationStats.length === 0) return null;
+      return `
+      <section class="card">
+        <h2>Итоги участия</h2>
+        <div class="stats-grid">
+          ${participationStats
+            .map(
+              (item) =>
+                `<div class="stat"><div class="stat-label">${escapeHtml(item.label)}</div><div class="stat-value">${item.value}</div></div>`,
+            )
+            .join("")}
+        </div>
+      </section>`;
+    }
+    case "banners_summary": {
+      if (report.banners.length === 0) return null;
+      const rows = report.banners
+        .map((banner) => {
+          const imageUrl = resolveAssetUrl(banner.backgroundUrl);
+          const imageCell = imageUrl
+            ? `<img class="banner-thumb" src="${escapeHtml(imageUrl)}" alt="" />`
+            : `<span class="muted">—</span>`;
+          const linkUrl = banner.linkUrl.trim();
+          const linkCell = linkUrl
+            ? `<a class="banner-link" href="${escapeHtml(linkUrl)}">${escapeHtml(linkUrl)}</a>`
+            : `<span class="muted">—</span>`;
+          return `<tr>
+          <td>${imageCell}</td>
+          <td>${linkCell}</td>
+          <td class="banner-clicks">${banner.uniqueClicks}</td>
+        </tr>`;
+        })
+        .join("");
+      return `
+      <section class="card">
+        <div class="card-title-row"><h2>Баннеры</h2><span class="badge" style="background:${primary}">${report.banners.length}</span></div>
+        <table class="banners-table">
+          <thead>
+            <tr>
+              <th>Картинка</th>
+              <th>Ссылка</th>
+              <th>Клики</th>
+            </tr>
+          </thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </section>`;
+    }
+    case "vote_results": {
+      if (report.voteQuestions.length === 0) return null;
+      const questions = report.voteQuestions
+        .map((question) => {
+          const body =
+            question.type === "tag_cloud"
+              ? tagCloudRows(question.tagCloud, primary)
+              : barRows(
+                  question.optionStats.slice(0, 8).map((row) => ({
+                    text: row.text,
+                    count: row.count,
+                  })),
+                  primary,
+                  textMuted,
+                );
+          return `<div class="question"><h3>${escapeHtml(question.text)}</h3>${body}</div>`;
+        })
+        .join("");
+      return `
+      <section class="card">
+        <div class="card-title-row"><h2>Результаты голосований</h2><span class="badge" style="background:${primary}">${report.voteQuestions.length}</span></div>
+        ${questions}
+      </section>`;
+    }
+    case "quiz_results": {
+      if (report.quizQuestions.length === 0) return null;
+      const bySubQuiz = new Map<string, typeof report.quizQuestions>();
+      for (const question of report.quizQuestions) {
+        const key = question.subQuizTitle?.trim() || "Без названия квиза";
+        const list = bySubQuiz.get(key) ?? [];
+        list.push(question);
+        bySubQuiz.set(key, list);
+      }
+      const groups = Array.from(bySubQuiz.entries())
+        .map(([title, questions]) => {
+          const items = questions
+            .map((question) => {
+              const body =
+                question.type === "tag_cloud"
+                  ? tagCloudRows(question.tagCloud, primary)
+                  : barRows(
+                      question.optionStats.slice(0, 8).map((row) => ({
+                        text: row.text,
+                        count: row.count,
+                      })),
+                      primary,
+                      textMuted,
+                    );
+              return `<div class="question"><h3>${escapeHtml(question.text)}</h3>${body}</div>`;
+            })
+            .join("");
+          return `<div class="group"><h3 class="group-title">${escapeHtml(title)}</h3>${items}</div>`;
+        })
+        .join("");
+      return `
+      <section class="card">
+        <div class="card-title-row"><h2>Результаты квизов</h2><span class="badge" style="background:${primary}">${report.quizQuestions.length}</span></div>
+        ${groups}
+      </section>`;
+    }
+    default:
+      return null;
+  }
+}
+
 export function buildReportPdfHtml(
   report: PublicEventReport,
   options?: { assetOrigin?: string },
@@ -87,108 +239,20 @@ export function buildReportPdfHtml(
   const surface = b.brandSurfaceColor?.trim() || "#1a2634";
   const text = b.brandTextColor?.trim() || "#ffffff";
   const textMuted = `${text}b8`;
-  const modules = new Set(report.config.reportModules);
   const generatedAt = new Date(report.generatedAt).toLocaleString("ru-RU");
 
+  const sectionCtx: ReportPdfSectionContext = {
+    report,
+    primary,
+    textMuted,
+    generatedAt,
+    resolveAssetUrl,
+  };
+
   const sections: string[] = [];
-
-  if (modules.has("event_header")) {
-    const logoUrl = resolveAssetUrl(b.brandLogoUrl ?? "");
-    const logo = logoUrl ? `<img class="logo" src="${escapeHtml(logoUrl)}" alt="" />` : "";
-    sections.push(`
-      <section class="card">
-        <div class="card-head split">
-          <div>
-            <h1>${escapeHtml(report.config.reportTitle || report.title)}</h1>
-            <p class="muted">Событие: ${escapeHtml(report.title)}</p>
-            <p class="muted">Сформирован: ${escapeHtml(generatedAt)}</p>
-          </div>
-          ${logo}
-        </div>
-      </section>`);
-  }
-
-  if (modules.has("participation_summary")) {
-    const participationStats = [
-      { label: "Участников", value: report.summary.participantsCount },
-      { label: "Голосований", value: report.voteQuestions.length },
-      { label: "Вопросов спикерам", value: report.speakerQuestions.total },
-      { label: "Квизов", value: report.summary.subQuizzesCount },
-    ].filter((item) => item.value > 0);
-    if (participationStats.length > 0) {
-      sections.push(`
-      <section class="card">
-        <h2>Итоги участия</h2>
-        <div class="stats-grid">
-          ${participationStats
-            .map(
-              (item) =>
-                `<div class="stat"><div class="stat-label">${escapeHtml(item.label)}</div><div class="stat-value">${item.value}</div></div>`,
-            )
-            .join("")}
-        </div>
-      </section>`);
-    }
-  }
-
-  if (modules.has("vote_results") && report.voteQuestions.length > 0) {
-    const questions = report.voteQuestions
-      .map((question) => {
-        const body =
-          question.type === "tag_cloud"
-            ? tagCloudRows(question.tagCloud, primary)
-            : barRows(
-                question.optionStats.slice(0, 8).map((row) => ({
-                  text: row.text,
-                  count: row.count,
-                })),
-                primary,
-                textMuted,
-              );
-        return `<div class="question"><h3>${escapeHtml(question.text)}</h3>${body}</div>`;
-      })
-      .join("");
-    sections.push(`
-      <section class="card">
-        <div class="card-title-row"><h2>Результаты голосований</h2><span class="badge" style="background:${primary}">${report.voteQuestions.length}</span></div>
-        ${questions}
-      </section>`);
-  }
-
-  if (modules.has("quiz_results") && report.quizQuestions.length > 0) {
-    const bySubQuiz = new Map<string, typeof report.quizQuestions>();
-    for (const question of report.quizQuestions) {
-      const key = question.subQuizTitle?.trim() || "Без названия квиза";
-      const list = bySubQuiz.get(key) ?? [];
-      list.push(question);
-      bySubQuiz.set(key, list);
-    }
-    const groups = Array.from(bySubQuiz.entries())
-      .map(([title, questions]) => {
-        const items = questions
-          .map((question) => {
-            const body =
-              question.type === "tag_cloud"
-                ? tagCloudRows(question.tagCloud, primary)
-                : barRows(
-                    question.optionStats.slice(0, 8).map((row) => ({
-                      text: row.text,
-                      count: row.count,
-                    })),
-                    primary,
-                    textMuted,
-                  );
-            return `<div class="question"><h3>${escapeHtml(question.text)}</h3>${body}</div>`;
-          })
-          .join("");
-        return `<div class="group"><h3 class="group-title">${escapeHtml(title)}</h3>${items}</div>`;
-      })
-      .join("");
-    sections.push(`
-      <section class="card">
-        <div class="card-title-row"><h2>Результаты квизов</h2><span class="badge" style="background:${primary}">${report.quizQuestions.length}</span></div>
-        ${groups}
-      </section>`);
+  for (const moduleId of report.config.reportModules) {
+    const html = buildReportPdfSection(moduleId, sectionCtx);
+    if (html) sections.push(html);
   }
 
   return `<!DOCTYPE html>
@@ -248,6 +312,11 @@ export function buildReportPdfHtml(
     .bar-meta { font-size: 12px; margin-top: 4px; text-align: right; }
     .tag-row { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
     .tag-chip { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 8px; border: 1px solid; font-size: 13px; }
+    .banners-table { width: 100%; border-collapse: collapse; margin-top: 8px; }
+    .banners-table th, .banners-table td { border: 1px solid color-mix(in srgb, var(--text) 16%, transparent); padding: 8px; text-align: left; vertical-align: middle; }
+    .banners-table th:last-child, .banners-table td.banner-clicks { text-align: right; width: 72px; }
+    .banner-thumb { display: block; max-height: 56px; max-width: 160px; object-fit: contain; border-radius: 6px; }
+    .banner-link { color: var(--accent); word-break: break-word; }
   </style>
 </head>
 <body data-report-pdf-ready="1">

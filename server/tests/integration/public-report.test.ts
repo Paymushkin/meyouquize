@@ -9,7 +9,7 @@ import {
   setQuestionEnabled,
   submitAnswer,
 } from "../../src/quiz-service.js";
-import { saveStoredPublicView } from "../../src/socket/public-view-store.js";
+import { saveStoredPublicView, getStoredPublicView } from "../../src/socket/public-view-store.js";
 import { activateQuestion, joinPlayer, uniqueSlug } from "../helpers/integrationFixtures.js";
 
 describe("public report", () => {
@@ -108,8 +108,9 @@ describe("public report", () => {
       },
     });
 
+    const storedBeforePublish = await getStoredPublicView(room!.id);
     await saveStoredPublicView(room!.id, {
-      ...DEFAULT_PUBLIC_VIEW_STATE,
+      ...storedBeforePublish,
       reportPublished: true,
     });
 
@@ -117,5 +118,35 @@ describe("public report", () => {
     expect(report).not.toBeNull();
     const voteQuestion = report!.voteQuestions.find((row) => row.questionId === question.id);
     expect(voteQuestion?.optionStats.find((row) => row.optionId === yesId)?.count).toBe(42);
+  });
+
+  it("includes banner image, link and click stats in report", async () => {
+    const slug = uniqueSlug("report-banners");
+    await createRoom({ eventName: slug, title: `Banners ${slug}` });
+    const room = await getRoomByEventName(slug);
+    await saveStoredPublicView(room!.id, {
+      ...DEFAULT_PUBLIC_VIEW_STATE,
+      reportPublished: true,
+      playerBanners: [
+        {
+          id: "banner-1",
+          linkUrl: "https://example.com/offer",
+          backgroundUrl: "/uploads/banner-1.png",
+          size: "2x1",
+          isVisible: true,
+        },
+      ],
+      playerBannerClickStats: [{ bannerId: "banner-1", uniqueClicks: 7 }],
+    });
+
+    const report = await getPublicReportBySlug(slug);
+    expect(report?.banners).toEqual([
+      {
+        id: "banner-1",
+        backgroundUrl: "/uploads/banner-1.png",
+        linkUrl: "https://example.com/offer",
+        uniqueClicks: 7,
+      },
+    ]);
   });
 });

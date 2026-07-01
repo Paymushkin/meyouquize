@@ -16,6 +16,8 @@ import {
   Tooltip,
   Typography,
 } from "@mui/material";
+import { useMemo } from "react";
+import { buildReportModuleDisplayOrder } from "../../features/admin/adminReportModules";
 import type { ReportModuleId } from "@meyouquize/shared";
 import type { RandomizerHistoryEntry } from "../../features/randomizer/randomizerLogic";
 import type { SpeakerQuestionItem } from "../../types/speakerQuestions";
@@ -71,6 +73,7 @@ const MODULE_LABELS: Record<ReportModuleId, string> = {
   feedback_summary: "Обратная связь",
   randomizer_summary: "Итоги рандомайзера",
   speaker_questions_summary: "Вопросы спикерам",
+  banners_summary: "Баннеры",
 };
 
 const ALL_MODULES: ReportModuleId[] = [
@@ -82,6 +85,7 @@ const ALL_MODULES: ReportModuleId[] = [
   "feedback_summary",
   "randomizer_summary",
   "speaker_questions_summary",
+  "banners_summary",
 ];
 
 function allRandomizerRunIds(
@@ -154,6 +158,11 @@ export function AdminReportSection(props: Props) {
       ? feedbackAllIds
       : reportFeedbackFormIds.filter((id) => feedbackAllIds.includes(id));
 
+  const moduleDisplayOrder = useMemo(
+    () => buildReportModuleDisplayOrder(reportModules),
+    [reportModules],
+  );
+
   return (
     <Card variant="outlined">
       <CardContent>
@@ -169,7 +178,7 @@ export function AdminReportSection(props: Props) {
 
           <Stack spacing={1}>
             <Typography variant="subtitle2">Модули отчета</Typography>
-            {ALL_MODULES.map((moduleId) => {
+            {moduleDisplayOrder.map((moduleId) => {
               const checked = reportModules.includes(moduleId);
               const index = reportModules.indexOf(moduleId);
               const canMoveUp = checked && index > 0;

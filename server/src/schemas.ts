@@ -563,6 +563,7 @@ export const setPublicViewSchema = z.object({
         "feedback_summary",
         "randomizer_summary",
         "speaker_questions_summary",
+        "banners_summary",
       ]),
     )
     .max(20)

@@ -757,15 +757,31 @@ export function buildApp() {
 
   app.get("/api/quiz/by-slug/:slug/public-report", async (req, res) => {
     const slug = Array.isArray(req.params.slug) ? req.params.slug[0] : req.params.slug;
+    const quiz = await getQuizBySlug(slug);
+    if (!quiz) {
+      return res.status(404).json(apiError("REPORT_NOT_FOUND", "Report not found"));
+    }
+    const view = publicViewJsonToState(quiz.publicView);
+    if (!view.reportPublished) {
+      return res.status(404).json(apiError("REPORT_NOT_PUBLISHED", "Report is not published"));
+    }
     const report = await getPublicReportBySlug(slug);
-    if (!report) return res.status(404).json({ error: "Not found" });
+    if (!report) return res.status(404).json(apiError("REPORT_NOT_FOUND", "Report not found"));
     return res.json(report);
   });
 
   app.get("/api/quiz/by-slug/:slug/public-report.pdf", async (req, res) => {
     const slug = Array.isArray(req.params.slug) ? req.params.slug[0] : req.params.slug;
+    const quiz = await getQuizBySlug(slug);
+    if (!quiz) {
+      return res.status(404).json(apiError("REPORT_NOT_FOUND", "Report not found"));
+    }
+    const view = publicViewJsonToState(quiz.publicView);
+    if (!view.reportPublished) {
+      return res.status(404).json(apiError("REPORT_NOT_PUBLISHED", "Report is not published"));
+    }
     const report = await getPublicReportBySlug(slug);
-    if (!report) return res.status(404).json({ error: "Not found" });
+    if (!report) return res.status(404).json(apiError("REPORT_NOT_FOUND", "Report not found"));
     const clientOrigin = resolveReportPdfPageOrigin(req, env.clientOrigins);
     const pageUrl = `${clientOrigin}/report/${encodeURIComponent(slug)}?pdf=1`;
     try {

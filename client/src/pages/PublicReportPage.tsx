@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useState, type ReactNode } from "react";
 import { useParams } from "react-router-dom";
 import {
   Alert,
@@ -8,6 +8,7 @@ import {
   CircularProgress,
   Container,
   CssBaseline,
+  Link,
   Stack,
   Table,
   TableBody,
@@ -161,6 +162,12 @@ type PublicReportPayload = {
       totalScore: number;
       totalResponseMs: number;
     }>;
+  }>;
+  banners: Array<{
+    id: string;
+    backgroundUrl: string;
+    linkUrl: string;
+    uniqueClicks: number;
   }>;
 };
 
@@ -501,7 +508,19 @@ export function PublicReportPage() {
           },
         );
         if (!response.ok) {
-          setError("Отчет не найден или не опубликован");
+          let message = "Отчёт не найден или не опубликован";
+          try {
+            const body = (await response.json()) as { code?: string };
+            if (body.code === "REPORT_NOT_PUBLISHED") {
+              message =
+                "Отчёт ещё не опубликован. В админке события откройте вкладку «Отчёт» и включите публикацию (иконка глаза).";
+            } else if (body.code === "REPORT_NOT_FOUND") {
+              message = "Событие с таким адресом не найдено.";
+            }
+          } catch {
+            // ignore malformed error body
+          }
+          setError(message);
           return;
         }
         const data = (await response.json()) as PublicReportPayload;
@@ -677,304 +696,348 @@ export function PublicReportPage() {
     }, 0);
   }
 
-  return (
-    <ThemeProvider theme={reportTheme}>
-      <CssBaseline />
-      <Container
-        maxWidth={false}
-        disableGutters
-        sx={{
-          ...backgroundSx,
-          minHeight: "100dvh",
-          py: isPdfMode ? 0 : 4,
-          px: isPdfMode ? 0 : { xs: 2, md: 4 },
-          backgroundColor: payload!.branding.brandBodyBackgroundColor,
-          fontFamily,
-        }}
-      >
-        <Stack
-          spacing={2}
-          sx={{
-            maxWidth: isPdfMode ? "none" : 1100,
-            mx: isPdfMode ? 0 : "auto",
-            p: isPdfMode ? 1.5 : 0,
-          }}
-        >
-          {showReportHeading && !hasModule("event_header") ? (
-            <Card variant="outlined" className="report-card">
-              <CardContent>
-                <Typography variant="h4">
-                  {payload!.config.reportTitle || payload!.title}
-                </Typography>
-                <Typography variant="body2" color="text.secondary">
-                  Событие: {payload!.title}
-                </Typography>
-              </CardContent>
-            </Card>
-          ) : null}
-
-          {hasModule("event_header") && (
-            <Card variant="outlined" className="report-card">
-              <CardContent>
-                <Stack
-                  direction={{ xs: "column", md: "row" }}
-                  alignItems={{ xs: "flex-start", md: "center" }}
-                  justifyContent="space-between"
-                >
-                  <Stack spacing={0.5} sx={{ textAlign: "left" }}>
-                    <Typography variant="h4">
-                      {payload!.config.reportTitle || payload!.title}
-                    </Typography>
-                    <Typography variant="body2">Событие: {payload!.title}</Typography>
-                    <Typography variant="body2">
-                      Сформирован: {new Date(payload!.generatedAt).toLocaleString("ru-RU")}
-                    </Typography>
-                  </Stack>
-                  {logoUrl ? (
-                    <Box component="img" src={logoUrl} alt="Логотип" sx={{ maxHeight: 72 }} />
-                  ) : null}
+  const renderReportModule = (moduleId: ReportModuleId): ReactNode => {
+    switch (moduleId) {
+      case "event_header":
+        return (
+          <Card variant="outlined" className="report-card">
+            <CardContent>
+              <Stack
+                direction={{ xs: "column", md: "row" }}
+                alignItems={{ xs: "flex-start", md: "center" }}
+                justifyContent="space-between"
+              >
+                <Stack spacing={0.5} sx={{ textAlign: "left" }}>
+                  <Typography variant="h4">
+                    {payload!.config.reportTitle || payload!.title}
+                  </Typography>
+                  <Typography variant="body2">Событие: {payload!.title}</Typography>
+                  <Typography variant="body2">
+                    Сформирован: {new Date(payload!.generatedAt).toLocaleString("ru-RU")}
+                  </Typography>
                 </Stack>
-              </CardContent>
-            </Card>
-          )}
-
-          {hasModule("participation_summary") && participationStats.length > 0 && (
-            <Card variant="outlined" className="report-card">
-              <CardContent>
-                <Typography variant="h6">Итоги участия</Typography>
+                {logoUrl ? (
+                  <Box component="img" src={logoUrl} alt="Логотип" sx={{ maxHeight: 72 }} />
+                ) : null}
+              </Stack>
+            </CardContent>
+          </Card>
+        );
+      case "participation_summary":
+        return (
+          <Card variant="outlined" className="report-card">
+            <CardContent>
+              <Typography variant="h6">Итоги участия</Typography>
+              <Box
+                sx={{
+                  mt: 1.25,
+                  display: "grid",
+                  gridTemplateColumns: {
+                    xs: "repeat(2, minmax(0, 1fr))",
+                    md: `repeat(${Math.min(participationStats.length, 4)}, minmax(0, 1fr))`,
+                  },
+                  gap: 1,
+                }}
+              >
+                {participationStats.map((item) => (
+                  <Box
+                    key={item.label}
+                    sx={{
+                      border: "1px solid",
+                      borderColor: "divider",
+                      borderRadius: 1.5,
+                      px: 1.25,
+                      py: 1,
+                    }}
+                  >
+                    <Typography variant="caption" color="text.secondary">
+                      {item.label}
+                    </Typography>
+                    <Typography variant="h4" fontWeight={900}>
+                      {item.value}
+                    </Typography>
+                  </Box>
+                ))}
+              </Box>
+            </CardContent>
+          </Card>
+        );
+      case "banners_summary":
+        return (
+          <Card variant="outlined" className="report-card">
+            <CardContent>
+              <Stack direction="row" alignItems="center" justifyContent="space-between">
+                <Typography variant="h6">Баннеры</Typography>
                 <Box
                   sx={{
-                    mt: 1.25,
-                    display: "grid",
-                    gridTemplateColumns: {
-                      xs: "repeat(2, minmax(0, 1fr))",
-                      md: `repeat(${Math.min(participationStats.length, 4)}, minmax(0, 1fr))`,
-                    },
-                    gap: 1,
+                    minWidth: 32,
+                    height: 32,
+                    px: 1,
+                    borderRadius: 999,
+                    bgcolor: "primary.main",
+                    color: "primary.contrastText",
+                    display: "inline-flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    fontWeight: 800,
+                    lineHeight: 1,
                   }}
                 >
-                  {participationStats.map((item) => (
-                    <Box
-                      key={item.label}
-                      sx={{
-                        border: "1px solid",
-                        borderColor: "divider",
-                        borderRadius: 1.5,
-                        px: 1.25,
-                        py: 1,
-                      }}
-                    >
-                      <Typography variant="caption" color="text.secondary">
-                        {item.label}
-                      </Typography>
-                      <Typography variant="h4" fontWeight={900}>
-                        {item.value}
-                      </Typography>
-                    </Box>
-                  ))}
+                  {payload!.banners.length}
                 </Box>
-              </CardContent>
-            </Card>
-          )}
-
-          {hasModule("quiz_results") && payload!.quizQuestions.length > 0 && (
-            <Card variant="outlined" className="report-card">
-              <CardContent>
-                <Stack
-                  direction="row"
-                  alignItems="center"
-                  justifyContent="space-between"
-                  sx={{ mb: 1 }}
+              </Stack>
+              <TableContainer sx={{ mt: 1.25 }}>
+                <Table size="small">
+                  <TableHead>
+                    <TableRow>
+                      <TableCell>Картинка</TableCell>
+                      <TableCell>Ссылка</TableCell>
+                      <TableCell align="right">Клики</TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {payload!.banners.map((banner) => {
+                      const imageUrl = resolveClientAssetUrl(banner.backgroundUrl);
+                      const linkUrl = banner.linkUrl.trim();
+                      return (
+                        <TableRow key={banner.id}>
+                          <TableCell>
+                            {imageUrl ? (
+                              <Box
+                                component="img"
+                                src={imageUrl}
+                                alt=""
+                                sx={{
+                                  display: "block",
+                                  maxHeight: 72,
+                                  maxWidth: 200,
+                                  objectFit: "contain",
+                                  borderRadius: 1,
+                                }}
+                              />
+                            ) : (
+                              "—"
+                            )}
+                          </TableCell>
+                          <TableCell sx={{ maxWidth: 320, wordBreak: "break-word" }}>
+                            {linkUrl ? (
+                              <Link href={linkUrl} target="_blank" rel="noopener noreferrer">
+                                {linkUrl}
+                              </Link>
+                            ) : (
+                              "—"
+                            )}
+                          </TableCell>
+                          <TableCell align="right">{banner.uniqueClicks}</TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              </TableContainer>
+            </CardContent>
+          </Card>
+        );
+      case "quiz_results":
+        return (
+          <Card variant="outlined" className="report-card">
+            <CardContent>
+              <Stack
+                direction="row"
+                alignItems="center"
+                justifyContent="space-between"
+                sx={{ mb: 1 }}
+              >
+                <Typography variant="h6">Результаты квизов</Typography>
+                <Box
+                  sx={{
+                    minWidth: 32,
+                    height: 32,
+                    px: 1,
+                    borderRadius: 999,
+                    bgcolor: "primary.main",
+                    color: "primary.contrastText",
+                    display: "inline-flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    fontWeight: 800,
+                    lineHeight: 1,
+                  }}
                 >
-                  <Typography variant="h6">Результаты квизов</Typography>
+                  {payload!.quizQuestions.length}
+                </Box>
+              </Stack>
+              <Stack spacing={2}>
+                {subQuizGroups.map((group) => (
                   <Box
+                    key={group.subQuizId}
+                    className="report-group"
                     sx={{
-                      minWidth: 32,
-                      height: 32,
-                      px: 1,
-                      borderRadius: 999,
-                      bgcolor: "primary.main",
-                      color: "primary.contrastText",
-                      display: "inline-flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      fontWeight: 800,
-                      lineHeight: 1,
+                      border: "1px solid",
+                      borderColor: "divider",
+                      borderRadius: 1.5,
+                      p: 1.5,
                     }}
                   >
-                    {payload!.quizQuestions.length}
-                  </Box>
-                </Stack>
-                <Stack spacing={2}>
-                  {subQuizGroups.map((group) => (
-                    <Box
-                      key={group.subQuizId}
-                      className="report-group"
-                      sx={{
-                        border: "1px solid",
-                        borderColor: "divider",
-                        borderRadius: 1.5,
-                        p: 1.5,
-                      }}
-                    >
-                      <Typography variant="subtitle1" fontWeight={700} sx={{ mb: 1 }}>
-                        {group.title}
-                      </Typography>
-                      <Stack spacing={1.25}>
-                        {group.questions.slice(0, 20).map((question) => (
-                          <Box key={question.questionId} className="report-question">
-                            <Typography fontWeight={700}>{question.text}</Typography>
-                            <ReportQuestionResults question={question} />
-                          </Box>
-                        ))}
-                      </Stack>
-                      {group.participantTable && group.participantTable.rows.length > 0 ? (
-                        <Box className="report-row" sx={{ mt: 1.5 }}>
-                          <Typography variant="subtitle2" fontWeight={700} sx={{ mb: 0.5 }}>
-                            Таблица результатов
-                          </Typography>
-                          <SubQuizReportParticipantTable
-                            table={group.participantTable}
-                            isPdfMode={isPdfMode}
-                          />
+                    <Typography variant="subtitle1" fontWeight={700} sx={{ mb: 1 }}>
+                      {group.title}
+                    </Typography>
+                    <Stack spacing={1.25}>
+                      {group.questions.slice(0, 20).map((question) => (
+                        <Box key={question.questionId} className="report-question">
+                          <Typography fontWeight={700}>{question.text}</Typography>
+                          <ReportQuestionResults question={question} />
                         </Box>
-                      ) : group.participantTable && group.participantTable.rows.length === 0 ? (
-                        <Typography variant="body2" color="text.secondary" sx={{ mt: 1.5 }}>
-                          Пока нет участников с ответами в этом квизе.
+                      ))}
+                    </Stack>
+                    {group.participantTable && group.participantTable.rows.length > 0 ? (
+                      <Box className="report-row" sx={{ mt: 1.5 }}>
+                        <Typography variant="subtitle2" fontWeight={700} sx={{ mb: 0.5 }}>
+                          Таблица результатов
                         </Typography>
-                      ) : null}
-                    </Box>
-                  ))}
-                </Stack>
-              </CardContent>
-            </Card>
-          )}
-
-          {hasModule("vote_results") && payload!.voteQuestions.length > 0 && (
-            <Card variant="outlined" className="report-card">
-              <CardContent>
-                <Stack
-                  direction="row"
-                  alignItems="center"
-                  justifyContent="space-between"
-                  sx={{ mb: 1 }}
+                        <SubQuizReportParticipantTable
+                          table={group.participantTable}
+                          isPdfMode={isPdfMode}
+                        />
+                      </Box>
+                    ) : group.participantTable && group.participantTable.rows.length === 0 ? (
+                      <Typography variant="body2" color="text.secondary" sx={{ mt: 1.5 }}>
+                        Пока нет участников с ответами в этом квизе.
+                      </Typography>
+                    ) : null}
+                  </Box>
+                ))}
+              </Stack>
+            </CardContent>
+          </Card>
+        );
+      case "vote_results":
+        return (
+          <Card variant="outlined" className="report-card">
+            <CardContent>
+              <Stack
+                direction="row"
+                alignItems="center"
+                justifyContent="space-between"
+                sx={{ mb: 1 }}
+              >
+                <Typography variant="h6">Результаты голосований</Typography>
+                <Box
+                  sx={{
+                    minWidth: 32,
+                    height: 32,
+                    px: 1,
+                    borderRadius: 999,
+                    bgcolor: "primary.main",
+                    color: "primary.contrastText",
+                    display: "inline-flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    fontWeight: 800,
+                    lineHeight: 1,
+                  }}
                 >
-                  <Typography variant="h6">Результаты голосований</Typography>
+                  {payload!.voteQuestions.length}
+                </Box>
+              </Stack>
+              <Stack spacing={1.25}>
+                {payload!.voteQuestions.slice(0, 20).map((question) => (
                   <Box
+                    key={question.questionId}
+                    className="report-question"
                     sx={{
-                      minWidth: 32,
-                      height: 32,
-                      px: 1,
-                      borderRadius: 999,
-                      bgcolor: "primary.main",
-                      color: "primary.contrastText",
-                      display: "inline-flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      fontWeight: 800,
-                      lineHeight: 1,
+                      border: "1px dashed",
+                      borderColor: "divider",
+                      borderRadius: 1.5,
+                      px: 1.5,
+                      py: 1.25,
                     }}
                   >
-                    {payload!.voteQuestions.length}
+                    <Typography fontWeight={700}>{question.text}</Typography>
+                    <ReportQuestionResults question={question} />
                   </Box>
-                </Stack>
-                <Stack spacing={1.25}>
-                  {payload!.voteQuestions.slice(0, 20).map((question) => (
-                    <Box
-                      key={question.questionId}
-                      className="report-question"
-                      sx={{
-                        border: "1px dashed",
-                        borderColor: "divider",
-                        borderRadius: 1.5,
-                        px: 1.5,
-                        py: 1.25,
-                      }}
-                    >
-                      <Typography fontWeight={700}>{question.text}</Typography>
-                      <ReportQuestionResults question={question} />
-                    </Box>
-                  ))}
-                </Stack>
-              </CardContent>
-            </Card>
-          )}
-
-          {hasModule("reactions_summary") && payload!.reactions.widgets.length > 0 && (
-            <Card variant="outlined" className="report-card">
-              <CardContent>
-                <Stack
-                  direction="row"
-                  alignItems="center"
-                  justifyContent="space-between"
-                  sx={{ mb: 1 }}
+                ))}
+              </Stack>
+            </CardContent>
+          </Card>
+        );
+      case "reactions_summary":
+        return (
+          <Card variant="outlined" className="report-card">
+            <CardContent>
+              <Stack
+                direction="row"
+                alignItems="center"
+                justifyContent="space-between"
+                sx={{ mb: 1 }}
+              >
+                <Typography variant="h6">Реакции аудитории</Typography>
+                <Box
+                  sx={{
+                    minWidth: 32,
+                    height: 32,
+                    px: 1,
+                    borderRadius: 999,
+                    bgcolor: "primary.main",
+                    color: "primary.contrastText",
+                    display: "inline-flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    fontWeight: 800,
+                    lineHeight: 1,
+                  }}
                 >
-                  <Typography variant="h6">Реакции аудитории</Typography>
+                  {payload!.reactions.widgets.length}
+                </Box>
+              </Stack>
+              <Stack spacing={1} sx={{ mt: 1 }}>
+                {payload!.reactions.widgets.map((widget) => (
                   <Box
+                    key={widget.id}
+                    className="report-row"
                     sx={{
-                      minWidth: 32,
-                      height: 32,
-                      px: 1,
-                      borderRadius: 999,
-                      bgcolor: "primary.main",
-                      color: "primary.contrastText",
-                      display: "inline-flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      fontWeight: 800,
-                      lineHeight: 1,
+                      border: "1px solid",
+                      borderColor: "divider",
+                      borderRadius: 1.5,
+                      px: 1.25,
+                      py: 1,
                     }}
                   >
-                    {payload!.reactions.widgets.length}
+                    <Typography fontWeight={700}>
+                      {widget.title || "Виджет без названия"}
+                    </Typography>
+                    <Typography variant="body2">
+                      Реакции:{" "}
+                      {widget.reactionStats.length > 0
+                        ? widget.reactionStats
+                            .map((item) => `${item.reaction} (${item.count})`)
+                            .join(", ")
+                        : "нет"}
+                    </Typography>
                   </Box>
-                </Stack>
-                <Stack spacing={1} sx={{ mt: 1 }}>
-                  {payload!.reactions.widgets.map((widget) => (
-                    <Box
-                      key={widget.id}
-                      className="report-row"
-                      sx={{
-                        border: "1px solid",
-                        borderColor: "divider",
-                        borderRadius: 1.5,
-                        px: 1.25,
-                        py: 1,
-                      }}
-                    >
-                      <Typography fontWeight={700}>
-                        {widget.title || "Виджет без названия"}
-                      </Typography>
-                      <Typography variant="body2">
-                        Реакции:{" "}
-                        {widget.reactionStats.length > 0
-                          ? widget.reactionStats
-                              .map((item) => `${item.reaction} (${item.count})`)
-                              .join(", ")
-                          : "нет"}
-                      </Typography>
-                    </Box>
-                  ))}
-                </Stack>
-              </CardContent>
-            </Card>
-          )}
+                ))}
+              </Stack>
+            </CardContent>
+          </Card>
+        );
+      case "feedback_summary":
+        return (
+          <>
+            {feedbackFormsToShow.length === 0 ? (
+              <Card variant="outlined" className="report-card">
+                <CardContent>
+                  <Typography variant="h6" gutterBottom>
+                    Обратная связь
+                  </Typography>
+                  <Alert severity="info">
+                    Нет форм обратной связи для этого мероприятия. Создайте их во вкладке «Обратная
+                    связь» в админке.
+                  </Alert>
+                </CardContent>
+              </Card>
+            ) : null}
 
-          {hasModule("feedback_summary") && feedbackFormsToShow.length === 0 ? (
-            <Card variant="outlined" className="report-card">
-              <CardContent>
-                <Typography variant="h6" gutterBottom>
-                  Обратная связь
-                </Typography>
-                <Alert severity="info">
-                  Нет форм обратной связи для этого мероприятия. Создайте их во вкладке «Обратная
-                  связь» в админке.
-                </Alert>
-              </CardContent>
-            </Card>
-          ) : null}
-
-          {hasModule("feedback_summary") &&
-            feedbackFormsToShow.map((form) => (
+            {feedbackFormsToShow.map((form) => (
               <Card key={form.formId} variant="outlined" className="report-card">
                 <CardContent>
                   <Stack
@@ -1095,138 +1158,182 @@ export function PublicReportPage() {
                 </CardContent>
               </Card>
             ))}
-
-          {hasModule("randomizer_summary") &&
-            (payload!.randomizer.currentWinners.length > 0 ||
-              payload!.randomizer.history.length > 0) && (
-              <Card variant="outlined" className="report-card">
-                <CardContent>
-                  <Stack direction="row" alignItems="center" justifyContent="space-between">
-                    <Typography variant="h6">Итоги рандомайзера</Typography>
+          </>
+        );
+      case "randomizer_summary":
+        return (
+          <Card variant="outlined" className="report-card">
+            <CardContent>
+              <Stack direction="row" alignItems="center" justifyContent="space-between">
+                <Typography variant="h6">Итоги рандомайзера</Typography>
+                <Box
+                  sx={{
+                    minWidth: 32,
+                    height: 32,
+                    px: 1,
+                    borderRadius: 999,
+                    bgcolor: "primary.main",
+                    color: "primary.contrastText",
+                    display: "inline-flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    fontWeight: 800,
+                    lineHeight: 1,
+                  }}
+                >
+                  {randomizerRunsToShow.length}
+                </Box>
+              </Stack>
+              <Stack spacing={1} sx={{ mt: 1 }}>
+                {randomizerRunsToShow.length > 0 ? (
+                  randomizerRunsToShow.map((run, runIndex) => (
                     <Box
+                      key={`${run.timestamp}-${runIndex}`}
+                      className="report-row"
                       sx={{
-                        minWidth: 32,
-                        height: 32,
-                        px: 1,
-                        borderRadius: 999,
-                        bgcolor: "primary.main",
-                        color: "primary.contrastText",
-                        display: "inline-flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        fontWeight: 800,
-                        lineHeight: 1,
+                        border: "1px solid",
+                        borderColor: "divider",
+                        borderRadius: 1.5,
+                        p: 1,
                       }}
                     >
-                      {randomizerRunsToShow.length}
-                    </Box>
-                  </Stack>
-                  <Stack spacing={1} sx={{ mt: 1 }}>
-                    {randomizerRunsToShow.length > 0 ? (
-                      randomizerRunsToShow.map((run, runIndex) => (
-                        <Box
-                          key={`${run.timestamp}-${runIndex}`}
-                          className="report-row"
-                          sx={{
-                            border: "1px solid",
-                            borderColor: "divider",
-                            borderRadius: 1.5,
-                            p: 1,
-                          }}
-                        >
-                          <Typography variant="caption" color="text.secondary">
-                            {run.timestamp ? `Запуск ${run.timestamp}` : `Запуск #${runIndex + 1}`}
-                          </Typography>
-                          <Stack
-                            direction="row"
-                            spacing={0.75}
-                            useFlexGap
-                            flexWrap="wrap"
-                            sx={{ mt: 0.5 }}
-                          >
-                            {run.winners.map((winner, winnerIndex) => (
-                              <Box
-                                key={`${winner}-${winnerIndex}`}
-                                sx={{
-                                  border: "1px solid",
-                                  borderColor: "divider",
-                                  borderRadius: 999,
-                                  px: 1.25,
-                                  py: 0.5,
-                                }}
-                              >
-                                <Typography variant="body2" fontWeight={700}>
-                                  {winner}
-                                </Typography>
-                              </Box>
-                            ))}
-                          </Stack>
-                        </Box>
-                      ))
-                    ) : (
-                      <Typography variant="body2" color="text.secondary">
-                        Победителей пока нет
+                      <Typography variant="caption" color="text.secondary">
+                        {run.timestamp ? `Запуск ${run.timestamp}` : `Запуск #${runIndex + 1}`}
                       </Typography>
-                    )}
-                  </Stack>
-                </CardContent>
-              </Card>
-            )}
+                      <Stack
+                        direction="row"
+                        spacing={0.75}
+                        useFlexGap
+                        flexWrap="wrap"
+                        sx={{ mt: 0.5 }}
+                      >
+                        {run.winners.map((winner, winnerIndex) => (
+                          <Box
+                            key={`${winner}-${winnerIndex}`}
+                            sx={{
+                              border: "1px solid",
+                              borderColor: "divider",
+                              borderRadius: 999,
+                              px: 1.25,
+                              py: 0.5,
+                            }}
+                          >
+                            <Typography variant="body2" fontWeight={700}>
+                              {winner}
+                            </Typography>
+                          </Box>
+                        ))}
+                      </Stack>
+                    </Box>
+                  ))
+                ) : (
+                  <Typography variant="body2" color="text.secondary">
+                    Победителей пока нет
+                  </Typography>
+                )}
+              </Stack>
+            </CardContent>
+          </Card>
+        );
+      case "speaker_questions_summary":
+        return (
+          <Card variant="outlined" className="report-card">
+            <CardContent>
+              <Stack direction="row" alignItems="center" justifyContent="space-between">
+                <Typography variant="h6">Вопросы спикерам</Typography>
+                <Box
+                  sx={{
+                    minWidth: 32,
+                    height: 32,
+                    px: 1,
+                    borderRadius: 999,
+                    bgcolor: "primary.main",
+                    color: "primary.contrastText",
+                    display: "inline-flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    fontWeight: 800,
+                    lineHeight: 1,
+                  }}
+                >
+                  {payload!.speakerQuestions.total}
+                </Box>
+              </Stack>
+              <TableContainer sx={{ mt: 1.25 }}>
+                <Table size="small">
+                  <TableHead>
+                    <TableRow>
+                      <TableCell>Кому</TableCell>
+                      <TableCell>Вопрос</TableCell>
+                      <TableCell>Автор</TableCell>
+                      <TableCell>Реакции</TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {payload!.speakerQuestions.items.slice(0, 30).map((item) => (
+                      <TableRow key={item.id}>
+                        <TableCell>{item.speakerName}</TableCell>
+                        <TableCell>{item.text}</TableCell>
+                        <TableCell>{item.author}</TableCell>
+                        <TableCell>
+                          {item.reactions.length > 0
+                            ? item.reactions
+                                .map((reaction) => `${reaction.reaction} (${reaction.count})`)
+                                .join(", ")
+                            : "нет"}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </TableContainer>
+            </CardContent>
+          </Card>
+        );
+      default:
+        return null;
+    }
+  };
 
-          {hasModule("speaker_questions_summary") && payload!.speakerQuestions.total > 0 && (
+  return (
+    <ThemeProvider theme={reportTheme}>
+      <CssBaseline />
+      <Container
+        maxWidth={false}
+        disableGutters
+        sx={{
+          ...backgroundSx,
+          minHeight: "100dvh",
+          py: isPdfMode ? 0 : 4,
+          px: isPdfMode ? 0 : { xs: 2, md: 4 },
+          backgroundColor: payload!.branding.brandBodyBackgroundColor,
+          fontFamily,
+        }}
+      >
+        <Stack
+          spacing={2}
+          sx={{
+            maxWidth: isPdfMode ? "none" : 1100,
+            mx: isPdfMode ? 0 : "auto",
+            p: isPdfMode ? 1.5 : 0,
+          }}
+        >
+          {showReportHeading && !hasModule("event_header") ? (
             <Card variant="outlined" className="report-card">
               <CardContent>
-                <Stack direction="row" alignItems="center" justifyContent="space-between">
-                  <Typography variant="h6">Вопросы спикерам</Typography>
-                  <Box
-                    sx={{
-                      minWidth: 32,
-                      height: 32,
-                      px: 1,
-                      borderRadius: 999,
-                      bgcolor: "primary.main",
-                      color: "primary.contrastText",
-                      display: "inline-flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      fontWeight: 800,
-                      lineHeight: 1,
-                    }}
-                  >
-                    {payload!.speakerQuestions.total}
-                  </Box>
-                </Stack>
-                <TableContainer sx={{ mt: 1.25 }}>
-                  <Table size="small">
-                    <TableHead>
-                      <TableRow>
-                        <TableCell>Кому</TableCell>
-                        <TableCell>Вопрос</TableCell>
-                        <TableCell>Автор</TableCell>
-                        <TableCell>Реакции</TableCell>
-                      </TableRow>
-                    </TableHead>
-                    <TableBody>
-                      {payload!.speakerQuestions.items.slice(0, 30).map((item) => (
-                        <TableRow key={item.id}>
-                          <TableCell>{item.speakerName}</TableCell>
-                          <TableCell>{item.text}</TableCell>
-                          <TableCell>{item.author}</TableCell>
-                          <TableCell>
-                            {item.reactions.length > 0
-                              ? item.reactions
-                                  .map((reaction) => `${reaction.reaction} (${reaction.count})`)
-                                  .join(", ")
-                              : "нет"}
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </TableContainer>
+                <Typography variant="h4">
+                  {payload!.config.reportTitle || payload!.title}
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  Событие: {payload!.title}
+                </Typography>
               </CardContent>
             </Card>
-          )}
+          ) : null}
+
+          {modules.map((moduleId) => (
+            <Fragment key={moduleId}>{renderReportModule(moduleId)}</Fragment>
+          ))}
         </Stack>
       </Container>
     </ThemeProvider>

@@ -19,6 +19,7 @@ describe("tag cloud manual persistence", () => {
         hiddenTagTexts: [],
         injectedTagWords: [{ text: "врач", count: 10 }],
         tagCountOverrides: [],
+        optionVoteCountOverrides: [],
       },
     };
 

@@ -114,7 +114,8 @@ export type ReportModuleId =
   | "reactions_summary"
   | "feedback_summary"
   | "randomizer_summary"
-  | "speaker_questions_summary";
+  | "speaker_questions_summary"
+  | "banners_summary";
 
 export type CloudWordCount = { text: string; count: number };
 
@@ -495,6 +496,7 @@ export const DEFAULT_PUBLIC_VIEW_STATE: PublicViewState = {
     "feedback_summary",
     "randomizer_summary",
     "speaker_questions_summary",
+    "banners_summary",
   ],
   reportVoteQuestionIds: [],
   reportQuizQuestionIds: [],
@@ -970,6 +972,21 @@ function sanitizeRandomizerHistory(
     .slice(0, 200);
 }
 
+/** Новые модули отчёта для событий, сохранённых до их появления в дефолте. */
+const REPORT_MODULE_BACKFILL: ReportModuleId[] = ["banners_summary"];
+
+export function backfillReportModules(
+  modules: ReportModuleId[],
+  fallback: ReportModuleId[],
+): ReportModuleId[] {
+  let result = [...modules];
+  for (const moduleId of REPORT_MODULE_BACKFILL) {
+    if (!fallback.includes(moduleId) || result.includes(moduleId)) continue;
+    result = [...result, moduleId];
+  }
+  return result.slice(0, 20);
+}
+
 function sanitizeReportModules(
   items: Array<ReportModuleId | "question_results"> | undefined,
   fallback: ReportModuleId[],
@@ -983,6 +1000,7 @@ function sanitizeReportModules(
     "feedback_summary",
     "randomizer_summary",
     "speaker_questions_summary",
+    "banners_summary",
   ]);
   if (!Array.isArray(items)) return [...fallback];
   const next: ReportModuleId[] = [];
@@ -997,7 +1015,7 @@ function sanitizeReportModules(
     if (!next.includes(item)) next.push(item);
   }
   if (next.length === 0) return [...fallback];
-  return next.slice(0, 20);
+  return backfillReportModules(next, fallback);
 }
 
 export function normalizePublicViewState(

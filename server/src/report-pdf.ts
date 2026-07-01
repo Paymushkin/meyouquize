@@ -53,6 +53,22 @@ async function renderSimplePdf(report: PublicEventReport): Promise<Buffer> {
       doc.moveDown();
     }
 
+    if (report.config.reportModules.includes("banners_summary") && report.banners.length > 0) {
+      doc.fontSize(14).text("Баннеры");
+      report.banners
+        .slice()
+        .sort((a, b) => b.uniqueClicks - a.uniqueClicks || a.id.localeCompare(b.id))
+        .forEach((banner, index) => {
+          const link = banner.linkUrl.trim() || "—";
+          doc
+            .fontSize(11)
+            .text(
+              `${index + 1}. Клики: ${banner.uniqueClicks}, ссылка: ${link}, картинка: ${banner.backgroundUrl.trim() || "—"}`,
+            );
+        });
+      doc.moveDown();
+    }
+
     if (
       report.config.reportModules.includes("randomizer_summary") &&
       (report.randomizer.currentWinners.length > 0 || report.randomizer.history.length > 0)

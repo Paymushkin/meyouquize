@@ -56,6 +56,7 @@ const baseReport: PublicEventReport = {
   speakerQuestions: { enabled: false, total: 0, onScreen: 0, items: [] },
   feedback: [],
   subQuizParticipantTables: [],
+  banners: [],
 };
 
 describe("buildReportPdfHtml", () => {
@@ -66,5 +67,27 @@ describe("buildReportPdfHtml", () => {
     expect(html).toContain("Отчёт");
     expect(html).toContain("Хорошо");
     expect(html).toContain('data-report-pdf-ready="1"');
+  });
+
+  it("renders banners section with image, link and clicks", () => {
+    const html = buildReportPdfHtml({
+      ...baseReport,
+      config: {
+        ...baseReport.config,
+        reportModules: ["banners_summary"],
+      },
+      banners: [
+        {
+          id: "b1",
+          backgroundUrl: "/uploads/banner.png",
+          linkUrl: "https://example.com/promo",
+          uniqueClicks: 12,
+        },
+      ],
+    });
+    expect(html).toContain("Баннеры");
+    expect(html).toContain("https://example.com/promo");
+    expect(html).toContain("/uploads/banner.png");
+    expect(html).toContain(">12<");
   });
 });

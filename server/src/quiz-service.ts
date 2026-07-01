@@ -1924,6 +1924,7 @@ export type PublicEventReport = {
       | "feedback_summary"
       | "randomizer_summary"
       | "speaker_questions_summary"
+      | "banners_summary"
     >;
     reportVoteQuestionIds: string[];
     reportQuizQuestionIds: string[];
@@ -1997,6 +1998,12 @@ export type PublicEventReport = {
   }[];
   /** Таблицы результатов по участникам (только для субквизов без флага скрытия в настройках отчёта). */
   subQuizParticipantTables: SubQuizDetailedResults[];
+  banners: Array<{
+    id: string;
+    backgroundUrl: string;
+    linkUrl: string;
+    uniqueClicks: number;
+  }>;
 };
 
 function buildReportRandomizerSubset(view: PublicViewState): {
@@ -2018,6 +2025,18 @@ function buildReportRandomizerSubset(view: PublicViewState): {
   );
   const history = allHistory.filter((_, i) => indexSet.has(i));
   return { currentWinners: wantCurrent ? [...allCurrent] : [], history };
+}
+
+function buildReportBanners(view: PublicViewState): PublicEventReport["banners"] {
+  const clicksById = new Map(
+    view.playerBannerClickStats.map((row) => [row.bannerId, row.uniqueClicks] as const),
+  );
+  return view.playerBanners.map((banner) => ({
+    id: banner.id,
+    backgroundUrl: banner.backgroundUrl,
+    linkUrl: banner.linkUrl,
+    uniqueClicks: clicksById.get(banner.id) ?? 0,
+  }));
 }
 
 export async function getPublicReportBySlug(slug: string): Promise<PublicEventReport | null> {
@@ -2230,6 +2249,7 @@ export async function getPublicReportBySlug(slug: string): Promise<PublicEventRe
     })(),
     feedback: feedbackForms,
     subQuizParticipantTables,
+    banners: buildReportBanners(view),
   };
 }
 

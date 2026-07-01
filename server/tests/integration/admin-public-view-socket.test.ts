@@ -2,6 +2,7 @@ import { io as ioClient, type Socket } from "socket.io-client";
 import request from "supertest";
 import { afterEach, describe, expect, it } from "vitest";
 import { getStoredPublicView } from "../../src/socket/public-view-store.js";
+import { VIEW_SET_DEDUPE_MS } from "../../src/socket/admin-view-set-dedupe.js";
 import { createTestServer, type TestServer } from "../helpers/testApp.js";
 import {
   adminCookieHeaderFromAuthResponse,
@@ -107,7 +108,9 @@ describe("admin public view socket", () => {
 
     const payload = {
       quizId,
-      mode: "title" as const,
+      mode: "question" as const,
+      questionId: question.id,
+      questionRevealStage: "options" as const,
       showFirstCorrectAnswerer: false,
     };
 
@@ -118,20 +121,25 @@ describe("admin public view socket", () => {
     admin.on("results:public:view", onView);
 
     admin.emit("admin:results:view:set", payload);
-    await new Promise((r) => setTimeout(r, 200));
+    await waitForEvent(admin, "results:public:view");
     expect(viewBroadcasts).toBe(1);
 
     admin.emit("admin:results:view:set", payload);
     await new Promise((r) => setTimeout(r, 200));
     expect(viewBroadcasts).toBe(1);
 
-    await new Promise((r) => setTimeout(r, 300));
-    admin.emit("admin:results:view:set", payload);
-    await new Promise((r) => setTimeout(r, 200));
+    await new Promise((r) => setTimeout(r, VIEW_SET_DEDUPE_MS + 50));
+    admin.emit("admin:results:view:set", {
+      ...payload,
+      questionRevealStage: "results" as const,
+    });
+    await waitForEvent(admin, "results:public:view");
     expect(viewBroadcasts).toBe(2);
 
     admin.off("results:public:view", onView);
-    expect((await getStoredPublicView(quizId)).mode).toBe("title");
+    const stored = await getStoredPublicView(quizId);
+    expect(stored.mode).toBe("question");
+    expect(stored.questionRevealStage).toBe("results");
   });
 
   it("applies distinct view:set modes without Forbidden", async () => {
