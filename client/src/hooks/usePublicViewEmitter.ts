@@ -3,6 +3,7 @@ import {
   sanitizeBannerLinkUrl,
   sanitizeExternalHttpUrl,
   type BrandThemeId,
+  type ReportModuleId,
 } from "@meyouquize/shared";
 import { useCallback } from "react";
 import {
@@ -118,16 +119,7 @@ type UsePublicViewEmitterParams = {
   randomizerHistory: RandomizerHistoryEntry[];
   randomizerRunId: number;
   reportTitle: string;
-  reportModules: Array<
-    | "event_header"
-    | "participation_summary"
-    | "quiz_results"
-    | "vote_results"
-    | "reactions_summary"
-    | "feedback_summary"
-    | "randomizer_summary"
-    | "speaker_questions_summary"
-  >;
+  reportModules: ReportModuleId[];
   reportVoteQuestionIds: string[];
   reportQuizQuestionIds: string[];
   reportQuizSubQuizIds: string[];
