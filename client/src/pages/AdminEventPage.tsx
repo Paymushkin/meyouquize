@@ -7,10 +7,6 @@ import {
   Button,
   Card,
   CardContent,
-  Dialog,
-  DialogActions,
-  DialogContent,
-  DialogTitle,
   Container,
   List,
   ListItemButton,
@@ -44,10 +40,6 @@ import EmojiEmotionsIcon from "@mui/icons-material/EmojiEmotions";
 import { resolveClientAssetUrl } from "../utils/resolveClientAssetUrl";
 import { AdminLoginForm } from "../components/AdminLoginForm";
 import { AdminBrandingSection } from "../components/admin/AdminBrandingSection";
-import { AdminGeneralSection } from "../components/admin/AdminGeneralSection";
-import { AdminResultsSection } from "../components/admin/AdminResultsSection";
-import { AdminSpeakersSection } from "../components/admin/AdminSpeakersSection";
-import { AdminBannersSection } from "../components/admin/AdminBannersSection";
 import { API_BASE } from "../config";
 import { randomUuid } from "../utils/randomUuid";
 import { buildPlayerJoinUrl, buildProjectorScreenUrl } from "../publicAppOrigin";
@@ -67,6 +59,12 @@ import { AdminEventQuestionsTab } from "./adminEvent/AdminEventQuestionsTab";
 import { AdminEventQuestionDialog } from "./adminEvent/AdminEventQuestionDialog";
 import { AdminEventTagCloudDialogs } from "./adminEvent/AdminEventTagCloudDialogs";
 import { AdminEventReportTab } from "./adminEvent/AdminEventReportTab";
+import { AdminEventConfirmDialogs } from "./adminEvent/AdminEventConfirmDialogs";
+import { AdminEventGeneralTab } from "./adminEvent/AdminEventGeneralTab";
+import { AdminEventSpeakersTab } from "./adminEvent/AdminEventSpeakersTab";
+import { AdminEventBannersTab } from "./adminEvent/AdminEventBannersTab";
+import { AdminEventResultsTab } from "./adminEvent/AdminEventResultsTab";
+import { AdminEventDangerTab } from "./adminEvent/AdminEventDangerTab";
 import type { PublicViewMode, PublicViewSetPatch } from "../publicViewContract";
 import {
   normalizePublicViewState,
@@ -2533,6 +2531,20 @@ export function AdminEventPage() {
     ],
   );
 
+  const speakerPanelActions = useMemo(
+    () => ({
+      onToggleEnabled: speakerQuestions.panelSetters.setEnabled,
+      onReactionsTextChange: speakerQuestions.panelSetters.setReactionsText,
+      onToggleShowAuthorOnScreen: speakerQuestions.panelSetters.setShowAuthorOnScreen,
+      onToggleShowRecipientOnScreen: speakerQuestions.panelSetters.setShowRecipientOnScreen,
+      onToggleShowReactionsOnScreen: speakerQuestions.panelSetters.setShowReactionsOnScreen,
+      onToggleAllowAllSpeakersTarget: speakerQuestions.panelSetters.setAllowAllSpeakersTarget,
+      onSpeakersTextChange: speakerQuestions.panelSetters.setSpeakersText,
+      onSaveSettings: saveSpeakerSettings,
+    }),
+    [speakerQuestions.panelSetters, saveSpeakerSettings],
+  );
+
   return (
     <Container maxWidth={false} disableGutters sx={{ p: 0, m: 0, maxWidth: "none" }}>
       <Snackbar
@@ -2703,30 +2715,16 @@ export function AdminEventPage() {
           <Box sx={{ flex: 1, minWidth: 0, mt: 0 }}>
             <Stack spacing={3}>
               {activeSection === "general" && (
-                <Stack spacing={2}>
-                  <AdminGeneralSection
-                    editableTitle={editableTitle}
-                    setEditableTitle={setEditableTitle}
-                    saveQuizTitle={saveQuizTitle}
-                    eventSlug={room?.slug ?? ""}
-                    showEventTitleOnPlayer={playerTiles.showEventTitleOnPlayer}
-                    onToggleShowEventTitleOnPlayer={playerTiles.updateShowEventTitleOnPlayer}
-                  />
-                  {eventName === "demo" && (
-                    <Card variant="outlined" sx={{ borderColor: "warning.main" }}>
-                      <CardContent>
-                        <Button
-                          variant="outlined"
-                          color="warning"
-                          onClick={() => setConfirmResetDemoOpen(true)}
-                          sx={{ textTransform: "none", alignSelf: "flex-start" }}
-                        >
-                          Вернуть тестовые данные
-                        </Button>
-                      </CardContent>
-                    </Card>
-                  )}
-                </Stack>
+                <AdminEventGeneralTab
+                  eventName={eventName}
+                  editableTitle={editableTitle}
+                  setEditableTitle={setEditableTitle}
+                  saveQuizTitle={saveQuizTitle}
+                  eventSlug={room?.slug ?? ""}
+                  showEventTitleOnPlayer={playerTiles.showEventTitleOnPlayer}
+                  onToggleShowEventTitleOnPlayer={playerTiles.updateShowEventTitleOnPlayer}
+                  onRequestResetDemo={() => setConfirmResetDemoOpen(true)}
+                />
               )}
               {activeSection === "questions" && (
                 <AdminEventQuestionsTab
@@ -2776,22 +2774,9 @@ export function AdminEventPage() {
               )}
 
               {activeSection === "speakers" && (
-                <AdminSpeakersSection
-                  settings={speakerQuestions.settings}
-                  panelActions={{
-                    onToggleEnabled: speakerQuestions.panelSetters.setEnabled,
-                    onReactionsTextChange: speakerQuestions.panelSetters.setReactionsText,
-                    onToggleShowAuthorOnScreen: speakerQuestions.panelSetters.setShowAuthorOnScreen,
-                    onToggleShowRecipientOnScreen:
-                      speakerQuestions.panelSetters.setShowRecipientOnScreen,
-                    onToggleShowReactionsOnScreen:
-                      speakerQuestions.panelSetters.setShowReactionsOnScreen,
-                    onToggleAllowAllSpeakersTarget:
-                      speakerQuestions.panelSetters.setAllowAllSpeakersTarget,
-                    onSpeakersTextChange: speakerQuestions.panelSetters.setSpeakersText,
-                    onSaveSettings: saveSpeakerSettings,
-                  }}
-                  questions={speakerQuestions.payload?.items ?? []}
+                <AdminEventSpeakersTab
+                  speakerQuestions={speakerQuestions}
+                  panelActions={speakerPanelActions}
                   onHide={hideSpeakerQuestion}
                   onRestore={restoreSpeakerQuestion}
                   onSetUserVisible={setSpeakerQuestionUserVisible}
@@ -2802,61 +2787,30 @@ export function AdminEventPage() {
               )}
 
               {activeSection === "banners" && (
-                <AdminBannersSection
+                <AdminEventBannersTab
                   eventName={eventName}
-                  banners={playerTiles.playerBanners}
-                  onCreate={playerTiles.createPlayerBanner}
-                  onUpdate={playerTiles.updatePlayerBanner}
-                  speakerTileText={playerTiles.speakerTileText}
-                  speakerTileBackgroundColor={playerTiles.speakerTileBackgroundColor}
-                  speakerTileTextColor={playerTiles.speakerTileTextColor}
-                  speakerTileVisible={playerTiles.speakerTileVisible}
-                  onSaveSpeakerTile={playerTiles.saveSpeakerTile}
-                  onToggleSpeakerTileVisible={playerTiles.toggleSpeakerTileVisible}
-                  programTileText={playerTiles.programTileText}
-                  programTileBackgroundColor={playerTiles.programTileBackgroundColor}
-                  programTileTextColor={playerTiles.programTileTextColor}
-                  programTileLinkUrl={playerTiles.programTileLinkUrl}
-                  programTileVisible={playerTiles.programTileVisible}
-                  onSaveProgramTile={playerTiles.saveProgramTile}
-                  onToggleProgramTileVisible={playerTiles.toggleProgramTileVisible}
-                  playerQuizResultsTileText={playerTiles.playerQuizResultsTileText}
-                  playerQuizResultsSubQuizIds={playerTiles.playerQuizResultsSubQuizIds}
+                  playerTiles={playerTiles}
                   subQuizzesForReport={subQuizzesForReport}
                   brandPrimaryColor={branding.brandPrimaryColor}
                   playerVoteOptionTextColor={branding.playerVoteOptionTextColor}
-                  bannerClickCounts={playerTiles.bannerClickCounts}
-                  tilesOrder={playerTiles.playerTilesOrder}
-                  onMoveTileUp={(id) => playerTiles.moveTile(id, -1)}
-                  onMoveTileDown={(id) => playerTiles.moveTile(id, 1)}
-                  onUploadMedia={async (file) => {
-                    try {
-                      return await uploadBannerMedia(file);
-                    } catch (error) {
-                      setMessage(
-                        error instanceof Error ? error.message : "Не удалось загрузить файл",
-                      );
-                      throw error;
-                    }
-                  }}
-                  onToggleVisible={playerTiles.togglePlayerBannerVisible}
-                  onDelete={playerTiles.deletePlayerBanner}
+                  uploadBannerMedia={uploadBannerMedia}
+                  onUploadError={setMessage}
                 />
               )}
 
               {activeSection === "branding" && <AdminBrandingSection {...brandingProps} />}
 
               {activeSection === "results" && (
-                <AdminResultsSection
+                <AdminEventResultsTab
                   leaderboardSort={leaderboardSort}
                   setLeaderboardSort={setLeaderboardSort}
                   displayedLeaderboard={displayedLeaderboard}
                   exportLeaderboardCsv={exportLeaderboardCsv}
-                  subQuizLeaderboardOptions={leaderboardsBySubQuiz.map((x) => ({
+                  leaderboardsBySubQuiz={leaderboardsBySubQuiz.map((x) => ({
                     subQuizId: x.subQuizId,
                     title: x.title,
                   }))}
-                  selectedResultsSubQuizId={resultsSubQuizId}
+                  resultsSubQuizId={resultsSubQuizId}
                   onSelectResultsSubQuiz={(subQuizId) => {
                     setResultsSubQuizId(subQuizId);
                     if (publicViewMode === "leaderboard" && quizId) {
@@ -2882,18 +2836,7 @@ export function AdminEventPage() {
                 />
               )}
               {activeSection === "danger" && (
-                <Card variant="outlined">
-                  <CardContent>
-                    <Typography variant="h6" color="error" gutterBottom>
-                      Опасные действия
-                    </Typography>
-                    <Stack direction={{ xs: "column", md: "row" }} spacing={1.5}>
-                      <Button onClick={resetAllAnswers} color="warning" variant="contained">
-                        Обнулить все ответы
-                      </Button>
-                    </Stack>
-                  </CardContent>
-                </Card>
+                <AdminEventDangerTab onResetAllAnswers={resetAllAnswers} />
               )}
             </Stack>
           </Box>
@@ -2937,108 +2880,23 @@ export function AdminEventPage() {
         onUpdateTagCountOverride={updateTagCountOverride}
         onClearTagCountOverride={clearTagCountOverride}
       />
-      <Dialog
-        open={confirmResetQuestionIndex !== null}
-        onClose={() => setConfirmResetQuestionIndex(null)}
-        maxWidth="xs"
-        fullWidth
-      >
-        <DialogTitle>Подтверждение</DialogTitle>
-        <DialogContent>
-          <Typography>
-            Будут удалены все ответы участников и сброшены ручные правки результатов (голоса, теги,
-            температуру).
-          </Typography>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setConfirmResetQuestionIndex(null)}>Отмена</Button>
-          <Button color="warning" variant="contained" onClick={runConfirmedResetQuestionAnswers}>
-            Обнулить
-          </Button>
-        </DialogActions>
-      </Dialog>
-      <Dialog
-        open={confirmResetSubQuizAnswers !== null}
-        onClose={() => setConfirmResetSubQuizAnswers(null)}
-        maxWidth="xs"
-        fullWidth
-      >
-        <DialogTitle>Обнулить результаты квиза?</DialogTitle>
-        <DialogContent>
-          <Typography>
-            Будут удалены все ответы участников по квизу «{confirmResetSubQuizAnswers?.title}» и
-            сброшены ручные правки результатов по его вопросам. Таблица лидеров и баллы по этому
-            квизу сбросятся. Действие нельзя отменить.
-          </Typography>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setConfirmResetSubQuizAnswers(null)}>Отмена</Button>
-          <Button color="error" variant="contained" onClick={runConfirmedResetSubQuizAnswers}>
-            Обнулить
-          </Button>
-        </DialogActions>
-      </Dialog>
-      <Dialog
-        open={confirmDeleteSubQuizId !== null}
-        onClose={closeDeleteSubQuizDialog}
-        maxWidth="xs"
-        fullWidth
-      >
-        <DialogTitle>Удалить квиз</DialogTitle>
-        <DialogContent>
-          <Typography>Удалить квиз? Это действие нельзя отменить.</Typography>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={closeDeleteSubQuizDialog}>Отмена</Button>
-          <Button
-            color="error"
-            variant="contained"
-            onClick={() => void runConfirmedRemoveSubQuiz()}
-          >
-            Удалить
-          </Button>
-        </DialogActions>
-      </Dialog>
-      <Dialog
-        open={confirmDeleteQuestionIndex !== null}
-        onClose={closeDeleteQuestionDialog}
-        maxWidth="xs"
-        fullWidth
-      >
-        <DialogTitle>Удалить голосование</DialogTitle>
-        <DialogContent>
-          <Typography>Удалить это голосование? Это действие нельзя отменить.</Typography>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={closeDeleteQuestionDialog}>Отмена</Button>
-          <Button
-            color="error"
-            variant="contained"
-            onClick={() => void runConfirmedRemoveQuestion()}
-          >
-            Удалить
-          </Button>
-        </DialogActions>
-      </Dialog>
-      <Dialog
-        open={confirmResetDemoOpen}
-        onClose={() => setConfirmResetDemoOpen(false)}
-        maxWidth="xs"
-        fullWidth
-      >
-        <DialogTitle>Сбросить demo</DialogTitle>
-        <DialogContent>
-          <Typography>
-            Сбросить ивент `demo` к тестовым данным? Все текущие изменения будут перезаписаны.
-          </Typography>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setConfirmResetDemoOpen(false)}>Отмена</Button>
-          <Button color="error" variant="contained" onClick={() => void resetDemoToDefault()}>
-            Сбросить
-          </Button>
-        </DialogActions>
-      </Dialog>
+      <AdminEventConfirmDialogs
+        confirmResetQuestionIndex={confirmResetQuestionIndex}
+        onCloseResetQuestion={() => setConfirmResetQuestionIndex(null)}
+        onConfirmResetQuestion={runConfirmedResetQuestionAnswers}
+        confirmResetSubQuizAnswers={confirmResetSubQuizAnswers}
+        onCloseResetSubQuiz={() => setConfirmResetSubQuizAnswers(null)}
+        onConfirmResetSubQuiz={runConfirmedResetSubQuizAnswers}
+        confirmDeleteSubQuizId={confirmDeleteSubQuizId}
+        onCloseDeleteSubQuiz={closeDeleteSubQuizDialog}
+        onConfirmDeleteSubQuiz={runConfirmedRemoveSubQuiz}
+        confirmDeleteQuestionIndex={confirmDeleteQuestionIndex}
+        onCloseDeleteQuestion={closeDeleteQuestionDialog}
+        onConfirmDeleteQuestion={runConfirmedRemoveQuestion}
+        confirmResetDemoOpen={confirmResetDemoOpen}
+        onCloseResetDemo={() => setConfirmResetDemoOpen(false)}
+        onConfirmResetDemo={resetDemoToDefault}
+      />
     </Container>
   );
 }
