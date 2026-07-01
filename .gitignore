@@ -16,5 +16,9 @@ media
 load/results/
 e2e/.fixture-state.json
 
+# IDE / локальные артефакты
+.cursor/
+test-results/
+
 # Локальные ops-заметки, постмортемы, рекомендации (не коммитить)
 deploy/ops/
