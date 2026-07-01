@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   applyScaleCountOverridesToRaw,
+  computeScaleAverageFromCounts,
   feedbackScaleOverrideKey,
   filterFeedbackFormsForReport,
   feedbackFormDisplayResponseCount,
@@ -188,6 +189,20 @@ describe("feedback scale count overrides", () => {
   it("applies overrides to raw counts", () => {
     const overrides = [{ text: feedbackScaleOverrideKey("s1", 1), count: 42 }];
     expect(applyScaleCountOverridesToRaw("s1", [1, 2, 3], overrides)).toEqual([1, 42, 3]);
+  });
+
+  it("computes average from display counts including overrides", () => {
+    const counts = applyScaleCountOverridesToRaw(
+      "s1",
+      [0, 0, 10, 0, 0],
+      [{ text: feedbackScaleOverrideKey("s1", 4), count: 10 }],
+    );
+    expect(counts).toEqual([0, 0, 10, 0, 10]);
+    expect(computeScaleAverageFromCounts(counts)).toBe(4);
+  });
+
+  it("returns null average when all counts are zero", () => {
+    expect(computeScaleAverageFromCounts([0, 0, 0])).toBeNull();
   });
 });
 

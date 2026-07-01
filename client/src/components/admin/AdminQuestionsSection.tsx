@@ -968,7 +968,7 @@ export function AdminQuestionsSection(props: Props) {
                                     </Box>
                                   );
                                 })}
-                                <QuestionVoterTotalRow total={voterTotal} />
+                                <QuestionVoterTotalRow total={totalVotes} />
                               </Stack>
                             );
                           })()}

@@ -203,6 +203,18 @@ export function applyScaleCountOverridesToRaw(
   });
 }
 
+export function computeScaleAverageFromCounts(counts: number[]): number | null {
+  let sum = 0;
+  let total = 0;
+  for (let idx = 0; idx < counts.length; idx++) {
+    const count = counts[idx] ?? 0;
+    if (count <= 0) continue;
+    sum += count * (idx + 1);
+    total += count;
+  }
+  return total > 0 ? Math.round((sum / total) * 100) / 100 : null;
+}
+
 function computeRawScaleCounts(
   scale: FeedbackScale,
   responses: Array<{ scaleAnswers: unknown }>,
@@ -652,7 +664,7 @@ export async function getFeedbackResultsByFormId(formId: string) {
       label: scale.label,
       options: scale.options,
       counts,
-      average: raw.average,
+      average: computeScaleAverageFromCounts(counts),
       responseCount: raw.responseCount,
     };
   });
