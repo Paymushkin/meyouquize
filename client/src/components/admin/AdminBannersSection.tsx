@@ -7,6 +7,7 @@ import { SpeakerTileTab } from "./banners/SpeakerTileTab";
 import { TilesOrderList } from "./banners/TilesOrderList";
 
 type Props = {
+  eventName: string;
   banners: PublicBanner[];
   onCreate: (linkUrl: string, backgroundUrl: string, size: "2x1" | "1x1" | "full") => void;
   onUpdate: (
@@ -55,6 +56,7 @@ type Props = {
 };
 
 export function AdminBannersSection({
+  eventName,
   banners,
   onCreate,
   onUpdate,
@@ -85,6 +87,7 @@ export function AdminBannersSection({
   onDelete,
 }: Props) {
   const state = useAdminBannersSectionState({
+    eventName,
     banners,
     tilesOrder,
     speakerTileText,

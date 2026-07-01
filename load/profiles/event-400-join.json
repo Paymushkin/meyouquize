@@ -1,0 +1,17 @@
+{
+  "run_http": false,
+  "http_vus": 5,
+  "http_duration": "30s",
+  "player_count": 400,
+  "run_submit": false,
+  "submit_players": 0,
+  "run_dashboard": false,
+  "dashboard_wait_ms": 3500,
+  "hold_ms": 60000,
+  "join_ramp_ms": 20000,
+  "join_distribution": "uniform",
+  "join_ack_timeout_ms": 45000,
+  "join_fail_tolerance": 4,
+  "join_connect_retries": 3,
+  "join_connect_backoff_ms": 500
+}

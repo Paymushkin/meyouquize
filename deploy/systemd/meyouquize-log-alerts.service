@@ -1,0 +1,8 @@
+[Unit]
+Description=Meyouquize journal alert check (ping timeout, unhandledRejection, restarts)
+After=network.target
+
+[Service]
+Type=oneshot
+EnvironmentFile=-/opt/meyouquize/current/deploy/env/.env.runtime
+ExecStart=/opt/meyouquize/current/deploy/scripts/meyouquize-log-alerts.sh

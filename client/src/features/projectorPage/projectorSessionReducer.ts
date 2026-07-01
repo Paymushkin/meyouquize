@@ -1,6 +1,7 @@
 import {
   DEFAULT_PUBLIC_VIEW_STATE,
   mergePublicViewState,
+  projectorPublicViewChanged,
   type PublicViewPayload,
   type PublicViewState,
 } from "@meyouquize/shared";
@@ -9,6 +10,7 @@ import type {
   ProjectorLeaderboardBySubQuiz,
   ProjectorQuestionResult,
 } from "../../types/projectorDashboard";
+import { projectorDashboardFingerprint } from "./projectorDashboardFingerprint";
 
 export type ProjectorSessionState = {
   questions: ProjectorQuestionResult[];
@@ -44,15 +46,32 @@ export function projectorSessionReducer(
   action: ProjectorSessionAction,
 ): ProjectorSessionState {
   switch (action.type) {
-    case "dashboard":
+    case "dashboard": {
+      const nextFingerprint = projectorDashboardFingerprint(
+        action.perQuestion,
+        action.leaderboard,
+        action.leaderboardsBySubQuiz,
+      );
+      const prevFingerprint = projectorDashboardFingerprint(
+        state.questions,
+        state.leaders,
+        state.leaderboardsBySubQuiz,
+      );
+      if (nextFingerprint === prevFingerprint) {
+        return state;
+      }
       return {
         ...state,
         questions: action.perQuestion,
         leaders: action.leaderboard,
         leaderboardsBySubQuiz: action.leaderboardsBySubQuiz,
       };
+    }
     case "publicView": {
       const view = mergePublicViewState(state.view, action.payload);
+      if (!projectorPublicViewChanged(state.view, view)) {
+        return state;
+      }
       const quizTitle =
         typeof action.payload.title === "string" ? action.payload.title.trim() : state.quizTitle;
       return { ...state, view, quizTitle };

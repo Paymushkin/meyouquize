@@ -1,8 +1,14 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import {
+  type BannersEditorTab,
+  readAdminUiPersistence,
+  writeAdminUiBannersTab,
+} from "../admin/adminUiPersistence";
 import type { PublicBanner } from "../../publicViewContract";
 import { buildOrderedTiles } from "./buildOrderedTiles";
 
 type Params = {
+  eventName: string;
   banners: PublicBanner[];
   tilesOrder: string[];
   speakerTileText: string;
@@ -36,6 +42,7 @@ type Params = {
 
 export function useAdminBannersSectionState(params: Params) {
   const {
+    eventName,
     banners,
     tilesOrder,
     speakerTileText,
@@ -71,7 +78,19 @@ export function useAdminBannersSectionState(params: Params) {
   const [programBgColorDraft, setProgramBgColorDraft] = useState(programTileBackgroundColor);
   const [programTextColorDraft, setProgramTextColorDraft] = useState(programTileTextColor);
   const [programLinkUrlDraft, setProgramLinkUrlDraft] = useState(programTileLinkUrl);
-  const [editorTab, setEditorTab] = useState<"banner" | "speaker" | "program">("banner");
+  const [editorTab, setEditorTab] = useState<BannersEditorTab>(
+    () => readAdminUiPersistence(eventName).bannersTab,
+  );
+
+  useEffect(() => {
+    if (!eventName) return;
+    setEditorTab(readAdminUiPersistence(eventName).bannersTab);
+  }, [eventName]);
+
+  useEffect(() => {
+    if (!eventName) return;
+    writeAdminUiBannersTab(eventName, editorTab);
+  }, [eventName, editorTab]);
 
   useEffect(() => {
     setSpeakerTextDraft(speakerTileText);

@@ -1,6 +1,9 @@
 import AddIcon from "@mui/icons-material/Add";
+import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
 import RateReviewIcon from "@mui/icons-material/RateReview";
+import RestoreIcon from "@mui/icons-material/Restore";
 import RestartAltIcon from "@mui/icons-material/RestartAlt";
+import TuneIcon from "@mui/icons-material/Tune";
 import {
   Alert,
   Box,
@@ -12,20 +15,25 @@ import {
   DialogActions,
   DialogContent,
   DialogTitle,
+  Divider,
   IconButton,
   LinearProgress,
   List,
   ListItemButton,
   Stack,
+  TextField,
   Tooltip,
   Typography,
 } from "@mui/material";
 import { useCallback, useEffect, useState } from "react";
+import { hasOptionVoteCountOverride } from "@meyouquize/shared";
 import { API_BASE } from "../../config";
 import { socket } from "../../socket";
 import {
   type FeedbackFormConfig,
+  type FeedbackOpenField,
   type FeedbackResultsPayload,
+  feedbackScaleOptionKey,
   hasOpenFieldAnswers,
 } from "../../types/feedback";
 import {
@@ -35,6 +43,7 @@ import {
   type FeedbackFormDraft,
 } from "./feedback/FeedbackFormEditorDialog";
 import { FeedbackRowQuickActions } from "./feedback/FeedbackRowQuickActions";
+import { VoteCountAdjustControls } from "./VoteCountAdjustControls";
 
 type Props = {
   eventName: string;
@@ -60,6 +69,14 @@ export function AdminFeedbackSection({ eventName, quizId, onlineUsersCount }: Pr
   const [editFormId, setEditFormId] = useState<string | null>(null);
   const [confirmResetFormId, setConfirmResetFormId] = useState<string | null>(null);
   const [dialogError, setDialogError] = useState("");
+  const [voteAdjustEditFormIds, setVoteAdjustEditFormIds] = useState<Set<string>>(() => new Set());
+  const [addResponseDialog, setAddResponseDialog] = useState<{
+    formId: string;
+    openFields: FeedbackOpenField[];
+  } | null>(null);
+  const [addResponseNickname, setAddResponseNickname] = useState("");
+  const [addResponseFieldValues, setAddResponseFieldValues] = useState<Record<string, string>>({});
+  const [addResponseError, setAddResponseError] = useState("");
 
   const loadForms = useCallback(async () => {
     const response = await fetch(
@@ -129,6 +146,86 @@ export function AdminFeedbackSection({ eventName, quizId, onlineUsersCount }: Pr
   function openEditDialog(formId: string) {
     setDialogError("");
     setEditFormId(formId);
+  }
+
+  function setFeedbackScaleCount(
+    formId: string,
+    scaleId: string,
+    optionIndex: number,
+    count: number,
+  ) {
+    socket.emit("feedback:scale-count:set", {
+      quizId,
+      formId,
+      scaleId,
+      optionIndex,
+      count,
+    });
+  }
+
+  function clearFeedbackScaleCount(formId: string, scaleId: string, optionIndex: number) {
+    socket.emit("feedback:scale-count:clear", {
+      quizId,
+      formId,
+      scaleId,
+      optionIndex,
+    });
+  }
+
+  function clearAllFeedbackScaleCounts(formId: string) {
+    socket.emit("feedback:scale-count:clear-all", { quizId, formId });
+  }
+
+  function openAddResponseDialog(formId: string, openFields: FeedbackOpenField[]) {
+    setAddResponseDialog({ formId, openFields });
+    setAddResponseNickname("");
+    setAddResponseFieldValues(Object.fromEntries(openFields.map((field) => [field.id, ""])));
+    setAddResponseError("");
+  }
+
+  function closeAddResponseDialog() {
+    setAddResponseDialog(null);
+    setAddResponseNickname("");
+    setAddResponseFieldValues({});
+    setAddResponseError("");
+  }
+
+  function submitInjectedResponse() {
+    if (!addResponseDialog) return;
+    const nickname = addResponseNickname.trim();
+    if (!nickname) {
+      setAddResponseError("Введите имя");
+      return;
+    }
+    const openFieldAnswers = Object.fromEntries(
+      Object.entries(addResponseFieldValues)
+        .map(([fieldId, value]) => [fieldId, value.trim()] as const)
+        .filter(([, value]) => value.length > 0),
+    );
+    if (Object.keys(openFieldAnswers).length === 0) {
+      setAddResponseError("Введите текст ответа");
+      return;
+    }
+    socket.emit("feedback:response:add", {
+      quizId,
+      formId: addResponseDialog.formId,
+      nickname,
+      openFieldAnswers,
+    });
+    closeAddResponseDialog();
+  }
+
+  function removeInjectedResponse(formId: string, injectedId: string) {
+    socket.emit("feedback:response:remove", { quizId, formId, injectedId });
+  }
+
+  function toggleVoteAdjustEdit(formId: string) {
+    setVoteAdjustEditFormIds((current) => {
+      const next = new Set(current);
+      if (next.has(formId)) next.delete(formId);
+      else next.add(formId);
+      return next;
+    });
   }
 
   async function createForm(draft: FeedbackFormDraft) {
@@ -299,7 +396,6 @@ export function AdminFeedbackSection({ eventName, quizId, onlineUsersCount }: Pr
                   const isCollecting = form.isActive && !form.isClosed;
                   const settingsExpanded = expandedSettingsFormId === form.id;
                   const results = resultsByFormId[form.id] ?? null;
-                  const responseCount = results?.responseCount ?? 0;
 
                   return (
                     <Box
@@ -401,10 +497,47 @@ export function AdminFeedbackSection({ eventName, quizId, onlineUsersCount }: Pr
                             <Stack spacing={1.5}>
                               <Stack
                                 direction="row"
-                                justifyContent="flex-end"
+                                justifyContent="space-between"
                                 alignItems="center"
                                 spacing={0.5}
                               >
+                                <Stack direction="row" alignItems="center" spacing={0.5}>
+                                  <Tooltip
+                                    title={
+                                      voteAdjustEditFormIds.has(form.id)
+                                        ? "Скрыть правку голосов"
+                                        : "Правка голосов"
+                                    }
+                                  >
+                                    <IconButton
+                                      size="small"
+                                      onClick={() => toggleVoteAdjustEdit(form.id)}
+                                      aria-label={
+                                        voteAdjustEditFormIds.has(form.id)
+                                          ? "Скрыть правку голосов"
+                                          : "Правка голосов"
+                                      }
+                                      aria-pressed={voteAdjustEditFormIds.has(form.id)}
+                                      color={
+                                        voteAdjustEditFormIds.has(form.id) ? "primary" : "default"
+                                      }
+                                    >
+                                      <TuneIcon fontSize="small" />
+                                    </IconButton>
+                                  </Tooltip>
+                                  {voteAdjustEditFormIds.has(form.id) &&
+                                  (results?.scaleCountOverrides?.length ?? 0) > 0 ? (
+                                    <Tooltip title="Восстановить все реальные результаты">
+                                      <IconButton
+                                        size="small"
+                                        onClick={() => clearAllFeedbackScaleCounts(form.id)}
+                                        aria-label="Восстановить все реальные результаты"
+                                      >
+                                        <RestoreIcon fontSize="small" />
+                                      </IconButton>
+                                    </Tooltip>
+                                  ) : null}
+                                </Stack>
                                 <Tooltip
                                   title={
                                     isCollecting
@@ -431,17 +564,19 @@ export function AdminFeedbackSection({ eventName, quizId, onlineUsersCount }: Pr
                                   форму.
                                 </Alert>
                               ) : null}
-                              <Typography variant="caption" color="text.secondary">
-                                Результаты
-                              </Typography>
-                              <Typography variant="body2" color="text.secondary">
-                                Ответило: {responseCount}
-                                {onlineUsersCount > 0 ? ` из ${onlineUsersCount} онлайн` : ""}
-                              </Typography>
-                              {(results?.scaleStats ?? []).map((stat) => {
+                              {(results?.scaleStats ?? []).map((stat, statIndex) => {
+                                const overrides = results?.scaleCountOverrides ?? [];
+                                const voteAdjustEditVisible = voteAdjustEditFormIds.has(form.id);
                                 const total = stat.counts.reduce((sum, n) => sum + n, 0);
                                 return (
                                   <Box key={stat.scaleId}>
+                                    {statIndex > 0 ? (
+                                      <Divider
+                                        component="div"
+                                        role="separator"
+                                        sx={{ borderColor: "divider", my: 2.5 }}
+                                      />
+                                    ) : null}
                                     <Typography variant="subtitle2" gutterBottom>
                                       {stat.label}
                                       {stat.average != null ? ` · среднее: ${stat.average}` : ""}
@@ -451,13 +586,58 @@ export function AdminFeedbackSection({ eventName, quizId, onlineUsersCount }: Pr
                                         const count = stat.counts[idx] ?? 0;
                                         const pct =
                                           total > 0 ? Math.round((count / total) * 100) : 0;
+                                        const optionKey = feedbackScaleOptionKey(stat.scaleId, idx);
                                         return (
                                           <Box key={`${stat.scaleId}-${idx}`}>
-                                            <Stack direction="row" justifyContent="space-between">
+                                            <Stack
+                                              direction="row"
+                                              justifyContent="space-between"
+                                              alignItems="center"
+                                            >
                                               <Typography variant="body2">{label}</Typography>
-                                              <Typography variant="body2" color="text.secondary">
-                                                {count} ({pct}%)
-                                              </Typography>
+                                              <Stack
+                                                direction="row"
+                                                spacing={0.75}
+                                                alignItems="center"
+                                              >
+                                                <Typography variant="body2" color="text.secondary">
+                                                  ({pct}%)
+                                                </Typography>
+                                                {voteAdjustEditVisible ? (
+                                                  <VoteCountAdjustControls
+                                                    count={count}
+                                                    hasOverride={hasOptionVoteCountOverride(
+                                                      overrides,
+                                                      optionKey,
+                                                    )}
+                                                    onDecrement={() =>
+                                                      setFeedbackScaleCount(
+                                                        form.id,
+                                                        stat.scaleId,
+                                                        idx,
+                                                        count - 1,
+                                                      )
+                                                    }
+                                                    onIncrement={() =>
+                                                      setFeedbackScaleCount(
+                                                        form.id,
+                                                        stat.scaleId,
+                                                        idx,
+                                                        count + 1,
+                                                      )
+                                                    }
+                                                    onRestore={() =>
+                                                      clearFeedbackScaleCount(
+                                                        form.id,
+                                                        stat.scaleId,
+                                                        idx,
+                                                      )
+                                                    }
+                                                  />
+                                                ) : (
+                                                  <Typography variant="body2">{count}</Typography>
+                                                )}
+                                              </Stack>
                                             </Stack>
                                             <LinearProgress
                                               variant="determinate"
@@ -468,36 +648,139 @@ export function AdminFeedbackSection({ eventName, quizId, onlineUsersCount }: Pr
                                         );
                                       })}
                                     </Stack>
+                                    <Stack
+                                      direction="row"
+                                      justifyContent="space-between"
+                                      alignItems="center"
+                                      sx={{ mt: 1 }}
+                                    >
+                                      <Typography variant="body2" color="text.secondary">
+                                        Всего
+                                      </Typography>
+                                      <Typography variant="body2" color="text.secondary">
+                                        {total}
+                                      </Typography>
+                                    </Stack>
                                   </Box>
                                 );
                               })}
-                              {(results?.form.openFields ?? []).map((field) => {
-                                const rows = (results?.responses ?? []).filter((row) =>
-                                  row.openFieldAnswers[field.id]?.trim(),
-                                );
-                                if (rows.length === 0) return null;
-                                return (
-                                  <Stack key={field.id} spacing={1}>
-                                    <Typography variant="subtitle2">{field.label}</Typography>
-                                    {rows.map((row) => (
-                                      <Box
-                                        key={`${field.id}-${row.nickname}-${row.submittedAt}`}
-                                        sx={{ p: 1.5, bgcolor: "action.hover", borderRadius: 1 }}
-                                      >
-                                        <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                                          {row.nickname}
-                                        </Typography>
-                                        <Typography variant="body2">
-                                          {row.openFieldAnswers[field.id]}
-                                        </Typography>
-                                      </Box>
-                                    ))}
+                              {(results?.form.openFields ?? []).length > 0 ? (
+                                <Stack spacing={1.5}>
+                                  {(results?.scaleStats ?? []).length > 0 ? (
+                                    <Divider
+                                      component="div"
+                                      role="separator"
+                                      sx={{ borderColor: "divider", my: 2.5 }}
+                                    />
+                                  ) : null}
+                                  <Stack
+                                    direction="row"
+                                    alignItems="center"
+                                    justifyContent="space-between"
+                                    spacing={1}
+                                  >
+                                    <Typography variant="subtitle2">Текстовые ответы</Typography>
+                                    <Button
+                                      size="small"
+                                      startIcon={<AddIcon />}
+                                      onClick={() =>
+                                        openAddResponseDialog(
+                                          form.id,
+                                          results?.form.openFields ?? [],
+                                        )
+                                      }
+                                    >
+                                      Добавить ответ
+                                    </Button>
                                   </Stack>
-                                );
-                              })}
-                              {(results?.responses ?? []).some((row) =>
-                                hasOpenFieldAnswers(row.openFieldAnswers, row.comment),
-                              ) && (results?.form.openFields ?? []).length === 0 ? (
+                                  {(results?.responses ?? []).filter((row) =>
+                                    hasOpenFieldAnswers(row.openFieldAnswers, row.comment),
+                                  ).length === 0 ? (
+                                    <Typography variant="body2" color="text.secondary">
+                                      Пока нет ответов
+                                    </Typography>
+                                  ) : (
+                                    (results?.responses ?? [])
+                                      .filter((row) =>
+                                        hasOpenFieldAnswers(row.openFieldAnswers, row.comment),
+                                      )
+                                      .map((row) => {
+                                        const rowKey =
+                                          row.injectedId ?? `${row.nickname}-${row.submittedAt}`;
+                                        return (
+                                          <Box
+                                            key={rowKey}
+                                            sx={{
+                                              p: 1.5,
+                                              bgcolor: row.isInjected
+                                                ? "action.selected"
+                                                : "action.hover",
+                                              borderRadius: 1,
+                                            }}
+                                          >
+                                            <Stack
+                                              direction="row"
+                                              alignItems="flex-start"
+                                              justifyContent="space-between"
+                                              spacing={1}
+                                            >
+                                              <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                                                {row.nickname}
+                                                {row.isInjected ? (
+                                                  <Typography
+                                                    component="span"
+                                                    variant="caption"
+                                                    color="text.secondary"
+                                                    sx={{ ml: 1 }}
+                                                  >
+                                                    (добавлено вручную)
+                                                  </Typography>
+                                                ) : null}
+                                              </Typography>
+                                              {row.isInjected && row.injectedId ? (
+                                                <Tooltip title="Удалить ответ">
+                                                  <IconButton
+                                                    size="small"
+                                                    aria-label="Удалить ответ"
+                                                    onClick={() =>
+                                                      removeInjectedResponse(
+                                                        form.id,
+                                                        row.injectedId!,
+                                                      )
+                                                    }
+                                                  >
+                                                    <DeleteOutlineIcon fontSize="small" />
+                                                  </IconButton>
+                                                </Tooltip>
+                                              ) : null}
+                                            </Stack>
+                                            <Stack spacing={0.5} sx={{ mt: 0.75 }}>
+                                              {(results?.form.openFields ?? []).map((field) => {
+                                                const text = row.openFieldAnswers[field.id]?.trim();
+                                                if (!text) return null;
+                                                return (
+                                                  <Box key={`${rowKey}-${field.id}`}>
+                                                    {(results?.form.openFields ?? []).length > 1 ? (
+                                                      <Typography
+                                                        variant="caption"
+                                                        color="text.secondary"
+                                                      >
+                                                        {field.label}
+                                                      </Typography>
+                                                    ) : null}
+                                                    <Typography variant="body2">{text}</Typography>
+                                                  </Box>
+                                                );
+                                              })}
+                                            </Stack>
+                                          </Box>
+                                        );
+                                      })
+                                  )}
+                                </Stack>
+                              ) : (results?.responses ?? []).some((row) =>
+                                  hasOpenFieldAnswers(row.openFieldAnswers, row.comment),
+                                ) && (results?.form.openFields ?? []).length === 0 ? (
                                 <Stack spacing={1}>
                                   <Typography variant="subtitle2">Комментарии</Typography>
                                   {results?.responses
@@ -557,8 +840,9 @@ export function AdminFeedbackSection({ eventName, quizId, onlineUsersCount }: Pr
         <DialogTitle>Обнулить результаты?</DialogTitle>
         <DialogContent>
           <Typography>
-            Будут удалены все ответы по форме «{confirmResetForm?.title.trim() || "Без названия"}».
-            Действие нельзя отменить.
+            Будут удалены все ответы по форме «{confirmResetForm?.title.trim() || "Без названия"}»,
+            в том числе добавленные вручную, и сброшены ручные правки голосов. Действие нельзя
+            отменить.
           </Typography>
         </DialogContent>
         <DialogActions>
@@ -571,6 +855,54 @@ export function AdminFeedbackSection({ eventName, quizId, onlineUsersCount }: Pr
             }}
           >
             Обнулить
+          </Button>
+        </DialogActions>
+      </Dialog>
+      <Dialog
+        open={addResponseDialog !== null}
+        onClose={closeAddResponseDialog}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle>Добавить ответ</DialogTitle>
+        <DialogContent>
+          <Stack spacing={2} sx={{ pt: 1 }}>
+            <TextField
+              autoFocus
+              label="Имя"
+              placeholder="Например: Гость"
+              value={addResponseNickname}
+              onChange={(e) => setAddResponseNickname(e.target.value)}
+              fullWidth
+            />
+            {(addResponseDialog?.openFields ?? []).map((field) => (
+              <TextField
+                key={field.id}
+                label={field.label}
+                placeholder={field.placeholder || "Текст ответа"}
+                value={addResponseFieldValues[field.id] ?? ""}
+                onChange={(e) =>
+                  setAddResponseFieldValues((prev) => ({
+                    ...prev,
+                    [field.id]: e.target.value,
+                  }))
+                }
+                multiline
+                minRows={2}
+                fullWidth
+              />
+            ))}
+            {addResponseError ? (
+              <Typography variant="body2" color="error">
+                {addResponseError}
+              </Typography>
+            ) : null}
+          </Stack>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={closeAddResponseDialog}>Отмена</Button>
+          <Button variant="contained" onClick={submitInjectedResponse}>
+            Добавить
           </Button>
         </DialogActions>
       </Dialog>

@@ -28,6 +28,10 @@ function attachClusterWorkerErrorGuards() {
 }
 
 async function startListening() {
+  process.on("unhandledRejection", (reason) => {
+    console.error("[process] unhandledRejection", reason);
+  });
+
   const { httpServer, io } = await buildServer();
   const server = httpServer.listen(env.port, "0.0.0.0", () => {
     const role = cluster.isPrimary ? "primary" : "worker";

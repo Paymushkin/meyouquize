@@ -148,4 +148,53 @@ describe("useQuizPlayFeedback", () => {
     act(() => fireSocketEvent("feedback:submitted"));
     expect(result.current.shouldDeferQuestionPopup).toBe(false);
   });
+
+  it("preserves scale answers when active feedback form reference changes", () => {
+    const form = makeForm();
+    const { result, rerender } = renderHook(
+      (props: { form: ActiveFeedbackForm; feedbackSubmittedFromState?: boolean }) =>
+        useQuizPlayFeedback({
+          quizId: "quiz-1",
+          activeFeedbackForm: props.form,
+          feedbackSubmittedFromState: props.feedbackSubmittedFromState,
+          joined: true,
+        }),
+      { initialProps: { form, feedbackSubmittedFromState: false } },
+    );
+
+    act(() => fireSocketEvent("player:feedback-status", { submitted: false }));
+    act(() => result.current.selectScaleOption("scale-1", 2));
+
+    rerender({ form: { ...makeForm() }, feedbackSubmittedFromState: false });
+
+    expect(result.current.scaleAnswers).toEqual({ "scale-1": 2 });
+    expect(result.current.canSubmitFeedback).toBe(true);
+  });
+
+  it("resets submitting and shows error when submit fails", () => {
+    const form = makeForm();
+    const { result } = renderHook(() =>
+      useQuizPlayFeedback({
+        quizId: "quiz-1",
+        activeFeedbackForm: form,
+        joined: true,
+      }),
+    );
+
+    act(() => fireSocketEvent("player:feedback-status", { submitted: false }));
+    act(() => result.current.selectScaleOption("scale-1", 2));
+    act(() => result.current.submitFeedback());
+
+    expect(result.current.submitting).toBe(true);
+    act(() =>
+      fireSocketEvent("error:message", {
+        code: "INTERNAL",
+        message: "Сбор обратной связи сейчас не активен",
+      }),
+    );
+
+    expect(result.current.submitting).toBe(false);
+    expect(result.current.submitError).toBe("Сбор обратной связи сейчас не активен");
+    expect(result.current.shouldShowFeedbackPopup).toBe(true);
+  });
 });

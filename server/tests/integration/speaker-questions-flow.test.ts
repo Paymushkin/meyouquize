@@ -1,10 +1,17 @@
 import { io as ioClient, type Socket } from "socket.io-client";
+import request from "supertest";
 import { afterEach, describe, expect, it } from "vitest";
 import { DEFAULT_PUBLIC_VIEW_STATE } from "@meyouquize/shared";
 import { createTestServer, type TestServer } from "../helpers/testApp.js";
 import { prisma } from "../../src/prisma.js";
-import { saveStoredPublicView } from "../../src/socket/public-view-store.js";
-import { joinPlayer, seedSingleChoiceQuiz, uniqueSlug } from "../helpers/integrationFixtures.js";
+import { getStoredPublicView, saveStoredPublicView } from "../../src/socket/public-view-store.js";
+import {
+  adminCookieHeaderFromAuthResponse,
+  adminPassword,
+  joinPlayer,
+  seedSingleChoiceQuiz,
+  uniqueSlug,
+} from "../helpers/integrationFixtures.js";
 
 type SpeakerQuestionsUpdate = {
   items: Array<{ id: string; text: string; isMine?: boolean; userVisible?: boolean }>;
@@ -24,12 +31,23 @@ function waitForEvent<T>(socket: Socket, event: string, timeoutMs = 5000): Promi
   });
 }
 
-async function connectSocket(baseUrl: string): Promise<Socket> {
+async function connectSocket(baseUrl: string, cookieHeader?: string): Promise<Socket> {
   return new Promise((resolve, reject) => {
-    const socket = ioClient(baseUrl, { transports: ["websocket"] });
+    const socket = ioClient(baseUrl, {
+      transports: ["websocket"],
+      extraHeaders: cookieHeader ? { Cookie: cookieHeader } : undefined,
+    });
     socket.once("connect", () => resolve(socket));
     socket.once("connect_error", (err) => reject(err));
   });
+}
+
+async function connectAdmin(server: TestServer): Promise<Socket> {
+  const authRes = await request(server.app)
+    .post("/api/admin/auth")
+    .send({ login: "admin", password: adminPassword() });
+  const cookieHeader = adminCookieHeaderFromAuthResponse(authRes);
+  return connectSocket(server.baseUrl, cookieHeader);
 }
 
 async function enableSpeakerQuestions(quizId: string) {
@@ -128,5 +146,28 @@ describe("speaker questions integration", () => {
 
     const count = await prisma.speakerQuestion.count({ where: { id: foreignId! } });
     expect(count).toBe(1);
+  });
+
+  it("persists allowAllSpeakersTarget=false in stored public view", async () => {
+    const { quizId } = await seedSingleChoiceQuiz(uniqueSlug("speaker-all-target"));
+    await enableSpeakerQuestions(quizId);
+    server = await createTestServer();
+    const admin = await connectAdmin(server);
+    sockets.push(admin);
+
+    admin.emit("admin:speaker:settings:set", {
+      quizId,
+      enabled: true,
+      speakers: ["Иванов"],
+      reactions: ["👍"],
+      showAuthorOnScreen: false,
+      showRecipientOnScreen: true,
+      showReactionsOnScreen: true,
+      allowAllSpeakersTarget: false,
+    });
+    await new Promise((r) => setTimeout(r, 400));
+
+    const stored = await getStoredPublicView(quizId);
+    expect(stored.speakerQuestionsAllowAllSpeakersTarget).toBe(false);
   });
 });

@@ -8,6 +8,7 @@ export type AdminSpeakerQuestionsSettingsValues = {
   showAuthorOnScreen: boolean;
   showRecipientOnScreen: boolean;
   showReactionsOnScreen: boolean;
+  allowAllSpeakersTarget: boolean;
   speakersText: string;
 };
 
@@ -18,6 +19,7 @@ export type AdminSpeakerQuestionsPanelActions = {
   onToggleShowAuthorOnScreen: (next: boolean) => void;
   onToggleShowRecipientOnScreen: (next: boolean) => void;
   onToggleShowReactionsOnScreen: (next: boolean) => void;
+  onToggleAllowAllSpeakersTarget: (next: boolean) => void;
   onSpeakersTextChange: (next: string) => void;
   onSaveSettings: () => void;
 };
@@ -30,6 +32,7 @@ type SpeakerQuestionsPublicSlice = Partial<
     | "speakerQuestionsShowAuthorOnScreen"
     | "speakerQuestionsShowRecipientOnScreen"
     | "speakerQuestionsShowReactionsOnScreen"
+    | "speakerQuestionsAllowAllSpeakersTarget"
   >
 >;
 
@@ -42,6 +45,7 @@ export function applySpeakerQuestionsAdminFieldsFromPublicView(
     setShowAuthorOnScreen: (v: boolean) => void;
     setShowRecipientOnScreen: (v: boolean) => void;
     setShowReactionsOnScreen: (v: boolean) => void;
+    setAllowAllSpeakersTarget: (v: boolean) => void;
   },
 ): void {
   if (typeof view.speakerQuestionsEnabled === "boolean") {
@@ -50,6 +54,9 @@ export function applySpeakerQuestionsAdminFieldsFromPublicView(
   const reactions = getStringArrayOrNull(view.speakerQuestionsReactions);
   if (reactions) {
     actions.setReactionsText(reactions.join("\n"));
+  }
+  if (typeof view.speakerQuestionsAllowAllSpeakersTarget === "boolean") {
+    actions.setAllowAllSpeakersTarget(view.speakerQuestionsAllowAllSpeakersTarget);
   }
   applySpeakerQuestionsScreenVisibilityFromView(view, actions);
 }

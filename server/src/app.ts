@@ -33,7 +33,12 @@ import { attachSocketIoRedisAdapter } from "./socket/redis-io-adapter.js";
 import { isPrivateNetworkViteDevPort } from "./cors-allow.js";
 import { prisma } from "./prisma.js";
 import { randomToken } from "./utils.js";
-import { readFontLibrary, registerFont } from "./font-library.js";
+import {
+  readFontLibrary,
+  registerFont,
+  publicFontEntry,
+  updateFontRegistryEntry,
+} from "./font-library.js";
 import { publicViewJsonToState } from "./socket/public-view-store.js";
 import {
   createRoom,
@@ -232,9 +237,14 @@ export function buildApp() {
     }
     const token = randomToken();
     const expiresAt = new Date(Date.now() + env.adminSessionHours * 60 * 60 * 1000);
-    await prisma.adminSession.create({
-      data: { token, expiresAt },
-    });
+    try {
+      await prisma.adminSession.create({
+        data: { token, expiresAt },
+      });
+    } catch (err) {
+      console.error("[admin] session create failed", err);
+      return res.status(503).json(apiError("DB_UNAVAILABLE", "Database temporarily unavailable"));
+    }
     const cookieSecure = env.networkMode === "internet" ? true : isRequestHttps(req);
     res.cookie(ADMIN_COOKIE, token, {
       sameSite: "lax",
@@ -270,8 +280,10 @@ export function buildApp() {
     });
   });
 
-  app.get("/api/admin/fonts", adminAuthMiddleware, (_req, res) => {
-    return res.json({ fonts: readFontLibrary(env.mediaDir) });
+  app.get("/api/admin/fonts", adminAuthMiddleware, (req, res) => {
+    const origin = `${req.protocol}://${req.get("host") ?? "localhost"}`;
+    const fonts = readFontLibrary(env.mediaDir).map((font) => publicFontEntry(font, origin));
+    return res.json({ fonts });
   });
 
   app.post("/api/admin/fonts/upload", adminAuthMiddleware, (req, res) => {
@@ -300,6 +312,15 @@ export function buildApp() {
       }> = [];
       let replacedFamily = false;
       let duplicateCount = 0;
+      const duplicateFonts: Array<{
+        id: string;
+        family: string;
+        url: string;
+        kind: "static" | "variable";
+        fileName: string;
+        sha256: string;
+        createdAt: string;
+      }> = [];
       const details: Array<{
         fileName: string;
         status: "created" | "duplicate";
@@ -323,6 +344,9 @@ export function buildApp() {
         });
         if (result.duplicate) {
           duplicateCount += 1;
+          const clientFont = publicFontEntry(result.font, origin);
+          updateFontRegistryEntry(env.mediaDir, clientFont);
+          duplicateFonts.push(clientFont);
           fs.unlink(file.path, () => {});
           details.push({
             fileName: file.originalname || file.filename,
@@ -353,12 +377,30 @@ export function buildApp() {
         });
       }
       if (!created.length) {
+        if (duplicateFonts.length) {
+          console.info("[fonts] batch reused existing fonts", {
+            family: familyRaw,
+            kind,
+            duplicateCount,
+          });
+          return res.status(200).json({
+            fonts: duplicateFonts,
+            duplicateCount,
+            details,
+            reused: true,
+          });
+        }
         console.warn("[fonts] batch finished with no new fonts", {
           family: familyRaw,
           kind,
           duplicateCount,
         });
-        return res.status(409).json({ error: "Все выбранные шрифты уже загружены" });
+        return res.status(409).json({
+          error: "Все выбранные шрифты уже загружены",
+          fonts: duplicateFonts,
+          duplicateCount,
+          details,
+        });
       }
       console.info("[fonts] upload batch completed", {
         family: familyRaw,

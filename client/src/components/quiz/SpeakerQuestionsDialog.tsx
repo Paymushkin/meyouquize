@@ -23,6 +23,14 @@ import {
   filterActualSpeakerQuestions,
   filterMySpeakerQuestions,
 } from "../../features/speakerQuestions/playerSpeakerQuestionsLists";
+import {
+  SPEAKER_ALL_TARGET_LABEL,
+  SPEAKER_SELECT_PLACEHOLDER_LABEL,
+  SPEAKER_UI_UNSELECTED,
+  normalizeSpeakerUiSelection,
+  speakerQuestionRecipientLabelForAudience,
+} from "../../features/speakerQuestions/speakerTargetUi";
+import { SPEAKER_ALL_TARGET } from "@meyouquize/shared";
 import { buildBrandPrimaryContainedButtonSx } from "../../pages/quiz-play/QuizPlayBrandingBlocks";
 import {
   PLAYER_DIALOG_CONTENT_SX,
@@ -38,14 +46,6 @@ const DEFAULT_SPEAKER_REACTIONS = ["👍", "🔥", "👏", "❤️"];
 
 type QuestionsTab = "actual" | "mine";
 
-const ALL_SPEAKERS_TARGET = "Все спикеры";
-const ALL_SPEAKERS_TARGET_LABEL = "Всем спикерам";
-
-function speakerQuestionLabel(speakerName: string): string {
-  if (speakerName === ALL_SPEAKERS_TARGET) return "Для всех спикеров";
-  return `Для: ${speakerName}`;
-}
-
 function SpeakerQuestionRow(props: {
   item: SpeakerQuestionItem;
   reactions: string[];
@@ -55,13 +55,18 @@ function SpeakerQuestionRow(props: {
   onDelete: (questionId: string) => void;
 }) {
   const { item, reactions, showReactions, showDelete, onReact, onDelete } = props;
+  const recipientLabel = speakerQuestionRecipientLabelForAudience(item.speakerName);
 
   return (
     <Stack spacing={1.5} sx={{ py: 0.25 }}>
       <Stack direction="row" alignItems="flex-start" justifyContent="space-between" spacing={1}>
-        <Typography variant="caption" color="text.secondary" sx={{ flex: 1 }}>
-          {speakerQuestionLabel(item.speakerName)}
-        </Typography>
+        {recipientLabel ? (
+          <Typography variant="caption" color="text.secondary" sx={{ flex: 1 }}>
+            {recipientLabel}
+          </Typography>
+        ) : (
+          <Box sx={{ flex: 1 }} />
+        )}
         {showDelete ? (
           <IconButton
             size="small"
@@ -137,6 +142,9 @@ export function SpeakerQuestionsDialog({
   onDelete,
 }: Props) {
   const reactions = speakerQuestions?.settings.reactions ?? DEFAULT_SPEAKER_REACTIONS;
+  const speakers = speakerQuestions?.settings.speakers ?? [];
+  const allowAllSpeakersTarget = speakerQuestions?.settings.allowAllSpeakersTarget !== false;
+  const selectValue = normalizeSpeakerUiSelection(speakerName, allowAllSpeakersTarget, speakers);
   const actualItems = useMemo(
     () => filterActualSpeakerQuestions(speakerQuestions?.items ?? []),
     [speakerQuestions?.items],
@@ -159,6 +167,14 @@ export function SpeakerQuestionsDialog({
     formBackgroundColor,
     formTextColor,
   );
+
+  useEffect(() => {
+    if (!open) return;
+    const next = normalizeSpeakerUiSelection(speakerName, allowAllSpeakersTarget, speakers);
+    if (next !== speakerName) {
+      onSpeakerNameChange(next);
+    }
+  }, [open, allowAllSpeakersTarget, onSpeakerNameChange, speakerName, speakers]);
 
   useEffect(() => {
     if (!open) return;
@@ -201,17 +217,32 @@ export function SpeakerQuestionsDialog({
               select
               hiddenLabel
               size="small"
-              value={speakerName}
+              value={selectValue}
               onChange={(e) => onSpeakerNameChange(e.target.value)}
               sx={textFieldSx}
               slotProps={{
                 select: {
+                  displayEmpty: !allowAllSpeakersTarget,
+                  renderValue: (selected) => {
+                    const value = String(selected ?? "");
+                    if (!allowAllSpeakersTarget && value === SPEAKER_UI_UNSELECTED) {
+                      return SPEAKER_SELECT_PLACEHOLDER_LABEL;
+                    }
+                    if (value === SPEAKER_ALL_TARGET) return SPEAKER_ALL_TARGET_LABEL;
+                    return value;
+                  },
                   MenuProps: selectMenuProps,
                 },
               }}
             >
-              <MenuItem value={ALL_SPEAKERS_TARGET}>{ALL_SPEAKERS_TARGET_LABEL}</MenuItem>
-              {(speakerQuestions?.settings.speakers ?? []).map((name) => (
+              {allowAllSpeakersTarget ? (
+                <MenuItem value={SPEAKER_ALL_TARGET}>{SPEAKER_ALL_TARGET_LABEL}</MenuItem>
+              ) : (
+                <MenuItem value={SPEAKER_UI_UNSELECTED}>
+                  {SPEAKER_SELECT_PLACEHOLDER_LABEL}
+                </MenuItem>
+              )}
+              {speakers.map((name) => (
                 <MenuItem key={name} value={name}>
                   {name}
                 </MenuItem>

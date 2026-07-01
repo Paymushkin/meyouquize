@@ -27,6 +27,7 @@ export function useSpeakerQuestionsAdminActions({ quizId, speakerSettings, setMe
       showAuthorOnScreen: speakerSettings.showAuthorOnScreen,
       showRecipientOnScreen: speakerSettings.showRecipientOnScreen,
       showReactionsOnScreen: speakerSettings.showReactionsOnScreen,
+      allowAllSpeakersTarget: speakerSettings.allowAllSpeakersTarget,
     });
     setMessage("Настройки секции спикеров сохранены");
   }, [quizId, setMessage, speakerSettings]);

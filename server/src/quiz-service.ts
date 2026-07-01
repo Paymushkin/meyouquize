@@ -1144,6 +1144,7 @@ function mapPerQuestion(questions: QuestionDashboardRow[]) {
       totalScore?: number;
     }>;
     let temperatureValue: number | null | undefined;
+    let voterCount = q.answers.length;
 
     if (q.type === QuestionType.RANKING) {
       const n = sortedOpts.length;
@@ -1192,6 +1193,7 @@ function mapPerQuestion(questions: QuestionDashboardRow[]) {
           }
         }
       }
+      voterCount = answerCount;
       optionStats = sortedOpts.map((o) => ({
         optionId: o.id,
         text: o.text,
@@ -1269,6 +1271,7 @@ function mapPerQuestion(questions: QuestionDashboardRow[]) {
           : undefined,
       optionStats,
       tagCloud,
+      answerCount: voterCount,
       ...(temperatureValue !== undefined ? { temperatureValue } : {}),
       ...(tagCloudReferenceAliases ? { tagCloudReferenceAliases } : {}),
       firstCorrectNicknames: [] as string[],
@@ -2053,7 +2056,7 @@ export async function getPublicReportBySlug(slug: string): Promise<PublicEventRe
           reactions: { select: { reaction: true } },
         },
       }),
-      getFeedbackResultsForReport(quiz.id),
+      getFeedbackResultsForReport(quiz.id, view.reportFeedbackFormIds),
     ]);
 
   const onScreen = speakerStats.find((row) => row.isOnScreen)?._count._all ?? 0;
@@ -2134,12 +2137,7 @@ export async function getPublicReportBySlug(slug: string): Promise<PublicEventRe
     if (filtered) subQuizParticipantTables.push(filtered);
   }
 
-  const feedbackFormIdSet =
-    view.reportFeedbackFormIds.length > 0 ? new Set(view.reportFeedbackFormIds) : null;
-  const feedbackForms =
-    feedbackFormIdSet === null
-      ? feedbackFormsRaw
-      : feedbackFormsRaw.filter((item) => feedbackFormIdSet.has(item.formId));
+  const feedbackForms = feedbackFormsRaw;
 
   return {
     title: quiz.title,
@@ -2646,6 +2644,7 @@ export async function resetQuestionAnswers(quizId: string, questionId: string) {
   await prisma.answer.deleteMany({
     where: { quizId, questionId },
   });
+  await clearQuestionManualDisplay(quizId, questionId);
   return getDashboardResults(quizId);
 }
 
@@ -2653,6 +2652,7 @@ export async function resetAllQuizAnswers(quizId: string) {
   await prisma.answer.deleteMany({
     where: { quizId },
   });
+  await clearAllQuestionManualDisplay(quizId);
   return getDashboardResults(quizId);
 }
 
@@ -2666,8 +2666,49 @@ export async function resetSubQuizAnswers(quizId: string, subQuizId: string) {
     await prisma.answer.deleteMany({
       where: { quizId, questionId: { in: questionIds } },
     });
+    await clearQuestionsManualDisplay(quizId, questionIds);
   }
   return questionIds;
+}
+
+async function clearQuestionManualDisplay(quizId: string, questionId: string): Promise<void> {
+  const qid = questionId.trim();
+  if (!qid) return;
+  const prev = await getStoredPublicView(quizId);
+  if (!prev.tagCloudManualByQuestionId[qid]) return;
+  const nextManual: TagCloudManualByQuestionId = { ...prev.tagCloudManualByQuestionId };
+  delete nextManual[qid];
+  await saveStoredPublicView(quizId, {
+    ...prev,
+    tagCloudManualByQuestionId: nextManual,
+  });
+}
+
+async function clearQuestionsManualDisplay(quizId: string, questionIds: string[]): Promise<void> {
+  if (questionIds.length === 0) return;
+  const prev = await getStoredPublicView(quizId);
+  const ids = new Set(questionIds.map((id) => id.trim()).filter(Boolean));
+  const nextManual: TagCloudManualByQuestionId = { ...prev.tagCloudManualByQuestionId };
+  let changed = false;
+  for (const id of ids) {
+    if (!nextManual[id]) continue;
+    delete nextManual[id];
+    changed = true;
+  }
+  if (!changed) return;
+  await saveStoredPublicView(quizId, {
+    ...prev,
+    tagCloudManualByQuestionId: nextManual,
+  });
+}
+
+async function clearAllQuestionManualDisplay(quizId: string): Promise<void> {
+  const prev = await getStoredPublicView(quizId);
+  if (Object.keys(prev.tagCloudManualByQuestionId).length === 0) return;
+  await saveStoredPublicView(quizId, {
+    ...prev,
+    tagCloudManualByQuestionId: {},
+  });
 }
 
 export type StandaloneVoteAdminDetail = {

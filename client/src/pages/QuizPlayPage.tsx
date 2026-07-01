@@ -25,6 +25,10 @@ import KeyboardArrowDownIcon from "@mui/icons-material/KeyboardArrowDown";
 import KeyboardArrowUpIcon from "@mui/icons-material/KeyboardArrowUp";
 import { FeedbackPopupCard } from "../components/quiz/FeedbackPopupCard";
 import { SpeakerQuestionsDialog } from "../components/quiz/SpeakerQuestionsDialog";
+import {
+  normalizeSpeakerUiSelection,
+  resolveSpeakerNameForCreate,
+} from "../features/speakerQuestions/speakerTargetUi";
 import { PlayerVoteResultsDialog } from "../components/quiz/PlayerVoteResultsDialog";
 import { PlayerQuizReportDialog } from "../components/quiz/PlayerQuizReportDialog";
 import {
@@ -42,9 +46,11 @@ import { useQuizPlayQuestionFlow } from "../hooks/useQuizPlayQuestionFlow";
 import { useBrandFont } from "../hooks/useBrandFont";
 import { useBodyBrandBackground } from "../hooks/useBodyBrandBackground";
 import { useEventFavicon } from "../hooks/useEventFavicon";
+import { getNickname, randomNickname, setNickname } from "../storage";
 import { socket } from "../socket";
-import { getNickname, getOrCreateDeviceId, randomNickname, setNickname } from "../storage";
-import { resolveClientAssetUrl } from "../utils/resolveClientAssetUrl";
+import { useQuizPlayJoin } from "../hooks/useQuizPlayJoin";
+import { buildQuizPlayConnectionChip } from "../features/quizPlay/connectionChip";
+import { getRoomNickKey, shouldRestoreJoin } from "../features/quizPlay/joinStorage";
 import { buildPlayerTilesOrder, getVisiblePlayerBanners } from "../features/quizPlay/tiles";
 import { QuestionPopupCard } from "../components/quiz/QuestionPopupCard";
 import { PlayerViewportBackground } from "../components/quiz/PlayerViewportBackground";
@@ -63,65 +69,10 @@ import {
 } from "./quiz-play/QuizPlayBrandingBlocks";
 import type { QuizState, ReactionType } from "./quiz-play/types";
 import type { SpeakerQuestionsPayload } from "../types/speakerQuestions";
+import { resolveClientAssetUrl } from "../utils/resolveClientAssetUrl";
+
 const REACTION_WINDOW_MS = 1000;
 const REACTION_MAX_PER_WINDOW = 10;
-/** Чуть больше socket.io timeout (45s) — аварийный сброс ожидания входа. */
-const JOIN_PENDING_TIMEOUT_MS = 50_000;
-
-function getRoomJoinKey(slug: string) {
-  return `mq_joined_${slug}`;
-}
-
-function getRoomNickKey(slug: string) {
-  return `mq_nickname_${slug}`;
-}
-
-function wasRoomJoined(slug: string): boolean {
-  return localStorage.getItem(getRoomJoinKey(slug)) === "1";
-}
-
-function hasPersistedNickname(slug: string): boolean {
-  const roomNickname = localStorage.getItem(getRoomNickKey(slug)) || "";
-  const persistedNick = roomNickname || getNickname() || "";
-  return persistedNick.trim().length > 0;
-}
-
-function shouldRestoreJoin(slug: string): boolean {
-  return Boolean(slug) && wasRoomJoined(slug) && hasPersistedNickname(slug);
-}
-
-function buildConnectionChip(status: "online" | "reconnecting" | "offline") {
-  if (status === "online") {
-    return { label: "Онлайн", variant: "filled" as const, accentFill: true as const };
-  }
-  if (status === "reconnecting") {
-    return { label: "Переподключение", color: "warning" as const, variant: "outlined" as const };
-  }
-  return { label: "Нет соединения", color: "error" as const, variant: "outlined" as const };
-}
-
-function emitJoinWithLog(slug: string, reason: "manual" | "restore", nick: string) {
-  const payload = {
-    slug,
-    nickname: nick,
-    deviceId: getOrCreateDeviceId(),
-  };
-  console.info("[quiz-play] join attempt", {
-    reason,
-    connected: socket.connected,
-    socketId: socket.id,
-    payload,
-  });
-  if (socket.connected) {
-    socket.emit("quiz:join", payload);
-    return;
-  }
-  socket.connect();
-  socket.once("connect", () => {
-    console.info("[quiz-play] socket connected, retry join", { socketId: socket.id, reason });
-    socket.emit("quiz:join", payload);
-  });
-}
 
 export function QuizPlayPage() {
   const { slug = "" } = useParams();
@@ -130,8 +81,8 @@ export function QuizPlayPage() {
     return roomNickname || getNickname() || "";
   });
   const [joined, setJoined] = useState(false);
-  const [joinPending, setJoinPending] = useState(() => shouldRestoreJoin(slug));
-  const restoreJoinAttemptedRef = useRef(false);
+  const [quizSessionReady, setQuizSessionReady] = useState(false);
+  const [joinPending, setJoinPending] = useState(() => shouldRestoreJoin(slug, getNickname()));
   const [quiz, setQuiz] = useState<QuizState | null>(null);
   const [submittedAnswers, setSubmittedAnswers] = useState<Record<string, string[]>>({});
   const [submittedQuestionIds, setSubmittedQuestionIds] = useState<string[]>([]);
@@ -150,7 +101,7 @@ export function QuizPlayPage() {
   const [resultsDialogQuestionId, setResultsDialogQuestionId] = useState<string | null>(null);
   const [quizReportOpen, setQuizReportOpen] = useState(false);
   const [quizReportSubQuizId, setQuizReportSubQuizId] = useState("");
-  const [bootLoading, setBootLoading] = useState(() => shouldRestoreJoin(slug));
+  const [bootLoading, setBootLoading] = useState(() => shouldRestoreJoin(slug, getNickname()));
   const nicknameInputRef = useRef<HTMLInputElement | null>(null);
   const rankRowRefs = useRef<Map<string, HTMLDivElement>>(new Map());
   const prevRankRowTopsRef = useRef<Map<string, number>>(new Map());
@@ -210,6 +161,7 @@ export function QuizPlayPage() {
     submittedQuestionIds,
     submittedAnswers,
     playerAnswersHydrated,
+    quizSessionReady,
   });
   const {
     shouldShowFeedbackPopup,
@@ -222,30 +174,38 @@ export function QuizPlayPage() {
     canSubmitFeedback,
     submitFeedback,
     submitting: feedbackSubmitting,
+    submitError: feedbackSubmitError,
   } = useQuizPlayFeedback({
     quizId: quiz?.id,
     activeFeedbackForm: quiz?.activeFeedbackForm,
     feedbackSubmittedFromState: quiz?.feedbackSubmitted,
     joined,
   });
+  const onJoinTimeout = useCallback(() => {
+    setError("Не удалось подключиться. Проверьте интернет и попробуйте снова.");
+  }, []);
+
+  const { joinedRef, requestJoin, requestRestoreJoin, markJoinPersisted, clearJoinPersisted } =
+    useQuizPlayJoin({
+      slug,
+      nickname,
+      joined,
+      joinPending,
+      setJoinPending,
+      setBootLoading,
+      onJoinTimeout,
+    });
+
   const handleParticipantMissing = useCallback(() => {
-    if (!slug) return;
-    const safeNick = (nickname || "").trim() || "Игрок";
-    setJoinPending(true);
-    emitJoinWithLog(slug, "restore", safeNick);
-  }, [nickname, slug]);
+    requestRestoreJoin();
+  }, [requestRestoreJoin]);
 
   const handleJoinFailed = useCallback(() => {
-    if (!slug) return;
-    try {
-      localStorage.removeItem(getRoomJoinKey(slug));
-    } catch {
-      // ignore storage errors in private mode
-    }
+    clearJoinPersisted();
     setJoinPending(false);
     setJoined(false);
     setNicknameError("Такое имя уже занято");
-  }, [slug]);
+  }, [clearJoinPersisted]);
 
   const clearJoinPending = useCallback(() => {
     setJoinPending(false);
@@ -253,17 +213,11 @@ export function QuizPlayPage() {
   }, []);
 
   const handleJoinSuccess = useCallback(() => {
-    if (slug) {
-      try {
-        localStorage.setItem(getRoomJoinKey(slug), "1");
-      } catch {
-        // ignore storage errors in private mode
-      }
-    }
+    markJoinPersisted();
     setError("");
     setNicknameError("");
     handleQuizJoined();
-  }, [slug, handleQuizJoined]);
+  }, [handleQuizJoined, markJoinPersisted]);
 
   useEffect(() => {
     if (!slug) return;
@@ -293,6 +247,12 @@ export function QuizPlayPage() {
     hasPlayerOverlay: showQuestionPopup || shouldShowFeedbackPopup,
   });
 
+  useEffect(() => {
+    if (!joined) {
+      setQuizSessionReady(false);
+    }
+  }, [joined]);
+
   useQuizPlaySocket({
     activeQuestionIdRef,
     activeQuestionTypeRef,
@@ -316,48 +276,14 @@ export function QuizPlayPage() {
     onQuizJoined: handleJoinSuccess,
     onJoinFailed: handleJoinFailed,
     onJoinSettled: clearJoinPending,
+    joinedRef,
+    onQuizSessionReadyChange: setQuizSessionReady,
   });
 
   useEffect(() => {
     if (!slug || !joined) return;
     socket.emit("speaker:questions:subscribe", { slug, viewer: "player" });
   }, [slug, joined]);
-
-  useEffect(() => {
-    if (!slug) return;
-    const reconnectAndRejoinIfNeeded = () => {
-      if (typeof document !== "undefined" && document.visibilityState !== "visible") return;
-      if (!socket.connected) socket.connect();
-      if (joined) {
-        const safeNick = (nickname || "").trim() || "Игрок";
-        emitJoinWithLog(slug, "restore", safeNick);
-      }
-    };
-    const onSocketConnect = () => {
-      if (!joined) return;
-      const safeNick = (nickname || "").trim() || "Игрок";
-      emitJoinWithLog(slug, "restore", safeNick);
-    };
-    const onVisibilityChange = () => {
-      reconnectAndRejoinIfNeeded();
-    };
-    const onPageShow = () => {
-      reconnectAndRejoinIfNeeded();
-    };
-    const onOnline = () => {
-      reconnectAndRejoinIfNeeded();
-    };
-    socket.on("connect", onSocketConnect);
-    document.addEventListener("visibilitychange", onVisibilityChange);
-    window.addEventListener("pageshow", onPageShow);
-    window.addEventListener("online", onOnline);
-    return () => {
-      socket.off("connect", onSocketConnect);
-      document.removeEventListener("visibilitychange", onVisibilityChange);
-      window.removeEventListener("pageshow", onPageShow);
-      window.removeEventListener("online", onOnline);
-    };
-  }, [joined, nickname, slug]);
 
   const {
     titleText,
@@ -376,27 +302,6 @@ export function QuizPlayPage() {
   });
 
   useEffect(() => {
-    if (!slug || restoreJoinAttemptedRef.current) return;
-    if (!shouldRestoreJoin(slug)) return;
-    restoreJoinAttemptedRef.current = true;
-    const roomNickname = localStorage.getItem(getRoomNickKey(slug)) || "";
-    const persistedNick = roomNickname || getNickname() || "";
-    setJoinPending(true);
-    setBootLoading(true);
-    emitJoinWithLog(slug, "restore", persistedNick.trim());
-  }, [slug]);
-
-  useEffect(() => {
-    if (!joinPending || joined) return;
-    const timer = window.setTimeout(() => {
-      setJoinPending(false);
-      setBootLoading(false);
-      setError("Не удалось подключиться. Проверьте интернет и попробуйте снова.");
-    }, JOIN_PENDING_TIMEOUT_MS);
-    return () => window.clearTimeout(timer);
-  }, [joinPending, joined]);
-
-  useEffect(() => {
     if (joined) {
       setJoinPending(false);
       setBootLoading(false);
@@ -410,6 +315,17 @@ export function QuizPlayPage() {
     }, 0);
     return () => window.clearTimeout(timer);
   }, [joined, joinPending]);
+
+  useEffect(() => {
+    const settings = speakerQuestions?.settings;
+    if (!settings) return;
+    const speakers = settings.speakers ?? [];
+    const allowAll = settings.allowAllSpeakersTarget !== false;
+    const next = normalizeSpeakerUiSelection(speakerName, allowAll, speakers);
+    if (next !== speakerName) {
+      setSpeakerName(next);
+    }
+  }, [speakerQuestions, speakerName]);
 
   const persistNickname = useCallback(
     (nextRaw: string) => {
@@ -431,7 +347,7 @@ export function QuizPlayPage() {
     }
     setJoinPending(true);
     setError("");
-    emitJoinWithLog(slug, "manual", trimmed);
+    requestJoin("manual");
     persistNickname(trimmed);
   }
 
@@ -460,10 +376,11 @@ export function QuizPlayPage() {
   }
 
   function submitSpeakerQuestion() {
-    if (!quiz?.id || !speakerQuestionText.trim()) return;
+    if (!quiz?.id || !speakerQuestionText.trim() || !quizSessionReady) return;
+    const allowAll = speakerQuestions?.settings.allowAllSpeakersTarget !== false;
     socket.emit("speaker:question:create", {
       quizId: quiz.id,
-      speakerName: speakerName.trim() || "Все спикеры",
+      speakerName: resolveSpeakerNameForCreate(speakerName, allowAll),
       text: speakerQuestionText.trim(),
     });
     setSpeakerQuestionText("");
@@ -487,7 +404,7 @@ export function QuizPlayPage() {
   }
 
   function toggleReaction(reactionType: ReactionType) {
-    if (!quiz?.id) return;
+    if (!quiz?.id || !quizSessionReady) return;
     const now = Date.now();
     const freshTimestamps = reactionTimestampsRef.current.filter(
       (ts) => now - ts <= REACTION_WINDOW_MS,
@@ -522,7 +439,7 @@ export function QuizPlayPage() {
   const speakerTileText = quiz?.speakerTileText?.trim() || "Вопросы спикерам";
   const speakerTileBackgroundColor = quiz?.speakerTileBackgroundColor?.trim() || "#1976d2";
   const speakerTileTextColor = quiz?.speakerTileTextColor?.trim() || "#ffffff";
-  const speakerTileVisible = quiz?.speakerTileVisible ?? true;
+  const speakerTileVisible = quiz?.speakerTileVisible ?? false;
   const programTileText = quiz?.programTileText?.trim() || "Программа";
   const programTileBackgroundColor = quiz?.programTileBackgroundColor?.trim() || "#6a1b9a";
   const programTileTextColor = quiz?.programTileTextColor?.trim() || "#ffffff";
@@ -566,7 +483,7 @@ export function QuizPlayPage() {
     () => buildPlayerTilesOrder(quiz?.playerTilesOrder, visiblePlayerBanners),
     [quiz?.playerTilesOrder, visiblePlayerBanners],
   );
-  const connectionChip = buildConnectionChip(connectionStatus);
+  const connectionChip = buildQuizPlayConnectionChip(connectionStatus, quizSessionReady);
   const completionScoreLine =
     typeof quiz?.myTotalScore === "number"
       ? `Ваш результат: ${ruBallLabel(quiz.myTotalScore)}`
@@ -803,6 +720,7 @@ export function QuizPlayPage() {
                 onClose={closeFeedbackPopup}
                 canSubmit={canSubmitFeedback}
                 submitting={feedbackSubmitting}
+                submitError={feedbackSubmitError}
                 onSubmit={submitFeedback}
               />
             ) : null}

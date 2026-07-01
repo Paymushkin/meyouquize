@@ -45,7 +45,13 @@ BASE_URL="https://preprod.example.com" QUIZ_SLUG="spring-forum" ADMIN_LOGIN="adm
 
 Растягивание подключений: `join_ramp_ms` (например 45000) и `join_ack_timeout_ms` — в `server/scripts/socket-load-burst.mjs`.
 
-Переживать редкие `connect_error` при join: переменные окружения **`JOIN_CONNECT_RETRIES`** (по умолчанию 3), **`JOIN_CONNECT_BACKOFF_MS`** (пауза между попытками), **`JOIN_FAIL_TOLERANCE`** (сколько неуспешных join допускается без exit 1; по умолчанию 1, `0` = строго все).
+**Репетиция ивента (400 join):** профиль `event-400-join` — только вход, без submit:
+
+```bash
+BASE_URL="https://preprod.example.com" QUIZ_SLUG="spring-forum" npm run load:event-400
+```
+
+Переживать редкие `connect_error` при join: переменные окружения **`JOIN_CONNECT_RETRIES`** (по умолчанию 3), **`JOIN_CONNECT_BACKOFF_MS`** (пауза между попытками), **`JOIN_FAIL_TOLERANCE`** (сколько неуспешных join допускается без exit 1; по умолчанию 1, `0` = строго все). В профиле `event-400-join` tolerance = 4.
 
 Если нужно гарантированно отправлять голоса даже при нестабильном `state:quiz`, можно явно передать:
 

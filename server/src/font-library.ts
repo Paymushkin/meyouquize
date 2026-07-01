@@ -29,6 +29,27 @@ function storePath(mediaDir: string): string {
   return path.join(mediaDir, "fonts-registry.json");
 }
 
+function localMediaFilename(url: string): string | null {
+  const match = url.match(/\/media\/([^/?#]+)$/);
+  return match?.[1] ?? null;
+}
+
+export function fontRegistryFileExists(font: StoredFont, mediaDir: string): boolean {
+  const name = localMediaFilename(font.url);
+  if (!name) return false;
+  return fs.existsSync(path.join(mediaDir, name));
+}
+
+/** Убирает записи, у которых файл в media/ отсутствует (после сбоя деплоя и т.п.). */
+export function pruneStaleFontRegistry(mediaDir: string): StoredFont[] {
+  const current = readFontLibrary(mediaDir);
+  const alive = current.filter((font) => fontRegistryFileExists(font, mediaDir));
+  if (alive.length !== current.length) {
+    writeFontLibrary(mediaDir, alive);
+  }
+  return alive;
+}
+
 export function readFontLibrary(mediaDir: string): StoredFont[] {
   const p = storePath(mediaDir);
   if (!fs.existsSync(p)) return [];
@@ -67,6 +88,19 @@ function writeFontLibrary(mediaDir: string, fonts: StoredFont[]) {
   fs.writeFileSync(p, JSON.stringify({ fonts }, null, 2), "utf-8");
 }
 
+/** Публичный URL шрифта на текущем origin (без localhost из dev-реестра). */
+export function publicFontEntry(font: StoredFont, origin: string): StoredFont {
+  const name = localMediaFilename(font.url);
+  if (!name) return font;
+  const base = origin.replace(/\/+$/, "");
+  return { ...font, url: `${base}/media/${name}` };
+}
+
+export function updateFontRegistryEntry(mediaDir: string, updated: StoredFont) {
+  const fonts = readFontLibrary(mediaDir).map((font) => (font.id === updated.id ? updated : font));
+  writeFontLibrary(mediaDir, fonts);
+}
+
 export function registerFont(params: {
   mediaDir: string;
   fileName: string;
@@ -78,15 +112,25 @@ export function registerFont(params: {
   const { mediaDir, fileName, filePath, fileUrl, family, kind } = params;
   const bytes = fs.readFileSync(filePath);
   const sha256 = crypto.createHash("sha256").update(bytes).digest("hex");
-  const current = readFontLibrary(mediaDir);
+  let current = pruneStaleFontRegistry(mediaDir);
   const existing = current.find((x) => x.sha256 === sha256);
-  if (existing) return { font: existing, duplicate: true, replacedFamily: false };
+  if (existing && fontRegistryFileExists(existing, mediaDir)) {
+    return { font: existing, duplicate: true, replacedFamily: false };
+  }
+  if (existing) {
+    current = current.filter((x) => x.sha256 !== sha256);
+  }
 
   const normalizedFamily = sanitizeFamily(family);
   const familyExisting = current.filter((x) => x.family === normalizedFamily);
-  if (kind === "static" && familyExisting.some((x) => x.kind === "variable")) {
+  const variableForFamily = familyExisting.find((x) => x.kind === "variable");
+  if (
+    kind === "static" &&
+    variableForFamily &&
+    fontRegistryFileExists(variableForFamily, mediaDir)
+  ) {
     return {
-      font: familyExisting.find((x) => x.kind === "variable")!,
+      font: variableForFamily,
       duplicate: true,
       replacedFamily: false,
     };

@@ -9,7 +9,7 @@ import {
   resetQuestionAnswers,
   resetSubQuizAnswers,
 } from "../../quiz-service.js";
-import { broadcastDashboardResultsNow } from "../dashboard-results.js";
+import { broadcastProjectorRoomSync } from "../dashboard-results.js";
 import { emitToQuizPlayersAndDashboard } from "../quiz-rooms.js";
 import type { EnrichedSocket } from "../handler-common.js";
 import { assertAdmin, fail } from "../handler-common.js";
@@ -23,7 +23,7 @@ export function registerAdminAnswerHandlers(socket: EnrichedSocket, io: Server) 
       emitToQuizPlayersAndDashboard(io, payload.quizId, "answers:cleared", {
         questionId: payload.questionId,
       });
-      await broadcastDashboardResultsNow(io, payload.quizId);
+      await broadcastProjectorRoomSync(io, payload.quizId);
     } catch (error) {
       fail(socket, error instanceof Error ? error.message : "Reset question failed");
     }
@@ -35,7 +35,7 @@ export function registerAdminAnswerHandlers(socket: EnrichedSocket, io: Server) 
       const payload = resetAnswersSchema.parse(raw);
       await resetAllQuizAnswers(payload.quizId);
       emitToQuizPlayersAndDashboard(io, payload.quizId, "answers:cleared", { all: true });
-      await broadcastDashboardResultsNow(io, payload.quizId);
+      await broadcastProjectorRoomSync(io, payload.quizId);
     } catch (error) {
       fail(socket, error instanceof Error ? error.message : "Reset all failed");
     }
@@ -50,7 +50,7 @@ export function registerAdminAnswerHandlers(socket: EnrichedSocket, io: Server) 
         subQuizId: payload.subQuizId,
         questionIds,
       });
-      await broadcastDashboardResultsNow(io, payload.quizId);
+      await broadcastProjectorRoomSync(io, payload.quizId);
     } catch (error) {
       fail(socket, error instanceof Error ? error.message : "Reset sub-quiz failed");
     }

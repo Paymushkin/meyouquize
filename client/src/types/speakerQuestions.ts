@@ -7,6 +7,8 @@ export type SpeakerQuestionsSettings = {
   showRecipientOnScreen?: boolean;
   /** Счётчики реакций на проекторе */
   showReactionsOnScreen?: boolean;
+  /** Показывать в форме вариант «Всем спикерам» */
+  allowAllSpeakersTarget?: boolean;
 };
 
 export type SpeakerQuestionItem = {

@@ -8,7 +8,7 @@ PROFILE_FILE="${LOAD_DIR}/profiles/${PROFILE_NAME}.json"
 
 if [[ ! -f "${PROFILE_FILE}" ]]; then
   echo "Unknown profile: ${PROFILE_NAME}"
-  echo "Available: smoke, players-300-vote-40s, nominal, nominal-ui, nominal-admin, nominal-admin-500, peak, soak, walkthrough, normal-200-2m, normal-join-vote-200-1m"
+  echo "Available: smoke, event-400-join, players-300-vote-40s, nominal, nominal-ui, nominal-admin, nominal-admin-500, peak, soak, walkthrough, normal-200-2m, normal-join-vote-200-1m"
   exit 1
 fi
 
@@ -50,6 +50,9 @@ SUBMIT_TIMEOUT_MS="$(parse_json_default "${PROFILE_FILE}" submit_timeout_ms 1200
 JOIN_RAMP_MS="$(parse_json_default "${PROFILE_FILE}" join_ramp_ms 0)"
 JOIN_DISTRIBUTION="$(parse_json_default "${PROFILE_FILE}" join_distribution uniform)"
 JOIN_ACK_TIMEOUT_MS="$(parse_json_default "${PROFILE_FILE}" join_ack_timeout_ms 15000)"
+JOIN_FAIL_TOLERANCE="$(parse_json_default "${PROFILE_FILE}" join_fail_tolerance 1)"
+JOIN_CONNECT_RETRIES="$(parse_json_default "${PROFILE_FILE}" join_connect_retries 3)"
+JOIN_CONNECT_BACKOFF_MS="$(parse_json_default "${PROFILE_FILE}" join_connect_backoff_ms 400)"
 SUBMIT_ON_JOIN="$(parse_json_default "${PROFILE_FILE}" submit_on_join false)"
 SUBMIT_DELAY_MIN_MS="$(parse_json_default "${PROFILE_FILE}" submit_delay_min_ms 1000)"
 SUBMIT_DELAY_MAX_MS="$(parse_json_default "${PROFILE_FILE}" submit_delay_max_ms 5000)"
@@ -120,6 +123,9 @@ set +e
   JOIN_RAMP_MS="${JOIN_RAMP_MS}" \
   JOIN_DISTRIBUTION="${JOIN_DISTRIBUTION}" \
   JOIN_ACK_TIMEOUT_MS="${JOIN_ACK_TIMEOUT_MS}" \
+  JOIN_FAIL_TOLERANCE="${JOIN_FAIL_TOLERANCE}" \
+  JOIN_CONNECT_RETRIES="${JOIN_CONNECT_RETRIES}" \
+  JOIN_CONNECT_BACKOFF_MS="${JOIN_CONNECT_BACKOFF_MS}" \
   SUBMIT_ON_JOIN="${SUBMIT_ON_JOIN}" \
   SUBMIT_DELAY_MIN_MS="${SUBMIT_DELAY_MIN_MS}" \
   SUBMIT_DELAY_MAX_MS="${SUBMIT_DELAY_MAX_MS}" \
@@ -157,6 +163,9 @@ SUBMIT_TIMEOUT_MS=${SUBMIT_TIMEOUT_MS}
 JOIN_RAMP_MS=${JOIN_RAMP_MS}
 JOIN_DISTRIBUTION=${JOIN_DISTRIBUTION}
 JOIN_ACK_TIMEOUT_MS=${JOIN_ACK_TIMEOUT_MS}
+JOIN_FAIL_TOLERANCE=${JOIN_FAIL_TOLERANCE}
+JOIN_CONNECT_RETRIES=${JOIN_CONNECT_RETRIES}
+JOIN_CONNECT_BACKOFF_MS=${JOIN_CONNECT_BACKOFF_MS}
 SUBMIT_ON_JOIN=${SUBMIT_ON_JOIN}
 SUBMIT_DELAY_MIN_MS=${SUBMIT_DELAY_MIN_MS}
 SUBMIT_DELAY_MAX_MS=${SUBMIT_DELAY_MAX_MS}

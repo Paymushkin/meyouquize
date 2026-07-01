@@ -666,6 +666,16 @@ export function PublicReportPage() {
     { label: "Вопросов спикерам", value: payload!.speakerQuestions.total },
     { label: "Квизов", value: payload!.summary.subQuizzesCount },
   ].filter((item) => item.value > 0);
+  const feedbackFormsToShow = payload!.feedback;
+  const showReportHeading = hasModule("event_header") || modules.length > 0;
+
+  function feedbackDisplayResponseCount(form: PublicReportPayload["feedback"][number]): number {
+    if (form.responseCount > 0) return form.responseCount;
+    return form.scaleStats.reduce((max, stat) => {
+      const total = stat.counts.reduce((sum, count) => sum + count, 0);
+      return Math.max(max, total);
+    }, 0);
+  }
 
   return (
     <ThemeProvider theme={reportTheme}>
@@ -690,6 +700,19 @@ export function PublicReportPage() {
             p: isPdfMode ? 1.5 : 0,
           }}
         >
+          {showReportHeading && !hasModule("event_header") ? (
+            <Card variant="outlined" className="report-card">
+              <CardContent>
+                <Typography variant="h4">
+                  {payload!.config.reportTitle || payload!.title}
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  Событие: {payload!.title}
+                </Typography>
+              </CardContent>
+            </Card>
+          ) : null}
+
           {hasModule("event_header") && (
             <Card variant="outlined" className="report-card">
               <CardContent>
@@ -936,130 +959,142 @@ export function PublicReportPage() {
             </Card>
           )}
 
+          {hasModule("feedback_summary") && feedbackFormsToShow.length === 0 ? (
+            <Card variant="outlined" className="report-card">
+              <CardContent>
+                <Typography variant="h6" gutterBottom>
+                  Обратная связь
+                </Typography>
+                <Alert severity="info">
+                  Нет форм обратной связи для этого мероприятия. Создайте их во вкладке «Обратная
+                  связь» в админке.
+                </Alert>
+              </CardContent>
+            </Card>
+          ) : null}
+
           {hasModule("feedback_summary") &&
-            payload!.feedback
-              .filter((form) => form.responseCount > 0)
-              .map((form) => (
-                <Card key={form.formId} variant="outlined" className="report-card">
-                  <CardContent>
-                    <Stack
-                      direction="row"
-                      alignItems="center"
-                      justifyContent="space-between"
-                      sx={{ mb: 1 }}
+            feedbackFormsToShow.map((form) => (
+              <Card key={form.formId} variant="outlined" className="report-card">
+                <CardContent>
+                  <Stack
+                    direction="row"
+                    alignItems="center"
+                    justifyContent="space-between"
+                    sx={{ mb: 1 }}
+                  >
+                    <Typography variant="h6">{form.title || "Обратная связь"}</Typography>
+                    <Box
+                      sx={{
+                        minWidth: 32,
+                        height: 32,
+                        px: 1,
+                        borderRadius: 999,
+                        bgcolor: "primary.main",
+                        color: "primary.contrastText",
+                        display: "inline-flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        fontWeight: 800,
+                        lineHeight: 1,
+                      }}
                     >
-                      <Typography variant="h6">{form.title || "Обратная связь"}</Typography>
+                      {feedbackDisplayResponseCount(form)}
+                    </Box>
+                  </Stack>
+                  <Stack spacing={2}>
+                    {form.scaleStats.map((stat) => (
                       <Box
+                        key={stat.scaleId}
+                        className="report-question"
                         sx={{
-                          minWidth: 32,
-                          height: 32,
-                          px: 1,
-                          borderRadius: 999,
-                          bgcolor: "primary.main",
-                          color: "primary.contrastText",
-                          display: "inline-flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                          fontWeight: 800,
-                          lineHeight: 1,
+                          border: "1px dashed",
+                          borderColor: "divider",
+                          borderRadius: 1.5,
+                          px: 1.5,
+                          py: 1.25,
                         }}
                       >
-                        {form.responseCount}
+                        <Typography fontWeight={700}>
+                          {stat.label}
+                          {stat.average != null ? ` · среднее: ${stat.average}` : ""}
+                        </Typography>
+                        <QuestionBarChart
+                          rows={stat.options.map((text, idx) => ({
+                            text,
+                            count: stat.counts[idx] ?? 0,
+                            isCorrect: false,
+                          }))}
+                        />
                       </Box>
-                    </Stack>
-                    <Stack spacing={2}>
-                      {form.scaleStats.map((stat) => (
-                        <Box
-                          key={stat.scaleId}
-                          className="report-question"
-                          sx={{
-                            border: "1px dashed",
-                            borderColor: "divider",
-                            borderRadius: 1.5,
-                            px: 1.5,
-                            py: 1.25,
-                          }}
-                        >
-                          <Typography fontWeight={700}>
-                            {stat.label}
-                            {stat.average != null ? ` · среднее: ${stat.average}` : ""}
-                          </Typography>
-                          <QuestionBarChart
-                            rows={stat.options.map((text, idx) => ({
-                              text,
-                              count: stat.counts[idx] ?? 0,
-                              isCorrect: false,
-                            }))}
-                          />
-                        </Box>
-                      ))}
-                      {form.openFields.map((field) => {
-                        const rows = form.responses.filter((row) =>
-                          row.openFieldAnswers[field.id]?.trim(),
-                        );
-                        if (rows.length === 0) return null;
-                        return (
-                          <Stack key={field.id} spacing={1}>
-                            <Typography variant="subtitle1" fontWeight={700}>
-                              {field.label}
-                            </Typography>
-                            {rows.slice(0, 50).map((row) => (
-                              <Box
-                                key={`${field.id}-${row.nickname}-${row.submittedAt}`}
-                                className="report-row"
-                                sx={{
-                                  border: "1px solid",
-                                  borderColor: "divider",
-                                  borderRadius: 1.5,
-                                  px: 1.25,
-                                  py: 1,
-                                }}
-                              >
-                                <Typography variant="body2" fontWeight={700}>
-                                  {row.nickname}
-                                </Typography>
-                                <Typography variant="body2">
-                                  {row.openFieldAnswers[field.id]}
-                                </Typography>
-                              </Box>
-                            ))}
-                          </Stack>
-                        );
-                      })}
-                      {form.responses.some((row) =>
-                        hasOpenFieldAnswers(row.openFieldAnswers, row.comment),
-                      ) && form.openFields.length === 0 ? (
-                        <Stack spacing={1}>
+                    ))}
+                    {form.openFields.map((field) => {
+                      const rows = form.responses.filter((row) =>
+                        row.openFieldAnswers[field.id]?.trim(),
+                      );
+                      if (rows.length === 0) return null;
+                      return (
+                        <Stack key={field.id} spacing={1}>
                           <Typography variant="subtitle1" fontWeight={700}>
-                            Комментарии
+                            {field.label}
                           </Typography>
-                          {form.responses
-                            .filter((row) => row.comment)
-                            .slice(0, 50)
-                            .map((row) => (
-                              <Box
-                                key={`${row.nickname}-${row.submittedAt}`}
-                                className="report-row"
-                                sx={{
-                                  border: "1px solid",
-                                  borderColor: "divider",
-                                  borderRadius: 1.5,
-                                  px: 1.25,
-                                  py: 1,
-                                }}
-                              >
-                                <Typography variant="body2" fontWeight={700}>
-                                  {row.nickname}
-                                </Typography>
-                                <Typography variant="body2">{row.comment}</Typography>
-                              </Box>
-                            ))}
+                          {rows.slice(0, 50).map((row) => (
+                            <Box
+                              key={`${field.id}-${row.nickname}-${row.submittedAt}`}
+                              className="report-row"
+                              sx={{
+                                border: "1px solid",
+                                borderColor: "divider",
+                                borderRadius: 1.5,
+                                px: 1.25,
+                                py: 1,
+                              }}
+                            >
+                              <Typography variant="body2" fontWeight={700}>
+                                {row.nickname}
+                              </Typography>
+                              <Typography variant="body2">
+                                {row.openFieldAnswers[field.id]}
+                              </Typography>
+                            </Box>
+                          ))}
                         </Stack>
-                      ) : null}
-                    </Stack>
-                  </CardContent>
-                </Card>
-              ))}
+                      );
+                    })}
+                    {form.responses.some((row) =>
+                      hasOpenFieldAnswers(row.openFieldAnswers, row.comment),
+                    ) && form.openFields.length === 0 ? (
+                      <Stack spacing={1}>
+                        <Typography variant="subtitle1" fontWeight={700}>
+                          Комментарии
+                        </Typography>
+                        {form.responses
+                          .filter((row) => row.comment)
+                          .slice(0, 50)
+                          .map((row) => (
+                            <Box
+                              key={`${row.nickname}-${row.submittedAt}`}
+                              className="report-row"
+                              sx={{
+                                border: "1px solid",
+                                borderColor: "divider",
+                                borderRadius: 1.5,
+                                px: 1.25,
+                                py: 1,
+                              }}
+                            >
+                              <Typography variant="body2" fontWeight={700}>
+                                {row.nickname}
+                              </Typography>
+                              <Typography variant="body2">{row.comment}</Typography>
+                            </Box>
+                          ))}
+                      </Stack>
+                    ) : null}
+                  </Stack>
+                </CardContent>
+              </Card>
+            ))}
 
           {hasModule("randomizer_summary") &&
             (payload!.randomizer.currentWinners.length > 0 ||

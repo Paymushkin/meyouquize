@@ -1,5 +1,10 @@
 import type { Server } from "socket.io";
-import { mergePublicViewState, type PublicViewPatch } from "@meyouquize/shared";
+import {
+  isPlayerOnlyPublicViewPatch,
+  mergePublicViewState,
+  projectorPublicViewChanged,
+  type PublicViewPatch,
+} from "@meyouquize/shared";
 import { setPublicViewSchema, subscribeResultsSchema } from "../../schemas.js";
 import { getDashboardResults, getQuizBySlug, getQuizPublicState } from "../../quiz-service.js";
 import { prisma } from "../../prisma.js";
@@ -14,6 +19,12 @@ import type { EnrichedSocket } from "../handler-common.js";
 import { assertAdmin, fail } from "../handler-common.js";
 import { toPublicViewPayload } from "../public-view-helpers.js";
 import { broadcastSpeakerQuestions } from "./speaker-questions.js";
+
+import {
+  adminViewSetDedupeKey,
+  shouldSkipAdminViewSetDedupe,
+  type AdminViewSetDedupeState,
+} from "../admin-view-set-dedupe.js";
 
 export function registerResultsDashboardHandlers(socket: EnrichedSocket, io: Server) {
   socket.on("results:subscribe", async (raw: unknown) => {
@@ -50,6 +61,17 @@ export function registerResultsDashboardHandlers(socket: EnrichedSocket, io: Ser
     try {
       await assertAdmin(socket);
       const payload = setPublicViewSchema.parse(raw);
+      const dedupeKey = adminViewSetDedupeKey(payload);
+      const prev = (socket.data as { lastViewSetDedupe?: AdminViewSetDedupeState })
+        .lastViewSetDedupe;
+      const now = Date.now();
+      if (shouldSkipAdminViewSetDedupe(prev, dedupeKey, now)) {
+        return;
+      }
+      (socket.data as { lastViewSetDedupe?: AdminViewSetDedupeState }).lastViewSetDedupe = {
+        key: dedupeKey,
+        at: now,
+      };
       const quiz = await getQuizPublicState(payload.quizId);
       if (!quiz) throw new Error("Quiz not found");
       const prevView = await getStoredPublicView(payload.quizId);
@@ -104,12 +126,17 @@ export function registerResultsDashboardHandlers(socket: EnrichedSocket, io: Ser
         questionId: nextView.questionId,
         showFirstCorrectAnswerer: nextView.showFirstCorrectAnswerer,
       });
-      emitToQuizDashboard(
-        io,
-        payload.quizId,
-        "results:public:view",
-        toPublicViewPayload(nextView, quiz.title),
-      );
+      if (
+        !isPlayerOnlyPublicViewPatch(payload as Record<string, unknown>) &&
+        projectorPublicViewChanged(prevView, nextView)
+      ) {
+        emitToQuizDashboard(
+          io,
+          payload.quizId,
+          "results:public:view",
+          toPublicViewPayload(nextView, quiz.title),
+        );
+      }
       const updatedQuizState = await getQuizPublicState(payload.quizId);
       await broadcastQuizPublicState(io, payload.quizId, updatedQuizState);
       if (speakerFeatureVisibilityChanged) {

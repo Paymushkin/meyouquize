@@ -19,14 +19,14 @@ function makeItem(overrides: Partial<SpeakerQuestionItem>): SpeakerQuestionItem 
 }
 
 describe("useSpeakerQuestionsTableState", () => {
-  it("по умолчанию сортирует по рейтингу по убыванию", () => {
+  it("по умолчанию сортирует по дате поступления: новые сверху", () => {
     const rows = [
-      makeItem({ id: "low", reactionCounts: { "👍": 1 } }),
-      makeItem({ id: "high", reactionCounts: { "🔥": 4, "👏": 1 } }),
-      makeItem({ id: "mid", reactionCounts: { "❤️": 2 } }),
+      makeItem({ id: "old", createdAt: "2026-01-01T10:00:00.000Z" }),
+      makeItem({ id: "new", createdAt: "2026-01-02T12:00:00.000Z" }),
+      makeItem({ id: "mid", createdAt: "2026-01-01T18:00:00.000Z" }),
     ];
     const { result } = renderHook(() => useSpeakerQuestionsTableState(rows));
-    expect(result.current.sortedRows.map((x) => x.id)).toEqual(["high", "mid", "low"]);
+    expect(result.current.sortedRows.map((x) => x.id)).toEqual(["new", "mid", "old"]);
   });
 
   it("обновляет сортировку через setSort", () => {

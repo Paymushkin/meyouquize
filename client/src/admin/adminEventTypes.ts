@@ -25,6 +25,8 @@ export type QuestionResult = {
   }>;
   /** Первые верно ответившие по времени (голосования комнаты), до 20 шт. */
   firstCorrectNicknames?: string[];
+  /** Участников ответило на вопрос */
+  answerCount?: number;
 };
 
 export type LeaderboardItem = {

@@ -24,6 +24,9 @@ export function useQuizPlayFeedback({
   const [scaleAnswers, setScaleAnswers] = useState<Record<string, number>>({});
   const [openFieldAnswers, setOpenFieldAnswers] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState("");
+
+  const activeFormId = activeFeedbackForm?.id ?? null;
 
   useEffect(() => {
     const onStatus = (payload: { submitted?: boolean }) => {
@@ -33,13 +36,17 @@ export function useQuizPlayFeedback({
     const onSubmitted = () => {
       setFeedbackSubmitted(true);
       setSubmitting(false);
+      setSubmitError("");
     };
     const onError = (payload: unknown) => {
+      setSubmitting(false);
       const message = parseSocketErrorMessage(payload);
       if (message.includes("уже отправили")) {
         setFeedbackSubmitted(true);
-        setSubmitting(false);
+        setSubmitError("");
+        return;
       }
+      if (message) setSubmitError(message);
     };
     socket.on("player:feedback-status", onStatus);
     socket.on("feedback:submitted", onSubmitted);
@@ -52,20 +59,26 @@ export function useQuizPlayFeedback({
   }, []);
 
   useEffect(() => {
-    if (!activeFeedbackForm) {
+    if (!activeFormId) {
       setFeedbackSubmitted(false);
       setFeedbackStatusKnown(false);
       setScaleAnswers({});
       setOpenFieldAnswers({});
+      setSubmitError("");
       return;
     }
     setScaleAnswers({});
     setOpenFieldAnswers({});
+    setSubmitError("");
+  }, [activeFormId]);
+
+  useEffect(() => {
+    if (!activeFormId) return;
     if (typeof feedbackSubmittedFromState === "boolean") {
       setFeedbackSubmitted(feedbackSubmittedFromState);
       setFeedbackStatusKnown(true);
     }
-  }, [activeFeedbackForm?.id, activeFeedbackForm, feedbackSubmittedFromState]);
+  }, [activeFormId, feedbackSubmittedFromState]);
 
   const activationKey =
     activeFeedbackForm?.id && activeFeedbackForm.activatedAt
@@ -124,6 +137,7 @@ export function useQuizPlayFeedback({
     if (!quizId || !activeFeedbackForm || !canSubmitFeedback || submitting || feedbackSubmitted) {
       return;
     }
+    setSubmitError("");
     setSubmitting(true);
     const trimmedAnswers = Object.fromEntries(
       Object.entries(openFieldAnswers)
@@ -157,5 +171,6 @@ export function useQuizPlayFeedback({
     canSubmitFeedback,
     submitFeedback,
     submitting,
+    submitError,
   };
 }

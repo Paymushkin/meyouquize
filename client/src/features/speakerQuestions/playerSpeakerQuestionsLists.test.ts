@@ -39,4 +39,13 @@ describe("playerSpeakerQuestionsLists", () => {
     ];
     expect(filterMySpeakerQuestions(items).map((q) => q.id)).toEqual(["1", "3"]);
   });
+
+  it("keeps not-selected speaker questions in player lists", () => {
+    const items = [
+      item({ id: "1", speakerName: "не выбрано", userVisible: true, isMine: true }),
+      item({ id: "2", speakerName: "Иванов", userVisible: true }),
+    ];
+    expect(filterActualSpeakerQuestions(items).map((q) => q.id)).toEqual(["1", "2"]);
+    expect(filterMySpeakerQuestions(items).map((q) => q.id)).toEqual(["1"]);
+  });
 });

@@ -43,7 +43,12 @@ import {
 
 const REACTION_WINDOW_MS = 1000;
 const REACTION_MAX_PER_WINDOW = 10;
+const JOIN_DEBOUNCE_MS = 2500;
 const reactionRateBySocket = new Map<string, number[]>();
+const lastJoinAckBySocket = new Map<
+  string,
+  { at: number; quizId: string; participantId: string }
+>();
 
 function allowReactionBurst(socketId: string): boolean {
   const now = Date.now();
@@ -62,6 +67,17 @@ export function registerQuizPlayHandlers(socket: EnrichedSocket, io: Server) {
   socket.on("quiz:join", async (raw: unknown) => {
     try {
       const payload = joinQuizSchema.parse(raw);
+      const recent = lastJoinAckBySocket.get(socket.id);
+      const now = Date.now();
+      if (
+        recent &&
+        now - recent.at < JOIN_DEBOUNCE_MS &&
+        socket.data.participantId === recent.participantId &&
+        socket.data.quizId === recent.quizId
+      ) {
+        socket.emit("quiz:joined", { ok: true });
+        return;
+      }
       const joined = await joinQuiz(payload);
       const state = await getQuizPublicState(joined.quizId);
       if (!state) throw new Error("Quiz not found");
@@ -85,6 +101,11 @@ export function registerQuizPlayHandlers(socket: EnrichedSocket, io: Server) {
         myTotalScore,
         mySubQuizScores,
         feedbackSubmitted,
+      });
+      lastJoinAckBySocket.set(socket.id, {
+        at: Date.now(),
+        quizId: joined.quizId,
+        participantId: joined.participantId,
       });
       trialLog("quiz_join_ok", {
         quizId: joined.quizId,

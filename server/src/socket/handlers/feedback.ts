@@ -1,7 +1,11 @@
 import type { Server } from "socket.io";
 import {
   feedbackFormActionSchema,
+  feedbackInjectedResponseAddSchema,
+  feedbackInjectedResponseRemoveSchema,
   feedbackQuizIdSchema,
+  feedbackScaleCountOverrideClearSchema,
+  feedbackScaleCountOverrideSchema,
   submitFeedbackSchema,
 } from "../../schemas.js";
 import { getQuizPublicState } from "../../quiz-service.js";
@@ -10,11 +14,16 @@ import type { EnrichedSocket } from "../handler-common.js";
 import { assertAdmin, fail } from "../handler-common.js";
 import {
   activateFeedbackForm,
+  addInjectedFeedbackResponse,
+  clearAllFeedbackScaleCountOverrides,
+  clearFeedbackScaleCountOverride,
   closeFeedbackForm,
   emitAllFeedbackResultsForQuiz,
   getFeedbackResultsByFormId,
   listFeedbackResultsByQuizId,
   resetFeedbackFormResponses,
+  removeInjectedFeedbackResponse,
+  setFeedbackScaleCountOverride,
   submitFeedbackResponse,
 } from "../../feedback-service.js";
 
@@ -86,6 +95,69 @@ export function registerFeedbackHandlers(socket: EnrichedSocket, io: Server) {
       if (state) await broadcastQuizPublicState(io, payload.quizId, state);
     } catch (error) {
       fail(socket, error instanceof Error ? error.message : "Reset feedback failed");
+    }
+  });
+
+  socket.on("feedback:scale-count:set", async (raw: unknown) => {
+    try {
+      await assertAdmin(socket);
+      const payload = feedbackScaleCountOverrideSchema.parse(raw);
+      await setFeedbackScaleCountOverride(payload);
+      const results = await getFeedbackResultsByFormId(payload.formId);
+      if (results) emitToQuizDashboard(io, payload.quizId, "feedback:results", results);
+    } catch (error) {
+      fail(socket, error instanceof Error ? error.message : "Set feedback scale count failed");
+    }
+  });
+
+  socket.on("feedback:scale-count:clear", async (raw: unknown) => {
+    try {
+      await assertAdmin(socket);
+      const payload = feedbackScaleCountOverrideClearSchema.parse(raw);
+      await clearFeedbackScaleCountOverride(payload);
+      const results = await getFeedbackResultsByFormId(payload.formId);
+      if (results) emitToQuizDashboard(io, payload.quizId, "feedback:results", results);
+    } catch (error) {
+      fail(socket, error instanceof Error ? error.message : "Clear feedback scale count failed");
+    }
+  });
+
+  socket.on("feedback:scale-count:clear-all", async (raw: unknown) => {
+    try {
+      await assertAdmin(socket);
+      const payload = feedbackFormActionSchema.parse(raw);
+      await clearAllFeedbackScaleCountOverrides(payload.formId, payload.quizId);
+      const results = await getFeedbackResultsByFormId(payload.formId);
+      if (results) emitToQuizDashboard(io, payload.quizId, "feedback:results", results);
+    } catch (error) {
+      fail(
+        socket,
+        error instanceof Error ? error.message : "Clear all feedback scale counts failed",
+      );
+    }
+  });
+
+  socket.on("feedback:response:add", async (raw: unknown) => {
+    try {
+      await assertAdmin(socket);
+      const payload = feedbackInjectedResponseAddSchema.parse(raw);
+      await addInjectedFeedbackResponse(payload);
+      const results = await getFeedbackResultsByFormId(payload.formId);
+      if (results) emitToQuizDashboard(io, payload.quizId, "feedback:results", results);
+    } catch (error) {
+      fail(socket, error instanceof Error ? error.message : "Add feedback response failed");
+    }
+  });
+
+  socket.on("feedback:response:remove", async (raw: unknown) => {
+    try {
+      await assertAdmin(socket);
+      const payload = feedbackInjectedResponseRemoveSchema.parse(raw);
+      await removeInjectedFeedbackResponse(payload);
+      const results = await getFeedbackResultsByFormId(payload.formId);
+      if (results) emitToQuizDashboard(io, payload.quizId, "feedback:results", results);
+    } catch (error) {
+      fail(socket, error instanceof Error ? error.message : "Remove feedback response failed");
     }
   });
 

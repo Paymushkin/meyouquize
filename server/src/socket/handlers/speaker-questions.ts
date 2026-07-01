@@ -16,6 +16,7 @@ import {
 import { prisma } from "../../prisma.js";
 import { containsProfanity } from "../../profanity.js";
 import { getQuizBySlug, getQuizPublicState } from "../../quiz-service.js";
+import { isKnownSpeakerTargetValue, SPEAKER_ALL_TARGET } from "@meyouquize/shared";
 import type { EnrichedSocket } from "../handler-common.js";
 import { assertAdmin, fail } from "../handler-common.js";
 import { getStoredPublicView } from "../public-view-store.js";
@@ -121,6 +122,7 @@ async function buildSpeakerQuestionsPayload(
       showAuthorOnScreen: view.speakerQuestionsShowAuthorOnScreen,
       showRecipientOnScreen: view.speakerQuestionsShowRecipientOnScreen,
       showReactionsOnScreen: view.speakerQuestionsShowReactionsOnScreen,
+      allowAllSpeakersTarget: view.speakerQuestionsAllowAllSpeakersTarget,
     },
     items,
   };
@@ -202,8 +204,8 @@ export function registerSpeakerQuestionsHandlers(socket: EnrichedSocket, io: Ser
     try {
       await assertAdmin(socket);
       const payload = adminSpeakerSettingsSchema.parse(raw);
-      const prev = await getStoredPublicView(payload.quizId);
-      const next = mergePublicViewState(prev, {
+      const prevView = await getStoredPublicView(payload.quizId);
+      const next = mergePublicViewState(prevView, {
         speakerQuestionsEnabled: payload.enabled,
         speakerTileVisible: payload.enabled,
         speakerQuestionsSpeakers: payload.speakers,
@@ -214,6 +216,9 @@ export function registerSpeakerQuestionsHandlers(socket: EnrichedSocket, io: Ser
           : {}),
         ...(payload.showReactionsOnScreen !== undefined
           ? { speakerQuestionsShowReactionsOnScreen: payload.showReactionsOnScreen }
+          : {}),
+        ...(payload.allowAllSpeakersTarget !== undefined
+          ? { speakerQuestionsAllowAllSpeakersTarget: payload.allowAllSpeakersTarget }
           : {}),
       });
       await saveStoredPublicView(payload.quizId, next);
@@ -246,10 +251,12 @@ export function registerSpeakerQuestionsHandlers(socket: EnrichedSocket, io: Ser
         throw new Error("Функция выключена администратором");
       }
       if (
-        payload.speakerName !== "Все спикеры" &&
-        view.speakerQuestionsSpeakers.length > 0 &&
-        !view.speakerQuestionsSpeakers.includes(payload.speakerName)
+        payload.speakerName === SPEAKER_ALL_TARGET &&
+        view.speakerQuestionsAllowAllSpeakersTarget === false
       ) {
+        throw new Error("Вариант «всем спикерам» отключён");
+      }
+      if (!isKnownSpeakerTargetValue(payload.speakerName, view.speakerQuestionsSpeakers)) {
         throw new Error("Спикер не найден");
       }
       if (containsProfanity(payload.text)) throw new Error("Вопрос содержит недопустимые слова");

@@ -5,7 +5,10 @@ import {
   type BrandThemeId,
 } from "@meyouquize/shared";
 import { useCallback } from "react";
-import { socket } from "../socket";
+import {
+  emitAdminPublicViewSet,
+  emitAdminPublicViewPatch,
+} from "../features/publicView/emitAdminPublicViewSet";
 import type {
   CloudWordCount,
   PublicBanner,
@@ -19,6 +22,7 @@ import {
   type RandomizerListMode,
   type RandomizerMode,
 } from "../features/randomizer/randomizerLogic";
+import { filterPublicViewSetEmitPayload } from "../features/publicView/filterPublicViewSetEmitPayload";
 
 type QuestionViewState = {
   id?: string;
@@ -404,7 +408,7 @@ export function usePublicViewEmitter(params: UsePublicViewEmitterParams) {
         projectorJoinQrOverlayCorner:
           patch.projectorJoinQrOverlayCorner ?? projectorJoinQrOverlayCorner,
       };
-      socket.emit("admin:results:view:set", nextPayload);
+      emitAdminPublicViewSet(filterPublicViewSetEmitPayload(patch, nextPayload));
     },
     [
       cloudAnimationStrength,
@@ -499,6 +503,14 @@ export function usePublicViewEmitter(params: UsePublicViewEmitterParams) {
     ],
   );
 
+  const emitPublicViewPatch = useCallback(
+    (patch: PublicViewSetPatch = {}) => {
+      if (!quizId) return;
+      emitAdminPublicViewPatch({ quizId, ...patch });
+    },
+    [quizId],
+  );
+
   const emitBrandingPatch = useCallback(
     (patch: PublicViewSetPatch) => {
       emitPublicViewSet(patch);
@@ -506,5 +518,5 @@ export function usePublicViewEmitter(params: UsePublicViewEmitterParams) {
     [emitPublicViewSet],
   );
 
-  return { emitPublicViewSet, emitBrandingPatch };
+  return { emitPublicViewSet, emitPublicViewPatch, emitBrandingPatch };
 }

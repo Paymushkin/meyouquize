@@ -45,6 +45,9 @@ type Params = {
   onJoinFailed?: () => void;
   /** Вход завершён (успех или ошибка) — снять индикатор ожидания. */
   onJoinSettled?: () => void;
+  /** Актуальный joined — для reconnect без показа экрана входа. */
+  joinedRef: MutableRefObject<boolean>;
+  onQuizSessionReadyChange?: (ready: boolean) => void;
 };
 
 export function useQuizPlaySocket({
@@ -70,6 +73,8 @@ export function useQuizPlaySocket({
   onQuizJoined,
   onJoinFailed,
   onJoinSettled,
+  joinedRef,
+  onQuizSessionReadyChange,
 }: Params) {
   useEffect(() => {
     if (!socket.connected) socket.connect();
@@ -153,6 +158,19 @@ export function useQuizPlaySocket({
         setError("");
         return;
       }
+      if (message === "Not joined") {
+        onParticipantMissing?.();
+        setError("");
+        return;
+      }
+      if (message === "Question is not open") {
+        setError("Вопрос ещё не открыт. Подождите, пока ведущий его запустит.");
+        return;
+      }
+      if (message.startsWith("Too many tags:")) {
+        setError("Слишком много тегов для этого вопроса. Уберите лишние ответы.");
+        return;
+      }
       if (code === "NICKNAME_TAKEN" || message === "Ник уже используется в этой комнате") {
         onJoinFailed?.();
         onJoinSettled?.();
@@ -170,14 +188,25 @@ export function useQuizPlaySocket({
       setError(socketConnectErrorMessage());
     };
     const onConnect = () => {
-      setConnectionStatus("online");
+      if (joinedRef.current) {
+        setConnectionStatus("reconnecting");
+      } else {
+        setConnectionStatus("online");
+      }
       setError((prev) => (isSocketConnectionErrorMessage(prev) ? "" : prev));
     };
     const onDisconnect = () => {
+      if (joinedRef.current) {
+        onQuizSessionReadyChange?.(false);
+        setConnectionStatus("reconnecting");
+        return;
+      }
       setConnectionStatus("offline");
     };
     const onJoined = () => {
       setJoined(true);
+      onQuizSessionReadyChange?.(true);
+      setConnectionStatus("online");
       onQuizJoined?.();
       onJoinSettled?.();
     };
@@ -285,5 +314,7 @@ export function useQuizPlaySocket({
     onQuizJoined,
     onJoinFailed,
     onJoinSettled,
+    joinedRef,
+    onQuizSessionReadyChange,
   ]);
 }

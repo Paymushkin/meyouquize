@@ -126,6 +126,10 @@ export function QuestionChart(props: QuestionChartProps) {
       }),
     [hiddenTagTexts, injectedTagWords, question.tagCloud, tagCountOverrides],
   );
+  const sourceWordsFingerprint = useMemo(
+    () => sourceWords.map((word) => `${word.text}\u0000${word.count}`).join("\u0001"),
+    [sourceWords],
+  );
   const hasTagWords = sourceWords.length > 0;
   const maxTagCount = useMemo(
     () => (sourceWords.length > 0 ? Math.max(...sourceWords.map((item) => item.count)) : 0),
@@ -300,7 +304,7 @@ export function QuestionChart(props: QuestionChartProps) {
     hasTagWords,
     isTagCloud,
     questionRevealStage,
-    sourceWords,
+    sourceWordsFingerprint,
   ]);
 
   const voteRows = useMemo(() => {

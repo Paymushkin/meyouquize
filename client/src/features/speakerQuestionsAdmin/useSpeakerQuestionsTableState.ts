@@ -4,7 +4,7 @@ import { sortRows, type SortKey, type SortState } from "./speakerQuestionsSort";
 
 export function useSpeakerQuestionsTableState(rows: SpeakerQuestionItem[]) {
   const [drafts, setDrafts] = useState<Record<string, string>>({});
-  const [sort, setSort] = useState<SortState<SortKey>>({ key: "rating", dir: "desc" });
+  const [sort, setSort] = useState<SortState<SortKey>>({ key: "created", dir: "desc" });
 
   const sortedRows = useMemo(() => sortRows(rows, sort), [rows, sort]);
 

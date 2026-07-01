@@ -235,6 +235,10 @@ model FeedbackForm {
   openFields         Json               @default("[]")
   commentEnabled     Boolean            @default(true)
   commentPlaceholder String             @default("")
+  /** [{ text: `${scaleId}:${optionIndex}`, count }] — ручная правка отображаемых голосов по шкале */
+  scaleCountOverrides Json              @default("[]")
+  /** [{ id, nickname, openFieldAnswers, submittedAt }] — ответы, добавленные из админки */
+  injectedResponses   Json              @default("[]")
   activatedAt        DateTime?
   createdAt          DateTime           @default(now())
   updatedAt          DateTime           @updatedAt

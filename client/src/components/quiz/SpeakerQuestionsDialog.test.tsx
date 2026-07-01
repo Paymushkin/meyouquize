@@ -119,6 +119,39 @@ describe("SpeakerQuestionsDialog", () => {
     expect(props.onDelete).toHaveBeenCalledWith("mine");
   });
 
+  it("hides «Всем спикерам» when allowAllSpeakersTarget is false", () => {
+    const props = renderDialog(
+      { speakerName: "" },
+      {
+        settings: {
+          enabled: true,
+          speakers: ["Иванов", "Петров"],
+          allowAllSpeakersTarget: false,
+        },
+      },
+    );
+
+    expect(screen.queryByText("Всем спикерам")).toBeNull();
+    expect(screen.getByText("Выбрать спикера")).toBeTruthy();
+    expect(props.onSubmit).toBeDefined();
+  });
+
+  it("allows submit without selected speaker when all-speakers option is disabled", () => {
+    const props = renderDialog(
+      { speakerName: "", speakerQuestionText: "Вопрос без спикера" },
+      {
+        settings: {
+          enabled: true,
+          speakers: ["Иванов"],
+          allowAllSpeakersTarget: false,
+        },
+      },
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Отправить вопрос" }));
+    expect(props.onSubmit).toHaveBeenCalledTimes(1);
+  });
+
   it("lists user-visible questions in actual tab including own published ones", () => {
     renderDialog(undefined, {
       items: [

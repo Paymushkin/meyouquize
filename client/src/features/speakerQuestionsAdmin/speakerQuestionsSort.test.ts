@@ -23,6 +23,17 @@ describe("speakerQuestionsSort", () => {
     expect(nextDir(true, "desc")).toBe("asc");
   });
 
+  it("сортирует по дате поступления", () => {
+    const rows = [
+      makeItem({ id: "old", createdAt: "2026-01-01T10:00:00.000Z" }),
+      makeItem({ id: "new", createdAt: "2026-01-02T12:00:00.000Z" }),
+      makeItem({ id: "mid", createdAt: "2026-01-01T18:00:00.000Z" }),
+    ];
+
+    const result = sortRows(rows, { key: "created", dir: "desc" });
+    expect(result.map((x) => x.id)).toEqual(["new", "mid", "old"]);
+  });
+
   it("сортирует по общему количеству реакций", () => {
     const rows = [
       makeItem({ id: "a", reactionCounts: { "👍": 2, "🔥": 1 } }), // 3

@@ -93,15 +93,24 @@ export function applyCloudManualToQuestions<T extends CloudManualQuestionFields>
   return questions.map((question) => {
     if (!question.id) return question;
     const entry = manual[question.id];
-    if (!entry) return question;
     return {
       ...question,
-      hiddenTagTexts: entry.hiddenTagTexts,
-      injectedTagWords: entry.injectedTagWords,
-      tagCountOverrides: entry.tagCountOverrides,
-      optionVoteCountOverrides: entry.optionVoteCountOverrides,
+      hiddenTagTexts: entry?.hiddenTagTexts ?? [],
+      injectedTagWords: entry?.injectedTagWords ?? [],
+      tagCountOverrides: entry?.tagCountOverrides ?? [],
+      optionVoteCountOverrides: entry?.optionVoteCountOverrides ?? [],
     };
   });
+}
+
+export function clearQuestionManualFields<T extends CloudManualQuestionFields>(question: T): T {
+  return {
+    ...question,
+    hiddenTagTexts: [],
+    injectedTagWords: [],
+    tagCountOverrides: [],
+    optionVoteCountOverrides: [],
+  };
 }
 
 export function buildCloudManualFromQuestions(

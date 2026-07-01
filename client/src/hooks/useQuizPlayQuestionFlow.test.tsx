@@ -91,6 +91,7 @@ describe("useQuizPlayQuestionFlow", () => {
         submittedQuestionIds: [],
         submittedAnswers: {},
         playerAnswersHydrated: true,
+        quizSessionReady: true,
       }),
     );
 
@@ -104,6 +105,43 @@ describe("useQuizPlayQuestionFlow", () => {
         tagAnswers: ["alpha"],
       }),
     );
+  });
+
+  it("blocks tag cloud submit when expanded tags exceed maxAnswers", () => {
+    const question = makeQuestion({ type: "tag_cloud", maxAnswers: 1 });
+    const quiz = makeQuiz({ activeQuestion: question, activeQuestions: [question] });
+    const { result } = renderHook(() =>
+      useQuizPlayQuestionFlow({
+        quiz,
+        submittedQuestionIds: [],
+        submittedAnswers: {},
+        playerAnswersHydrated: true,
+        quizSessionReady: true,
+      }),
+    );
+
+    act(() => result.current.setTagAnswers(["alpha; beta"]));
+    expect(result.current.canSubmit).toBe(false);
+    act(() => result.current.submit());
+    expect(mockSocket.emit).not.toHaveBeenCalled();
+  });
+
+  it("blocks submit until quiz session is ready after reconnect", () => {
+    const quiz = makeQuiz();
+    const { result } = renderHook(() =>
+      useQuizPlayQuestionFlow({
+        quiz,
+        submittedQuestionIds: [],
+        submittedAnswers: {},
+        playerAnswersHydrated: true,
+        quizSessionReady: false,
+      }),
+    );
+
+    act(() => result.current.toggleOption("o1"));
+    expect(result.current.canSubmit).toBe(false);
+    act(() => result.current.submit());
+    expect(mockSocket.emit).not.toHaveBeenCalled();
   });
 
   it("reorders ranking options", () => {

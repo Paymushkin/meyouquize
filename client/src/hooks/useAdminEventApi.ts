@@ -1,5 +1,6 @@
 import {
   useCallback,
+  useEffect,
   useRef,
   useState,
   type Dispatch,
@@ -23,6 +24,8 @@ import { readCloudManualFromPublicView } from "../features/tagCloudAdmin";
 import type { CloudManualStateByQuestion } from "../publicViewContract";
 import { socket } from "../socket";
 import { parseApiErrorMessage } from "../utils/apiError";
+
+const TAG_CLOUD_MANUAL_DEBOUNCE_MS = 400;
 
 type Params = {
   eventName: string;
@@ -79,26 +82,39 @@ export function useAdminEventApi(params: Params) {
     }
   }, [setIsAuth]);
 
+  const loadRoomInFlightRef = useRef<Promise<void> | null>(null);
+
   const loadRoom = useCallback(async () => {
-    const response = await fetch(`${API_BASE}/api/admin/rooms/${eventName}`, {
-      credentials: "include",
-    });
-    if (!response.ok) return;
-    const data = (await response.json()) as AdminEventRoom;
-    const cloudManual = readCloudManualFromPublicView(data.publicView);
-    const sheets: SubQuizSheet[] = data.subQuizzes.map((s) => ({
-      id: s.id,
-      title: s.title,
-      questionFlowMode: s.questionFlowMode === "AUTO" ? "auto" : "manual",
-    }));
-    setSubQuizSheets(sheets);
-    setRoom(data);
-    setQuizId(data.id);
-    const flat = flattenQuestionsFromRoom(data, cloudManual);
-    if (flat[0]?.id) setQuestionId(flat[0].id);
-    setQuestionForms(flat);
-    lastSavedSnapshotRef.current = serializeRoomContent(sheets, flat);
-    setSelectedQuestionIndex(0);
+    if (loadRoomInFlightRef.current) {
+      return loadRoomInFlightRef.current;
+    }
+    const promise = (async () => {
+      try {
+        const response = await fetch(`${API_BASE}/api/admin/rooms/${eventName}`, {
+          credentials: "include",
+        });
+        if (!response.ok) return;
+        const data = (await response.json()) as AdminEventRoom;
+        const cloudManual = readCloudManualFromPublicView(data.publicView);
+        const sheets: SubQuizSheet[] = data.subQuizzes.map((s) => ({
+          id: s.id,
+          title: s.title,
+          questionFlowMode: s.questionFlowMode === "AUTO" ? "auto" : "manual",
+        }));
+        setSubQuizSheets(sheets);
+        setRoom(data);
+        setQuizId(data.id);
+        const flat = flattenQuestionsFromRoom(data, cloudManual);
+        if (flat[0]?.id) setQuestionId(flat[0].id);
+        setQuestionForms(flat);
+        lastSavedSnapshotRef.current = serializeRoomContent(sheets, flat);
+        setSelectedQuestionIndex(0);
+      } finally {
+        loadRoomInFlightRef.current = null;
+      }
+    })();
+    loadRoomInFlightRef.current = promise;
+    return promise;
   }, [
     eventName,
     lastSavedSnapshotRef,
@@ -338,12 +354,62 @@ export function useAdminEventApi(params: Params) {
     [eventName, setMessage, setRoom],
   );
 
+  const pendingManualRef = useRef<CloudManualStateByQuestion | null>(null);
+  const manualDebounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const manualPersistWaitersRef = useRef<Array<(ok: boolean) => void>>([]);
+
+  const flushPendingTagCloudManual = useCallback(async (): Promise<boolean> => {
+    const manual = pendingManualRef.current;
+    pendingManualRef.current = null;
+    if (!manual) {
+      const waiters = manualPersistWaitersRef.current;
+      manualPersistWaitersRef.current = [];
+      waiters.forEach((resolve) => resolve(true));
+      return true;
+    }
+    const ok = await persistTagCloudManual(manual);
+    const waiters = manualPersistWaitersRef.current;
+    manualPersistWaitersRef.current = [];
+    waiters.forEach((resolve) => resolve(ok));
+    return ok;
+  }, [persistTagCloudManual]);
+
+  const schedulePersistTagCloudManual = useCallback(
+    (manual: CloudManualStateByQuestion): Promise<boolean> => {
+      if (Object.keys(manual).length === 0) return Promise.resolve(true);
+      pendingManualRef.current = manual;
+      return new Promise((resolve) => {
+        manualPersistWaitersRef.current.push(resolve);
+        if (manualDebounceTimerRef.current) {
+          clearTimeout(manualDebounceTimerRef.current);
+        }
+        manualDebounceTimerRef.current = setTimeout(() => {
+          manualDebounceTimerRef.current = null;
+          void flushPendingTagCloudManual();
+        }, TAG_CLOUD_MANUAL_DEBOUNCE_MS);
+      });
+    },
+    [flushPendingTagCloudManual],
+  );
+
+  useEffect(() => {
+    return () => {
+      if (manualDebounceTimerRef.current) {
+        clearTimeout(manualDebounceTimerRef.current);
+        manualDebounceTimerRef.current = null;
+      }
+      if (pendingManualRef.current) {
+        void flushPendingTagCloudManual();
+      }
+    };
+  }, [flushPendingTagCloudManual]);
+
   return {
     authChecked,
     checkSession,
     loadRoom,
     persistQuestions,
-    persistTagCloudManual,
+    persistTagCloudManual: schedulePersistTagCloudManual,
     lastPersistQuestionsErrorRef,
     patchQuestionProjectorSettings,
     patchQuestionAdminDone,

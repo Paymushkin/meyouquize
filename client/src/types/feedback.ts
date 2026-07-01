@@ -50,9 +50,19 @@ export type FeedbackScaleStat = {
   responseCount: number;
 };
 
+export type FeedbackScaleCountOverride = {
+  text: string;
+  count: number;
+};
+
+export function feedbackScaleOptionKey(scaleId: string, optionIndex: number): string {
+  return `${scaleId}:${optionIndex}`;
+}
+
 export type FeedbackResultsPayload = {
   form: FeedbackFormConfig;
   responseCount: number;
+  scaleCountOverrides?: FeedbackScaleCountOverride[];
   scaleStats: FeedbackScaleStat[];
   responses: Array<{
     nickname: string;
@@ -61,6 +71,8 @@ export type FeedbackResultsPayload = {
     /** @deprecated use openFieldAnswers */
     comment: string | null;
     submittedAt: string;
+    isInjected?: boolean;
+    injectedId?: string;
   }>;
 };
 

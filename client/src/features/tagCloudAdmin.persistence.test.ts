@@ -43,7 +43,13 @@ describe("tagCloudAdmin persistence helpers", () => {
         tagCountOverrides: [],
         optionVoteCountOverrides: [],
       },
-      { id: "q-2", injectedTagWords: [{ text: "старый", count: 1 }] },
+      {
+        id: "q-2",
+        hiddenTagTexts: [],
+        injectedTagWords: [],
+        tagCountOverrides: [],
+        optionVoteCountOverrides: [],
+      },
     ]);
   });
 

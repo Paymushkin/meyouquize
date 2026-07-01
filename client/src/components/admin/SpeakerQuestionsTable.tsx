@@ -17,6 +17,7 @@ import {
 import SaveOutlinedIcon from "@mui/icons-material/SaveOutlined";
 import DeleteOutlineOutlinedIcon from "@mui/icons-material/DeleteOutlineOutlined";
 import type { SpeakerQuestionItem } from "../../types/speakerQuestions";
+import { SPEAKER_ALL_TARGET, SPEAKER_NOT_SELECTED } from "@meyouquize/shared";
 import {
   nextDir,
   type SortKey,
@@ -132,7 +133,11 @@ export function SpeakerQuestionsTable({
                 </TableCell>
                 <TableCell>
                   <Typography variant="body2">
-                    {q.speakerName === "Все спикеры" ? "Все спикеры" : q.speakerName}
+                    {q.speakerName === SPEAKER_ALL_TARGET
+                      ? "Все спикеры"
+                      : q.speakerName === SPEAKER_NOT_SELECTED
+                        ? "Не выбрано"
+                        : q.speakerName}
                   </Typography>
                 </TableCell>
                 <TableCell align="center">

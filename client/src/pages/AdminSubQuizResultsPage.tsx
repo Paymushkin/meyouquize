@@ -36,6 +36,7 @@ import {
   type PublicViewPayload,
 } from "@meyouquize/shared";
 import { leaderboardPlaceByScore, type LeaderboardItem } from "../admin/adminEventTypes";
+import { emitAdminPublicViewSet } from "../features/publicView/emitAdminPublicViewSet";
 import { socket } from "../socket";
 
 type SubQuizResultsPayload = {
@@ -124,8 +125,7 @@ export function AdminSubQuizResultsPage() {
 
   useEffect(() => {
     if (!isAuth) return;
-    if (socket.connected) socket.disconnect();
-    socket.connect();
+    if (!socket.connected) socket.connect();
   }, [isAuth]);
 
   useEffect(() => {
@@ -195,7 +195,7 @@ export function AdminSubQuizResultsPage() {
   const toggleResultsOnProjector = useCallback(() => {
     if (!payload?.quizId) return;
     const next: PublicViewMode = publicViewMode === "leaderboard" ? "title" : "leaderboard";
-    socket.emit("admin:results:view:set", {
+    emitAdminPublicViewSet({
       quizId: payload.quizId,
       mode: next,
       ...(next === "leaderboard" && payload.subQuizId
@@ -215,7 +215,7 @@ export function AdminSubQuizResultsPage() {
       const safe = Number.isFinite(raw) ? Math.max(0, Math.min(100, Math.trunc(raw))) : 0;
       setHighlightedLeadersCount(safe);
       if (!payload?.quizId) return;
-      socket.emit("admin:results:view:set", {
+      emitAdminPublicViewSet({
         quizId: payload.quizId,
         mode: publicViewMode,
         highlightedLeadersCount: safe,
@@ -232,7 +232,7 @@ export function AdminSubQuizResultsPage() {
       const safe = Number.isFinite(raw) ? Math.max(1, Math.min(20, Math.trunc(raw))) : 1;
       setFirstCorrectWinnersCount(safe);
       if (!payload?.quizId) return;
-      socket.emit("admin:results:view:set", {
+      emitAdminPublicViewSet({
         quizId: payload.quizId,
         mode: publicViewMode,
         firstCorrectWinnersCount: safe,

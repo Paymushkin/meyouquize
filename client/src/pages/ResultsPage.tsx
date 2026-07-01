@@ -34,7 +34,7 @@ const DEFAULT_REACTIONS = ["👍", "👏", "🔥", "🤔"] as const;
 /** Горизонтальные отступы контента вопроса на проекторе (голосование, облако тегов). */
 const PROJECTOR_QUESTION_CONTENT_PX = { xs: 3, sm: 5, md: 8, lg: 10, xl: 12 } as const;
 
-import { speakerTargetLabel } from "./results/speakerTargetLabel";
+import { speakerTargetLabelForAudience } from "./results/speakerTargetLabel";
 export function ResultsPage() {
   const { slug = "" } = useParams();
   const p = useResultsProjectorSession(slug);
@@ -359,139 +359,145 @@ export function ResultsPage() {
               boxSizing: "border-box",
             }}
           >
-            {screenSpeakerQuestions.map((item, idx, arr) => (
-              <Fragment key={item.id}>
-                <Card
-                  variant="outlined"
-                  sx={() => ({
-                    width: "100%",
-                    maxWidth: 1040,
-                    bgcolor: "transparent",
-                    backgroundImage: "none",
-                    borderColor: "transparent",
-                    borderWidth: 0,
-                    boxShadow: "none",
-                    overflow: "visible",
-                    opacity: 0,
-                    transform: "translateY(16px) scale(0.985)",
-                    animation: "speakerQuestionEnter 560ms cubic-bezier(0.2, 0.8, 0.2, 1) forwards",
-                    animationDelay: `${Math.min(idx * 90, 450)}ms`,
-                    "@keyframes speakerQuestionEnter": {
-                      "0%": { opacity: 0, transform: "translateY(16px) scale(0.985)" },
-                      "100%": { opacity: 1, transform: "translateY(0) scale(1)" },
-                    },
-                  })}
-                >
-                  <CardContent
-                    sx={{
-                      py: 1.25,
-                      px: 2.5,
-                      minHeight: 140,
-                      display: "flex",
-                      alignItems: "center",
-                      bgcolor: "rgba(0, 0, 0, 0.16)",
-                      borderRadius: 2,
-                      backdropFilter: "blur(6px)",
-                      WebkitBackdropFilter: "blur(6px)",
-                    }}
+            {screenSpeakerQuestions.map((item, idx, arr) => {
+              const recipientLabel = view.speakerQuestionsShowRecipientOnScreen
+                ? speakerTargetLabelForAudience(item.speakerName)
+                : null;
+              return (
+                <Fragment key={item.id}>
+                  <Card
+                    variant="outlined"
+                    sx={() => ({
+                      width: "100%",
+                      maxWidth: 1040,
+                      bgcolor: "transparent",
+                      backgroundImage: "none",
+                      borderColor: "transparent",
+                      borderWidth: 0,
+                      boxShadow: "none",
+                      overflow: "visible",
+                      opacity: 0,
+                      transform: "translateY(16px) scale(0.985)",
+                      animation:
+                        "speakerQuestionEnter 560ms cubic-bezier(0.2, 0.8, 0.2, 1) forwards",
+                      animationDelay: `${Math.min(idx * 90, 450)}ms`,
+                      "@keyframes speakerQuestionEnter": {
+                        "0%": { opacity: 0, transform: "translateY(16px) scale(0.985)" },
+                        "100%": { opacity: 1, transform: "translateY(0) scale(1)" },
+                      },
+                    })}
                   >
-                    <Stack spacing={1.5} sx={{ width: "100%" }}>
-                      <Box
-                        sx={{
-                          bgcolor: "transparent",
-                          color: "#fff",
-                          borderRadius: 3,
-                          px: 0,
-                          py: 0,
-                          boxShadow: "none",
-                          display: "flex",
-                          flexDirection: "column",
-                          gap: 1.5,
-                        }}
-                      >
-                        {view.speakerQuestionsShowRecipientOnScreen ? (
-                          <Typography
-                            variant="caption"
-                            sx={{ color: "#fff", fontWeight: 700, letterSpacing: 0.2 }}
-                          >
-                            {speakerTargetLabel(item.speakerName)}
-                          </Typography>
-                        ) : null}
-                        <Typography
-                          variant="h4"
+                    <CardContent
+                      sx={{
+                        py: 1.25,
+                        px: 2.5,
+                        minHeight: 140,
+                        display: "flex",
+                        alignItems: "center",
+                        bgcolor: "rgba(0, 0, 0, 0.16)",
+                        borderRadius: 2,
+                        backdropFilter: "blur(6px)",
+                        WebkitBackdropFilter: "blur(6px)",
+                      }}
+                    >
+                      <Stack spacing={1.5} sx={{ width: "100%" }}>
+                        <Box
                           sx={{
+                            bgcolor: "transparent",
                             color: "#fff",
-                            fontWeight: 400,
-                            lineHeight: 1.14,
-                            fontSize: { xs: "1.95rem", md: "2.7rem" },
-                            whiteSpace: "pre-line",
+                            borderRadius: 3,
+                            px: 0,
+                            py: 0,
+                            boxShadow: "none",
+                            display: "flex",
+                            flexDirection: "column",
+                            gap: 1.5,
                           }}
                         >
-                          {item.text}
-                        </Typography>
-                      </Box>
-                      <Stack
-                        direction="row"
-                        alignItems="center"
-                        justifyContent="space-between"
-                        sx={{ px: 0.5 }}
-                      >
-                        {view.speakerQuestionsShowAuthorOnScreen ? (
-                          <Typography variant="body2" sx={{ opacity: 0.9, color: "#fff" }}>
-                            от {item.authorNickname}
-                          </Typography>
-                        ) : (
-                          <Box />
-                        )}
-                        {view.speakerQuestionsShowReactionsOnScreen ? (
-                          <Stack
-                            direction="row"
-                            spacing={0.75}
-                            useFlexGap
-                            flexWrap="wrap"
-                            justifyContent="flex-end"
+                          {recipientLabel ? (
+                            <Typography
+                              variant="caption"
+                              sx={{ color: "#fff", fontWeight: 700, letterSpacing: 0.2 }}
+                            >
+                              {recipientLabel}
+                            </Typography>
+                          ) : null}
+                          <Typography
+                            variant="h4"
+                            sx={{
+                              color: "#fff",
+                              fontWeight: 400,
+                              lineHeight: 1.14,
+                              fontSize: { xs: "1.95rem", md: "2.7rem" },
+                              whiteSpace: "pre-line",
+                            }}
                           >
-                            {Object.entries(item.reactionCounts ?? {})
-                              .filter(([, count]) => count > 0)
-                              .map(([reaction, count]) => (
-                                <Box
-                                  key={`${item.id}_${reaction}`}
-                                  sx={{
-                                    bgcolor: "transparent",
-                                    border: `1px solid ${alpha("#fff", 0.5)}`,
-                                    borderRadius: 999,
-                                    px: 1,
-                                    py: 0.5,
-                                  }}
-                                >
-                                  <Typography
-                                    variant="body2"
-                                    sx={{ color: "#fff", fontWeight: 700 }}
+                            {item.text}
+                          </Typography>
+                        </Box>
+                        <Stack
+                          direction="row"
+                          alignItems="center"
+                          justifyContent="space-between"
+                          sx={{ px: 0.5 }}
+                        >
+                          {view.speakerQuestionsShowAuthorOnScreen ? (
+                            <Typography variant="body2" sx={{ opacity: 0.9, color: "#fff" }}>
+                              от {item.authorNickname}
+                            </Typography>
+                          ) : (
+                            <Box />
+                          )}
+                          {view.speakerQuestionsShowReactionsOnScreen ? (
+                            <Stack
+                              direction="row"
+                              spacing={0.75}
+                              useFlexGap
+                              flexWrap="wrap"
+                              justifyContent="flex-end"
+                            >
+                              {Object.entries(item.reactionCounts ?? {})
+                                .filter(([, count]) => count > 0)
+                                .map(([reaction, count]) => (
+                                  <Box
+                                    key={`${item.id}_${reaction}`}
+                                    sx={{
+                                      bgcolor: "transparent",
+                                      border: `1px solid ${alpha("#fff", 0.5)}`,
+                                      borderRadius: 999,
+                                      px: 1,
+                                      py: 0.5,
+                                    }}
                                   >
-                                    {reaction} {count}
-                                  </Typography>
-                                </Box>
-                              ))}
-                          </Stack>
-                        ) : (
-                          <Box />
-                        )}
+                                    <Typography
+                                      variant="body2"
+                                      sx={{ color: "#fff", fontWeight: 700 }}
+                                    >
+                                      {reaction} {count}
+                                    </Typography>
+                                  </Box>
+                                ))}
+                            </Stack>
+                          ) : (
+                            <Box />
+                          )}
+                        </Stack>
                       </Stack>
-                    </Stack>
-                  </CardContent>
-                </Card>
-                {idx < arr.length - 1 ? (
-                  <Box
-                    sx={{
-                      width: "100%",
-                      height: 1.5,
-                      my: 2.5,
-                      bgcolor: "rgba(255, 255, 255, 0.25)",
-                    }}
-                  />
-                ) : null}
-              </Fragment>
-            ))}
+                    </CardContent>
+                  </Card>
+                  {idx < arr.length - 1 ? (
+                    <Box
+                      sx={{
+                        width: "100%",
+                        height: 1.5,
+                        my: 2.5,
+                        bgcolor: "rgba(255, 255, 255, 0.25)",
+                      }}
+                    />
+                  ) : null}
+                </Fragment>
+              );
+            })}
           </Stack>
         )}
         {view.mode === "reactions" && (

@@ -267,5 +267,6 @@ describe("DEFAULT_PUBLIC_VIEW_STATE", () => {
   it("has stable defaults", () => {
     expect(DEFAULT_PUBLIC_VIEW_STATE.mode).toBe("title");
     expect(DEFAULT_PUBLIC_VIEW_STATE.projectorJoinQrVisible).toBe(false);
+    expect(DEFAULT_PUBLIC_VIEW_STATE.speakerTileVisible).toBe(false);
   });
 });

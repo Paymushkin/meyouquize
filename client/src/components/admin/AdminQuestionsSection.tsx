@@ -1,5 +1,6 @@
 import AddIcon from "@mui/icons-material/Add";
 import ContentCopyIcon from "@mui/icons-material/ContentCopy";
+import DragIndicatorIcon from "@mui/icons-material/DragIndicator";
 import KeyboardArrowDownIcon from "@mui/icons-material/KeyboardArrowDown";
 import KeyboardArrowUpIcon from "@mui/icons-material/KeyboardArrowUp";
 import CloudQueueIcon from "@mui/icons-material/CloudQueue";
@@ -7,7 +8,7 @@ import FormatListNumberedIcon from "@mui/icons-material/FormatListNumbered";
 import HowToVoteIcon from "@mui/icons-material/HowToVote";
 import LeaderboardIcon from "@mui/icons-material/Leaderboard";
 import OpenInNewIcon from "@mui/icons-material/OpenInNew";
-import RestoreIcon from "@mui/icons-material/Restore";
+import SettingsIcon from "@mui/icons-material/Settings";
 import {
   Box,
   Button,
@@ -26,10 +27,15 @@ import {
   Typography,
 } from "@mui/material";
 import { Link as RouterLink } from "react-router-dom";
+import { useState } from "react";
 import { isEditorQuizMode, type QuestionForm } from "../../admin/adminEventForm";
 import type { QuestionResult } from "../../admin/adminEventTypes";
 import type { PublicViewMode } from "../../publicViewContract";
-import { hasOptionVoteCountOverride, resolveOptionDisplayCount } from "@meyouquize/shared";
+import {
+  hasOptionVoteCountOverride,
+  resolveOptionDisplayCount,
+  computeTemperatureWeightedAverage,
+} from "@meyouquize/shared";
 import {
   runAdminQuestionRevealResultsFlow,
   runAdminQuestionSlideshowFlow,
@@ -38,6 +44,19 @@ import { QuestionRowProjectorControls } from "./questionRow/QuestionRowProjector
 import { QuestionRowQuickActions } from "./questionRow/QuestionRowQuickActions";
 import { QuestionSettingsToolbar } from "./questionRow/QuestionSettingsToolbar";
 import { VoteCountAdjustControls } from "./VoteCountAdjustControls";
+
+function QuestionVoterTotalRow({ total }: { total: number }) {
+  return (
+    <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mt: 1 }}>
+      <Typography variant="body2" color="text.secondary">
+        Всего
+      </Typography>
+      <Typography variant="body2" color="text.secondary">
+        {total}
+      </Typography>
+    </Stack>
+  );
+}
 
 type Props = {
   questionForms: QuestionForm[];
@@ -98,9 +117,21 @@ type Props = {
     mode: "markDone" | "markActive";
     onToggle: (globalIndex: number) => void;
   };
+  /** Режим управления списком: перенос и порядок (голосования комнаты). */
+  voteListManageMode?: boolean;
+  /** Кнопка в шапке «Актуальные» для вкл/выкл режима. */
+  voteListManageToggle?: {
+    enabled: boolean;
+    onToggle: () => void;
+  };
+  onReorderVoteInList?: (fromLocalIndex: number, toLocalIndex: number) => void;
   /** Клонировать голосование комнаты (вкладка «Голосования»). */
   onCloneQuestion?: (globalIndex: number) => void;
 };
+
+function questionSupportsVoteAdjust(type: QuestionForm["type"]): boolean {
+  return type !== "tag_cloud" && type !== "ranking";
+}
 
 export function AdminQuestionsSection(props: Props) {
   const {
@@ -141,8 +172,25 @@ export function AdminQuestionsSection(props: Props) {
     playerVisibleResultQuestionIds,
     togglePlayerVisibleResultQuestionId,
     adminDoneToggle,
+    voteListManageMode = false,
+    voteListManageToggle,
+    onReorderVoteInList,
     onCloneQuestion,
   } = props;
+
+  const [dragLocalIndex, setDragLocalIndex] = useState<number | null>(null);
+  const [dropLocalIndex, setDropLocalIndex] = useState<number | null>(null);
+
+  const [voteAdjustEditIndices, setVoteAdjustEditIndices] = useState<Set<number>>(() => new Set());
+
+  function toggleVoteAdjustEdit(globalIndex: number) {
+    setVoteAdjustEditIndices((current) => {
+      const next = new Set(current);
+      if (next.has(globalIndex)) next.delete(globalIndex);
+      else next.add(globalIndex);
+      return next;
+    });
+  }
 
   function questionTypeLabel(type: QuestionForm["type"]) {
     if (type === "tag_cloud") return "Облако тегов";
@@ -194,17 +242,38 @@ export function AdminQuestionsSection(props: Props) {
                   {listTitle}
                 </Typography>
               )}
-              {listHeaderShowAddButton ? (
-                <Stack direction="row" spacing={1}>
-                  <Button
-                    startIcon={<AddIcon />}
-                    variant="outlined"
-                    size="small"
-                    onClick={addQuestion}
-                    sx={{ textTransform: "none" }}
-                  >
-                    {addButtonLabel}
-                  </Button>
+              {voteListManageToggle || listHeaderShowAddButton ? (
+                <Stack direction="row" spacing={1} alignItems="center">
+                  {voteListManageToggle ? (
+                    <Tooltip
+                      title={
+                        voteListManageToggle.enabled
+                          ? "Скрыть управление списком"
+                          : "Управление списком"
+                      }
+                    >
+                      <IconButton
+                        size="small"
+                        onClick={voteListManageToggle.onToggle}
+                        aria-label="Управление списком голосований"
+                        aria-pressed={voteListManageToggle.enabled}
+                        color={voteListManageToggle.enabled ? "primary" : "default"}
+                      >
+                        <SettingsIcon fontSize="small" />
+                      </IconButton>
+                    </Tooltip>
+                  ) : null}
+                  {listHeaderShowAddButton ? (
+                    <Button
+                      startIcon={<AddIcon />}
+                      variant="outlined"
+                      size="small"
+                      onClick={addQuestion}
+                      sx={{ textTransform: "none" }}
+                    >
+                      {addButtonLabel}
+                    </Button>
+                  ) : null}
                 </Stack>
               ) : null}
             </Stack>
@@ -227,11 +296,46 @@ export function AdminQuestionsSection(props: Props) {
               const showStandaloneAdminBlock = isStandaloneVote && !!question.id;
               return (
                 <Box
-                  key={`q-list-${qIndex}`}
+                  key={question.id ?? `q-list-${g}`}
                   component="li"
                   sx={{ display: "block", listStyle: "none" }}
+                  onDragOver={(event) => {
+                    if (!voteListManageMode || !onReorderVoteInList || dragLocalIndex === null) {
+                      return;
+                    }
+                    event.preventDefault();
+                    event.dataTransfer.dropEffect = "move";
+                    setDropLocalIndex(qIndex);
+                  }}
+                  onDragLeave={() => {
+                    setDropLocalIndex((current) => (current === qIndex ? null : current));
+                  }}
+                  onDrop={(event) => {
+                    if (!voteListManageMode || !onReorderVoteInList || dragLocalIndex === null) {
+                      return;
+                    }
+                    event.preventDefault();
+                    event.stopPropagation();
+                    if (dragLocalIndex !== qIndex) {
+                      onReorderVoteInList(dragLocalIndex, qIndex);
+                    }
+                    setDragLocalIndex(null);
+                    setDropLocalIndex(null);
+                  }}
                 >
-                  <Box sx={{ position: "relative" }}>
+                  <Box
+                    sx={{
+                      position: "relative",
+                      borderRadius: 1,
+                      outline:
+                        dropLocalIndex === qIndex && dragLocalIndex !== qIndex
+                          ? "2px dashed"
+                          : "none",
+                      outlineColor: "primary.main",
+                      outlineOffset: -2,
+                      opacity: dragLocalIndex === qIndex ? 0.55 : 1,
+                    }}
+                  >
                     <ListItemButton
                       disableGutters
                       selected={false}
@@ -265,7 +369,7 @@ export function AdminQuestionsSection(props: Props) {
                           py: 0.5,
                         }}
                       >
-                        {adminDoneToggle ? (
+                        {voteListManageMode && adminDoneToggle ? (
                           <Tooltip
                             title={
                               !question.id
@@ -297,6 +401,36 @@ export function AdminQuestionsSection(props: Props) {
                                 )}
                               </IconButton>
                             </span>
+                          </Tooltip>
+                        ) : null}
+                        {voteListManageMode && onReorderVoteInList ? (
+                          <Tooltip title="Перетащите для изменения порядка">
+                            <Box
+                              component="span"
+                              draggable
+                              onDragStart={(event) => {
+                                event.stopPropagation();
+                                setDragLocalIndex(qIndex);
+                                setDropLocalIndex(null);
+                                event.dataTransfer.effectAllowed = "move";
+                                event.dataTransfer.setData("text/plain", String(qIndex));
+                              }}
+                              onDragEnd={() => {
+                                setDragLocalIndex(null);
+                                setDropLocalIndex(null);
+                              }}
+                              onClick={(event) => event.stopPropagation()}
+                              sx={{
+                                display: "flex",
+                                alignItems: "center",
+                                flexShrink: 0,
+                                cursor: "grab",
+                                color: "text.secondary",
+                                touchAction: "none",
+                              }}
+                            >
+                              <DragIndicatorIcon sx={{ fontSize: 20 }} />
+                            </Box>
                           </Tooltip>
                         ) : null}
                         <Tooltip title={questionTypeLabel(question.type)} enterTouchDelay={400}>
@@ -433,6 +567,14 @@ export function AdminQuestionsSection(props: Props) {
                               }
                               togglePlayerVisibleResultQuestionId(question.id);
                             }}
+                            showRestoreVoteResults={
+                              voteAdjustEditIndices.has(g) &&
+                              (question.optionVoteCountOverrides?.length ?? 0) > 0
+                            }
+                            onRestoreVoteResults={() => resetOptionVoteCountOverrides(g)}
+                            showVoteAdjustToggle={questionSupportsVoteAdjust(question.type)}
+                            voteAdjustEditVisible={voteAdjustEditIndices.has(g)}
+                            onToggleVoteAdjustEdit={() => toggleVoteAdjustEdit(g)}
                           />
                           {showStandaloneAdminBlock &&
                           isEditorQuizMode(question) &&
@@ -475,26 +617,12 @@ export function AdminQuestionsSection(props: Props) {
                               <MenuItem value="total_score">Сумма баллов (по варианту)</MenuItem>
                             </TextField>
                           ) : null}
-                          <Stack direction="row" alignItems="center" justifyContent="space-between">
-                            <Typography variant="caption" color="text.secondary">
-                              Результаты вопроса
-                            </Typography>
-                            {(question.optionVoteCountOverrides?.length ?? 0) > 0 ? (
-                              <Tooltip title="Восстановить все реальные результаты">
-                                <IconButton
-                                  size="small"
-                                  onClick={() => resetOptionVoteCountOverrides(g)}
-                                  aria-label="Восстановить все реальные результаты"
-                                >
-                                  <RestoreIcon fontSize="small" />
-                                </IconButton>
-                              </Tooltip>
-                            ) : null}
-                          </Stack>
                           {(() => {
+                            const voteAdjustEditVisible = voteAdjustEditIndices.has(g);
                             const result = question.id
                               ? questionResults.find((item) => item.questionId === question.id)
                               : undefined;
+                            const voterTotal = result?.answerCount ?? 0;
                             if (question.type === "tag_cloud") {
                               const tags = result?.tagCloud ?? [];
                               const injected = question.injectedTagWords ?? [];
@@ -573,6 +701,7 @@ export function AdminQuestionsSection(props: Props) {
                                           <Stack
                                             direction="row"
                                             justifyContent="space-between"
+                                            alignItems="center"
                                             sx={{ mb: 0.25 }}
                                           >
                                             <Typography variant="caption" color="text.primary">
@@ -598,6 +727,7 @@ export function AdminQuestionsSection(props: Props) {
                                         </Box>
                                       );
                                     })}
+                                    <QuestionVoterTotalRow total={voterTotal} />
                                   </Stack>
                                 );
                               }
@@ -638,6 +768,7 @@ export function AdminQuestionsSection(props: Props) {
                                         <Stack
                                           direction="row"
                                           justifyContent="space-between"
+                                          alignItems="center"
                                           sx={{ mb: 0.25 }}
                                         >
                                           <Typography variant="caption" color="text.primary">
@@ -661,6 +792,7 @@ export function AdminQuestionsSection(props: Props) {
                                       </Box>
                                     );
                                   })}
+                                  <QuestionVoterTotalRow total={voterTotal} />
                                 </Stack>
                               );
                             }
@@ -683,9 +815,15 @@ export function AdminQuestionsSection(props: Props) {
                                 (sum, option) => sum + option.count,
                                 0,
                               );
+                              const temperatureValue = computeTemperatureWeightedAverage(
+                                bars.map((option) => ({
+                                  count: option.count,
+                                  weight: option.weight ?? 0,
+                                })),
+                              );
                               const tempLabel =
-                                result?.temperatureValue != null
-                                  ? `Температура: ${result.temperatureValue}`
+                                temperatureValue != null
+                                  ? `Температура: ${temperatureValue}`
                                   : null;
                               return (
                                 <Stack spacing={0.8}>
@@ -704,36 +842,43 @@ export function AdminQuestionsSection(props: Props) {
                                         <Stack
                                           direction="row"
                                           justifyContent="space-between"
+                                          alignItems="center"
                                           sx={{ mb: 0.25 }}
                                         >
                                           <Typography variant="caption" color="text.primary">
                                             {option.text}
                                             {option.weight != null ? ` (вес ${option.weight})` : ""}
                                           </Typography>
-                                          <VoteCountAdjustControls
-                                            count={option.count}
-                                            hasOverride={hasOptionVoteCountOverride(
-                                              overrides,
-                                              option.optionId,
-                                            )}
-                                            onDecrement={() =>
-                                              updateOptionVoteCountOverride(
-                                                g,
+                                          {voteAdjustEditVisible ? (
+                                            <VoteCountAdjustControls
+                                              count={option.count}
+                                              hasOverride={hasOptionVoteCountOverride(
+                                                overrides,
                                                 option.optionId,
-                                                option.count - 1,
-                                              )
-                                            }
-                                            onIncrement={() =>
-                                              updateOptionVoteCountOverride(
-                                                g,
-                                                option.optionId,
-                                                option.count + 1,
-                                              )
-                                            }
-                                            onRestore={() =>
-                                              clearOptionVoteCountOverride(g, option.optionId)
-                                            }
-                                          />
+                                              )}
+                                              onDecrement={() =>
+                                                updateOptionVoteCountOverride(
+                                                  g,
+                                                  option.optionId,
+                                                  option.count - 1,
+                                                )
+                                              }
+                                              onIncrement={() =>
+                                                updateOptionVoteCountOverride(
+                                                  g,
+                                                  option.optionId,
+                                                  option.count + 1,
+                                                )
+                                              }
+                                              onRestore={() =>
+                                                clearOptionVoteCountOverride(g, option.optionId)
+                                              }
+                                            />
+                                          ) : (
+                                            <Typography variant="caption">
+                                              {option.count}
+                                            </Typography>
+                                          )}
                                         </Stack>
                                         <LinearProgress
                                           variant="determinate"
@@ -744,6 +889,7 @@ export function AdminQuestionsSection(props: Props) {
                                       </Box>
                                     );
                                   })}
+                                  <QuestionVoterTotalRow total={totalVotes} />
                                 </Stack>
                               );
                             }
@@ -775,6 +921,7 @@ export function AdminQuestionsSection(props: Props) {
                                       <Stack
                                         direction="row"
                                         justifyContent="space-between"
+                                        alignItems="center"
                                         sx={{ mb: 0.25 }}
                                       >
                                         <Typography
@@ -783,30 +930,34 @@ export function AdminQuestionsSection(props: Props) {
                                         >
                                           {option.text} {option.isCorrect ? "(правильный)" : ""}
                                         </Typography>
-                                        <VoteCountAdjustControls
-                                          count={option.count}
-                                          hasOverride={hasOptionVoteCountOverride(
-                                            overrides,
-                                            option.optionId,
-                                          )}
-                                          onDecrement={() =>
-                                            updateOptionVoteCountOverride(
-                                              g,
+                                        {voteAdjustEditVisible ? (
+                                          <VoteCountAdjustControls
+                                            count={option.count}
+                                            hasOverride={hasOptionVoteCountOverride(
+                                              overrides,
                                               option.optionId,
-                                              option.count - 1,
-                                            )
-                                          }
-                                          onIncrement={() =>
-                                            updateOptionVoteCountOverride(
-                                              g,
-                                              option.optionId,
-                                              option.count + 1,
-                                            )
-                                          }
-                                          onRestore={() =>
-                                            clearOptionVoteCountOverride(g, option.optionId)
-                                          }
-                                        />
+                                            )}
+                                            onDecrement={() =>
+                                              updateOptionVoteCountOverride(
+                                                g,
+                                                option.optionId,
+                                                option.count - 1,
+                                              )
+                                            }
+                                            onIncrement={() =>
+                                              updateOptionVoteCountOverride(
+                                                g,
+                                                option.optionId,
+                                                option.count + 1,
+                                              )
+                                            }
+                                            onRestore={() =>
+                                              clearOptionVoteCountOverride(g, option.optionId)
+                                            }
+                                          />
+                                        ) : (
+                                          <Typography variant="caption">{option.count}</Typography>
+                                        )}
                                       </Stack>
                                       <LinearProgress
                                         variant="determinate"
@@ -817,6 +968,7 @@ export function AdminQuestionsSection(props: Props) {
                                     </Box>
                                   );
                                 })}
+                                <QuestionVoterTotalRow total={voterTotal} />
                               </Stack>
                             );
                           })()}

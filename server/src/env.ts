@@ -11,8 +11,12 @@ import {
 
 const currentFile = fileURLToPath(import.meta.url);
 const serverSrcDir = path.dirname(currentFile);
-const projectRootEnv = path.resolve(serverSrcDir, "../../.env");
-const runtimeEnvPath = path.resolve(serverSrcDir, "../../deploy/env/.env.runtime");
+/** `server/src` → repo root; `server/dist/src` → repo root (не `server/media`). */
+const projectRootDir = serverSrcDir.includes(`${path.sep}dist${path.sep}`)
+  ? path.resolve(serverSrcDir, "../../..")
+  : path.resolve(serverSrcDir, "../..");
+const projectRootEnv = path.resolve(projectRootDir, ".env");
+const runtimeEnvPath = path.resolve(projectRootDir, "deploy/env/.env.runtime");
 
 /** Integration/E2E: env задаётся в vitest/playwright setup — не подмешивать dev .env. */
 const skipDotenvForTestDatabase =
@@ -232,7 +236,7 @@ export const env = {
     0,
     Number.parseInt(process.env.QUIZ_ONLINE_COUNT_DEBOUNCE_MS ?? "250", 10) || 250,
   ),
-  mediaDir: process.env.MEDIA_DIR?.trim() || path.resolve(serverSrcDir, "../../media"),
+  mediaDir: process.env.MEDIA_DIR?.trim() || path.resolve(projectRootDir, "media"),
   /** Количество Node-воркеров (см. `server/src/index.ts`). */
   clusterWorkers,
   /** При true Redis-адаптер Socket.IO обязателен и при ошибке подключения процесс падает. */

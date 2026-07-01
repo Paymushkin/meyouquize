@@ -20,10 +20,22 @@ type Params = {
   submittedQuestionIds: string[];
   submittedAnswers: Record<string, string[]>;
   playerAnswersHydrated: boolean;
+  /** false после disconnect до повторного quiz:joined */
+  quizSessionReady?: boolean;
 };
 
+function tagCloudExpandedCount(lines: string[]): number {
+  return expandTagCloudSubmitLines(lines.map((value) => value.trim()).filter(Boolean)).length;
+}
+
 export function useQuizPlayQuestionFlow(params: Params) {
-  const { quiz, submittedQuestionIds, submittedAnswers, playerAnswersHydrated } = params;
+  const {
+    quiz,
+    submittedQuestionIds,
+    submittedAnswers,
+    playerAnswersHydrated,
+    quizSessionReady = true,
+  } = params;
   const [selected, setSelected] = useState<string[]>([]);
   const [rankOrder, setRankOrder] = useState<string[]>([]);
   const [tagAnswers, setTagAnswers] = useState<string[]>([""]);
@@ -95,11 +107,18 @@ export function useQuizPlayQuestionFlow(params: Params) {
   }, [nonQuizActiveQuestion]);
 
   const canSubmit = useMemo(() => {
-    if (!quiz || !nonQuizActiveQuestion) return false;
+    if (!quiz || !nonQuizActiveQuestion || !quizSessionReady) return false;
     const alreadySubmitted = submittedQuestionIds.includes(nonQuizActiveQuestion.id);
     if (nonQuizActiveQuestion.type === "tag_cloud") {
       const filled = tagAnswers.map((value) => value.trim()).filter(Boolean);
-      return filled.length > 0 && !nonQuizActiveQuestion.isClosed && !alreadySubmitted;
+      const maxAnswers = Math.max(1, nonQuizActiveQuestion.maxAnswers ?? 1);
+      const expandedCount = tagCloudExpandedCount(filled);
+      return (
+        expandedCount > 0 &&
+        expandedCount <= maxAnswers &&
+        !nonQuizActiveQuestion.isClosed &&
+        !alreadySubmitted
+      );
     }
     if (nonQuizActiveQuestion.type === "ranking") {
       const n = nonQuizActiveQuestion.options.length;
@@ -114,17 +133,28 @@ export function useQuizPlayQuestionFlow(params: Params) {
       );
     }
     return selected.length > 0 && !nonQuizActiveQuestion.isClosed && !alreadySubmitted;
-  }, [quiz, nonQuizActiveQuestion, selected, rankOrder, submittedQuestionIds, tagAnswers]);
+  }, [
+    quiz,
+    nonQuizActiveQuestion,
+    selected,
+    rankOrder,
+    submittedQuestionIds,
+    tagAnswers,
+    quizSessionReady,
+  ]);
 
   const submit = useCallback(() => {
-    if (!quiz || !nonQuizActiveQuestion || !canSubmit) return;
+    if (!quiz || !nonQuizActiveQuestion || !canSubmit || !quizSessionReady) return;
     if (nonQuizActiveQuestion.type === "tag_cloud") {
+      const expanded = expandTagCloudSubmitLines(
+        tagAnswers.map((value) => value.trim()).filter(Boolean),
+      );
+      const maxAnswers = Math.max(1, nonQuizActiveQuestion.maxAnswers ?? 1);
+      if (expanded.length === 0 || expanded.length > maxAnswers) return;
       const payload = {
         quizId: quiz.id,
         questionId: nonQuizActiveQuestion.id,
-        tagAnswers: expandTagCloudSubmitLines(
-          tagAnswers.map((value) => value.trim()).filter(Boolean),
-        ),
+        tagAnswers: expanded,
       };
       pendingSubmitPayloadRef.current = payload;
       socket.emit("answer:submit", payload);
@@ -147,7 +177,7 @@ export function useQuizPlayQuestionFlow(params: Params) {
     };
     pendingSubmitPayloadRef.current = payload;
     socket.emit("answer:submit", payload);
-  }, [quiz, nonQuizActiveQuestion, canSubmit, tagAnswers, rankOrder, selected]);
+  }, [quiz, nonQuizActiveQuestion, canSubmit, tagAnswers, rankOrder, selected, quizSessionReady]);
 
   const onQuestionSubmitted = useCallback((questionId: string) => {
     setDismissedQuestionId(questionId);

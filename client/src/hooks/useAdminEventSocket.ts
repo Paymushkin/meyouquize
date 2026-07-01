@@ -1,4 +1,4 @@
-import { useCallback, type Dispatch, type SetStateAction } from "react";
+import { useCallback, type Dispatch, type MutableRefObject, type SetStateAction } from "react";
 import type {
   LeaderboardItem,
   QuestionResult,
@@ -15,6 +15,7 @@ import type { SpeakerQuestionsPayload } from "../types/speakerQuestions";
 import type { ReactionSession } from "../pages/quiz-play/types";
 import { parseSocketErrorMessage } from "../utils/socketError";
 import { patchQuestionsFromPublicView } from "../features/publicView/patchQuestionFromPublicView";
+import { recordServerPublicView } from "../features/publicView/publicViewEmitCoordination";
 
 type ActiveState = {
   activeQuestion: { id: string } | null;
@@ -92,6 +93,7 @@ type Params = {
   setReactionsOverlayText?: (value: string) => void;
   setReactionWidgets?: (value: Array<{ id: string; title: string; reactions: string[] }>) => void;
   setOnlineUsersCount?: (value: number) => void;
+  onPublicViewExtrasRef?: MutableRefObject<(payload: PublicViewPayload) => void>;
 };
 
 export function useAdminEventSocket<TQuestion extends QuestionFormPatchable>(
@@ -157,6 +159,7 @@ export function useAdminEventSocket<TQuestion extends QuestionFormPatchable>(
     setReactionsOverlayText,
     setReactionWidgets,
     setOnlineUsersCount,
+    onPublicViewExtrasRef,
   } = params;
 
   const clearSocketListeners = useCallback(() => {
@@ -255,15 +258,23 @@ export function useAdminEventSocket<TQuestion extends QuestionFormPatchable>(
     ],
   );
 
+  const subscribeAdminChannels = useCallback(() => {
+    socket.emit("results:subscribe", { slug: eventName, viewer: "admin" });
+    socket.emit("speaker:questions:subscribe", { slug: eventName, viewer: "admin" });
+    socket.emit("quiz:online:request");
+  }, [eventName]);
+
   const setupSocketListeners = useCallback(() => {
-    if (socket.connected) socket.disconnect();
     clearSocketListeners();
-    socket.connect();
+    if (!socket.connected) {
+      socket.connect();
+    }
     socket.on("connect", () => {
-      socket.emit("results:subscribe", { slug: eventName, viewer: "admin" });
-      socket.emit("speaker:questions:subscribe", { slug: eventName, viewer: "admin" });
-      socket.emit("quiz:online:request");
+      subscribeAdminChannels();
     });
+    if (socket.connected) {
+      subscribeAdminChannels();
+    }
     socket.on("state:quiz", (state: ActiveState) => {
       if (state.activeQuestion?.id) setQuestionId(state.activeQuestion.id);
       if (setReactionSession) {
@@ -297,6 +308,16 @@ export function useAdminEventSocket<TQuestion extends QuestionFormPatchable>(
       },
     );
     socket.on("results:public:view", (payload: PublicViewPayload) => {
+      recordServerPublicView({
+        mode: payload.mode,
+        questionId: payload.questionId,
+        questionRevealStage: payload.questionRevealStage,
+        showFirstCorrectAnswerer: payload.showFirstCorrectAnswerer,
+        showVoteCount: payload.showVoteCount,
+        showQuestionTitle: payload.showQuestionTitle,
+        leaderboardSubQuizId: payload.leaderboardSubQuizId,
+        highlightedLeadersCount: payload.highlightedLeadersCount,
+      });
       const view = normalizePublicViewState(payload);
       setPublicViewMode(view.mode);
       setPublicViewQuestionId(view.questionId);
@@ -324,6 +345,7 @@ export function useAdminEventSocket<TQuestion extends QuestionFormPatchable>(
             })),
         );
       }
+      onPublicViewExtrasRef?.current?.(payload);
     });
     socket.on("speaker:questions:update", (payload: SpeakerQuestionsPayload) => {
       setSpeakerQuestionsPayload(payload);
@@ -336,6 +358,7 @@ export function useAdminEventSocket<TQuestion extends QuestionFormPatchable>(
   }, [
     applyBrandingState,
     clearSocketListeners,
+    subscribeAdminChannels,
     eventName,
     setHighlightedLeadersCount,
     setLeaderboard,
@@ -354,6 +377,7 @@ export function useAdminEventSocket<TQuestion extends QuestionFormPatchable>(
     setReactionsOverlayText,
     setReactionWidgets,
     setOnlineUsersCount,
+    onPublicViewExtrasRef,
   ]);
 
   return { setupSocketListeners, clearSocketListeners };

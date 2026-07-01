@@ -113,10 +113,16 @@ async function renderSimplePdf(report: PublicEventReport): Promise<Buffer> {
 
     if (report.config.reportModules.includes("feedback_summary") && report.feedback.length > 0) {
       report.feedback.forEach((form, formIndex) => {
-        if (form.responseCount <= 0) return;
+        const displayCount =
+          form.responseCount > 0
+            ? form.responseCount
+            : form.scaleStats.reduce((max, stat) => {
+                const total = stat.counts.reduce((sum, count) => sum + count, 0);
+                return Math.max(max, total);
+              }, 0);
         if (formIndex > 0) doc.moveDown();
         doc.fontSize(14).text(form.title || "Обратная связь");
-        doc.fontSize(11).text(`Ответов: ${form.responseCount}`);
+        doc.fontSize(11).text(`Ответов: ${displayCount}`);
         form.scaleStats.forEach((stat) => {
           doc.moveDown(0.2);
           doc.fontSize(12).text(stat.label);

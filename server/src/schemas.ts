@@ -320,15 +320,17 @@ export const subscribeResultsSchema = z.object({
 
 export const setPublicViewSchema = z.object({
   quizId: z.string().min(1),
-  mode: z.enum([
-    "title",
-    "question",
-    "leaderboard",
-    "speaker_questions",
-    "reactions",
-    "randomizer",
-    "report",
-  ]),
+  mode: z
+    .enum([
+      "title",
+      "question",
+      "leaderboard",
+      "speaker_questions",
+      "reactions",
+      "randomizer",
+      "report",
+    ])
+    .optional(),
   questionId: z.string().min(1).optional(),
   questionRevealStage: z.enum(["options", "results"]).optional(),
   highlightedLeadersCount: z.number().int().min(0).max(100).optional(),
@@ -443,6 +445,7 @@ export const setPublicViewSchema = z.object({
   speakerQuestionsShowAuthorOnScreen: z.boolean().optional(),
   speakerQuestionsShowRecipientOnScreen: z.boolean().optional(),
   speakerQuestionsShowReactionsOnScreen: z.boolean().optional(),
+  speakerQuestionsAllowAllSpeakersTarget: z.boolean().optional(),
   showEventTitleOnPlayer: z.boolean().optional(),
   playerBanners: z
     .array(
@@ -669,6 +672,7 @@ export const adminSpeakerSettingsSchema = z.object({
   showAuthorOnScreen: z.boolean().optional(),
   showRecipientOnScreen: z.boolean().optional(),
   showReactionsOnScreen: z.boolean().optional(),
+  allowAllSpeakersTarget: z.boolean().optional(),
 });
 
 export const activateQuestionSchema = z.object({
@@ -740,6 +744,34 @@ export const upsertFeedbackFormSchema = z.object({
 export const feedbackFormActionSchema = z.object({
   quizId: z.string().min(1),
   formId: z.string().min(1),
+});
+
+export const feedbackScaleCountOverrideSchema = z.object({
+  quizId: z.string().min(1),
+  formId: z.string().min(1),
+  scaleId: z.string().trim().min(1).max(80),
+  optionIndex: z.number().int().min(0).max(9),
+  count: z.number().int().min(0).max(1_000_000),
+});
+
+export const feedbackScaleCountOverrideClearSchema = z.object({
+  quizId: z.string().min(1),
+  formId: z.string().min(1),
+  scaleId: z.string().trim().min(1).max(80),
+  optionIndex: z.number().int().min(0).max(9),
+});
+
+export const feedbackInjectedResponseAddSchema = z.object({
+  quizId: z.string().min(1),
+  formId: z.string().min(1),
+  nickname: z.string().trim().min(1).max(80),
+  openFieldAnswers: z.record(z.string().trim().min(1).max(80), z.string().trim().max(2000)),
+});
+
+export const feedbackInjectedResponseRemoveSchema = z.object({
+  quizId: z.string().min(1),
+  formId: z.string().min(1),
+  injectedId: z.string().trim().min(1).max(80),
 });
 
 export const feedbackQuizIdSchema = z.object({

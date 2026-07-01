@@ -5,6 +5,8 @@ import { prisma } from "./prisma.js";
 export const FEEDBACK_SCALE_MIN_OPTIONS = 2;
 export const FEEDBACK_SCALE_MAX_OPTIONS = 10;
 export const FEEDBACK_OPEN_FIELD_MAX = 10;
+/** Стабильный id для legacy-форм с commentEnabled и пустым openFields в БД. */
+export const LEGACY_FEEDBACK_OPEN_FIELD_ID = "legacy-comment";
 
 export type FeedbackScale = {
   id: string;
@@ -48,6 +50,184 @@ export type FeedbackFormInput = {
   commentEnabled?: boolean;
   commentPlaceholder?: string;
 };
+
+export type FeedbackScaleCountOverride = { text: string; count: number };
+
+export type FeedbackInjectedResponse = {
+  id: string;
+  nickname: string;
+  openFieldAnswers: Record<string, string>;
+  submittedAt: string;
+};
+
+export type FeedbackResultResponseRow = {
+  nickname: string;
+  scaleAnswers: Record<string, number>;
+  openFieldAnswers: Record<string, string>;
+  comment: string | null;
+  submittedAt: string;
+  isInjected?: boolean;
+  injectedId?: string;
+};
+
+export function feedbackScaleOverrideKey(scaleId: string, optionIndex: number): string {
+  return `${scaleId}:${optionIndex}`;
+}
+
+export function parseScaleCountOverrides(json: unknown): FeedbackScaleCountOverride[] {
+  if (!Array.isArray(json)) return [];
+  const out: FeedbackScaleCountOverride[] = [];
+  for (const item of json) {
+    if (!item || typeof item !== "object" || Array.isArray(item)) continue;
+    const text = (item as { text?: unknown }).text;
+    const count = (item as { count?: unknown }).count;
+    if (typeof text !== "string" || !text.trim()) continue;
+    if (typeof count !== "number" || !Number.isFinite(count)) continue;
+    out.push({ text: text.trim(), count: Math.max(0, Math.trunc(count)) });
+  }
+  return out;
+}
+
+export function parseInjectedResponses(json: unknown): FeedbackInjectedResponse[] {
+  if (!Array.isArray(json)) return [];
+  const out: FeedbackInjectedResponse[] = [];
+  for (const item of json) {
+    if (!item || typeof item !== "object" || Array.isArray(item)) continue;
+    const row = item as {
+      id?: unknown;
+      nickname?: unknown;
+      openFieldAnswers?: unknown;
+      submittedAt?: unknown;
+    };
+    if (typeof row.id !== "string" || !row.id.trim()) continue;
+    if (typeof row.nickname !== "string" || !row.nickname.trim()) continue;
+    const openFieldAnswers = parseOpenFieldAnswers(row.openFieldAnswers);
+    if (Object.keys(openFieldAnswers).length === 0) continue;
+    const submittedAt =
+      typeof row.submittedAt === "string" && row.submittedAt.trim()
+        ? row.submittedAt.trim()
+        : new Date().toISOString();
+    out.push({
+      id: row.id.trim().slice(0, 80),
+      nickname: row.nickname.trim().slice(0, 80),
+      openFieldAnswers,
+      submittedAt,
+    });
+  }
+  return out.slice(0, 500);
+}
+
+function validateInjectedOpenFieldAnswers(
+  openFields: FeedbackOpenField[],
+  raw: Record<string, string>,
+): Record<string, string> {
+  const allowedFieldIds = new Set(openFields.map((field) => field.id));
+  const out: Record<string, string> = {};
+  for (const [fieldId, value] of Object.entries(raw)) {
+    if (!allowedFieldIds.has(fieldId)) {
+      throw new Error("Invalid feedback payload");
+    }
+    const trimmed = value.trim();
+    if (trimmed.length > 0) {
+      out[fieldId] = trimmed.slice(0, 2000);
+    }
+  }
+  if (Object.keys(out).length === 0) {
+    throw new Error("Введите текст ответа");
+  }
+  return out;
+}
+
+function mapResponseRowFromDb(
+  r: {
+    scaleAnswers: unknown;
+    openFieldAnswers: unknown;
+    comment: string | null;
+    submittedAt: Date;
+    participant: { nickname: string };
+  },
+  openFields: FeedbackOpenField[],
+): FeedbackResultResponseRow {
+  const openFieldAnswers = normalizeResponseOpenFieldAnswers(
+    parseOpenFieldAnswers(r.openFieldAnswers),
+    r.comment,
+    openFields,
+  );
+  const legacyComment =
+    openFields.length === 1 ? (openFieldAnswers[openFields[0]!.id] ?? null) : r.comment;
+  return {
+    nickname: r.participant.nickname,
+    scaleAnswers:
+      r.scaleAnswers && typeof r.scaleAnswers === "object"
+        ? (r.scaleAnswers as Record<string, number>)
+        : {},
+    openFieldAnswers,
+    comment: legacyComment,
+    submittedAt: r.submittedAt.toISOString(),
+    isInjected: false,
+  };
+}
+
+function mapResponseRowFromInjected(
+  injected: FeedbackInjectedResponse,
+  openFields: FeedbackOpenField[],
+): FeedbackResultResponseRow {
+  const openFieldAnswers = normalizeResponseOpenFieldAnswers(
+    injected.openFieldAnswers,
+    null,
+    openFields,
+  );
+  const legacyComment =
+    openFields.length === 1 ? (openFieldAnswers[openFields[0]!.id] ?? null) : null;
+  return {
+    nickname: injected.nickname,
+    scaleAnswers: {},
+    openFieldAnswers,
+    comment: legacyComment,
+    submittedAt: injected.submittedAt,
+    isInjected: true,
+    injectedId: injected.id,
+  };
+}
+
+export function applyScaleCountOverridesToRaw(
+  scaleId: string,
+  rawCounts: number[],
+  overrides: FeedbackScaleCountOverride[],
+): number[] {
+  if (overrides.length === 0) return rawCounts;
+  return rawCounts.map((live, idx) => {
+    const key = feedbackScaleOverrideKey(scaleId, idx);
+    const row = overrides.find((item) => item.text === key);
+    return row !== undefined ? row.count : live;
+  });
+}
+
+function computeRawScaleCounts(
+  scale: FeedbackScale,
+  responses: Array<{ scaleAnswers: unknown }>,
+): { counts: number[]; average: number | null; responseCount: number } {
+  const counts = Array.from({ length: scale.options.length }, () => 0);
+  let sum = 0;
+  let count = 0;
+  const maxIdx = scale.options.length - 1;
+  for (const response of responses) {
+    const answers =
+      response.scaleAnswers && typeof response.scaleAnswers === "object"
+        ? (response.scaleAnswers as Record<string, number>)
+        : {};
+    const idx = answers[scale.id];
+    if (typeof idx !== "number" || idx < 0 || idx > maxIdx) continue;
+    counts[idx] += 1;
+    sum += idx + 1;
+    count += 1;
+  }
+  return {
+    counts,
+    average: count > 0 ? Math.round((sum / count) * 100) / 100 : null,
+    responseCount: count,
+  };
+}
 
 export function defaultFeedbackScales(): FeedbackScale[] {
   return [
@@ -114,13 +294,46 @@ export function parseFeedbackOpenFields(
   if (commentEnabled) {
     return [
       {
-        id: randomUUID(),
+        id: LEGACY_FEEDBACK_OPEN_FIELD_ID,
         label: "Комментарий",
         placeholder: (commentPlaceholder ?? "").trim().slice(0, 300),
       },
     ];
   }
   return [];
+}
+
+export function resolveSubmitOpenFieldAnswers(
+  openFields: FeedbackOpenField[],
+  raw?: Record<string, string>,
+): Record<string, string> {
+  const allowedFieldIds = new Set(openFields.map((field) => field.id));
+  const trimmedEntries = Object.entries(raw ?? {})
+    .map(([fieldId, value]) => [fieldId, value.trim()] as const)
+    .filter(([, value]) => value.length > 0);
+
+  if (trimmedEntries.length === 0) return {};
+
+  const resolved: Record<string, string> = {};
+  const unknown: Array<[string, string]> = [];
+
+  for (const [fieldId, value] of trimmedEntries) {
+    if (allowedFieldIds.has(fieldId)) {
+      resolved[fieldId] = value.slice(0, 2000);
+    } else {
+      unknown.push([fieldId, value]);
+    }
+  }
+
+  if (unknown.length === 0) return resolved;
+
+  // Раньше legacy-поле получало новый randomUUID при каждом parse — принимаем один «чужой» ключ.
+  if (unknown.length === 1 && openFields.length === 1 && Object.keys(resolved).length === 0) {
+    resolved[openFields[0]!.id] = unknown[0]![1].slice(0, 2000);
+    return resolved;
+  }
+
+  throw new Error("Invalid feedback payload");
 }
 
 function parseOpenFieldAnswers(json: unknown): Record<string, string> {
@@ -380,17 +593,7 @@ export async function submitFeedbackResponse(input: {
   const form = await getActiveFeedbackFormConfig(input.quizId);
   if (!form) throw new Error("Сбор обратной связи сейчас не активен");
   validateScaleAnswers(form.scales, input.scaleAnswers);
-  const allowedFieldIds = new Set(form.openFields.map((field) => field.id));
-  const openFieldAnswers: Record<string, string> = {};
-  for (const [fieldId, value] of Object.entries(input.openFieldAnswers ?? {})) {
-    if (!allowedFieldIds.has(fieldId)) {
-      throw new Error("Invalid feedback payload");
-    }
-    const trimmed = value.trim();
-    if (trimmed.length > 0) {
-      openFieldAnswers[fieldId] = trimmed.slice(0, 2000);
-    }
-  }
+  const openFieldAnswers = resolveSubmitOpenFieldAnswers(form.openFields, input.openFieldAnswers);
   if (
     input.comment &&
     input.comment.trim().length > 0 &&
@@ -439,56 +642,33 @@ export async function getFeedbackResultsByFormId(formId: string) {
     return null;
   }
   const config = mapFormRow(form);
+  const scaleCountOverrides = parseScaleCountOverrides(form.scaleCountOverrides);
+  const injectedResponses = parseInjectedResponses(form.injectedResponses);
   const scaleStats = config.scales.map((scale) => {
-    const counts = Array.from({ length: scale.options.length }, () => 0);
-    let sum = 0;
-    let count = 0;
-    const maxIdx = scale.options.length - 1;
-    for (const response of form.responses) {
-      const answers =
-        response.scaleAnswers && typeof response.scaleAnswers === "object"
-          ? (response.scaleAnswers as Record<string, number>)
-          : {};
-      const idx = answers[scale.id];
-      if (typeof idx !== "number" || idx < 0 || idx > maxIdx) continue;
-      counts[idx] += 1;
-      sum += idx + 1;
-      count += 1;
-    }
+    const raw = computeRawScaleCounts(scale, form.responses);
+    const counts = applyScaleCountOverridesToRaw(scale.id, raw.counts, scaleCountOverrides);
     return {
       scaleId: scale.id,
       label: scale.label,
       options: scale.options,
       counts,
-      average: count > 0 ? Math.round((sum / count) * 100) / 100 : null,
-      responseCount: count,
+      average: raw.average,
+      responseCount: raw.responseCount,
     };
   });
+  const realResponses = form.responses.map((r) => mapResponseRowFromDb(r, config.openFields));
+  const injectedRows = injectedResponses.map((row) =>
+    mapResponseRowFromInjected(row, config.openFields),
+  );
+  const responses = [...realResponses, ...injectedRows].sort((a, b) =>
+    b.submittedAt.localeCompare(a.submittedAt),
+  );
   return {
     form: config,
-    responseCount: form.responses.length,
+    responseCount: form.responses.length + injectedResponses.length,
+    scaleCountOverrides,
     scaleStats,
-    responses: form.responses.map((r) => {
-      const openFieldAnswers = normalizeResponseOpenFieldAnswers(
-        parseOpenFieldAnswers(r.openFieldAnswers),
-        r.comment,
-        config.openFields,
-      );
-      const legacyComment =
-        config.openFields.length === 1
-          ? (openFieldAnswers[config.openFields[0]!.id] ?? null)
-          : r.comment;
-      return {
-        nickname: r.participant.nickname,
-        scaleAnswers:
-          r.scaleAnswers && typeof r.scaleAnswers === "object"
-            ? (r.scaleAnswers as Record<string, number>)
-            : {},
-        openFieldAnswers,
-        comment: legacyComment,
-        submittedAt: r.submittedAt.toISOString(),
-      };
-    }),
+    responses,
   };
 }
 
@@ -540,9 +720,44 @@ export function mapFeedbackResultsToReportItem(
   };
 }
 
-export async function getFeedbackResultsForReport(quizId: string): Promise<FeedbackReportItem[]> {
+/** Формы для отчёта с учётом reportFeedbackFormIds; устаревшие id не скрывают весь блок. */
+export function filterFeedbackFormsForReport(
+  forms: FeedbackReportItem[],
+  reportFeedbackFormIds: string[],
+): FeedbackReportItem[] {
+  if (forms.length === 0 || reportFeedbackFormIds.length === 0) return forms;
+  const formIdSet = new Set(forms.map((form) => form.formId));
+  const validIds = reportFeedbackFormIds.filter((id) => formIdSet.has(id));
+  if (validIds.length === 0) return forms;
+  const pick = new Set(validIds);
+  return forms.filter((form) => pick.has(form.formId));
+}
+
+export function feedbackFormDisplayResponseCount(form: FeedbackReportItem): number {
+  if (form.responseCount > 0) return form.responseCount;
+  return form.scaleStats.reduce((max, stat) => {
+    const total = stat.counts.reduce((sum, count) => sum + count, 0);
+    return Math.max(max, total);
+  }, 0);
+}
+
+/** Формы для отчёта с учётом reportFeedbackFormIds (включая нулевые и ручные правки). */
+export function selectFeedbackFormsForReport(
+  mapped: FeedbackReportItem[],
+  reportFeedbackFormIds: string[],
+): FeedbackReportItem[] {
+  return filterFeedbackFormsForReport(mapped, reportFeedbackFormIds);
+}
+
+export async function getFeedbackResultsForReport(
+  quizId: string,
+  reportFeedbackFormIds: string[] = [],
+): Promise<FeedbackReportItem[]> {
   const results = await listFeedbackResultsByQuizId(quizId);
-  return results.filter((item) => item.responseCount > 0).map(mapFeedbackResultsToReportItem);
+  const mapped = results
+    .filter((item): item is NonNullable<typeof item> => item != null)
+    .map(mapFeedbackResultsToReportItem);
+  return selectFeedbackFormsForReport(mapped, reportFeedbackFormIds);
 }
 
 export async function resetFeedbackFormResponses(formId: string, quizId: string): Promise<void> {
@@ -550,7 +765,141 @@ export async function resetFeedbackFormResponses(formId: string, quizId: string)
   if (!form || form.quizId !== quizId) {
     throw new Error("Форма обратной связи не найдена");
   }
-  await prisma.feedbackResponse.deleteMany({ where: { feedbackFormId: formId } });
+  await prisma.$transaction([
+    prisma.feedbackResponse.deleteMany({ where: { feedbackFormId: formId } }),
+    prisma.feedbackForm.update({
+      where: { id: formId },
+      data: { scaleCountOverrides: [], injectedResponses: [] },
+    }),
+  ]);
+}
+
+export async function setFeedbackScaleCountOverride(params: {
+  formId: string;
+  quizId: string;
+  scaleId: string;
+  optionIndex: number;
+  count: number;
+}): Promise<void> {
+  const form = await prisma.feedbackForm.findUnique({
+    where: { id: params.formId },
+    include: { responses: true },
+  });
+  if (!form || form.quizId !== params.quizId) {
+    throw new Error("Форма обратной связи не найдена");
+  }
+  const scales = parseFeedbackScales(form.scales);
+  const scale = scales.find((item) => item.id === params.scaleId);
+  if (!scale) {
+    throw new Error("Шкала не найдена");
+  }
+  if (params.optionIndex < 0 || params.optionIndex >= scale.options.length) {
+    throw new Error("Недопустимый вариант шкалы");
+  }
+  const raw = computeRawScaleCounts(scale, form.responses);
+  const liveCount = raw.counts[params.optionIndex] ?? 0;
+  const safeCount = Math.max(0, Math.trunc(params.count));
+  const key = feedbackScaleOverrideKey(params.scaleId, params.optionIndex);
+  let overrides = parseScaleCountOverrides(form.scaleCountOverrides);
+  if (safeCount === liveCount) {
+    overrides = overrides.filter((item) => item.text !== key);
+  } else {
+    overrides = [...overrides.filter((item) => item.text !== key), { text: key, count: safeCount }];
+  }
+  await prisma.feedbackForm.update({
+    where: { id: params.formId },
+    data: { scaleCountOverrides: overrides as unknown as Prisma.InputJsonValue },
+  });
+}
+
+export async function clearFeedbackScaleCountOverride(params: {
+  formId: string;
+  quizId: string;
+  scaleId: string;
+  optionIndex: number;
+}): Promise<void> {
+  const form = await prisma.feedbackForm.findUnique({ where: { id: params.formId } });
+  if (!form || form.quizId !== params.quizId) {
+    throw new Error("Форма обратной связи не найдена");
+  }
+  const key = feedbackScaleOverrideKey(params.scaleId, params.optionIndex);
+  const overrides = parseScaleCountOverrides(form.scaleCountOverrides).filter(
+    (item) => item.text !== key,
+  );
+  await prisma.feedbackForm.update({
+    where: { id: params.formId },
+    data: { scaleCountOverrides: overrides as unknown as Prisma.InputJsonValue },
+  });
+}
+
+export async function clearAllFeedbackScaleCountOverrides(
+  formId: string,
+  quizId: string,
+): Promise<void> {
+  const form = await prisma.feedbackForm.findUnique({ where: { id: formId } });
+  if (!form || form.quizId !== quizId) {
+    throw new Error("Форма обратной связи не найдена");
+  }
+  await prisma.feedbackForm.update({
+    where: { id: formId },
+    data: { scaleCountOverrides: [] },
+  });
+}
+
+export async function addInjectedFeedbackResponse(params: {
+  formId: string;
+  quizId: string;
+  nickname: string;
+  openFieldAnswers: Record<string, string>;
+}): Promise<void> {
+  const form = await prisma.feedbackForm.findUnique({ where: { id: params.formId } });
+  if (!form || form.quizId !== params.quizId) {
+    throw new Error("Форма обратной связи не найдена");
+  }
+  const config = mapFormRow(form);
+  if (config.openFields.length === 0) {
+    throw new Error("В форме нет текстовых полей");
+  }
+  const nickname = params.nickname.trim().slice(0, 80);
+  if (!nickname) {
+    throw new Error("Введите имя");
+  }
+  const openFieldAnswers = validateInjectedOpenFieldAnswers(
+    config.openFields,
+    params.openFieldAnswers,
+  );
+  const injected = parseInjectedResponses(form.injectedResponses);
+  const next: FeedbackInjectedResponse = {
+    id: randomUUID(),
+    nickname,
+    openFieldAnswers,
+    submittedAt: new Date().toISOString(),
+  };
+  await prisma.feedbackForm.update({
+    where: { id: params.formId },
+    data: {
+      injectedResponses: [...injected, next] as unknown as Prisma.InputJsonValue,
+    },
+  });
+}
+
+export async function removeInjectedFeedbackResponse(params: {
+  formId: string;
+  quizId: string;
+  injectedId: string;
+}): Promise<void> {
+  const form = await prisma.feedbackForm.findUnique({ where: { id: params.formId } });
+  if (!form || form.quizId !== params.quizId) {
+    throw new Error("Форма обратной связи не найдена");
+  }
+  const injectedId = params.injectedId.trim();
+  const injected = parseInjectedResponses(form.injectedResponses).filter(
+    (row) => row.id !== injectedId,
+  );
+  await prisma.feedbackForm.update({
+    where: { id: params.formId },
+    data: { injectedResponses: injected as unknown as Prisma.InputJsonValue },
+  });
 }
 
 export async function getQuizIdByEventName(eventName: string): Promise<string | null> {

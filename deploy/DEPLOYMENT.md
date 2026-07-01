@@ -139,6 +139,8 @@ Also verify from browser:
 
 Если в браузере `WebSocket … closed before established`: обновите Caddyfile из репозитория (блок `flush_interval -1` у `reverse_proxy` для `/api` и `/socket.io`), затем `sudo systemctl reload caddy`. Проверьте, что в `.env` в `CLIENT_ORIGIN` указан **ровно** тот же origin, что в адресной строке (например `https://meyou.site`, без лишнего слэша и с тем же `www`/без `www`).
 
+Перед ивентом и после: [MONITORING.md](./MONITORING.md), [EVENT-DAY-CHECKLIST.md](./EVENT-DAY-CHECKLIST.md).
+
 ## 7) Cloudflare (рекомендуется для internet-режима)
 
 Прокси перед доменом снижает риск недоступности при DDoS и сбоях TLS до IP VPS. Пошагово: [CLOUDFLARE.md](./CLOUDFLARE.md).

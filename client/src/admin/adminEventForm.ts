@@ -228,6 +228,20 @@ export function questionAllowsOptionImages(q: QuestionForm): boolean {
   return Boolean(q.useImages) && q.type !== "tag_cloud";
 }
 
+export function getQuestionTypeSelectValue(
+  question: QuestionForm,
+): "single" | "multi" | "ranking" | "tag_cloud" | "poll" | "temperature" {
+  if (question.type === "temperature") return "temperature";
+  if (
+    (question.subQuizId == null || question.subQuizId === undefined) &&
+    (question.type === "single" || question.type === "multi") &&
+    !isEditorQuizMode(question)
+  ) {
+    return "poll";
+  }
+  return question.type;
+}
+
 /** Копия вопроса/голосования для вставки в комнату (без id, без ответов, неактивна). */
 export function cloneQuestionForm(source: QuestionForm): QuestionForm {
   const cloned = JSON.parse(JSON.stringify(source)) as QuestionForm;

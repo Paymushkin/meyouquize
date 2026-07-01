@@ -25,6 +25,7 @@ export function AdminSpeakerSettingsPanel({ settings, actions }: Props) {
     showAuthorOnScreen,
     showRecipientOnScreen,
     showReactionsOnScreen,
+    allowAllSpeakersTarget,
     speakersText,
   } = settings;
   const {
@@ -33,6 +34,7 @@ export function AdminSpeakerSettingsPanel({ settings, actions }: Props) {
     onToggleShowAuthorOnScreen,
     onToggleShowRecipientOnScreen,
     onToggleShowReactionsOnScreen,
+    onToggleAllowAllSpeakersTarget,
     onSpeakersTextChange,
     onSaveSettings,
   } = actions;
@@ -77,6 +79,16 @@ export function AdminSpeakerSettingsPanel({ settings, actions }: Props) {
                 />
               }
               label="Реакции на экране"
+            />
+            <FormControlLabel
+              sx={{ m: 0, minHeight: 36 }}
+              control={
+                <Switch
+                  checked={allowAllSpeakersTarget}
+                  onChange={(_, v) => onToggleAllowAllSpeakersTarget(v)}
+                />
+              }
+              label="Вариант «Всем спикерам» у игроков"
             />
           </Stack>
           <Stack direction={{ xs: "column", md: "row" }} spacing={1.5} sx={{ width: "100%" }}>

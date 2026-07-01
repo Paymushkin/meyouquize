@@ -206,6 +206,8 @@ export interface PublicViewState {
   speakerQuestionsShowRecipientOnScreen: boolean;
   /** Секция «Вопросы спикерам»: показывать счётчики реакций на проекторе */
   speakerQuestionsShowReactionsOnScreen: boolean;
+  /** Разрешить в форме игрока вариант «Всем спикерам» */
+  speakerQuestionsAllowAllSpeakersTarget: boolean;
   /** Показывать название ивента в интерфейсе игрока */
   showEventTitleOnPlayer: boolean;
   /** Баннеры для пользовательского интерфейса */
@@ -435,6 +437,7 @@ export const DEFAULT_PUBLIC_VIEW_STATE: PublicViewState = {
   speakerQuestionsShowAuthorOnScreen: false,
   speakerQuestionsShowRecipientOnScreen: true,
   speakerQuestionsShowReactionsOnScreen: true,
+  speakerQuestionsAllowAllSpeakersTarget: true,
   showEventTitleOnPlayer: true,
   playerBanners: [],
   playerBannerClickStats: [],
@@ -443,7 +446,7 @@ export const DEFAULT_PUBLIC_VIEW_STATE: PublicViewState = {
   speakerTileText: "Вопросы спикерам",
   speakerTileBackgroundColor: "#1976d2",
   speakerTileTextColor: "#ffffff",
-  speakerTileVisible: true,
+  speakerTileVisible: false,
   programTileText: "Программа",
   programTileBackgroundColor: "#6a1b9a",
   programTileTextColor: "#ffffff",
@@ -1201,6 +1204,10 @@ export function normalizePublicViewState(
       typeof value?.speakerQuestionsShowReactionsOnScreen === "boolean"
         ? value.speakerQuestionsShowReactionsOnScreen
         : base.speakerQuestionsShowReactionsOnScreen,
+    speakerQuestionsAllowAllSpeakersTarget:
+      typeof value?.speakerQuestionsAllowAllSpeakersTarget === "boolean"
+        ? value.speakerQuestionsAllowAllSpeakersTarget
+        : base.speakerQuestionsAllowAllSpeakersTarget,
     showEventTitleOnPlayer:
       typeof value?.showEventTitleOnPlayer === "boolean"
         ? value.showEventTitleOnPlayer
@@ -1575,6 +1582,13 @@ export {
   type PublicViewRoomPruneSlice,
 } from "./prunePlayerUiRefs.js";
 export {
+  isPlayerOnlyPublicViewPatch,
+  isPlayerOnlyPublicViewStateKey,
+  pickProjectorPublicViewState,
+  projectorPublicViewChanged,
+  projectorPublicViewFingerprint,
+} from "./projectorPublicView.js";
+export {
   computeTemperatureWeightedAverage,
   clampTemperatureScaleValue,
   roundTemperatureScaleValue,
@@ -1584,3 +1598,10 @@ export {
   TEMPERATURE_SCALE_MIN,
   TEMPERATURE_SCALE_MAX,
 } from "./temperatureVote.js";
+export {
+  SPEAKER_ALL_TARGET,
+  SPEAKER_NOT_SELECTED,
+  isKnownSpeakerTargetValue,
+  isSpeakerRecipientHiddenFromAudience,
+  shouldShowSpeakerRecipientToAudience,
+} from "./speakerQuestionTargets.js";

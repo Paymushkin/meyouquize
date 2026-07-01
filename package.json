@@ -38,7 +38,11 @@
     "load:nominal-admin": "bash load/run.sh nominal-admin",
     "load:walkthrough": "bash load/run.sh walkthrough",
     "load:peak": "bash load/run.sh peak",
+    "load:event-400": "bash load/run.sh event-400-join",
     "load:soak": "bash load/run.sh soak",
+    "ops:log-summary": "bash deploy/scripts/post-event-log-summary.sh",
+    "ops:event-check": "bash deploy/scripts/event-day-check.sh",
+    "ops:log-alerts": "bash deploy/scripts/meyouquize-log-alerts.sh",
     "load:socket:artillery": "npx artillery run load/artillery-socket.yml",
     "install:chromium": "npx playwright install chromium",
     "install:pdf": "bash deploy/scripts/install-pdf-chromium.sh"

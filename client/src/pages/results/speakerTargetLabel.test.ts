@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { speakerTargetLabel } from "./speakerTargetLabel.js";
+import { speakerTargetLabel, speakerTargetLabelForAudience } from "./speakerTargetLabel.js";
 
 describe("speakerTargetLabel", () => {
   it("formats all-speakers label", () => {
@@ -8,5 +8,10 @@ describe("speakerTargetLabel", () => {
 
   it("formats specific speaker", () => {
     expect(speakerTargetLabel("Иван")).toBe("кому: Иван");
+  });
+
+  it("hides not-selected recipient for audience", () => {
+    expect(speakerTargetLabelForAudience("не выбрано")).toBeNull();
+    expect(speakerTargetLabelForAudience("Иван")).toBe("кому: Иван");
   });
 });

@@ -29,6 +29,7 @@ type Props = {
   onClose: () => void;
   canSubmit: boolean;
   submitting: boolean;
+  submitError?: string;
   onSubmit: () => void;
 };
 
@@ -60,6 +61,7 @@ export function FeedbackPopupCard(props: Props) {
     onClose,
     canSubmit,
     submitting,
+    submitError,
     onSubmit,
   } = props;
 
@@ -158,6 +160,11 @@ export function FeedbackPopupCard(props: Props) {
                 ))}
               </Stack>
               <Box sx={{ pt: 3.5 }}>
+                {submitError ? (
+                  <Typography color="error" sx={{ mb: 1.5 }}>
+                    {submitError}
+                  </Typography>
+                ) : null}
                 <Button
                   disabled={!canSubmit || submitting}
                   onClick={onSubmit}

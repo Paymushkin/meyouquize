@@ -13,6 +13,7 @@ import {
 } from "@mui/material";
 import { alpha } from "@mui/material/styles";
 import type { Dispatch, RefObject, SetStateAction } from "react";
+import { expandTagCloudSubmitLines } from "@meyouquize/shared";
 import {
   PLAYER_POPUP_ALIGN_SX,
   PLAYER_POPUP_CARD_SX,
@@ -71,6 +72,12 @@ export function QuestionPopupCard(props: QuestionPopupCardProps) {
     "Расставьте варианты от лучшего к худшему. Баллы по позициям задаёт ведущий; зачёт в общей таблице не меняется."
       ? "Расставьте варианты от лучшего к худшему."
       : rankingHintRaw;
+  const tagLimit = question.type === "tag_cloud" ? Math.max(1, question.maxAnswers ?? 1) : 0;
+  const expandedTagCount =
+    question.type === "tag_cloud"
+      ? expandTagCloudSubmitLines(tagAnswers.map((value) => value.trim()).filter(Boolean)).length
+      : 0;
+  const tagCountOverLimit = question.type === "tag_cloud" && expandedTagCount > tagLimit;
   const questionLength = question.text.trim().length;
   const metaChipSx = {
     height: 24,
@@ -171,6 +178,16 @@ export function QuestionPopupCard(props: QuestionPopupCardProps) {
                 )}
                 {question.type === "tag_cloud" && (
                   <Stack spacing={1.5}>
+                    <Typography variant="body2" sx={{ color: "rgba(255,255,255,0.75)" }}>
+                      {tagLimit === 1
+                        ? "Один ответ. Несколько слов через «;» считаются одним тегом."
+                        : `До ${tagLimit} тегов. Несколько слов через «;» в одном поле — один тег.`}
+                    </Typography>
+                    {tagCountOverLimit ? (
+                      <Typography variant="body2" sx={{ color: "#ffb4ab" }}>
+                        Слишком много тегов: максимум {tagLimit}
+                      </Typography>
+                    ) : null}
                     {(answeredCurrentQuestion
                       ? (submittedAnswers[question.id] ?? [])
                       : tagAnswers
@@ -185,11 +202,18 @@ export function QuestionPopupCard(props: QuestionPopupCardProps) {
                           value={value}
                           onChange={(e) => {
                             const nextValue = e.target.value;
-                            const limit = question.maxAnswers ?? 5;
                             setTagAnswers((prev) => {
                               const next = prev.map((item, i) => (i === index ? nextValue : item));
                               const isLastField = index === next.length - 1;
-                              if (isLastField && nextValue.trim() && next.length < limit) {
+                              const expanded = expandTagCloudSubmitLines(
+                                next.map((item) => item.trim()).filter(Boolean),
+                              );
+                              if (
+                                isLastField &&
+                                nextValue.trim() &&
+                                next.length < tagLimit &&
+                                expanded.length < tagLimit
+                              ) {
                                 next.push("");
                               }
                               return next;
