@@ -1,45 +1,12 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { flushSync } from "react-dom";
 import { useParams } from "react-router-dom";
-import {
-  Alert,
-  Box,
-  Button,
-  Card,
-  CardContent,
-  Container,
-  List,
-  ListItemButton,
-  ListItemIcon,
-  ListItemText,
-  IconButton,
-  Paper,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
-  Snackbar,
-  Stack,
-  TextField,
-  Tooltip,
-  Typography,
-} from "@mui/material";
+import { Alert, Box, Button, Container, Snackbar, Stack, TextField, Tooltip } from "@mui/material";
 import AddIcon from "@mui/icons-material/Add";
-import SettingsSuggestIcon from "@mui/icons-material/SettingsSuggest";
-import BrandingWatermarkIcon from "@mui/icons-material/BrandingWatermark";
-import RecordVoiceOverIcon from "@mui/icons-material/RecordVoiceOver";
-import QuizIcon from "@mui/icons-material/Quiz";
-import InsightsIcon from "@mui/icons-material/Insights";
-import ReportProblemIcon from "@mui/icons-material/ReportProblem";
 import RemoveIcon from "@mui/icons-material/Remove";
-import DescriptionIcon from "@mui/icons-material/Description";
-import ViewCarouselIcon from "@mui/icons-material/ViewCarousel";
 import EmojiEmotionsIcon from "@mui/icons-material/EmojiEmotions";
 import { resolveClientAssetUrl } from "../utils/resolveClientAssetUrl";
 import { AdminLoginForm } from "../components/AdminLoginForm";
-import { AdminBrandingSection } from "../components/admin/AdminBrandingSection";
 import { API_BASE } from "../config";
 import { randomUuid } from "../utils/randomUuid";
 import { buildPlayerJoinUrl, buildProjectorScreenUrl } from "../publicAppOrigin";
@@ -55,16 +22,11 @@ import { useAdminReport } from "../features/admin/useAdminReport";
 import { useAdminReactions } from "../features/admin/useAdminReactions";
 import { useAdminBrandingVisual } from "../features/admin/useAdminBrandingVisual";
 import { buildAdminQuestionsSectionSharedBindings } from "../features/admin/adminQuestionsSectionSharedBindings";
-import { AdminEventQuestionsTab } from "./adminEvent/AdminEventQuestionsTab";
-import { AdminEventQuestionDialog } from "./adminEvent/AdminEventQuestionDialog";
-import { AdminEventTagCloudDialogs } from "./adminEvent/AdminEventTagCloudDialogs";
-import { AdminEventReportTab } from "./adminEvent/AdminEventReportTab";
-import { AdminEventConfirmDialogs } from "./adminEvent/AdminEventConfirmDialogs";
-import { AdminEventGeneralTab } from "./adminEvent/AdminEventGeneralTab";
-import { AdminEventSpeakersTab } from "./adminEvent/AdminEventSpeakersTab";
-import { AdminEventBannersTab } from "./adminEvent/AdminEventBannersTab";
-import { AdminEventResultsTab } from "./adminEvent/AdminEventResultsTab";
-import { AdminEventDangerTab } from "./adminEvent/AdminEventDangerTab";
+import { AdminEventSectionRouter } from "./adminEvent/AdminEventSectionRouter";
+import { AdminEventQuestionOverlays } from "./adminEvent/AdminEventQuestionOverlays";
+import { AdminEventStatusBar } from "./adminEvent/AdminEventStatusBar";
+import { AdminEventNavSidebar } from "./adminEvent/AdminEventNavSidebar";
+import { getCurrentPublicScreenText } from "./adminEvent/adminEventScreenLabel";
 import type { PublicViewMode, PublicViewSetPatch } from "../publicViewContract";
 import {
   normalizePublicViewState,
@@ -133,42 +95,6 @@ const ADMIN_BANNER_AUTO_HIDE_MS = 2000;
 const RESULTS_UI_STORAGE_PREFIX = "mq_admin_results_ui_";
 const EXPANDED_SUBQUIZ_STORAGE_PREFIX = "mq_admin_expanded_subquiz_";
 const ADMIN_BODY_BG_FALLBACK = "#22313c";
-
-const ADMIN_NAV: {
-  id: AdminSection;
-  label: string;
-  icon: React.ReactNode;
-}[] = [
-  { id: "general", label: "Общее", icon: <SettingsSuggestIcon fontSize="small" /> },
-  { id: "questions", label: "Вопросы", icon: <QuizIcon fontSize="small" /> },
-  { id: "speakers", label: "Спикеры", icon: <RecordVoiceOverIcon fontSize="small" /> },
-  { id: "banners", label: "Баннеры", icon: <ViewCarouselIcon fontSize="small" /> },
-  { id: "results", label: "Результаты", icon: <InsightsIcon fontSize="small" /> },
-  { id: "report", label: "Отчет", icon: <DescriptionIcon fontSize="small" /> },
-  { id: "branding", label: "Брендирование", icon: <BrandingWatermarkIcon fontSize="small" /> },
-  { id: "danger", label: "Опасные", icon: <ReportProblemIcon fontSize="small" /> },
-];
-
-function publicScreenModeLabel(mode: PublicViewMode): string {
-  if (mode === "leaderboard") return "таблица лидеров";
-  if (mode === "speaker_questions") return "вопросы спикерам";
-  if (mode === "reactions") return "реакции";
-  if (mode === "randomizer") return "рандомайзер";
-  if (mode === "report") return "отчет";
-  if (mode === "question") return "вопрос";
-  return "название";
-}
-
-function getCurrentPublicScreenText(params: {
-  mode: PublicViewMode;
-  projectorJoinQrVisible: boolean;
-  eventTitle?: string;
-}): string {
-  const { mode, projectorJoinQrVisible, eventTitle } = params;
-  if (mode !== "title") return publicScreenModeLabel(mode);
-  if (projectorJoinQrVisible) return "qr";
-  return eventTitle?.trim() ? "название" : "фон";
-}
 
 function clampInt(value: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, Math.trunc(value)));
@@ -2545,6 +2471,19 @@ export function AdminEventPage() {
     [speakerQuestions.panelSetters, saveSpeakerSettings],
   );
 
+  const onSelectResultsSubQuiz = useCallback(
+    (subQuizId: string) => {
+      setResultsSubQuizId(subQuizId);
+      if (publicViewMode === "leaderboard" && quizId) {
+        emitPublicViewSet({
+          mode: "leaderboard",
+          leaderboardSubQuizId: subQuizId,
+        });
+      }
+    },
+    [publicViewMode, quizId, emitPublicViewSet],
+  );
+
   return (
     <Container maxWidth={false} disableGutters sx={{ p: 0, m: 0, maxWidth: "none" }}>
       <Snackbar
@@ -2576,44 +2515,11 @@ export function AdminEventPage() {
         </Alert>
       </Snackbar>
       {isAuth && room ? (
-        <Box sx={{ width: "100%", mb: 0 }}>
-          <Paper
-            elevation={0}
-            sx={{
-              width: "100%",
-              borderRadius: 0,
-              borderBottom: "1px solid",
-              borderColor: "divider",
-              bgcolor: "#111",
-              color: "#fff",
-              px: { xs: 1, sm: 2 },
-              py: 0.75,
-            }}
-          >
-            <Stack direction="row" spacing={2} alignItems="center" justifyContent="space-between">
-              <Typography variant="caption">Экран: {currentPublicScreenText}</Typography>
-              <Typography
-                variant="caption"
-                sx={{
-                  color:
-                    adminSocketStatus === "connected"
-                      ? "success.light"
-                      : adminSocketStatus === "connecting"
-                        ? "warning.light"
-                        : "error.light",
-                }}
-              >
-                Статус:{" "}
-                {adminSocketStatus === "connected"
-                  ? "подключено"
-                  : adminSocketStatus === "connecting"
-                    ? "подключение..."
-                    : "отключено"}
-              </Typography>
-              <Typography variant="caption">Онлайн: {onlineUsersCount}</Typography>
-            </Stack>
-          </Paper>
-        </Box>
+        <AdminEventStatusBar
+          currentPublicScreenText={currentPublicScreenText}
+          adminSocketStatus={adminSocketStatus}
+          onlineUsersCount={onlineUsersCount}
+        />
       ) : null}
       {!authChecked ? null : !isAuth ? (
         <Box
@@ -2640,262 +2546,170 @@ export function AdminEventPage() {
       ) : null}
       {isAuth && room && (
         <Stack direction="row" spacing={0} alignItems="stretch">
-          <Card
-            variant="outlined"
-            component="nav"
-            aria-label="Разделы админки"
-            sx={{
-              width: { xs: 72, md: 256 },
-              flexShrink: 0,
-              alignSelf: "flex-start",
-              position: "sticky",
-              top: 0,
-              maxHeight: "calc(100vh - 32px)",
-              overflowY: "auto",
-              borderTopLeftRadius: 0,
-              borderBottomLeftRadius: 0,
-              borderTopRightRadius: 0,
-              borderBottomRightRadius: 0,
-            }}
-          >
-            <CardContent
-              sx={{
-                px: { xs: 0.25, md: 1.5 },
-                py: { xs: 1, md: 2 },
-                "&:last-child": { pb: { xs: 1, md: 2 } },
-              }}
-            >
-              <List
-                dense
-                sx={{
-                  py: 0,
-                  display: "block",
-                }}
-              >
-                {ADMIN_NAV.map(({ id, label, icon }) => (
-                  <ListItemButton
-                    key={id}
-                    selected={activeSection === id}
-                    onClick={() => setActiveSection(id)}
-                    aria-label={label}
-                    sx={{
-                      minWidth: 0,
-                      justifyContent: { xs: "center", md: "flex-start" },
-                      borderRadius: 1,
-                      py: { xs: 1.25, md: 1 },
-                      px: { xs: 0.5, md: 1.25 },
-                    }}
-                  >
-                    <ListItemIcon
-                      sx={{
-                        minWidth: { xs: 0, md: 40 },
-                        mr: { xs: 0, md: 0 },
-                        justifyContent: "center",
-                      }}
-                    >
-                      {icon}
-                    </ListItemIcon>
-                    <ListItemText
-                      primary={label}
-                      primaryTypographyProps={{
-                        variant: "body2",
-                        fontWeight: activeSection === id ? 600 : 400,
-                      }}
-                      sx={{
-                        display: { xs: "none", md: "block" },
-                        m: 0,
-                      }}
-                    />
-                  </ListItemButton>
-                ))}
-              </List>
-            </CardContent>
-          </Card>
-
+          <AdminEventNavSidebar activeSection={activeSection} onSectionChange={setActiveSection} />
           <Box sx={{ flex: 1, minWidth: 0, mt: 0 }}>
             <Stack spacing={3}>
-              {activeSection === "general" && (
-                <AdminEventGeneralTab
-                  eventName={eventName}
-                  editableTitle={editableTitle}
-                  setEditableTitle={setEditableTitle}
-                  saveQuizTitle={saveQuizTitle}
-                  eventSlug={room?.slug ?? ""}
-                  showEventTitleOnPlayer={playerTiles.showEventTitleOnPlayer}
-                  onToggleShowEventTitleOnPlayer={playerTiles.updateShowEventTitleOnPlayer}
-                  onRequestResetDemo={() => setConfirmResetDemoOpen(true)}
-                />
-              )}
-              {activeSection === "questions" && (
-                <AdminEventQuestionsTab
-                  roomQuestionsTab={roomQuestionsTab}
-                  onRoomQuestionsTabChange={setRoomQuestionsTab}
-                  eventName={eventName}
-                  quizId={quizId}
-                  onlineUsersCount={onlineUsersCount}
-                  eventParticipantNicknames={eventParticipantNicknames}
-                  subQuizSheets={subQuizSheets}
-                  setSubQuizSheets={setSubQuizSheets}
-                  questionForms={questionForms}
-                  selectedQuestionIndex={selectedQuestionIndex}
-                  expandedSubQuizId={expandedSubQuizId}
-                  setExpandedSubQuizId={setExpandedSubQuizId}
-                  votesIndexMap={votesIndexMap}
-                  activeVoteIndices={activeVoteIndices}
-                  doneVoteIndices={doneVoteIndices}
-                  activeVotesSelectedListIndex={activeVotesSelectedListIndex}
-                  doneVotesSelectedListIndex={doneVotesSelectedListIndex}
-                  voteListManageMode={voteListManageMode}
-                  setVoteListManageMode={setVoteListManageMode}
-                  publicViewMode={publicViewMode}
-                  resultsSubQuizId={resultsSubQuizId}
-                  firstCorrectWinnersCount={firstCorrectWinnersCount}
-                  setFirstCorrectWinnersCount={setFirstCorrectWinnersCount}
-                  highlightedLeadersCount={highlightedLeadersCount}
-                  setHighlightedLeadersCount={setHighlightedLeadersCount}
-                  questionsSectionBindings={questionsSectionBindings}
-                  playerTiles={playerTiles}
-                  randomizer={randomizer}
-                  adminReactions={adminReactions}
-                  emitPublicViewPatch={emitPublicViewPatch}
-                  setPublicResultsView={setPublicResultsView}
-                  addSubQuizSheet={addSubQuizSheet}
-                  addQuestionToSubQuiz={addQuestionToSubQuiz}
-                  saveSubQuizTitle={saveSubQuizTitleApi}
-                  requestRemoveSubQuizSheet={requestRemoveSubQuizSheet}
-                  toggleQuestion={toggleQuestion}
-                  updateFirstCorrectWinnersCount={updateFirstCorrectWinnersCount}
-                  updateHighlightedLeaders={updateHighlightedLeaders}
-                  confirmResetSubQuizAnswersById={confirmResetSubQuizAnswersById}
-                  toggleQuestionAdminDone={toggleQuestionAdminDone}
-                  reorderVoteInList={reorderVoteInList}
-                  cloneQuestionAtIndex={cloneQuestionAtIndex}
-                />
-              )}
-
-              {activeSection === "speakers" && (
-                <AdminEventSpeakersTab
-                  speakerQuestions={speakerQuestions}
-                  panelActions={speakerPanelActions}
-                  onHide={hideSpeakerQuestion}
-                  onRestore={restoreSpeakerQuestion}
-                  onSetUserVisible={setSpeakerQuestionUserVisible}
-                  onSetOnScreen={setSpeakerQuestionOnScreenAndOpenProjector}
-                  onUpdateQuestionText={updateSpeakerQuestionText}
-                  onDeleteQuestion={deleteSpeakerQuestion}
-                />
-              )}
-
-              {activeSection === "banners" && (
-                <AdminEventBannersTab
-                  eventName={eventName}
-                  playerTiles={playerTiles}
-                  subQuizzesForReport={subQuizzesForReport}
-                  brandPrimaryColor={branding.brandPrimaryColor}
-                  playerVoteOptionTextColor={branding.playerVoteOptionTextColor}
-                  uploadBannerMedia={uploadBannerMedia}
-                  onUploadError={setMessage}
-                />
-              )}
-
-              {activeSection === "branding" && <AdminBrandingSection {...brandingProps} />}
-
-              {activeSection === "results" && (
-                <AdminEventResultsTab
-                  leaderboardSort={leaderboardSort}
-                  setLeaderboardSort={setLeaderboardSort}
-                  displayedLeaderboard={displayedLeaderboard}
-                  exportLeaderboardCsv={exportLeaderboardCsv}
-                  leaderboardsBySubQuiz={leaderboardsBySubQuiz.map((x) => ({
+              <AdminEventSectionRouter
+                activeSection={activeSection}
+                general={{
+                  eventName,
+                  editableTitle,
+                  setEditableTitle,
+                  saveQuizTitle,
+                  eventSlug: room.slug,
+                  showEventTitleOnPlayer: playerTiles.showEventTitleOnPlayer,
+                  onToggleShowEventTitleOnPlayer: playerTiles.updateShowEventTitleOnPlayer,
+                  onRequestResetDemo: () => setConfirmResetDemoOpen(true),
+                }}
+                questions={{
+                  roomQuestionsTab,
+                  onRoomQuestionsTabChange: setRoomQuestionsTab,
+                  eventName,
+                  quizId,
+                  onlineUsersCount,
+                  eventParticipantNicknames,
+                  subQuizSheets,
+                  setSubQuizSheets,
+                  questionForms,
+                  selectedQuestionIndex,
+                  expandedSubQuizId,
+                  setExpandedSubQuizId,
+                  votesIndexMap,
+                  activeVoteIndices,
+                  doneVoteIndices,
+                  activeVotesSelectedListIndex,
+                  doneVotesSelectedListIndex,
+                  voteListManageMode,
+                  setVoteListManageMode,
+                  publicViewMode,
+                  resultsSubQuizId,
+                  firstCorrectWinnersCount,
+                  setFirstCorrectWinnersCount,
+                  highlightedLeadersCount,
+                  setHighlightedLeadersCount,
+                  questionsSectionBindings,
+                  playerTiles,
+                  randomizer,
+                  adminReactions,
+                  emitPublicViewPatch,
+                  setPublicResultsView,
+                  addSubQuizSheet,
+                  addQuestionToSubQuiz,
+                  saveSubQuizTitle: saveSubQuizTitleApi,
+                  requestRemoveSubQuizSheet,
+                  toggleQuestion,
+                  updateFirstCorrectWinnersCount,
+                  updateHighlightedLeaders,
+                  confirmResetSubQuizAnswersById,
+                  toggleQuestionAdminDone,
+                  reorderVoteInList,
+                  cloneQuestionAtIndex,
+                }}
+                speakers={{
+                  speakerQuestions,
+                  panelActions: speakerPanelActions,
+                  onHide: hideSpeakerQuestion,
+                  onRestore: restoreSpeakerQuestion,
+                  onSetUserVisible: setSpeakerQuestionUserVisible,
+                  onSetOnScreen: setSpeakerQuestionOnScreenAndOpenProjector,
+                  onUpdateQuestionText: updateSpeakerQuestionText,
+                  onDeleteQuestion: deleteSpeakerQuestion,
+                }}
+                banners={{
+                  eventName,
+                  playerTiles,
+                  subQuizzesForReport,
+                  brandPrimaryColor: branding.brandPrimaryColor,
+                  playerVoteOptionTextColor: branding.playerVoteOptionTextColor,
+                  uploadBannerMedia,
+                  onUploadError: setMessage,
+                }}
+                branding={brandingProps}
+                results={{
+                  leaderboardSort,
+                  setLeaderboardSort,
+                  displayedLeaderboard,
+                  exportLeaderboardCsv,
+                  leaderboardsBySubQuiz: leaderboardsBySubQuiz.map((x) => ({
                     subQuizId: x.subQuizId,
                     title: x.title,
-                  }))}
-                  resultsSubQuizId={resultsSubQuizId}
-                  onSelectResultsSubQuiz={(subQuizId) => {
-                    setResultsSubQuizId(subQuizId);
-                    if (publicViewMode === "leaderboard" && quizId) {
-                      emitPublicViewSet({
-                        mode: "leaderboard",
-                        leaderboardSubQuizId: subQuizId,
-                      });
-                    }
-                  }}
-                />
-              )}
-              {activeSection === "report" && (
-                <AdminEventReportTab
-                  roomSlug={room.slug}
-                  adminReport={adminReport}
-                  randomizer={randomizer}
-                  adminReactions={adminReactions}
-                  speakerQuestions={speakerQuestions}
-                  availableQuizQuestions={availableQuizQuestions}
-                  availableVoteQuestions={availableVoteQuestions}
-                  emitPublicViewPatch={emitPublicViewPatch}
-                  setMessage={setMessage}
-                />
-              )}
-              {activeSection === "danger" && (
-                <AdminEventDangerTab onResetAllAnswers={resetAllAnswers} />
-              )}
+                  })),
+                  resultsSubQuizId,
+                  onSelectResultsSubQuiz,
+                }}
+                report={{
+                  roomSlug: room.slug,
+                  adminReport,
+                  randomizer,
+                  adminReactions,
+                  speakerQuestions,
+                  availableQuizQuestions,
+                  availableVoteQuestions,
+                  emitPublicViewPatch,
+                  setMessage,
+                }}
+                danger={{ onResetAllAnswers: resetAllAnswers }}
+              />
             </Stack>
           </Box>
         </Stack>
       )}
       {isAuth && !room && <Alert severity="warning">Комната не найдена.</Alert>}
-      <AdminEventQuestionDialog
-        open={isQuestionDialogOpen}
-        question={questionForms[selectedQuestionIndex]}
-        dialogError={questionDialogError}
-        onDialogError={setQuestionDialogError}
-        defaultRankingQuizHint={defaultRankingQuizHint}
-        defaultRankingJuryHint={defaultRankingJuryHint}
-        newOptionText={newOptionText}
-        setNewOptionText={setNewOptionText}
-        onCancel={cancelQuestionDialog}
-        onSave={saveQuestionDialogAndClose}
-        onRequestRemove={() => requestRemoveQuestion(selectedQuestionIndex)}
-        onUpdateQuestion={(patch) => updateQuestion(selectedQuestionIndex, patch)}
-        onUpdateOption={(oIndex, patch) => updateOption(selectedQuestionIndex, oIndex, patch)}
-        onRemoveOption={(oIndex) => removeOption(selectedQuestionIndex, oIndex)}
-        onCommitNewOption={commitNewOption}
-        onSetTagCloudTagPointsAt={(tagIdx, raw) =>
-          setTagCloudTagPointsAt(selectedQuestionIndex, tagIdx, raw)
-        }
-        onSetRankingTierAt={(rankIdx, raw) => setRankingTierAt(selectedQuestionIndex, rankIdx, raw)}
-        onFillRankingTiersDescending={() => fillRankingTiersDescending(selectedQuestionIndex)}
-        uploadBannerMedia={uploadBannerMedia}
-      />
-      <AdminEventTagCloudDialogs
-        tagInputQuestionIndex={tagInputDialogQuestionIndex}
-        tagResultsQuestionIndex={tagResultsDialogQuestionIndex}
-        questionForms={questionForms}
-        onQuestionFormsChange={setQuestionForms}
-        questionResults={questionResults}
-        tagResultsOrder={tagResultsOrder}
-        onCloseTagInput={closeTagInputDialog}
-        onApplyInjectedTagList={applyInjectedTagListFromDialog}
-        onCloseTagResults={closeTagResultsDialog}
-        onToggleTagVisibility={toggleTagVisibility}
-        onUpdateTagCountOverride={updateTagCountOverride}
-        onClearTagCountOverride={clearTagCountOverride}
-      />
-      <AdminEventConfirmDialogs
-        confirmResetQuestionIndex={confirmResetQuestionIndex}
-        onCloseResetQuestion={() => setConfirmResetQuestionIndex(null)}
-        onConfirmResetQuestion={runConfirmedResetQuestionAnswers}
-        confirmResetSubQuizAnswers={confirmResetSubQuizAnswers}
-        onCloseResetSubQuiz={() => setConfirmResetSubQuizAnswers(null)}
-        onConfirmResetSubQuiz={runConfirmedResetSubQuizAnswers}
-        confirmDeleteSubQuizId={confirmDeleteSubQuizId}
-        onCloseDeleteSubQuiz={closeDeleteSubQuizDialog}
-        onConfirmDeleteSubQuiz={runConfirmedRemoveSubQuiz}
-        confirmDeleteQuestionIndex={confirmDeleteQuestionIndex}
-        onCloseDeleteQuestion={closeDeleteQuestionDialog}
-        onConfirmDeleteQuestion={runConfirmedRemoveQuestion}
-        confirmResetDemoOpen={confirmResetDemoOpen}
-        onCloseResetDemo={() => setConfirmResetDemoOpen(false)}
-        onConfirmResetDemo={resetDemoToDefault}
+      <AdminEventQuestionOverlays
+        questionDialog={{
+          open: isQuestionDialogOpen,
+          question: questionForms[selectedQuestionIndex],
+          dialogError: questionDialogError,
+          onDialogError: setQuestionDialogError,
+          defaultRankingQuizHint,
+          defaultRankingJuryHint,
+          newOptionText,
+          setNewOptionText,
+          onCancel: cancelQuestionDialog,
+          onSave: saveQuestionDialogAndClose,
+          onRequestRemove: () => requestRemoveQuestion(selectedQuestionIndex),
+          onUpdateQuestion: (patch) => updateQuestion(selectedQuestionIndex, patch),
+          onUpdateOption: (oIndex, patch) => updateOption(selectedQuestionIndex, oIndex, patch),
+          onRemoveOption: (oIndex) => removeOption(selectedQuestionIndex, oIndex),
+          onCommitNewOption: commitNewOption,
+          onSetTagCloudTagPointsAt: (tagIdx, raw) =>
+            setTagCloudTagPointsAt(selectedQuestionIndex, tagIdx, raw),
+          onSetRankingTierAt: (rankIdx, raw) =>
+            setRankingTierAt(selectedQuestionIndex, rankIdx, raw),
+          onFillRankingTiersDescending: () => fillRankingTiersDescending(selectedQuestionIndex),
+          uploadBannerMedia,
+        }}
+        tagCloudDialogs={{
+          tagInputQuestionIndex: tagInputDialogQuestionIndex,
+          tagResultsQuestionIndex: tagResultsDialogQuestionIndex,
+          questionForms,
+          onQuestionFormsChange: setQuestionForms,
+          questionResults,
+          tagResultsOrder,
+          onCloseTagInput: closeTagInputDialog,
+          onApplyInjectedTagList: applyInjectedTagListFromDialog,
+          onCloseTagResults: closeTagResultsDialog,
+          onToggleTagVisibility: toggleTagVisibility,
+          onUpdateTagCountOverride: updateTagCountOverride,
+          onClearTagCountOverride: clearTagCountOverride,
+        }}
+        confirmDialogs={{
+          confirmResetQuestionIndex,
+          onCloseResetQuestion: () => setConfirmResetQuestionIndex(null),
+          onConfirmResetQuestion: runConfirmedResetQuestionAnswers,
+          confirmResetSubQuizAnswers,
+          onCloseResetSubQuiz: () => setConfirmResetSubQuizAnswers(null),
+          onConfirmResetSubQuiz: runConfirmedResetSubQuizAnswers,
+          confirmDeleteSubQuizId,
+          onCloseDeleteSubQuiz: closeDeleteSubQuizDialog,
+          onConfirmDeleteSubQuiz: runConfirmedRemoveSubQuiz,
+          confirmDeleteQuestionIndex,
+          onCloseDeleteQuestion: closeDeleteQuestionDialog,
+          onConfirmDeleteQuestion: runConfirmedRemoveQuestion,
+          confirmResetDemoOpen,
+          onCloseResetDemo: () => setConfirmResetDemoOpen(false),
+          onConfirmResetDemo: resetDemoToDefault,
+        }}
       />
     </Container>
   );
