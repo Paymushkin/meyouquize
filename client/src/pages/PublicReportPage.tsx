@@ -38,6 +38,13 @@ import { useEventFavicon } from "../hooks/useEventFavicon";
 import { leaderboardPlaceByScore, type LeaderboardItem } from "../admin/adminEventTypes";
 import { hasOpenFieldAnswers } from "../types/feedback";
 
+const DEFAULT_REPORT_LOGO_URL = "/logo.svg";
+
+function buildPublicReportDocumentTitle(eventTitle: string | undefined): string {
+  const title = eventTitle?.trim();
+  return title ? `Отчет | ${title}` : "Отчет";
+}
+
 type PublicReportPayload = {
   title: string;
   slug: string;
@@ -537,7 +544,8 @@ export function PublicReportPage() {
   }, [slug]);
 
   const fontFamily = payload?.branding.brandFontFamily ?? "Jost, Arial, sans-serif";
-  const logoUrl = resolveClientAssetUrl(payload?.branding.brandLogoUrl ?? "");
+  const logoUrl =
+    resolveClientAssetUrl(payload?.branding.brandLogoUrl ?? "") || DEFAULT_REPORT_LOGO_URL;
   const bgUrl = resolveClientAssetUrl(payload?.branding.brandProjectorBackgroundImageUrl ?? "");
   const brandFontUrl = resolveClientAssetUrl(payload?.branding.brandFontUrl ?? "");
   const pdfRobotoUrl = "/fonts/roboto/Roboto-VariableFont_wdth,wght.ttf";
@@ -546,6 +554,14 @@ export function PublicReportPage() {
     isPdfMode ? pdfRobotoUrl : brandFontUrl || undefined,
   );
   useEventFavicon(logoUrl);
+
+  useEffect(() => {
+    const previous = document.title;
+    document.title = buildPublicReportDocumentTitle(payload?.title);
+    return () => {
+      document.title = previous;
+    };
+  }, [payload?.title]);
 
   useBodyBrandBackground({
     backgroundColor: payload?.branding.brandBodyBackgroundColor || "#0f1d2a",
@@ -688,6 +704,7 @@ export function PublicReportPage() {
     { label: "Голосований", value: voteQuestionsCount },
     { label: "Вопросов спикерам", value: payload!.speakerQuestions.total },
     { label: "Квизов", value: payload!.summary.subQuizzesCount },
+    { label: "Форм обратной связи", value: payload!.feedback.length },
   ].filter((item) => item.value > 0);
   const feedbackFormsToShow = payload!.feedback;
   const showReportHeading = hasModule("event_header") || modules.length > 0;
@@ -712,9 +729,7 @@ export function PublicReportPage() {
                     Сформирован: {new Date(payload!.generatedAt).toLocaleString("ru-RU")}
                   </Typography>
                 </Stack>
-                {logoUrl ? (
-                  <Box component="img" src={logoUrl} alt="Логотип" sx={{ maxHeight: 72 }} />
-                ) : null}
+                <Box component="img" src={logoUrl} alt="Логотип" sx={{ maxHeight: 72 }} />
               </Stack>
             </CardContent>
           </Card>
@@ -730,7 +745,7 @@ export function PublicReportPage() {
                   display: "grid",
                   gridTemplateColumns: {
                     xs: "repeat(2, minmax(0, 1fr))",
-                    md: `repeat(${Math.min(participationStats.length, 4)}, minmax(0, 1fr))`,
+                    md: `repeat(${Math.min(participationStats.length, 5)}, minmax(0, 1fr))`,
                   },
                   gap: 1,
                 }}

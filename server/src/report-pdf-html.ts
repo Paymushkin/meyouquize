@@ -5,6 +5,8 @@ import type { ReportModuleId } from "@meyouquize/shared";
 import { formatVoteDistributionPercent, voteDistributionPercentWidth } from "@meyouquize/shared";
 import type { PublicEventReport } from "./quiz-service.js";
 
+const DEFAULT_REPORT_LOGO_URL = "/logo.svg";
+
 const require = createRequire(import.meta.url);
 
 function escapeHtml(value: string): string {
@@ -88,8 +90,8 @@ function buildReportPdfSection(
 
   switch (moduleId) {
     case "event_header": {
-      const logoUrl = resolveAssetUrl(b.brandLogoUrl ?? "");
-      const logo = logoUrl ? `<img class="logo" src="${escapeHtml(logoUrl)}" alt="" />` : "";
+      const logoUrl = resolveAssetUrl(b.brandLogoUrl?.trim() || DEFAULT_REPORT_LOGO_URL);
+      const logo = `<img class="logo" src="${escapeHtml(logoUrl)}" alt="" />`;
       return `
       <section class="card">
         <div class="card-head split">
@@ -108,6 +110,7 @@ function buildReportPdfSection(
         { label: "Голосований", value: report.voteQuestions.length },
         { label: "Вопросов спикерам", value: report.speakerQuestions.total },
         { label: "Квизов", value: report.summary.subQuizzesCount },
+        { label: "Форм обратной связи", value: report.feedback.length },
       ].filter((item) => item.value > 0);
       if (participationStats.length === 0) return null;
       return `
@@ -300,7 +303,7 @@ export function buildReportPdfHtml(
     .logo { max-height: 72px; max-width: 220px; object-fit: contain; }
     .card-title-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
     .badge { color: #fff; border-radius: 999px; min-width: 32px; height: 32px; padding: 0 10px; display: inline-flex; align-items: center; justify-content: center; font-weight: 800; }
-    .stats-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+    .stats-grid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px; }
     .stat { border: 1px solid color-mix(in srgb, var(--text) 16%, transparent); border-radius: 10px; padding: 10px; }
     .stat-label { color: var(--text-muted); font-size: 12px; }
     .stat-value { font-size: 28px; font-weight: 900; margin-top: 4px; }
