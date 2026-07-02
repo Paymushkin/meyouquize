@@ -48,6 +48,7 @@ export type AdminEventQuestionsTabProps = {
   quizId: string;
   onlineUsersCount: number;
   eventParticipantNicknames: string[];
+  refreshEventParticipantNicknames: () => void | Promise<void>;
   subQuizSheets: SubQuizSheet[];
   setSubQuizSheets: Dispatch<SetStateAction<SubQuizSheet[]>>;
   questionForms: QuestionForm[];
@@ -103,6 +104,7 @@ export function AdminEventQuestionsTab({
   quizId,
   onlineUsersCount,
   eventParticipantNicknames,
+  refreshEventParticipantNicknames,
   subQuizSheets,
   setSubQuizSheets,
   questionForms,
@@ -593,6 +595,16 @@ export function AdminEventQuestionsTab({
               title={randomizer.title}
               namesText={randomizer.namesText}
               participantsNamesText={eventParticipantNicknames.join("\n")}
+              liveParticipantCount={eventParticipantNicknames.length}
+              onRefreshParticipants={() => {
+                void refreshEventParticipantNicknames();
+              }}
+              onImportParticipantsToFreeList={() => {
+                const text = eventParticipantNicknames.join("\n");
+                randomizer.markNamesEdited();
+                randomizer.setNamesText(text);
+                emitPublicViewPatch({ randomizerNamesText: text });
+              }}
               minNumber={randomizer.minNumber}
               maxNumber={randomizer.maxNumber}
               winnersCount={randomizer.winnersCount}
@@ -606,6 +618,9 @@ export function AdminEventQuestionsTab({
                 emitPublicViewPatch({ randomizerMode: next });
               }}
               onListModeChange={(next) => {
+                if (next === "participants_only") {
+                  void refreshEventParticipantNicknames();
+                }
                 randomizer.setListMode(next);
                 emitPublicViewPatch({
                   randomizerListMode: next,

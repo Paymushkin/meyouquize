@@ -8,6 +8,7 @@ import { API_BASE } from "../config";
 import { buildPlayerJoinUrl, buildProjectorScreenUrl } from "../publicAppOrigin";
 import { useAdminPlayerTiles } from "../features/admin/useAdminPlayerTiles";
 import { useAdminEventBootstrap } from "../features/admin/useAdminEventBootstrap";
+import { useEventParticipantNicknames } from "../features/admin/useEventParticipantNicknames";
 import { useAdminSpeakerQuestions } from "../features/admin/useAdminSpeakerQuestions";
 import { useAdminFontLibrary } from "../features/admin/useAdminFontLibrary";
 import {
@@ -163,7 +164,8 @@ export function AdminEventPage() {
   const [activeSection, setActiveSection] = useState<AdminSection>(
     () => readAdminUiPersistence(eventName).section,
   );
-  const [eventParticipantNicknames, setEventParticipantNicknames] = useState<string[]>([]);
+  const { eventParticipantNicknames, refreshEventParticipantNicknames } =
+    useEventParticipantNicknames(eventName, isAuth);
   const speakerReportIdsApplierRef = useRef<(ids: unknown) => void>(() => {});
   const setPublicResultsViewRef = useRef<AdminSetPublicResultsView>(() => {});
   const emitPublicViewPatchRef = useRef<(patch: PublicViewSetPatch) => void>(() => {});
@@ -834,11 +836,18 @@ export function AdminEventPage() {
     checkSession,
     loadRoom,
     loadFontLibrary,
-    setEventParticipantNicknames,
     setAvailableFeedbackForms: adminReport.setAvailableFeedbackForms,
     setReportFeedbackFormIds: adminReport.setReportFeedbackFormIds,
     emitPublicViewPatch: (patch) => emitPublicViewPatchRef.current(patch),
   });
+
+  const prevOnlineUsersCountRef = useRef(0);
+  useEffect(() => {
+    if (onlineUsersCount > prevOnlineUsersCountRef.current) {
+      void refreshEventParticipantNicknames();
+    }
+    prevOnlineUsersCountRef.current = onlineUsersCount;
+  }, [onlineUsersCount, refreshEventParticipantNicknames]);
 
   useEffect(() => {
     setupSocketListeners();
@@ -1503,6 +1512,7 @@ export function AdminEventPage() {
                   quizId,
                   onlineUsersCount,
                   eventParticipantNicknames,
+                  refreshEventParticipantNicknames,
                   subQuizSheets,
                   setSubQuizSheets,
                   questionForms,

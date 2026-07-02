@@ -688,14 +688,6 @@ export function PublicReportPage() {
   const feedbackFormsToShow = payload!.feedback;
   const showReportHeading = hasModule("event_header") || modules.length > 0;
 
-  function feedbackDisplayResponseCount(form: PublicReportPayload["feedback"][number]): number {
-    if (form.responseCount > 0) return form.responseCount;
-    return form.scaleStats.reduce((max, stat) => {
-      const total = stat.counts.reduce((sum, count) => sum + count, 0);
-      return Math.max(max, total);
-    }, 0);
-  }
-
   const renderReportModule = (moduleId: ReportModuleId): ReactNode => {
     switch (moduleId) {
       case "event_header":
@@ -1040,31 +1032,9 @@ export function PublicReportPage() {
             {feedbackFormsToShow.map((form) => (
               <Card key={form.formId} variant="outlined" className="report-card">
                 <CardContent>
-                  <Stack
-                    direction="row"
-                    alignItems="center"
-                    justifyContent="space-between"
-                    sx={{ mb: 1 }}
-                  >
-                    <Typography variant="h6">{form.title || "Обратная связь"}</Typography>
-                    <Box
-                      sx={{
-                        minWidth: 32,
-                        height: 32,
-                        px: 1,
-                        borderRadius: 999,
-                        bgcolor: "primary.main",
-                        color: "primary.contrastText",
-                        display: "inline-flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        fontWeight: 800,
-                        lineHeight: 1,
-                      }}
-                    >
-                      {feedbackDisplayResponseCount(form)}
-                    </Box>
-                  </Stack>
+                  <Typography variant="h6" sx={{ mb: 1 }}>
+                    {form.title || "Обратная связь"}
+                  </Typography>
                   <Stack spacing={2}>
                     {form.scaleStats.map((stat) => (
                       <Box

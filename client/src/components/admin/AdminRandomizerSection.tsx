@@ -22,10 +22,11 @@ import {
   Tooltip,
   Typography,
 } from "@mui/material";
-import type {
-  RandomizerHistoryEntry,
-  RandomizerListMode,
-  RandomizerMode,
+import {
+  parseNames,
+  type RandomizerHistoryEntry,
+  type RandomizerListMode,
+  type RandomizerMode,
 } from "../../features/randomizer/randomizerLogic";
 import { useState } from "react";
 
@@ -35,6 +36,9 @@ type Props = {
   title: string;
   namesText: string;
   participantsNamesText: string;
+  liveParticipantCount: number;
+  onRefreshParticipants: () => void;
+  onImportParticipantsToFreeList: () => void;
   minNumber: number;
   maxNumber: number;
   winnersCount: number;
@@ -65,6 +69,9 @@ export function AdminRandomizerSection(props: Props) {
     title,
     namesText,
     participantsNamesText,
+    liveParticipantCount,
+    onRefreshParticipants,
+    onImportParticipantsToFreeList,
     minNumber,
     maxNumber,
     winnersCount,
@@ -135,8 +142,8 @@ export function AdminRandomizerSection(props: Props) {
                   disabled={listMode === "participants_only"}
                   helperText={
                     listMode === "participants_only"
-                      ? "Список формируется из вошедших в ивент"
-                      : "Можно добавлять и удалять любых участников"
+                      ? `Актуальный список из комнаты: ${liveParticipantCount} участников`
+                      : `Сохранённый список: ${parseNames(namesText).length} имён. В комнате сейчас: ${liveParticipantCount}.`
                   }
                   sx={{
                     "& .MuiInputBase-inputMultiline": {
@@ -145,6 +152,16 @@ export function AdminRandomizerSection(props: Props) {
                     },
                   }}
                 />
+                <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
+                  <Button size="small" variant="outlined" onClick={onRefreshParticipants}>
+                    Обновить из комнаты
+                  </Button>
+                  {listMode === "free_list" ? (
+                    <Button size="small" variant="text" onClick={onImportParticipantsToFreeList}>
+                      Заменить список участниками
+                    </Button>
+                  ) : null}
+                </Stack>
               </Stack>
             ) : (
               <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5}>

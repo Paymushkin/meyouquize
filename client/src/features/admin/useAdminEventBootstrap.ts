@@ -10,7 +10,6 @@ type Params = {
   checkSession: () => Promise<boolean>;
   loadRoom: () => Promise<void>;
   loadFontLibrary: () => Promise<void>;
-  setEventParticipantNicknames: (nicknames: string[]) => void;
   setAvailableFeedbackForms: (forms: FeedbackFormRow[]) => void;
   setReportFeedbackFormIds: Dispatch<SetStateAction<string[]>>;
   emitPublicViewPatch: (patch: Pick<PublicViewSetPatch, "reportFeedbackFormIds">) => void;
@@ -23,7 +22,6 @@ export function useAdminEventBootstrap({
   checkSession,
   loadRoom,
   loadFontLibrary,
-  setEventParticipantNicknames,
   setAvailableFeedbackForms,
   setReportFeedbackFormIds,
   emitPublicViewPatch,
@@ -64,24 +62,12 @@ export function useAdminEventBootstrap({
     let active = true;
     void (async () => {
       try {
-        const [participantsRes, feedbackRes] = await Promise.all([
-          fetch(`${API_BASE}/api/admin/rooms/${encodeURIComponent(eventName)}/participants`, {
-            credentials: "include",
-          }),
-          fetch(`${API_BASE}/api/admin/rooms/${encodeURIComponent(eventName)}/feedback`, {
-            credentials: "include",
-          }),
-        ]);
+        const feedbackRes = await fetch(
+          `${API_BASE}/api/admin/rooms/${encodeURIComponent(eventName)}/feedback`,
+          { credentials: "include" },
+        );
 
         if (!active) return;
-
-        if (participantsRes.ok) {
-          const payload = (await participantsRes.json()) as { nicknames?: unknown };
-          const nicknames = Array.isArray(payload.nicknames)
-            ? payload.nicknames.filter((item): item is string => typeof item === "string")
-            : [];
-          setEventParticipantNicknames(nicknames);
-        }
 
         if (feedbackRes.ok) {
           const items = (await feedbackRes.json()) as Array<{ id?: string; title?: string }>;
@@ -112,11 +98,5 @@ export function useAdminEventBootstrap({
     return () => {
       active = false;
     };
-  }, [
-    eventName,
-    isAuth,
-    setAvailableFeedbackForms,
-    setEventParticipantNicknames,
-    setReportFeedbackFormIds,
-  ]);
+  }, [eventName, isAuth, setAvailableFeedbackForms, setReportFeedbackFormIds]);
 }
