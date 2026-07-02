@@ -53,7 +53,7 @@ export type AdminEventQuestionsTabProps = {
   quizId: string;
   onlineUsersCount: number;
   eventParticipantNicknames: string[];
-  refreshEventParticipantNicknames: () => void | Promise<void>;
+  refreshEventParticipantNicknames: () => Promise<string[]>;
   subQuizSheets: SubQuizSheet[];
   setSubQuizSheets: Dispatch<SetStateAction<SubQuizSheet[]>>;
   questionForms: QuestionForm[];
