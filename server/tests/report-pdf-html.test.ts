@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { buildReportPdfHtml } from "../src/report-pdf-html.js";
 import type { PublicEventReport } from "../src/quiz-service.js";
+import { makeReportConfig, makeReportPerQuestion } from "./helpers/reportFixtures.js";
 
 const baseReport: PublicEventReport = {
   title: "Демо",
@@ -17,16 +18,10 @@ const baseReport: PublicEventReport = {
     brandProjectorBackgroundImageUrl: "",
     brandBodyBackgroundColor: "#0f1d2a",
   },
-  config: {
+  config: makeReportConfig({
     reportTitle: "Отчёт",
     reportModules: ["event_header", "vote_results"],
-    reportVoteQuestionIds: [],
-    reportQuizQuestionIds: [],
-    reportQuizSubQuizIds: [],
-    reportFeedbackFormIds: [],
-    reportSpeakerQuestionIds: [],
-    reportPublished: true,
-  },
+  }),
   summary: {
     participantsCount: 10,
     questionsCount: 2,
@@ -36,20 +31,15 @@ const baseReport: PublicEventReport = {
   leaderboard: [],
   quizQuestions: [],
   voteQuestions: [
-    {
+    makeReportPerQuestion({
       questionId: "q1",
       text: "Как вам?",
-      subQuizId: null,
-      type: "single",
       optionStats: [
         { optionId: "o1", text: "Хорошо", count: 7, isCorrect: false },
         { optionId: "o2", text: "Отлично", count: 3, isCorrect: false },
       ],
-      tagCloud: [],
-      firstCorrectNicknames: [],
-      projectorShowFirstCorrect: false,
-      projectorFirstCorrectWinnersCount: 1,
-    },
+      answerCount: 10,
+    }),
   ],
   randomizer: { currentWinners: [], history: [] },
   reactions: { overlayText: "", widgets: [] },
@@ -79,6 +69,7 @@ describe("buildReportPdfHtml", () => {
             { optionId: "o1", text: "A", count: 1, isCorrect: false },
             { optionId: "o2", text: "B", count: 2, isCorrect: false },
           ],
+          answerCount: 3,
         },
       ],
     });
@@ -90,10 +81,9 @@ describe("buildReportPdfHtml", () => {
     const html = buildReportPdfHtml({
       ...baseReport,
       voteQuestions: [
-        {
+        makeReportPerQuestion({
           questionId: "temp-1",
           text: "Уровень вовлечённости",
-          subQuizId: null,
           type: "temperature",
           temperatureSubtitle: "Температура",
           temperatureValue: 75,
@@ -101,11 +91,8 @@ describe("buildReportPdfHtml", () => {
             { optionId: "o1", text: "Холодно", count: 1, isCorrect: false, weight: 0 },
             { optionId: "o2", text: "Жарко", count: 3, isCorrect: false, weight: 100 },
           ],
-          tagCloud: [],
-          firstCorrectNicknames: [],
-          projectorShowFirstCorrect: false,
-          projectorFirstCorrectWinnersCount: 1,
-        },
+          answerCount: 4,
+        }),
       ],
     });
     expect(html).toContain("Температура: 75 / 100");
@@ -115,10 +102,10 @@ describe("buildReportPdfHtml", () => {
   it("renders banners section with image, link and clicks", () => {
     const html = buildReportPdfHtml({
       ...baseReport,
-      config: {
+      config: makeReportConfig({
         ...baseReport.config,
         reportModules: ["banners_summary"],
-      },
+      }),
       banners: [
         {
           id: "b1",

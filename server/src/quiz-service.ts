@@ -927,6 +927,7 @@ export async function getQuizPublicState(quizId: string) {
     slug: quiz.slug,
     status: quiz.status,
     showEventTitleOnPlayer: view.showEventTitleOnPlayer,
+    playerAutoJoinRandomNickname: view.playerAutoJoinRandomNickname,
     playerBanners: view.playerBanners,
     activePlayerBannerId: view.activePlayerBannerId,
     speakerTileText: view.speakerTileText,
@@ -2393,6 +2394,54 @@ export async function startSubQuizAuto(quizId: string, subQuizId: string) {
   return getQuizPublicState(quizId);
 }
 
+const PARTICIPANT_NICKNAME_MAX_LENGTH = 40;
+
+async function isParticipantNicknameTaken(
+  quizId: string,
+  nickname: string,
+  excludeParticipantId?: string,
+): Promise<boolean> {
+  const row = await prisma.participant.findFirst({
+    where: {
+      quizId,
+      nickname: {
+        equals: nickname,
+        mode: "insensitive",
+      },
+      ...(excludeParticipantId ? { NOT: { id: excludeParticipantId } } : {}),
+    },
+    select: { id: true },
+  });
+  return row != null;
+}
+
+function buildParticipantNicknameWithSuffix(baseNickname: string, suffix: string): string {
+  const maxBaseLength = Math.max(1, PARTICIPANT_NICKNAME_MAX_LENGTH - suffix.length);
+  const trimmedBase = baseNickname.trim().slice(0, maxBaseLength).trimEnd();
+  const safeBase = trimmedBase || baseNickname.trim().slice(0, 1) || "Игрок";
+  return `${safeBase}${suffix}`;
+}
+
+async function resolveUniqueParticipantNickname(
+  quizId: string,
+  desiredNickname: string,
+  excludeParticipantId?: string,
+): Promise<string> {
+  const baseNickname = desiredNickname.trim() || "Игрок";
+  if (!(await isParticipantNicknameTaken(quizId, baseNickname, excludeParticipantId))) {
+    return baseNickname;
+  }
+  for (let attempt = 0; attempt < 100; attempt += 1) {
+    const suffix = ` ${Math.floor(100 + Math.random() * 900)}`;
+    const candidate = buildParticipantNicknameWithSuffix(baseNickname, suffix);
+    if (!(await isParticipantNicknameTaken(quizId, candidate, excludeParticipantId))) {
+      return candidate;
+    }
+  }
+  const fallbackSuffix = ` ${Date.now() % 10000}`;
+  return buildParticipantNicknameWithSuffix(baseNickname, fallbackSuffix);
+}
+
 export async function joinQuiz(payload: { slug: string; nickname: string; deviceId: string }) {
   let nickname = payload.nickname.trim();
   if (containsProfanity(nickname)) {
@@ -2408,20 +2457,7 @@ export async function joinQuiz(payload: { slug: string; nickname: string; device
     },
     select: { id: true },
   });
-  const duplicateNickname = await prisma.participant.findFirst({
-    where: {
-      quizId: quiz.id,
-      nickname: {
-        equals: nickname,
-        mode: "insensitive",
-      },
-      ...(currentParticipant ? { NOT: { id: currentParticipant.id } } : {}),
-    },
-    select: { id: true },
-  });
-  if (duplicateNickname) {
-    throw new Error("Ник уже используется в этой комнате");
-  }
+  nickname = await resolveUniqueParticipantNickname(quiz.id, nickname, currentParticipant?.id);
   const participant = await prisma.participant.upsert({
     where: {
       quizId_deviceId: { quizId: quiz.id, deviceId: payload.deviceId },
@@ -2435,7 +2471,7 @@ export async function joinQuiz(payload: { slug: string; nickname: string; device
       nickname,
     },
   });
-  return { quizId: quiz.id, participantId: participant.id };
+  return { quizId: quiz.id, participantId: participant.id, nickname };
 }
 
 export async function updateParticipantNickname(payload: {
@@ -2452,20 +2488,11 @@ export async function updateParticipantNickname(payload: {
     select: { id: true },
   });
   if (!currentParticipant) throw new Error("Participant not found");
-  const duplicateNickname = await prisma.participant.findFirst({
-    where: {
-      quizId: payload.quizId,
-      nickname: {
-        equals: nickname,
-        mode: "insensitive",
-      },
-      NOT: { id: payload.participantId },
-    },
-    select: { id: true },
-  });
-  if (duplicateNickname) {
-    throw new Error("Ник уже используется в этой комнате");
-  }
+  nickname = await resolveUniqueParticipantNickname(
+    payload.quizId,
+    nickname,
+    payload.participantId,
+  );
   await prisma.participant.update({
     where: { id: payload.participantId },
     data: { nickname },

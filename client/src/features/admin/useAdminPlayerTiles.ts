@@ -31,6 +31,7 @@ export function useAdminPlayerTiles({
   subQuizzesForReport,
 }: Params) {
   const [showEventTitleOnPlayer, setShowEventTitleOnPlayer] = useState(true);
+  const [playerAutoJoinRandomNickname, setPlayerAutoJoinRandomNickname] = useState(false);
   const [playerBanners, setPlayerBanners] = useState<PublicBanner[]>([]);
   const [speakerTileText, setSpeakerTileText] = useState("Вопросы спикерам");
   const [speakerTileBackgroundColor, setSpeakerTileBackgroundColor] = useState("#1976d2");
@@ -75,6 +76,7 @@ export function useAdminPlayerTiles({
       setPlayerBanners(nextBanners);
       applyAdminPlayerTilesFromPublicView(pv, nextBanners, {
         setShowEventTitleOnPlayer,
+        setPlayerAutoJoinRandomNickname,
         setSpeakerTileText,
         setSpeakerTileBackgroundColor,
         setSpeakerTileTextColor,
@@ -378,10 +380,22 @@ export function useAdminPlayerTiles({
     [emitPublicViewPatch, refreshQuizState],
   );
 
+  const updatePlayerAutoJoinRandomNickname = useCallback(
+    (next: boolean) => {
+      setPlayerAutoJoinRandomNickname(next);
+      emitPublicViewPatch({ playerAutoJoinRandomNickname: next });
+      refreshQuizState();
+    },
+    [emitPublicViewPatch, refreshQuizState],
+  );
+
   return {
     showEventTitleOnPlayer,
     setShowEventTitleOnPlayer,
     updateShowEventTitleOnPlayer,
+    playerAutoJoinRandomNickname,
+    setPlayerAutoJoinRandomNickname,
+    updatePlayerAutoJoinRandomNickname,
     playerBanners,
     setPlayerBanners,
     speakerTileText,

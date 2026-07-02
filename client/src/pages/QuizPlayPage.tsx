@@ -101,8 +101,9 @@ export function QuizPlayPage() {
   const [resultsDialogQuestionId, setResultsDialogQuestionId] = useState<string | null>(null);
   const [quizReportOpen, setQuizReportOpen] = useState(false);
   const [quizReportSubQuizId, setQuizReportSubQuizId] = useState("");
-  const [bootLoading, setBootLoading] = useState(() => shouldRestoreJoin(slug, getNickname()));
+  const [bootLoading, setBootLoading] = useState(() => Boolean(slug));
   const nicknameInputRef = useRef<HTMLInputElement | null>(null);
+  const autoJoinStartedRef = useRef(false);
   const rankRowRefs = useRef<Map<string, HTMLDivElement>>(new Map());
   const prevRankRowTopsRef = useRef<Map<string, number>>(new Map());
   const reactionTimestampsRef = useRef<number[]>([]);
@@ -185,27 +186,29 @@ export function QuizPlayPage() {
     setError("Не удалось подключиться. Проверьте интернет и попробуйте снова.");
   }, []);
 
-  const { joinedRef, requestJoin, requestRestoreJoin, markJoinPersisted, clearJoinPersisted } =
-    useQuizPlayJoin({
-      slug,
-      nickname,
-      joined,
-      joinPending,
-      setJoinPending,
-      setBootLoading,
-      onJoinTimeout,
-    });
+  const { joinedRef, requestJoin, requestRestoreJoin, markJoinPersisted } = useQuizPlayJoin({
+    slug,
+    nickname,
+    joined,
+    joinPending,
+    setJoinPending,
+    setBootLoading,
+    onJoinTimeout,
+  });
 
   const handleParticipantMissing = useCallback(() => {
     requestRestoreJoin();
   }, [requestRestoreJoin]);
 
-  const handleJoinFailed = useCallback(() => {
-    clearJoinPersisted();
-    setJoinPending(false);
-    setJoined(false);
-    setNicknameError("Такое имя уже занято");
-  }, [clearJoinPersisted]);
+  const persistNickname = useCallback(
+    (nextRaw: string) => {
+      const next = nextRaw.trim();
+      setNick(next);
+      setNickname(next);
+      if (slug) localStorage.setItem(getRoomNickKey(slug), next);
+    },
+    [slug],
+  );
 
   const clearJoinPending = useCallback(() => {
     setJoinPending(false);
@@ -218,6 +221,13 @@ export function QuizPlayPage() {
     setNicknameError("");
     handleQuizJoined();
   }, [handleQuizJoined, markJoinPersisted]);
+
+  const handleJoinedNickname = useCallback(
+    (next: string) => {
+      persistNickname(next);
+    },
+    [persistNickname],
+  );
 
   useEffect(() => {
     if (!slug) return;
@@ -274,7 +284,7 @@ export function QuizPlayPage() {
     setSpeakerQuestions,
     onParticipantMissing: handleParticipantMissing,
     onQuizJoined: handleJoinSuccess,
-    onJoinFailed: handleJoinFailed,
+    onJoinedNickname: handleJoinedNickname,
     onJoinSettled: clearJoinPending,
     joinedRef,
     onQuizSessionReadyChange: setQuizSessionReady,
@@ -296,10 +306,38 @@ export function QuizPlayPage() {
     brandLogoUrl,
     brandFontFamily,
     brandFontUrl,
+    joinMetaLoaded,
+    playerAutoJoinRandomNickname,
   } = useQuizPlayMetaBranding({
     slug,
     quiz,
   });
+
+  const showNicknameJoinForm =
+    joinMetaLoaded && !joined && !joinPending && !playerAutoJoinRandomNickname;
+
+  useEffect(() => {
+    if (!joinMetaLoaded) return;
+    if (!slug) {
+      setBootLoading(false);
+      return;
+    }
+    if (shouldRestoreJoin(slug, getNickname())) {
+      setBootLoading(false);
+      return;
+    }
+    if (!playerAutoJoinRandomNickname) {
+      setBootLoading(false);
+      return;
+    }
+    if (!autoJoinStartedRef.current) {
+      autoJoinStartedRef.current = true;
+      setJoinPending(true);
+      setError("");
+      requestJoin("manual", randomNickname());
+    }
+    setBootLoading(false);
+  }, [joinMetaLoaded, slug, playerAutoJoinRandomNickname, requestJoin, setJoinPending]);
 
   useEffect(() => {
     if (joined) {
@@ -309,12 +347,12 @@ export function QuizPlayPage() {
   }, [joined]);
 
   useEffect(() => {
-    if (joined || joinPending) return;
+    if (joined || joinPending || playerAutoJoinRandomNickname) return;
     const timer = window.setTimeout(() => {
       nicknameInputRef.current?.focus();
     }, 0);
     return () => window.clearTimeout(timer);
-  }, [joined, joinPending]);
+  }, [joined, joinPending, playerAutoJoinRandomNickname]);
 
   useEffect(() => {
     const settings = speakerQuestions?.settings;
@@ -327,16 +365,6 @@ export function QuizPlayPage() {
     }
   }, [speakerQuestions, speakerName]);
 
-  const persistNickname = useCallback(
-    (nextRaw: string) => {
-      const next = nextRaw.trim();
-      setNick(next);
-      setNickname(next);
-      if (slug) localStorage.setItem(getRoomNickKey(slug), next);
-    },
-    [slug],
-  );
-
   function join() {
     const trimmed = nickname.trim();
     setNicknameError("");
@@ -348,7 +376,6 @@ export function QuizPlayPage() {
     setJoinPending(true);
     setError("");
     requestJoin("manual");
-    persistNickname(trimmed);
   }
 
   function editNickname() {
@@ -637,7 +664,7 @@ export function QuizPlayPage() {
                 }}
               />
             ) : null}
-            {!joined && !joinPending && (
+            {!joined && !joinPending && showNicknameJoinForm && (
               <Box sx={JOIN_SCREEN_MAIN_SX}>
                 <Stack sx={JOIN_SCREEN_STACK_SX}>
                   {error && !nicknameError ? (

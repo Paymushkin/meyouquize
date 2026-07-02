@@ -8,6 +8,7 @@ import { API_BASE } from "../config";
 import { buildPlayerJoinUrl, buildProjectorScreenUrl } from "../publicAppOrigin";
 import { useAdminPlayerTiles } from "../features/admin/useAdminPlayerTiles";
 import { useAdminEventBootstrap } from "../features/admin/useAdminEventBootstrap";
+import { useAdminFeedbackCatalog } from "../features/admin/useAdminFeedbackCatalog";
 import { useEventParticipantNicknames } from "../features/admin/useEventParticipantNicknames";
 import { useAdminSpeakerQuestions } from "../features/admin/useAdminSpeakerQuestions";
 import { useAdminFontLibrary } from "../features/admin/useAdminFontLibrary";
@@ -164,8 +165,10 @@ export function AdminEventPage() {
   const [activeSection, setActiveSection] = useState<AdminSection>(
     () => readAdminUiPersistence(eventName).section,
   );
+  const participantNicknamesPollEnabled =
+    isAuth && activeSection === "questions" && roomQuestionsTab === "randomizer";
   const { eventParticipantNicknames, refreshEventParticipantNicknames } =
-    useEventParticipantNicknames(eventName, isAuth);
+    useEventParticipantNicknames(eventName, isAuth, participantNicknamesPollEnabled);
   const speakerReportIdsApplierRef = useRef<(ids: unknown) => void>(() => {});
   const setPublicResultsViewRef = useRef<AdminSetPublicResultsView>(() => {});
   const emitPublicViewPatchRef = useRef<(patch: PublicViewSetPatch) => void>(() => {});
@@ -281,6 +284,14 @@ export function AdminEventPage() {
   const adminReport = useAdminReport({
     emitPublicViewPatch: (patch) => emitPublicViewPatchRef.current(patch),
     onSpeakerQuestionIdsFromView: (ids) => speakerReportIdsApplierRef.current(ids),
+  });
+
+  const feedbackCatalog = useAdminFeedbackCatalog({
+    eventName,
+    isAuth,
+    setAvailableFeedbackForms: adminReport.setAvailableFeedbackForms,
+    setReportFeedbackFormIds: adminReport.setReportFeedbackFormIds,
+    emitPublicViewPatch: (patch) => emitPublicViewPatchRef.current(patch),
   });
 
   const randomizer = useAdminRandomizer({
@@ -690,6 +701,7 @@ export function AdminEventPage() {
     showFirstCorrectAnswerer,
     firstCorrectWinnersCount,
     showEventTitleOnPlayer: playerTiles.showEventTitleOnPlayer,
+    playerAutoJoinRandomNickname: playerTiles.playerAutoJoinRandomNickname,
     playerBanners: playerTiles.playerBanners,
     speakerTileText: playerTiles.speakerTileText,
     speakerTileBackgroundColor: playerTiles.speakerTileBackgroundColor,
@@ -835,11 +847,19 @@ export function AdminEventPage() {
     isAuth,
     checkSession,
     loadRoom,
-    loadFontLibrary,
-    setAvailableFeedbackForms: adminReport.setAvailableFeedbackForms,
-    setReportFeedbackFormIds: adminReport.setReportFeedbackFormIds,
-    emitPublicViewPatch: (patch) => emitPublicViewPatchRef.current(patch),
   });
+
+  useEffect(() => {
+    if (!isAuth) return;
+    const needFeedbackCatalog =
+      activeSection === "report" ||
+      (activeSection === "questions" && roomQuestionsTab === "feedback");
+    if (needFeedbackCatalog) void feedbackCatalog.ensureCatalogLoaded();
+  }, [isAuth, activeSection, roomQuestionsTab, feedbackCatalog.ensureCatalogLoaded]);
+
+  useEffect(() => {
+    if (isAuth && activeSection === "branding") void loadFontLibrary();
+  }, [isAuth, activeSection, loadFontLibrary]);
 
   const prevOnlineUsersCountRef = useRef(0);
   useEffect(() => {
@@ -1480,8 +1500,6 @@ export function AdminEventPage() {
             onSuccess={() =>
               checkSession().then((ok) => {
                 if (!ok) return;
-                void loadRoom();
-                void loadFontLibrary();
                 setupSocketListeners();
               })
             }
@@ -1503,6 +1521,9 @@ export function AdminEventPage() {
                   eventSlug: room.slug,
                   showEventTitleOnPlayer: playerTiles.showEventTitleOnPlayer,
                   onToggleShowEventTitleOnPlayer: playerTiles.updateShowEventTitleOnPlayer,
+                  playerAutoJoinRandomNickname: playerTiles.playerAutoJoinRandomNickname,
+                  onTogglePlayerAutoJoinRandomNickname:
+                    playerTiles.updatePlayerAutoJoinRandomNickname,
                   onRequestResetDemo: () => setConfirmResetDemoOpen(true),
                 }}
                 questions={{
@@ -1513,6 +1534,10 @@ export function AdminEventPage() {
                   onlineUsersCount,
                   eventParticipantNicknames,
                   refreshEventParticipantNicknames,
+                  feedbackForms: feedbackCatalog.feedbackForms,
+                  setFeedbackForms: feedbackCatalog.setFeedbackForms,
+                  syncFeedbackCatalogToReport: feedbackCatalog.syncCatalogToReport,
+                  feedbackCatalogLoading: feedbackCatalog.catalogLoading,
                   subQuizSheets,
                   setSubQuizSheets,
                   questionForms,

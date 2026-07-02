@@ -4,6 +4,7 @@ import type { PublicBanner } from "../../publicViewContract";
 
 type TileSetters = {
   setShowEventTitleOnPlayer: (value: boolean) => void;
+  setPlayerAutoJoinRandomNickname: (value: boolean) => void;
   setSpeakerTileText: (value: string) => void;
   setSpeakerTileBackgroundColor: (value: string) => void;
   setSpeakerTileTextColor: (value: string) => void;
@@ -36,6 +37,9 @@ export function applyAdminPlayerTilesFromPublicView(
 ) {
   if (typeof pv.showEventTitleOnPlayer === "boolean") {
     setters.setShowEventTitleOnPlayer(pv.showEventTitleOnPlayer);
+  }
+  if (typeof pv.playerAutoJoinRandomNickname === "boolean") {
+    setters.setPlayerAutoJoinRandomNickname(pv.playerAutoJoinRandomNickname);
   }
   if (typeof pv.speakerTileText === "string") {
     setters.setSpeakerTileText(pv.speakerTileText);

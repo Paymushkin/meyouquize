@@ -19,14 +19,31 @@ describe("player flow", () => {
     expect(participant?.nickname).toBe("Player Renamed");
   });
 
-  it("rejects duplicate nickname for different devices", async () => {
+  it("assigns unique suffix when nickname is already taken", async () => {
     const slug = uniqueSlug("dup-nick");
     await createRoom({ eventName: slug, title: `Room ${slug}` });
 
-    await joinQuiz({ slug, nickname: "SameNick", deviceId: "device-1" });
-    await expect(joinQuiz({ slug, nickname: "SameNick", deviceId: "device-2" })).rejects.toThrow(
-      "Ник уже используется",
-    );
+    const first = await joinQuiz({ slug, nickname: "SameNick", deviceId: "device-1" });
+    const second = await joinQuiz({ slug, nickname: "SameNick", deviceId: "device-2" });
+
+    expect(first.nickname).toBe("SameNick");
+    expect(second.nickname).not.toBe("SameNick");
+    expect(second.nickname).toMatch(/^SameNick \d{3}$/);
+  });
+
+  it("assigns unique suffix when renaming to an existing nickname", async () => {
+    const slug = uniqueSlug("rename-dup");
+    await createRoom({ eventName: slug, title: `Room ${slug}` });
+
+    await joinQuiz({ slug, nickname: "Taken", deviceId: "device-1" });
+    const joined = await joinQuiz({ slug, nickname: "Free", deviceId: "device-2" });
+    const updated = await updateParticipantNickname({
+      quizId: joined.quizId,
+      participantId: joined.participantId,
+      nickname: "Taken",
+    });
+
+    expect(updated.nickname).toMatch(/^Taken \d{3}$/);
   });
 
   it("sanitizes profane nickname on join", async () => {

@@ -81,6 +81,7 @@ type UsePublicViewEmitterParams = {
   showFirstCorrectAnswerer: boolean;
   firstCorrectWinnersCount: number;
   showEventTitleOnPlayer: boolean;
+  playerAutoJoinRandomNickname: boolean;
   playerBanners: PublicBanner[];
   speakerTileText: string;
   speakerTileBackgroundColor: string;
@@ -175,6 +176,7 @@ export function usePublicViewEmitter(params: UsePublicViewEmitterParams) {
     showFirstCorrectAnswerer,
     firstCorrectWinnersCount,
     showEventTitleOnPlayer,
+    playerAutoJoinRandomNickname,
     playerBanners,
     speakerTileText,
     speakerTileBackgroundColor,
@@ -307,6 +309,8 @@ export function usePublicViewEmitter(params: UsePublicViewEmitterParams) {
         showFirstCorrectAnswerer: patch.showFirstCorrectAnswerer ?? showFirstCorrectAnswerer,
         firstCorrectWinnersCount: patch.firstCorrectWinnersCount ?? firstCorrectWinnersCount,
         showEventTitleOnPlayer: patch.showEventTitleOnPlayer ?? showEventTitleOnPlayer,
+        playerAutoJoinRandomNickname:
+          patch.playerAutoJoinRandomNickname ?? playerAutoJoinRandomNickname,
         playerBanners: playerBannersForEmit(patch.playerBanners ?? playerBanners),
         speakerTileText: patch.speakerTileText ?? speakerTileText,
         speakerTileBackgroundColor: patch.speakerTileBackgroundColor ?? speakerTileBackgroundColor,
@@ -427,6 +431,7 @@ export function usePublicViewEmitter(params: UsePublicViewEmitterParams) {
       showFirstCorrectAnswerer,
       firstCorrectWinnersCount,
       showEventTitleOnPlayer,
+      playerAutoJoinRandomNickname,
       playerBanners,
       speakerTileText,
       speakerTileBackgroundColor,

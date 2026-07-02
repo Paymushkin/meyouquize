@@ -447,6 +447,7 @@ export const setPublicViewSchema = z.object({
   speakerQuestionsShowReactionsOnScreen: z.boolean().optional(),
   speakerQuestionsAllowAllSpeakersTarget: z.boolean().optional(),
   showEventTitleOnPlayer: z.boolean().optional(),
+  playerAutoJoinRandomNickname: z.boolean().optional(),
   playerBanners: z
     .array(
       z.object({

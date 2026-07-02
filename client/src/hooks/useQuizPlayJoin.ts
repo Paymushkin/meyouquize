@@ -37,9 +37,10 @@ export function useQuizPlayJoin({
 
   const safeNick = () => (nickname || "").trim() || "Игрок";
 
-  const requestJoin = (reason: "manual" | "restore") => {
+  const requestJoin = (reason: "manual" | "restore", nicknameOverride?: string) => {
     if (!slug) return;
-    emitQuizJoin(slug, reason, safeNick());
+    const nick = (nicknameOverride ?? safeNick()).trim() || "Игрок";
+    emitQuizJoin(slug, reason, nick);
   };
 
   const requestRestoreJoin = () => {

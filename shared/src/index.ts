@@ -211,6 +211,8 @@ export interface PublicViewState {
   speakerQuestionsAllowAllSpeakersTarget: boolean;
   /** Показывать название ивента в интерфейсе игрока */
   showEventTitleOnPlayer: boolean;
+  /** Вход в ивент без формы: сразу случайный ник (пользователь может сменить позже). */
+  playerAutoJoinRandomNickname: boolean;
   /** Баннеры для пользовательского интерфейса */
   playerBanners: PublicBanner[];
   /** Уникальные клики по баннерам (для админки). */
@@ -440,6 +442,7 @@ export const DEFAULT_PUBLIC_VIEW_STATE: PublicViewState = {
   speakerQuestionsShowReactionsOnScreen: true,
   speakerQuestionsAllowAllSpeakersTarget: true,
   showEventTitleOnPlayer: true,
+  playerAutoJoinRandomNickname: false,
   playerBanners: [],
   playerBannerClickStats: [],
   playerBannerClickParticipantIds: {},
@@ -1230,6 +1233,10 @@ export function normalizePublicViewState(
       typeof value?.showEventTitleOnPlayer === "boolean"
         ? value.showEventTitleOnPlayer
         : base.showEventTitleOnPlayer,
+    playerAutoJoinRandomNickname:
+      typeof value?.playerAutoJoinRandomNickname === "boolean"
+        ? value.playerAutoJoinRandomNickname
+        : base.playerAutoJoinRandomNickname,
     playerBanners,
     playerBannerClickStats: bannerClickData.playerBannerClickStats,
     playerBannerClickParticipantIds: bannerClickData.playerBannerClickParticipantIds,

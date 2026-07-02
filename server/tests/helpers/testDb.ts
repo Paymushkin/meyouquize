@@ -64,9 +64,9 @@ export async function initTestDatabase(): Promise<void> {
 
 export async function resetTestDatabase(): Promise<void> {
   const client = prisma ?? (await import("../../src/prisma.js")).prisma;
-  await client.$executeRawUnsafe(`SELECT pg_advisory_lock(${TEST_DB_RESET_LOCK_KEY})`);
-  try {
-    await client.$executeRawUnsafe(`
+  await client.$transaction(async (tx) => {
+    await tx.$executeRawUnsafe(`SELECT pg_advisory_xact_lock(${TEST_DB_RESET_LOCK_KEY})`);
+    await tx.$executeRawUnsafe(`
       TRUNCATE TABLE
         "FeedbackResponse",
         "FeedbackForm",
@@ -81,9 +81,7 @@ export async function resetTestDatabase(): Promise<void> {
         "Quiz"
       RESTART IDENTITY CASCADE;
     `);
-  } finally {
-    await client.$executeRawUnsafe(`SELECT pg_advisory_unlock(${TEST_DB_RESET_LOCK_KEY})`);
-  }
+  });
 }
 
 export async function shutdownTestDatabase(): Promise<void> {

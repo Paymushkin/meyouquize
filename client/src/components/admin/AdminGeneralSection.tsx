@@ -25,6 +25,8 @@ type Props = {
   eventSlug: string;
   showEventTitleOnPlayer: boolean;
   onToggleShowEventTitleOnPlayer: (next: boolean) => void;
+  playerAutoJoinRandomNickname: boolean;
+  onTogglePlayerAutoJoinRandomNickname: (next: boolean) => void;
 };
 
 export function AdminGeneralSection(props: Props) {
@@ -35,6 +37,8 @@ export function AdminGeneralSection(props: Props) {
     eventSlug,
     showEventTitleOnPlayer,
     onToggleShowEventTitleOnPlayer,
+    playerAutoJoinRandomNickname,
+    onTogglePlayerAutoJoinRandomNickname,
   } = props;
   const joinUrl = buildPlayerJoinUrl(eventSlug);
   const screenUrl = buildProjectorScreenUrl(eventSlug);
@@ -157,6 +161,16 @@ export function AdminGeneralSection(props: Props) {
               />
             }
             label="Показывать название ивента у пользователя"
+          />
+          <FormControlLabel
+            sx={{ m: 0, mt: 1 }}
+            control={
+              <Switch
+                checked={playerAutoJoinRandomNickname}
+                onChange={(_, next) => onTogglePlayerAutoJoinRandomNickname(next)}
+              />
+            }
+            label="Вход без формы: сразу случайное имя"
           />
         </CardContent>
       </Card>

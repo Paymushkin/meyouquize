@@ -17,5 +17,5 @@ export const options = {
 export default function () {
   const base = __ENV.BASE_URL || "http://localhost:4000";
   const res = http.get(`${base}/`);
-  check(res, { "200": (r) => r.status === 200 });
+  check(res, { 200: (r) => r.status === 200 });
 }

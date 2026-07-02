@@ -1,10 +1,4 @@
-import {
-  Box,
-  FormControlLabel,
-  Switch,
-  TextField,
-  Tooltip,
-} from "@mui/material";
+import { Box, FormControlLabel, Switch, TextField, Tooltip } from "@mui/material";
 
 type Props = {
   projectorShowFirstCorrect: boolean;
@@ -38,7 +32,7 @@ export function QuestionRowProjectorControls(props: Props) {
     >
       <Tooltip title="Кубок в строке вопроса. В редакторе отметьте верный вариант.">
         <FormControlLabel
-          control={(
+          control={
             <Switch
               size="small"
               checked={projectorShowFirstCorrect}
@@ -46,7 +40,7 @@ export function QuestionRowProjectorControls(props: Props) {
                 onProjectorShowFirstCorrectChange(checked);
               }}
             />
-          )}
+          }
           label="Победители"
           sx={{
             m: 0,

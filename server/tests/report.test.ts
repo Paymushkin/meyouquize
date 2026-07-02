@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
+import type { Request } from "express";
 import { setPublicViewSchema } from "../src/schemas.js";
 import { renderPublicReportPdf, resolveReportPdfPageOrigin } from "../src/report-pdf.js";
 import type { PublicEventReport } from "../src/quiz-service.js";
+import { makeReportConfig, makeReportPerQuestion } from "./helpers/reportFixtures.js";
 
 describe("report contracts", () => {
   it("resolves pdf page origin from forwarded headers", () => {
@@ -13,7 +15,7 @@ describe("report contracts", () => {
           return undefined;
         },
         secure: true,
-      },
+      } as Pick<Request, "get" | "secure">,
       ["http://localhost:5173"],
     );
     expect(origin).toBe("https://meyou.site");
@@ -53,15 +55,14 @@ describe("report contracts", () => {
         brandProjectorBackgroundImageUrl: "",
         brandBodyBackgroundColor: "#000000",
       },
-      config: {
+      config: makeReportConfig({
         reportTitle: "Отчет мероприятия",
         reportModules: ["event_header", "quiz_results", "vote_results"],
         reportVoteQuestionIds: ["q-vote-1"],
         reportQuizQuestionIds: ["q1"],
         reportQuizSubQuizIds: ["sq1"],
         reportFeedbackFormIds: ["f1"],
-        reportPublished: true,
-      },
+      }),
       summary: {
         participantsCount: 42,
         questionsCount: 10,
@@ -70,34 +71,21 @@ describe("report contracts", () => {
       },
       leaderboard: [{ participantId: "p1", nickname: "Игрок", score: 120, totalResponseMs: 5000 }],
       quizQuestions: [
-        {
+        makeReportPerQuestion({
           questionId: "q1",
           text: "Вопрос 1",
           subQuizId: "sq1",
-          projectorShowFirstCorrect: false,
-          projectorFirstCorrectWinnersCount: 1,
-          type: "single",
-          rankingProjectorMetric: undefined,
-          rankingKind: undefined,
           optionStats: [{ optionId: "o1", text: "A", count: 10, isCorrect: true }],
-          tagCloud: [],
-          firstCorrectNicknames: [],
-        },
+          answerCount: 10,
+        }),
       ],
       voteQuestions: [
-        {
+        makeReportPerQuestion({
           questionId: "q-vote-1",
           text: "Голосование 1",
-          subQuizId: null,
-          projectorShowFirstCorrect: false,
-          projectorFirstCorrectWinnersCount: 1,
-          type: "single",
-          rankingProjectorMetric: undefined,
-          rankingKind: undefined,
           optionStats: [{ optionId: "o1", text: "Да", count: 7, isCorrect: false }],
-          tagCloud: [],
-          firstCorrectNicknames: [],
-        },
+          answerCount: 7,
+        }),
       ],
       randomizer: {
         currentWinners: ["Анна"],

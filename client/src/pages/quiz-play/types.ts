@@ -96,6 +96,7 @@ export type QuizState = {
   id: string;
   title: string;
   showEventTitleOnPlayer?: boolean;
+  playerAutoJoinRandomNickname?: boolean;
   playerBanners?: Array<{
     id: string;
     linkUrl: string;

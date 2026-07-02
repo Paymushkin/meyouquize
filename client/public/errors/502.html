@@ -23,8 +23,13 @@
         --border: rgba(255, 255, 255, 0.12);
         --surface: rgba(255, 255, 255, 0.04);
       }
-      * { box-sizing: border-box; }
-      html, body { height: 100%; }
+      * {
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        height: 100%;
+      }
       body {
         margin: 0;
         background: var(--bg);
@@ -73,7 +78,11 @@
         transform: translateX(-50%);
         width: min(120vw, 70vw);
         height: min(120vw, 70vw);
-        background: radial-gradient(closest-side, rgba(243, 247, 34, 0.12), rgba(243, 247, 34, 0) 70%);
+        background: radial-gradient(
+          closest-side,
+          rgba(243, 247, 34, 0.12),
+          rgba(243, 247, 34, 0) 70%
+        );
         pointer-events: none;
         z-index: 0;
       }
@@ -117,7 +126,10 @@
         font-weight: 600;
         text-decoration: none;
         font-size: 16px;
-        transition: transform 200ms ease, box-shadow 200ms ease, background 200ms ease;
+        transition:
+          transform 200ms ease,
+          box-shadow 200ms ease,
+          background 200ms ease;
         border: 1px solid transparent;
       }
       .btn-primary {

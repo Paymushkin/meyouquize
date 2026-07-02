@@ -76,13 +76,16 @@ export function AdminPage() {
         title: form.title,
         questions: JSON.parse(form.questionsJson),
       };
-      socket.once("quiz:created", async (quiz: { id: string; slug: string; accessToken: string }) => {
-        setQuizId(quiz.id);
-        const url = `${window.location.origin}/q/${quiz.slug}?token=${quiz.accessToken}`;
-        setJoinUrl(url);
-        const qr = await QRCode.toDataURL(url);
-        setQrData(qr);
-      });
+      socket.once(
+        "quiz:created",
+        async (quiz: { id: string; slug: string; accessToken: string }) => {
+          setQuizId(quiz.id);
+          const url = `${window.location.origin}/q/${quiz.slug}?token=${quiz.accessToken}`;
+          setJoinUrl(url);
+          const qr = await QRCode.toDataURL(url);
+          setQrData(qr);
+        },
+      );
       socket.emit("quiz:create", payload);
     } catch {
       setMessage("Invalid questions JSON");

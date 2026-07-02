@@ -41,8 +41,8 @@ type Params = {
   setSpeakerQuestions: Dispatch<SetStateAction<SpeakerQuestionsPayload | null>>;
   onParticipantMissing?: () => void;
   onQuizJoined?: () => void;
-  /** Сброс «вошёл» в localStorage при ошибке входа (занятый ник и т.п.). */
-  onJoinFailed?: () => void;
+  /** Фактический ник после входа (может отличаться при автодобавлении суффикса). */
+  onJoinedNickname?: (nickname: string) => void;
   /** Вход завершён (успех или ошибка) — снять индикатор ожидания. */
   onJoinSettled?: () => void;
   /** Актуальный joined — для reconnect без показа экрана входа. */
@@ -71,7 +71,7 @@ export function useQuizPlaySocket({
   setSpeakerQuestions,
   onParticipantMissing,
   onQuizJoined,
-  onJoinFailed,
+  onJoinedNickname,
   onJoinSettled,
   joinedRef,
   onQuizSessionReadyChange,
@@ -171,11 +171,6 @@ export function useQuizPlaySocket({
         setError("Слишком много тегов для этого вопроса. Уберите лишние ответы.");
         return;
       }
-      if (code === "NICKNAME_TAKEN" || message === "Ник уже используется в этой комнате") {
-        onJoinFailed?.();
-        onJoinSettled?.();
-        return;
-      }
       const displayMessage =
         message === "Join failed"
           ? "Не удалось войти в комнату. Проверьте имя и повторите попытку."
@@ -203,7 +198,11 @@ export function useQuizPlaySocket({
       }
       setConnectionStatus("offline");
     };
-    const onJoined = () => {
+    const onJoined = (payload?: { nickname?: string }) => {
+      const resolvedNickname = payload?.nickname?.trim();
+      if (resolvedNickname) {
+        onJoinedNickname?.(resolvedNickname);
+      }
       setJoined(true);
       onQuizSessionReadyChange?.(true);
       setConnectionStatus("online");
@@ -312,7 +311,7 @@ export function useQuizPlaySocket({
     setSpeakerQuestions,
     onParticipantMissing,
     onQuizJoined,
-    onJoinFailed,
+    onJoinedNickname,
     onJoinSettled,
     joinedRef,
     onQuizSessionReadyChange,

@@ -219,9 +219,14 @@ export function buildApp() {
   });
   const adminApiLimiter = rateLimit({
     windowMs: 60_000,
-    limit: 240,
+    limit: env.networkMode === "internet" ? 600 : 1200,
     standardHeaders: true,
     legacyHeaders: false,
+    skip: (req) => {
+      if (isAdminAuthBypassed()) return true;
+      const token = req.cookies?.[ADMIN_COOKIE];
+      return Boolean(token?.trim());
+    },
     message: { error: "Too many admin API requests. Please try again in a minute." },
   });
 
@@ -752,6 +757,7 @@ export function buildApp() {
       brandLogoUrl: view.brandLogoUrl,
       brandFontFamily: view.brandFontFamily,
       brandFontUrl: view.brandFontUrl,
+      playerAutoJoinRandomNickname: view.playerAutoJoinRandomNickname,
     });
   });
 

@@ -14,7 +14,11 @@ async function fetchParticipantNicknames(eventName: string): Promise<string[]> {
 }
 
 /** Актуальный список ников участников комнаты (для рандомайзера и др.). */
-export function useEventParticipantNicknames(eventName: string, isAuth: boolean) {
+export function useEventParticipantNicknames(
+  eventName: string,
+  isAuth: boolean,
+  pollEnabled = false,
+) {
   const [eventParticipantNicknames, setEventParticipantNicknames] = useState<string[]>([]);
 
   const refreshEventParticipantNicknames = useCallback(async (): Promise<string[]> => {
@@ -25,8 +29,8 @@ export function useEventParticipantNicknames(eventName: string, isAuth: boolean)
   }, [eventName, isAuth]);
 
   useEffect(() => {
-    if (!eventName || !isAuth) {
-      setEventParticipantNicknames([]);
+    if (!eventName || !isAuth || !pollEnabled) {
+      if (!pollEnabled) setEventParticipantNicknames([]);
       return;
     }
     void refreshEventParticipantNicknames();
@@ -34,7 +38,7 @@ export function useEventParticipantNicknames(eventName: string, isAuth: boolean)
       void refreshEventParticipantNicknames();
     }, 30_000);
     return () => window.clearInterval(intervalId);
-  }, [eventName, isAuth, refreshEventParticipantNicknames]);
+  }, [eventName, isAuth, pollEnabled, refreshEventParticipantNicknames]);
 
   return { eventParticipantNicknames, refreshEventParticipantNicknames };
 }

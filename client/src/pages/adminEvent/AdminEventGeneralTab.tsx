@@ -9,6 +9,8 @@ export type AdminEventGeneralTabProps = {
   eventSlug: string;
   showEventTitleOnPlayer: boolean;
   onToggleShowEventTitleOnPlayer: (next: boolean) => void;
+  playerAutoJoinRandomNickname: boolean;
+  onTogglePlayerAutoJoinRandomNickname: (next: boolean) => void;
   onRequestResetDemo: () => void;
 };
 
@@ -20,6 +22,8 @@ export function AdminEventGeneralTab({
   eventSlug,
   showEventTitleOnPlayer,
   onToggleShowEventTitleOnPlayer,
+  playerAutoJoinRandomNickname,
+  onTogglePlayerAutoJoinRandomNickname,
   onRequestResetDemo,
 }: AdminEventGeneralTabProps) {
   return (
@@ -31,6 +35,8 @@ export function AdminEventGeneralTab({
         eventSlug={eventSlug}
         showEventTitleOnPlayer={showEventTitleOnPlayer}
         onToggleShowEventTitleOnPlayer={onToggleShowEventTitleOnPlayer}
+        playerAutoJoinRandomNickname={playerAutoJoinRandomNickname}
+        onTogglePlayerAutoJoinRandomNickname={onTogglePlayerAutoJoinRandomNickname}
       />
       {eventName === "demo" && (
         <Card variant="outlined" sx={{ borderColor: "warning.main" }}>

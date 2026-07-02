@@ -4,6 +4,7 @@ import { withProjectorTagCloudFields } from "./tagCloudManual.js";
 /** Поля publicView, которые влияют только на интерфейс игрока / отчёт, но не на проектор. */
 const PLAYER_ONLY_PUBLIC_VIEW_KEYS = [
   "showEventTitleOnPlayer",
+  "playerAutoJoinRandomNickname",
   "playerBanners",
   "playerBannerClickStats",
   "playerBannerClickParticipantIds",

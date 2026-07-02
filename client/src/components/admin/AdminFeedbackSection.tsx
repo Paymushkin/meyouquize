@@ -25,7 +25,7 @@ import {
   Tooltip,
   Typography,
 } from "@mui/material";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, type Dispatch, type SetStateAction } from "react";
 import { hasOptionVoteCountOverride } from "@meyouquize/shared";
 import { API_BASE } from "../../config";
 import { socket } from "../../socket";
@@ -49,6 +49,10 @@ type Props = {
   eventName: string;
   quizId: string;
   onlineUsersCount: number;
+  forms: FeedbackFormConfig[];
+  setForms: Dispatch<SetStateAction<FeedbackFormConfig[]>>;
+  syncCatalogToReport: (forms: FeedbackFormConfig[]) => void;
+  catalogLoading?: boolean;
 };
 
 function resultsMapFromList(
@@ -57,10 +61,17 @@ function resultsMapFromList(
   return Object.fromEntries(items.map((item) => [item.form.id, item]));
 }
 
-export function AdminFeedbackSection({ eventName, quizId, onlineUsersCount }: Props) {
+export function AdminFeedbackSection({
+  eventName,
+  quizId,
+  onlineUsersCount,
+  forms,
+  setForms,
+  syncCatalogToReport,
+  catalogLoading = false,
+}: Props) {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [forms, setForms] = useState<FeedbackFormConfig[]>([]);
   const [resultsByFormId, setResultsByFormId] = useState<Record<string, FeedbackResultsPayload>>(
     {},
   );
@@ -78,19 +89,6 @@ export function AdminFeedbackSection({ eventName, quizId, onlineUsersCount }: Pr
   const [addResponseFieldValues, setAddResponseFieldValues] = useState<Record<string, string>>({});
   const [addResponseError, setAddResponseError] = useState("");
 
-  const loadForms = useCallback(async () => {
-    const response = await fetch(
-      `${API_BASE}/api/admin/rooms/${encodeURIComponent(eventName)}/feedback`,
-      {
-        credentials: "include",
-      },
-    );
-    if (!response.ok) {
-      return;
-    }
-    setForms((await response.json()) as FeedbackFormConfig[]);
-  }, [eventName]);
-
   const loadResults = useCallback(async () => {
     const response = await fetch(
       `${API_BASE}/api/admin/rooms/${encodeURIComponent(eventName)}/feedback/results`,
@@ -105,13 +103,13 @@ export function AdminFeedbackSection({ eventName, quizId, onlineUsersCount }: Pr
     let active = true;
     void (async () => {
       setLoading(true);
-      await Promise.all([loadForms(), loadResults()]);
+      await loadResults();
       if (active) setLoading(false);
     })();
     return () => {
       active = false;
     };
-  }, [loadForms, loadResults]);
+  }, [loadResults]);
 
   useEffect(() => {
     if (!quizId) return;
@@ -253,7 +251,11 @@ export function AdminFeedbackSection({ eventName, quizId, onlineUsersCount }: Pr
         return;
       }
       const data = (await response.json()) as FeedbackFormConfig;
-      setForms((prev) => [...prev, data]);
+      setForms((prev) => {
+        const next = [...prev, data];
+        syncCatalogToReport(next);
+        return next;
+      });
       setCreateDialogOpen(false);
       await loadResults();
     } finally {
@@ -286,7 +288,11 @@ export function AdminFeedbackSection({ eventName, quizId, onlineUsersCount }: Pr
         return;
       }
       const data = (await response.json()) as FeedbackFormConfig;
-      setForms((prev) => prev.map((form) => (form.id === formId ? data : form)));
+      setForms((prev) => {
+        const next = prev.map((form) => (form.id === formId ? data : form));
+        syncCatalogToReport(next);
+        return next;
+      });
       setEditFormId(null);
       await loadResults();
     } finally {
@@ -313,7 +319,7 @@ export function AdminFeedbackSection({ eventName, quizId, onlineUsersCount }: Pr
     ? (forms.find((form) => form.id === confirmResetFormId) ?? null)
     : null;
 
-  if (loading) {
+  if (loading || catalogLoading) {
     return (
       <Card variant="outlined">
         <CardContent>

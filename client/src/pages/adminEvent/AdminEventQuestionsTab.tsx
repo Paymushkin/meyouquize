@@ -43,6 +43,7 @@ import {
 } from "../../features/randomizer/randomizerLogic";
 import type { PublicViewMode, PublicViewSetPatch } from "../../publicViewContract";
 import { socket } from "../../socket";
+import type { FeedbackFormConfig } from "../../types/feedback";
 
 export type AdminEventQuestionsTabProps = {
   roomQuestionsTab: RoomQuestionsTab;
@@ -54,6 +55,10 @@ export type AdminEventQuestionsTabProps = {
   onlineUsersCount: number;
   eventParticipantNicknames: string[];
   refreshEventParticipantNicknames: () => Promise<string[]>;
+  feedbackForms: FeedbackFormConfig[];
+  setFeedbackForms: Dispatch<SetStateAction<FeedbackFormConfig[]>>;
+  syncFeedbackCatalogToReport: (forms: FeedbackFormConfig[]) => void;
+  feedbackCatalogLoading: boolean;
   subQuizSheets: SubQuizSheet[];
   setSubQuizSheets: Dispatch<SetStateAction<SubQuizSheet[]>>;
   questionForms: QuestionForm[];
@@ -110,6 +115,10 @@ export function AdminEventQuestionsTab({
   onlineUsersCount,
   eventParticipantNicknames,
   refreshEventParticipantNicknames,
+  feedbackForms,
+  setFeedbackForms,
+  syncFeedbackCatalogToReport,
+  feedbackCatalogLoading,
   subQuizSheets,
   setSubQuizSheets,
   questionForms,
@@ -636,6 +645,10 @@ export function AdminEventQuestionsTab({
               eventName={eventName}
               quizId={quizId}
               onlineUsersCount={onlineUsersCount}
+              forms={feedbackForms}
+              setForms={setFeedbackForms}
+              syncCatalogToReport={syncFeedbackCatalogToReport}
+              catalogLoading={feedbackCatalogLoading}
             />
           ) : null}
           {roomQuestionsTab === "randomizer" && (

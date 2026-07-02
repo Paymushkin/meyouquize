@@ -26,6 +26,8 @@ export function useQuizPlayMetaBranding({ slug, quiz }: Params) {
   const [metaBrandLogoUrl, setMetaBrandLogoUrl] = useState("");
   const [metaBrandFontFamily, setMetaBrandFontFamily] = useState("");
   const [metaBrandFontUrl, setMetaBrandFontUrl] = useState("");
+  const [joinMetaLoaded, setJoinMetaLoaded] = useState(!slug);
+  const [playerAutoJoinRandomNickname, setPlayerAutoJoinRandomNickname] = useState(false);
 
   useEffect(() => {
     document.title = quiz?.title?.trim() || "Квиз";
@@ -38,7 +40,11 @@ export function useQuizPlayMetaBranding({ slug, quiz }: Params) {
   }, [quiz?.title]);
 
   useEffect(() => {
-    if (!slug) return;
+    if (!slug) {
+      setJoinMetaLoaded(true);
+      return;
+    }
+    setJoinMetaLoaded(false);
     const controller = new AbortController();
     void (async () => {
       try {
@@ -57,6 +63,7 @@ export function useQuizPlayMetaBranding({ slug, quiz }: Params) {
           brandLogoUrl?: string;
           brandFontFamily?: string;
           brandFontUrl?: string;
+          playerAutoJoinRandomNickname?: boolean;
         };
         if (typeof payload.title === "string") {
           setQuizTitle(payload.title);
@@ -91,12 +98,25 @@ export function useQuizPlayMetaBranding({ slug, quiz }: Params) {
         if (typeof payload.brandFontUrl === "string") {
           setMetaBrandFontUrl(payload.brandFontUrl);
         }
+        if (typeof payload.playerAutoJoinRandomNickname === "boolean") {
+          setPlayerAutoJoinRandomNickname(payload.playerAutoJoinRandomNickname);
+        }
       } catch {
         // ignore network errors, socket state can still provide title later
+      } finally {
+        if (!controller.signal.aborted) {
+          setJoinMetaLoaded(true);
+        }
       }
     })();
     return () => controller.abort();
   }, [slug]);
+
+  useEffect(() => {
+    if (typeof quiz?.playerAutoJoinRandomNickname === "boolean") {
+      setPlayerAutoJoinRandomNickname(quiz.playerAutoJoinRandomNickname);
+    }
+  }, [quiz?.playerAutoJoinRandomNickname]);
 
   useEffect(() => {
     if (typeof quiz?.brandPlayerBackgroundImageUrl === "string") {
@@ -181,5 +201,7 @@ export function useQuizPlayMetaBranding({ slug, quiz }: Params) {
     brandLogoUrl,
     brandFontFamily,
     brandFontUrl,
+    joinMetaLoaded,
+    playerAutoJoinRandomNickname,
   };
 }

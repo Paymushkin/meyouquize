@@ -47,7 +47,7 @@ const JOIN_DEBOUNCE_MS = 2500;
 const reactionRateBySocket = new Map<string, number[]>();
 const lastJoinAckBySocket = new Map<
   string,
-  { at: number; quizId: string; participantId: string }
+  { at: number; quizId: string; participantId: string; nickname: string }
 >();
 
 function allowReactionBurst(socketId: string): boolean {
@@ -75,7 +75,7 @@ export function registerQuizPlayHandlers(socket: EnrichedSocket, io: Server) {
         socket.data.participantId === recent.participantId &&
         socket.data.quizId === recent.quizId
       ) {
-        socket.emit("quiz:joined", { ok: true });
+        socket.emit("quiz:joined", { ok: true, nickname: recent.nickname });
         return;
       }
       const joined = await joinQuiz(payload);
@@ -89,7 +89,7 @@ export function registerQuizPlayHandlers(socket: EnrichedSocket, io: Server) {
       socket.data.participantId = joined.participantId;
       socket.data.quizId = joined.quizId;
       await socket.join(quizPlayerRoom(joined.quizId));
-      socket.emit("quiz:joined", { ok: true });
+      socket.emit("quiz:joined", { ok: true, nickname: joined.nickname });
       socket.emit("player:answers", answersMap);
       const feedbackSubmitted = await hasParticipantSubmittedFeedback(
         joined.quizId,
@@ -106,6 +106,7 @@ export function registerQuizPlayHandlers(socket: EnrichedSocket, io: Server) {
         at: Date.now(),
         quizId: joined.quizId,
         participantId: joined.participantId,
+        nickname: joined.nickname,
       });
       trialLog("quiz_join_ok", {
         quizId: joined.quizId,
@@ -120,11 +121,7 @@ export function registerQuizPlayHandlers(socket: EnrichedSocket, io: Server) {
         error: trialErrorMessage(error, "Join failed"),
       });
       const message = error instanceof Error ? error.message : "Join failed";
-      if (message === "Ник уже используется в этой комнате") {
-        fail(socket, { code: "NICKNAME_TAKEN", message });
-      } else {
-        fail(socket, message);
-      }
+      fail(socket, message);
     }
   });
 
@@ -196,11 +193,7 @@ export function registerQuizPlayHandlers(socket: EnrichedSocket, io: Server) {
       await broadcastQuizPublicState(io, payload.quizId, state);
     } catch (error) {
       const message = error instanceof Error ? error.message : "Update nickname failed";
-      if (message === "Ник уже используется в этой комнате") {
-        fail(socket, { code: "NICKNAME_TAKEN", message });
-      } else {
-        fail(socket, message);
-      }
+      fail(socket, message);
     }
   });
 

@@ -10,6 +10,12 @@ import {
 } from "../helpers/integrationFixtures.js";
 import { setQuestionEnabled } from "../../src/quiz-service.js";
 
+function readSetCookieHeader(headers: request.Response["headers"]): string[] {
+  const raw = headers["set-cookie"];
+  if (Array.isArray(raw)) return raw;
+  return raw ? [raw] : [];
+}
+
 describe("HTTP API integration", () => {
   it("POST /api/admin/auth accepts valid credentials", async () => {
     const app = buildApp();
@@ -18,7 +24,7 @@ describe("HTTP API integration", () => {
       .send({ login: "admin", password: adminPassword() });
     expect(response.status).toBe(200);
     expect(response.body).toMatchObject({ ok: true });
-    expect(response.headers["set-cookie"]?.some((c) => c.startsWith("mq_admin="))).toBe(true);
+    expect(readSetCookieHeader(response.headers).some((c) => c.startsWith("mq_admin="))).toBe(true);
   });
 
   it("POST /api/admin/auth rejects invalid credentials", async () => {
