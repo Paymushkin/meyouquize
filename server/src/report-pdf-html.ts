@@ -2,7 +2,11 @@ import fs from "node:fs";
 import { createRequire } from "node:module";
 import path from "node:path";
 import type { ReportModuleId } from "@meyouquize/shared";
-import { formatVoteDistributionPercent, voteDistributionPercentWidth } from "@meyouquize/shared";
+import {
+  formatTemperatureScaleLabel,
+  formatVoteDistributionPercent,
+  voteDistributionPercentWidth,
+} from "@meyouquize/shared";
 import type { PublicEventReport } from "./quiz-service.js";
 
 const DEFAULT_REPORT_LOGO_URL = "/logo.svg";
@@ -57,6 +61,48 @@ function barRows(
       </div>`;
     })
     .join("");
+}
+
+function formatReportTemperatureAverage(
+  value: number | null | undefined,
+  subtitle?: string | null,
+): string | null {
+  const label = formatTemperatureScaleLabel(value);
+  if (!label) return null;
+  const prefix = subtitle?.trim() || "Среднее";
+  return `${prefix}: ${label}`;
+}
+
+type ReportQuestionRow = PublicEventReport["voteQuestions"][number];
+
+function reportQuestionResultsBody(
+  question: ReportQuestionRow,
+  primary: string,
+  textMuted: string,
+): string {
+  if (question.type === "tag_cloud") {
+    return tagCloudRows(question.tagCloud, primary);
+  }
+  if (question.type === "temperature") {
+    const averageLabel = formatReportTemperatureAverage(
+      question.temperatureValue,
+      question.temperatureSubtitle,
+    );
+    if (!averageLabel) {
+      return `<p class="muted">Пока нет ответов</p>`;
+    }
+    const bars = barRows(
+      question.optionStats.slice(0, 8).map((row) => ({ text: row.text, count: row.count })),
+      primary,
+      textMuted,
+    );
+    return `<p class="temperature-avg"><strong>${escapeHtml(averageLabel)}</strong></p>${bars}`;
+  }
+  return barRows(
+    question.optionStats.slice(0, 8).map((row) => ({ text: row.text, count: row.count })),
+    primary,
+    textMuted,
+  );
 }
 
 function tagCloudRows(tags: Array<{ text: string; count: number }>, primary: string): string {
@@ -163,20 +209,10 @@ function buildReportPdfSection(
     case "vote_results": {
       if (report.voteQuestions.length === 0) return null;
       const questions = report.voteQuestions
-        .map((question) => {
-          const body =
-            question.type === "tag_cloud"
-              ? tagCloudRows(question.tagCloud, primary)
-              : barRows(
-                  question.optionStats.slice(0, 8).map((row) => ({
-                    text: row.text,
-                    count: row.count,
-                  })),
-                  primary,
-                  textMuted,
-                );
-          return `<div class="question"><h3>${escapeHtml(question.text)}</h3>${body}</div>`;
-        })
+        .map(
+          (question) =>
+            `<div class="question"><h3>${escapeHtml(question.text)}</h3>${reportQuestionResultsBody(question, primary, textMuted)}</div>`,
+        )
         .join("");
       return `
       <section class="card">
@@ -196,20 +232,10 @@ function buildReportPdfSection(
       const groups = Array.from(bySubQuiz.entries())
         .map(([title, questions]) => {
           const items = questions
-            .map((question) => {
-              const body =
-                question.type === "tag_cloud"
-                  ? tagCloudRows(question.tagCloud, primary)
-                  : barRows(
-                      question.optionStats.slice(0, 8).map((row) => ({
-                        text: row.text,
-                        count: row.count,
-                      })),
-                      primary,
-                      textMuted,
-                    );
-              return `<div class="question"><h3>${escapeHtml(question.text)}</h3>${body}</div>`;
-            })
+            .map(
+              (question) =>
+                `<div class="question"><h3>${escapeHtml(question.text)}</h3>${reportQuestionResultsBody(question, primary, textMuted)}</div>`,
+            )
             .join("");
           return `<div class="group"><h3 class="group-title">${escapeHtml(title)}</h3>${items}</div>`;
         })

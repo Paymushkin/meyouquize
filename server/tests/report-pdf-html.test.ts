@@ -86,6 +86,32 @@ describe("buildReportPdfHtml", () => {
     expect(html).toContain("66,7%");
   });
 
+  it("renders temperature vote with weighted average", () => {
+    const html = buildReportPdfHtml({
+      ...baseReport,
+      voteQuestions: [
+        {
+          questionId: "temp-1",
+          text: "Уровень вовлечённости",
+          subQuizId: null,
+          type: "temperature",
+          temperatureSubtitle: "Температура",
+          temperatureValue: 75,
+          optionStats: [
+            { optionId: "o1", text: "Холодно", count: 1, isCorrect: false, weight: 0 },
+            { optionId: "o2", text: "Жарко", count: 3, isCorrect: false, weight: 100 },
+          ],
+          tagCloud: [],
+          firstCorrectNicknames: [],
+          projectorShowFirstCorrect: false,
+          projectorFirstCorrectWinnersCount: 1,
+        },
+      ],
+    });
+    expect(html).toContain("Температура: 75 / 100");
+    expect(html).toContain("Холодно");
+  });
+
   it("renders banners section with image, link and clicks", () => {
     const html = buildReportPdfHtml({
       ...baseReport,

@@ -24,6 +24,7 @@ import { alpha, useTheme } from "@mui/material/styles";
 import AccessTimeIcon from "@mui/icons-material/AccessTime";
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import {
+  formatTemperatureScaleLabel,
   formatVoteDistributionPercent,
   voteDistributionPercentWidth,
   type ReportModuleId,
@@ -43,6 +44,16 @@ const DEFAULT_REPORT_LOGO_URL = "/logo.svg";
 function buildPublicReportDocumentTitle(eventTitle: string | undefined): string {
   const title = eventTitle?.trim();
   return title ? `Отчет | ${title}` : "Отчет";
+}
+
+function formatReportTemperatureAverage(
+  value: number | null | undefined,
+  subtitle?: string | null,
+): string | null {
+  const label = formatTemperatureScaleLabel(value);
+  if (!label) return null;
+  const prefix = subtitle?.trim() || "Среднее";
+  return `${prefix}: ${label}`;
 }
 
 type PublicReportPayload = {
@@ -80,7 +91,9 @@ type PublicReportPayload = {
     text: string;
     subQuizId?: string | null;
     subQuizTitle?: string;
-    type: "single" | "multi" | "tag_cloud" | "ranking";
+    type: "single" | "multi" | "tag_cloud" | "ranking" | "temperature";
+    temperatureValue?: number | null;
+    temperatureSubtitle?: string | null;
     optionStats: Array<{
       text: string;
       count: number;
@@ -88,6 +101,7 @@ type PublicReportPayload = {
       avgRank?: number;
       avgScore?: number;
       totalScore?: number;
+      weight?: number;
     }>;
     tagCloud: Array<{ text: string; count: number }>;
   }>;
@@ -96,7 +110,9 @@ type PublicReportPayload = {
     text: string;
     subQuizId?: string | null;
     subQuizTitle?: string;
-    type: "single" | "multi" | "tag_cloud" | "ranking";
+    type: "single" | "multi" | "tag_cloud" | "ranking" | "temperature";
+    temperatureValue?: number | null;
+    temperatureSubtitle?: string | null;
     optionStats: Array<{
       text: string;
       count: number;
@@ -104,6 +120,7 @@ type PublicReportPayload = {
       avgRank?: number;
       avgScore?: number;
       totalScore?: number;
+      weight?: number;
     }>;
     tagCloud: Array<{ text: string; count: number }>;
   }>;
@@ -480,12 +497,40 @@ function ReportQuestionResults({
 }: {
   question: {
     type: string;
+    temperatureValue?: number | null;
+    temperatureSubtitle?: string | null;
     optionStats: Array<{ text: string; count: number; isCorrect?: boolean }>;
     tagCloud: Array<{ text: string; count: number }>;
   };
 }) {
   if (question.type === "tag_cloud") {
     return <TagCloudReportWords tags={question.tagCloud} />;
+  }
+  if (question.type === "temperature") {
+    const averageLabel = formatReportTemperatureAverage(
+      question.temperatureValue,
+      question.temperatureSubtitle,
+    );
+    if (!averageLabel) {
+      return (
+        <Typography variant="body2" color="text.secondary" sx={{ mt: 0.75 }}>
+          Пока нет ответов
+        </Typography>
+      );
+    }
+    return (
+      <Stack spacing={0.75} sx={{ mt: 0.75 }}>
+        <Typography variant="body1" fontWeight={700}>
+          {averageLabel}
+        </Typography>
+        <QuestionBarChart
+          rows={question.optionStats.slice(0, 8).map((item) => ({
+            text: item.text,
+            count: item.count,
+          }))}
+        />
+      </Stack>
+    );
   }
   return (
     <QuestionBarChart
