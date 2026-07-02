@@ -1617,6 +1617,10 @@ export {
   TEMPERATURE_SCALE_MAX,
 } from "./temperatureVote.js";
 export {
+  formatVoteDistributionPercent,
+  voteDistributionPercentWidth,
+} from "./voteDistributionPercent.js";
+export {
   SPEAKER_ALL_TARGET,
   SPEAKER_NOT_SELECTED,
   isKnownSpeakerTargetValue,

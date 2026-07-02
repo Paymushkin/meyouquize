@@ -23,7 +23,11 @@ import {
 import { alpha, useTheme } from "@mui/material/styles";
 import AccessTimeIcon from "@mui/icons-material/AccessTime";
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
-import type { ReportModuleId } from "@meyouquize/shared";
+import {
+  formatVoteDistributionPercent,
+  voteDistributionPercentWidth,
+  type ReportModuleId,
+} from "@meyouquize/shared";
 import { API_BASE } from "../config";
 import { buildBrandBackground } from "../features/branding/brandVisual";
 import { buildReportTheme } from "../features/report/buildReportTheme";
@@ -389,7 +393,7 @@ function QuestionBarChart({
               <Box
                 sx={{
                   height: "100%",
-                  width: `${total > 0 ? (row.count / total) * 100 : 0}%`,
+                  width: `${voteDistributionPercentWidth(row.count, total)}%`,
                   bgcolor: "primary.main",
                 }}
               />
@@ -397,9 +401,9 @@ function QuestionBarChart({
             <Typography
               variant="caption"
               color="text.secondary"
-              sx={{ minWidth: 52, textAlign: "right" }}
+              sx={{ minWidth: 58, textAlign: "right" }}
             >
-              {total > 0 ? `${Math.round((row.count / total) * 100)}%` : "0%"} • {row.count}
+              {formatVoteDistributionPercent(row.count, total)} • {row.count}
             </Typography>
           </Stack>
         </Stack>

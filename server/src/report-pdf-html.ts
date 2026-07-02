@@ -2,6 +2,7 @@ import fs from "node:fs";
 import { createRequire } from "node:module";
 import path from "node:path";
 import type { ReportModuleId } from "@meyouquize/shared";
+import { formatVoteDistributionPercent, voteDistributionPercentWidth } from "@meyouquize/shared";
 import type { PublicEventReport } from "./quiz-service.js";
 
 const require = createRequire(import.meta.url);
@@ -42,14 +43,15 @@ function barRows(
   }
   return rows
     .map((row) => {
-      const pct = total > 0 ? Math.round((row.count / total) * 100) : 0;
+      const pctLabel = formatVoteDistributionPercent(row.count, total);
+      const pctWidth = voteDistributionPercentWidth(row.count, total);
       return `
       <div class="bar-row">
         <div class="bar-label">${escapeHtml(row.text)}</div>
         <div class="bar-track">
-          <div class="bar-fill" style="width:${pct}%;background:${primary}"></div>
+          <div class="bar-fill" style="width:${pctWidth}%;background:${primary}"></div>
         </div>
-        <div class="bar-meta" style="color:${textMuted}">${pct}% • ${row.count}</div>
+        <div class="bar-meta" style="color:${textMuted}">${pctLabel} • ${row.count}</div>
       </div>`;
     })
     .join("");

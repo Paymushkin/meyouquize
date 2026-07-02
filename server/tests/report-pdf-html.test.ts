@@ -69,6 +69,23 @@ describe("buildReportPdfHtml", () => {
     expect(html).toContain('data-report-pdf-ready="1"');
   });
 
+  it("renders vote distribution with fractional percents", () => {
+    const html = buildReportPdfHtml({
+      ...baseReport,
+      voteQuestions: [
+        {
+          ...baseReport.voteQuestions[0]!,
+          optionStats: [
+            { optionId: "o1", text: "A", count: 1, isCorrect: false },
+            { optionId: "o2", text: "B", count: 2, isCorrect: false },
+          ],
+        },
+      ],
+    });
+    expect(html).toContain("33,3%");
+    expect(html).toContain("66,7%");
+  });
+
   it("renders banners section with image, link and clicks", () => {
     const html = buildReportPdfHtml({
       ...baseReport,
