@@ -154,7 +154,9 @@ export function AdminRandomizerSection(props: Props) {
                 />
                 <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
                   <Button size="small" variant="outlined" onClick={onRefreshParticipants}>
-                    Обновить из комнаты
+                    {listMode === "participants_only"
+                      ? "Обновить из комнаты"
+                      : `Обновить список из комнаты (${liveParticipantCount})`}
                   </Button>
                   {listMode === "free_list" ? (
                     <Button size="small" variant="text" onClick={onImportParticipantsToFreeList}>

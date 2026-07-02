@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   RANDOMIZER_FREE_LIST_NAMES_TEXT_MAX_LENGTH,
   buildRandomizerAnimationPool,
+  isStaleParticipantSnapshot,
   randomizerNamesTextForPublicView,
 } from "./randomizerLogic";
 
@@ -28,6 +29,20 @@ describe("buildRandomizerAnimationPool", () => {
         randomizerAnimationPool: [],
       }),
     ).toEqual(["Аня", "Боря"]);
+  });
+});
+
+describe("isStaleParticipantSnapshot", () => {
+  it("detects when saved list is an older participant subset", () => {
+    expect(isStaleParticipantSnapshot(["Аня", "Боря"], ["Аня", "Боря", "Вика"])).toBe(true);
+  });
+
+  it("ignores custom free lists that are not a subset of room", () => {
+    expect(isStaleParticipantSnapshot(["Гость 1", "Гость 2"], ["Аня", "Боря", "Вика"])).toBe(false);
+  });
+
+  it("ignores when saved list is already up to date", () => {
+    expect(isStaleParticipantSnapshot(["Аня", "Боря"], ["Аня", "Боря"])).toBe(false);
   });
 });
 

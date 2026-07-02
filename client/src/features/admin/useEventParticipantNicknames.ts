@@ -17,10 +17,11 @@ async function fetchParticipantNicknames(eventName: string): Promise<string[]> {
 export function useEventParticipantNicknames(eventName: string, isAuth: boolean) {
   const [eventParticipantNicknames, setEventParticipantNicknames] = useState<string[]>([]);
 
-  const refreshEventParticipantNicknames = useCallback(async () => {
-    if (!eventName || !isAuth) return;
+  const refreshEventParticipantNicknames = useCallback(async (): Promise<string[]> => {
+    if (!eventName || !isAuth) return [];
     const nicknames = await fetchParticipantNicknames(eventName);
     setEventParticipantNicknames(nicknames);
+    return nicknames;
   }, [eventName, isAuth]);
 
   useEffect(() => {

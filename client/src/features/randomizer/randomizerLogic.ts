@@ -36,6 +36,14 @@ export function parseNames(linesText: string): string[] {
     .filter((line) => line.length > 0);
 }
 
+/** Свободный список — устаревший снимок участников (в комнату зашли новые, старые имена на месте). */
+export function isStaleParticipantSnapshot(savedNames: string[], liveNicknames: string[]): boolean {
+  if (savedNames.length === 0 || liveNicknames.length === 0) return false;
+  if (savedNames.length >= liveNicknames.length) return false;
+  const liveLower = new Set(liveNicknames.map((name) => name.toLowerCase()));
+  return savedNames.every((name) => liveLower.has(name.toLowerCase()));
+}
+
 export function buildNumberRange(minNumber: number, maxNumber: number): string[] {
   if (!Number.isFinite(minNumber) || !Number.isFinite(maxNumber)) return [];
   const min = Math.trunc(minNumber);

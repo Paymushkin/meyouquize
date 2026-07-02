@@ -19,6 +19,7 @@ import {
   Typography,
 } from "@mui/material";
 import type { Dispatch, SetStateAction } from "react";
+import { useCallback, useEffect } from "react";
 import {
   buildQuestionIndexMapForSubQuiz,
   type QuestionForm,
@@ -35,7 +36,11 @@ import type { useAdminRandomizer } from "../../features/admin/useAdminRandomizer
 import type { useAdminReactions } from "../../features/admin/useAdminReactions";
 import type { useAdminPlayerTiles } from "../../features/admin/useAdminPlayerTiles";
 import type { AdminSetPublicResultsView } from "../../features/admin/useAdminRandomizer";
-import { randomizerNamesTextForPublicView } from "../../features/randomizer/randomizerLogic";
+import {
+  isStaleParticipantSnapshot,
+  parseNames,
+  randomizerNamesTextForPublicView,
+} from "../../features/randomizer/randomizerLogic";
 import type { PublicViewMode, PublicViewSetPatch } from "../../publicViewContract";
 import { socket } from "../../socket";
 
@@ -142,6 +147,51 @@ export function AdminEventQuestionsTab({
   reorderVoteInList,
   cloneQuestionAtIndex,
 }: AdminEventQuestionsTabProps) {
+  const importParticipantsToFreeList = useCallback(
+    (nicknames: string[]) => {
+      if (nicknames.length === 0) return;
+      const text = nicknames.join("\n");
+      randomizer.markNamesEdited();
+      randomizer.setNamesText(text);
+      emitPublicViewPatch({ randomizerNamesText: text });
+    },
+    [emitPublicViewPatch, randomizer],
+  );
+
+  const refreshParticipantsFromRoom = useCallback(
+    async (options?: { forceImportFreeList?: boolean }) => {
+      const nicknames = await refreshEventParticipantNicknames();
+      if (
+        nicknames.length > 0 &&
+        randomizer.listMode === "free_list" &&
+        options?.forceImportFreeList
+      ) {
+        importParticipantsToFreeList(nicknames);
+      }
+      return nicknames;
+    },
+    [importParticipantsToFreeList, randomizer.listMode, refreshEventParticipantNicknames],
+  );
+
+  useEffect(() => {
+    if (roomQuestionsTab !== "randomizer") return;
+    void (async () => {
+      const nicknames = await refreshEventParticipantNicknames();
+      if (randomizer.listMode !== "free_list") return;
+      if (randomizer.namesEditedRef.current) return;
+      const saved = parseNames(randomizer.namesText);
+      if (!isStaleParticipantSnapshot(saved, nicknames)) return;
+      importParticipantsToFreeList(nicknames);
+    })();
+  }, [
+    roomQuestionsTab,
+    refreshEventParticipantNicknames,
+    randomizer.listMode,
+    randomizer.namesText,
+    randomizer.namesEditedRef,
+    importParticipantsToFreeList,
+  ]);
+
   return (
     <Stack spacing={2} sx={{ minWidth: 0 }}>
       <Paper
@@ -597,13 +647,10 @@ export function AdminEventQuestionsTab({
               participantsNamesText={eventParticipantNicknames.join("\n")}
               liveParticipantCount={eventParticipantNicknames.length}
               onRefreshParticipants={() => {
-                void refreshEventParticipantNicknames();
+                void refreshParticipantsFromRoom({ forceImportFreeList: true });
               }}
               onImportParticipantsToFreeList={() => {
-                const text = eventParticipantNicknames.join("\n");
-                randomizer.markNamesEdited();
-                randomizer.setNamesText(text);
-                emitPublicViewPatch({ randomizerNamesText: text });
+                importParticipantsToFreeList(eventParticipantNicknames);
               }}
               minNumber={randomizer.minNumber}
               maxNumber={randomizer.maxNumber}
@@ -622,6 +669,13 @@ export function AdminEventQuestionsTab({
                   void refreshEventParticipantNicknames();
                 }
                 randomizer.setListMode(next);
+                if (next === "free_list" && eventParticipantNicknames.length > 0) {
+                  const text = eventParticipantNicknames.join("\n");
+                  randomizer.markNamesEdited();
+                  randomizer.setNamesText(text);
+                  emitPublicViewPatch({ randomizerListMode: next, randomizerNamesText: text });
+                  return;
+                }
                 emitPublicViewPatch({
                   randomizerListMode: next,
                   randomizerNamesText: randomizerNamesTextForPublicView(
