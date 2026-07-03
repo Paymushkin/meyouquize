@@ -1,6 +1,7 @@
 import cluster from "node:cluster";
 import { buildServer } from "./app.js";
 import { env } from "./env.js";
+import { formatErrorForLog, formatRejectionForLog } from "./logging.js";
 import { ensureMigrationsAppliedOrThrow, resetProjectorViewOnStartup } from "./startup-checks.js";
 import { ensureDemoQuizExists } from "./demo-seed.js";
 
@@ -15,7 +16,7 @@ function isIpcDisconnectedError(err: unknown): boolean {
 
 function swallowIpcDisconnectError(err: NodeJS.ErrnoException) {
   if (isIpcDisconnectedError(err)) return;
-  console.error("[cluster] worker error", err);
+  console.error("[cluster] worker error", formatErrorForLog(err));
 }
 
 function attachClusterWorkerErrorGuards() {
@@ -29,7 +30,7 @@ function attachClusterWorkerErrorGuards() {
 
 async function startListening() {
   process.on("unhandledRejection", (reason) => {
-    console.error("[process] unhandledRejection", reason);
+    console.error("[process] unhandledRejection", formatRejectionForLog(reason));
   });
 
   const { httpServer, io } = await buildServer();

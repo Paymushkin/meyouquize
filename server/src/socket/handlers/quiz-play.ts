@@ -19,6 +19,7 @@ import {
   submitAnswer,
   updateParticipantNickname,
 } from "../../quiz-service.js";
+import { schedulePlayerQuizScoreEmit } from "../../submit-player-score.js";
 import { hasParticipantSubmittedFeedback } from "../../feedback-service.js";
 import {
   broadcastDashboardResultsNow,
@@ -134,20 +135,21 @@ export function registerQuizPlayHandlers(socket: EnrichedSocket, io: Server) {
       }
       const payload = submitAnswerSchema.parse(raw);
       if (!socket.data.participantId) throw new Error("Not joined");
-      await submitAnswer({ ...payload, participantId: socket.data.participantId });
+      if (socket.data.quizId !== payload.quizId) throw new Error("Not joined");
+      await submitAnswer({
+        ...payload,
+        participantId: socket.data.participantId,
+        trustedParticipant: true,
+      });
       socket.emit("answer:submitted", { ok: true });
-      const [myTotalScore, mySubQuizScores] = await Promise.all([
-        getParticipantTotalScoreForQuiz(payload.quizId, socket.data.participantId),
-        getParticipantScoresBySubQuiz(payload.quizId, socket.data.participantId),
-      ]);
-      socket.emit("player:quiz-score", { myTotalScore, mySubQuizScores });
+      scheduleDashboardResultsBroadcast(io, payload.quizId);
+      schedulePlayerQuizScoreEmit(socket, payload.quizId, socket.data.participantId);
       trialLog("answer_submit_ok", {
         quizId: payload.quizId,
         questionId: payload.questionId,
         participantId: socket.data.participantId,
         ...trialSocketPayload(socket.id),
       });
-      scheduleDashboardResultsBroadcast(io, payload.quizId);
     } catch (error) {
       const payload =
         raw && typeof raw === "object" && "quizId" in raw && "questionId" in raw

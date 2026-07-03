@@ -22,6 +22,22 @@ import {
   ScoringMode,
 } from "@prisma/client";
 import { prisma } from "./prisma.js";
+import {
+  acquireDashboardComputeLock,
+  getCachedDashboardResultsJson,
+  invalidateDashboardResultsCache,
+  releaseDashboardComputeLock,
+  setCachedDashboardResultsJson,
+  sleepMs,
+} from "./dashboard-results-cache.js";
+import { attachAnswersToQuestions, groupAnswersByQuestionId } from "./dashboard-results-build.js";
+import { env } from "./env.js";
+import {
+  getCachedSubmitQuestion,
+  invalidateSubmitQuestionCacheForQuiz,
+  setCachedSubmitQuestion,
+  type SubmitQuestionRow,
+} from "./submit-question-cache.js";
 import { getActiveFeedbackFormPublic, getFeedbackResultsForReport } from "./feedback-service.js";
 import { cleanupUnusedQuestionMedia, collectQuestionMediaUrlsForQuiz } from "./media-cleanup.js";
 import {
@@ -117,7 +133,7 @@ const TAG_CLOUD_TAGS_DASHBOARD_CAP = 500;
 const DASHBOARD_FIRST_CORRECT_CAP = 20;
 
 /** Строка вопроса для дашборда: только поля, нужные mapPerQuestion. */
-type QuestionDashboardRow = Prisma.QuestionGetPayload<{
+type QuestionDashboardRowBase = Prisma.QuestionGetPayload<{
   select: {
     id: true;
     text: true;
@@ -140,9 +156,12 @@ type QuestionDashboardRow = Prisma.QuestionGetPayload<{
         weight: true;
       };
     };
-    answers: { select: { selectedOptionIds: true } };
   };
 }>;
+
+type QuestionDashboardRow = QuestionDashboardRowBase & {
+  answers: Array<{ selectedOptionIds: string }>;
+};
 
 export type QuestionReplaceInput = {
   id?: string;
@@ -738,6 +757,8 @@ export async function replaceRoomContent(eventName: string, content: RoomContent
     await saveStoredPublicView(roomId, prunedView);
   }
 
+  await invalidateDashboardResultsCache(roomId);
+
   return getRoomByEventName(eventName);
 }
 
@@ -960,6 +981,7 @@ export async function getQuizPublicState(quizId: string) {
     brandTextColor: view.brandTextColor,
     brandFontFamily: view.brandFontFamily,
     brandFontUrl: view.brandFontUrl,
+    brandFontUrls: view.brandFontUrls,
     brandLogoUrl: view.brandLogoUrl,
     brandPlayerBackgroundImageUrl: view.brandPlayerBackgroundImageUrl,
     brandProjectorBackgroundImageUrl: view.brandProjectorBackgroundImageUrl,
@@ -1123,7 +1145,9 @@ function mapPerQuestion(questions: QuestionDashboardRow[]) {
         q.answers.reduce<Record<string, number>>((acc, answer) => {
           const tags = parseTagAnswers(answer.selectedOptionIds, false);
           tags.forEach((tag) => {
-            acc[tag] = (acc[tag] ?? 0) + 1;
+            const key = normalizeTagComparable(tag);
+            if (!key) return;
+            acc[key] = (acc[key] ?? 0) + 1;
           });
           return acc;
         }, {}),
@@ -1557,33 +1581,80 @@ export type DashboardResults = {
 };
 
 export async function getDashboardResults(quizId: string): Promise<DashboardResults> {
-  const [questions, subQuizzes] = await Promise.all([
-    prisma.question.findMany({
-      where: { quizId },
+  if (env.dashboardResultsCacheMs > 0 && env.redisUrl) {
+    const cachedJson = await getCachedDashboardResultsJson(quizId);
+    if (cachedJson) {
+      try {
+        return JSON.parse(cachedJson) as DashboardResults;
+      } catch {
+        await invalidateDashboardResultsCache(quizId);
+      }
+    }
+
+    const locked = await acquireDashboardComputeLock(quizId);
+    if (!locked) {
+      await sleepMs(50);
+      const retryJson = await getCachedDashboardResultsJson(quizId);
+      if (retryJson) {
+        try {
+          return JSON.parse(retryJson) as DashboardResults;
+        } catch {
+          await invalidateDashboardResultsCache(quizId);
+        }
+      }
+    }
+
+    try {
+      const freshJson = await getCachedDashboardResultsJson(quizId);
+      if (freshJson) {
+        try {
+          return JSON.parse(freshJson) as DashboardResults;
+        } catch {
+          await invalidateDashboardResultsCache(quizId);
+        }
+      }
+      const results = await computeDashboardResults(quizId);
+      await setCachedDashboardResultsJson(quizId, JSON.stringify(results));
+      return results;
+    } finally {
+      if (locked) {
+        await releaseDashboardComputeLock(quizId);
+      }
+    }
+  }
+
+  return computeDashboardResults(quizId);
+}
+
+async function computeDashboardResults(quizId: string): Promise<DashboardResults> {
+  const questionSelect = {
+    id: true,
+    text: true,
+    subQuizId: true,
+    type: true,
+    projectorShowFirstCorrect: true,
+    projectorFirstCorrectWinnersCount: true,
+    rankingPointsByRank: true,
+    rankingProjectorMetric: true,
+    rankingKind: true,
+    imageUrl: true,
+    temperatureSubtitle: true,
+    options: {
       select: {
         id: true,
         text: true,
-        subQuizId: true,
-        type: true,
-        projectorShowFirstCorrect: true,
-        projectorFirstCorrectWinnersCount: true,
-        rankingPointsByRank: true,
-        rankingProjectorMetric: true,
-        rankingKind: true,
+        isCorrect: true,
+        sortOrder: true,
         imageUrl: true,
-        temperatureSubtitle: true,
-        options: {
-          select: {
-            id: true,
-            text: true,
-            isCorrect: true,
-            sortOrder: true,
-            imageUrl: true,
-            weight: true,
-          },
-        },
-        answers: { select: { selectedOptionIds: true } },
+        weight: true,
       },
+    },
+  } as const;
+
+  const [questions, subQuizzes, answerRows] = await Promise.all([
+    prisma.question.findMany({
+      where: { quizId },
+      select: questionSelect,
       orderBy: { order: "asc" },
     }),
     prisma.subQuiz.findMany({
@@ -1591,11 +1662,20 @@ export async function getDashboardResults(quizId: string): Promise<DashboardResu
       orderBy: { sortOrder: "asc" },
       select: { id: true, title: true },
     }),
+    prisma.answer.findMany({
+      where: { quizId },
+      select: { questionId: true, selectedOptionIds: true },
+    }),
   ]);
+  const answersByQuestion = groupAnswersByQuestionId(answerRows);
+  const questionsWithAnswers = attachAnswersToQuestions(
+    questions,
+    answersByQuestion,
+  ) as QuestionDashboardRow[];
   const leaderboardsBySubQuiz = await aggregateLeaderboardsBySubQuizForQuiz(quizId, subQuizzes);
   const leaderboard = leaderboardsBySubQuiz[0]?.rows ?? [];
   const firstCorrectMap = await firstCorrectNicknamesForStandaloneQuestions(quizId);
-  const perQuestion = mapPerQuestion(questions).map((row) => {
+  const perQuestion = mapPerQuestion(questionsWithAnswers).map((row) => {
     const nicks = row.subQuizId == null ? (firstCorrectMap.get(row.questionId) ?? []) : [];
     return { ...row, firstCorrectNicknames: nicks };
   });
@@ -2255,6 +2335,7 @@ export async function getPublicReportBySlug(slug: string): Promise<PublicEventRe
 }
 
 export async function activateNextQuestion(quizId: string, subQuizId?: string) {
+  invalidateSubmitQuestionCacheForQuiz(quizId);
   const sq = subQuizId
     ? await prisma.subQuiz.findFirst({ where: { id: subQuizId, quizId } })
     : await prisma.subQuiz.findFirst({ where: { quizId }, orderBy: { sortOrder: "asc" } });
@@ -2285,6 +2366,7 @@ export async function activateNextQuestion(quizId: string, subQuizId?: string) {
 }
 
 export async function closeQuestion(quizId: string, questionId: string) {
+  invalidateSubmitQuestionCacheForQuiz(quizId);
   const q = await prisma.question.findFirst({ where: { id: questionId, quizId } });
   if (!q) throw new Error("Question not found");
   await prisma.question.updateMany({
@@ -2301,6 +2383,7 @@ export async function closeQuestion(quizId: string, questionId: string) {
 }
 
 export async function setQuestionEnabled(quizId: string, questionId: string, enabled: boolean) {
+  invalidateSubmitQuestionCacheForQuiz(quizId);
   const question = await prisma.question.findFirst({
     where: { id: questionId, quizId },
   });
@@ -2346,6 +2429,7 @@ export async function setQuestionEnabled(quizId: string, questionId: string, ena
 }
 
 export async function finishQuiz(quizId: string) {
+  invalidateSubmitQuestionCacheForQuiz(quizId);
   await prisma.$transaction([
     prisma.question.updateMany({
       where: { quizId, isActive: true },
@@ -2371,6 +2455,7 @@ export async function closeSubQuiz(quizId: string, subQuizId: string) {
 }
 
 export async function startSubQuizAuto(quizId: string, subQuizId: string) {
+  invalidateSubmitQuestionCacheForQuiz(quizId);
   const sq = await prisma.subQuiz.findFirst({ where: { id: subQuizId, quizId } });
   if (!sq) throw new Error("SubQuiz not found");
   await prisma.$transaction([
@@ -2500,6 +2585,20 @@ export async function updateParticipantNickname(payload: {
   return { nickname };
 }
 
+async function loadSubmitQuestion(
+  quizId: string,
+  questionId: string,
+): Promise<SubmitQuestionRow | null> {
+  const cached = getCachedSubmitQuestion(quizId, questionId);
+  if (cached) return cached;
+  const question = await prisma.question.findFirst({
+    where: { id: questionId, quizId },
+    include: { options: { orderBy: { sortOrder: "asc" } } },
+  });
+  if (question) setCachedSubmitQuestion(quizId, questionId, question);
+  return question;
+}
+
 export async function submitAnswer(payload: {
   quizId: string;
   questionId: string;
@@ -2507,18 +2606,22 @@ export async function submitAnswer(payload: {
   rankedOptionIds?: string[];
   tagAnswers?: string[];
   participantId: string;
+  /** Участник уже проверен при join (socket handler). */
+  trustedParticipant?: boolean;
 }) {
-  const participant = await prisma.participant.findFirst({
-    where: { id: payload.participantId, quizId: payload.quizId },
-    select: { id: true },
-  });
+  const participantPromise = payload.trustedParticipant
+    ? Promise.resolve({ id: payload.participantId })
+    : prisma.participant.findFirst({
+        where: { id: payload.participantId, quizId: payload.quizId },
+        select: { id: true },
+      });
+  const [participant, question] = await Promise.all([
+    participantPromise,
+    loadSubmitQuestion(payload.quizId, payload.questionId),
+  ]);
   if (!participant) {
     throw new Error("Participant not found");
   }
-  const question = await prisma.question.findFirst({
-    where: { id: payload.questionId, quizId: payload.quizId },
-    include: { options: { orderBy: { sortOrder: "asc" } } },
-  });
   if (!question) throw new Error("Question not found");
   if (!question.isActive || question.isClosed) throw new Error("Question is not open");
 
@@ -2542,6 +2645,7 @@ export async function submitAnswer(payload: {
         },
       },
     });
+    void invalidateDashboardResultsCache(payload.quizId);
   }
 
   const responseMs = computeResponseMs(Date.now(), question.activatedAt);
@@ -2581,6 +2685,7 @@ export async function submitAnswer(payload: {
           responseMs,
         },
       });
+      void invalidateDashboardResultsCache(payload.quizId);
       return;
     }
 
@@ -2599,6 +2704,7 @@ export async function submitAnswer(payload: {
         responseMs,
       },
     });
+    void invalidateDashboardResultsCache(payload.quizId);
     return;
   }
 
@@ -2678,12 +2784,14 @@ export async function submitAnswer(payload: {
       responseMs,
     },
   });
+  void invalidateDashboardResultsCache(payload.quizId);
 }
 
 export async function resetParticipantAnswers(quizId: string, participantId: string) {
   await prisma.answer.deleteMany({
     where: { quizId, participantId },
   });
+  await invalidateDashboardResultsCache(quizId);
   return getDashboardResults(quizId);
 }
 
@@ -2692,6 +2800,7 @@ export async function resetQuestionAnswers(quizId: string, questionId: string) {
     where: { quizId, questionId },
   });
   await clearQuestionManualDisplay(quizId, questionId);
+  await invalidateDashboardResultsCache(quizId);
   return getDashboardResults(quizId);
 }
 
@@ -2700,6 +2809,7 @@ export async function resetAllQuizAnswers(quizId: string) {
     where: { quizId },
   });
   await clearAllQuestionManualDisplay(quizId);
+  await invalidateDashboardResultsCache(quizId);
   return getDashboardResults(quizId);
 }
 
@@ -2715,6 +2825,7 @@ export async function resetSubQuizAnswers(quizId: string, subQuizId: string) {
     });
     await clearQuestionsManualDisplay(quizId, questionIds);
   }
+  await invalidateDashboardResultsCache(quizId);
   return questionIds;
 }
 
@@ -2906,7 +3017,9 @@ export async function getStandaloneVoteAdminDetail(
       ? Object.entries(
           answers.reduce<Record<string, number>>((acc, answer) => {
             parseTagAnswers(answer.selectedOptionIds, false).forEach((tag) => {
-              acc[tag] = (acc[tag] ?? 0) + 1;
+              const key = normalizeTagComparable(tag);
+              if (!key) return;
+              acc[key] = (acc[key] ?? 0) + 1;
             });
             return acc;
           }, {}),

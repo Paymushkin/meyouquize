@@ -228,6 +228,11 @@ export const env = {
     0,
     Number.parseInt(process.env.DASHBOARD_RESULTS_DEBOUNCE_MS ?? "220", 10) || 220,
   ),
+  /** Короткий кэш payload дашборда в Redis (мс); 0 = выключен. Требует REDIS_URL. */
+  dashboardResultsCacheMs: Math.max(
+    0,
+    Number.parseInt(process.env.DASHBOARD_RESULTS_CACHE_MS ?? "400", 10) || 400,
+  ),
   /**
    * После join/disconnect пересчёт онлайна через fetchSockets по комнате — дорогой при сотнях сокетов.
    * Дебаунс склеивает всплески (один проход вместо сотен подряд). 0 = без дебаунса (только для отладки).
@@ -249,4 +254,9 @@ export const env = {
   trialLogsEnabled:
     process.env.DEBUG_TRIAL_LOGS === "1" ||
     process.env.DEBUG_TRIAL_LOGS?.trim().toLowerCase() === "true",
+  /** Логи connect/disconnect Socket.IO (шумно на ивенте; по умолчанию только dev). */
+  socketConnectionLogsEnabled:
+    process.env.DEBUG_SOCKET_LOGS === "1" ||
+    process.env.DEBUG_SOCKET_LOGS?.trim().toLowerCase() === "true" ||
+    process.env.MEYOUQUIZE_DEV === "1",
 };

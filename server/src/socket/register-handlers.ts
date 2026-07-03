@@ -1,4 +1,5 @@
 import type { Server, Socket } from "socket.io";
+import { env } from "../env.js";
 import { clearSubmitRateLimit } from "./submit-rate-limit.js";
 import type { EnrichedSocket } from "./handler-common.js";
 import { registerAdminAnswerHandlers } from "./handlers/admin-answers.js";
@@ -12,10 +13,12 @@ import { emitQuizOnlineCount } from "./quiz-rooms.js";
 export function registerSocketHandlers(io: Server) {
   io.on("connection", (socket: Socket) => {
     const enrichedSocket = socket as EnrichedSocket;
-    console.info("[socket] connected", {
-      socketId: enrichedSocket.id,
-      isAdmin: !!enrichedSocket.data.isAdmin,
-    });
+    if (env.socketConnectionLogsEnabled) {
+      console.info("[socket] connected", {
+        socketId: enrichedSocket.id,
+        isAdmin: !!enrichedSocket.data.isAdmin,
+      });
+    }
 
     registerQuizPlayHandlers(enrichedSocket, io);
     registerAdminAnswerHandlers(enrichedSocket, io);
@@ -32,7 +35,9 @@ export function registerSocketHandlers(io: Server) {
       ) {
         void emitQuizOnlineCount(io, enrichedSocket.data.quizId);
       }
-      console.info("[socket] disconnected", { socketId: enrichedSocket.id, reason });
+      if (env.socketConnectionLogsEnabled) {
+        console.info("[socket] disconnected", { socketId: enrichedSocket.id, reason });
+      }
     });
   });
 }
