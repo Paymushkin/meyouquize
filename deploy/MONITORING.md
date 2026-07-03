@@ -4,15 +4,28 @@
 
 ## Trial-логи на проде
 
-В `deploy/env/.env.runtime`:
+По умолчанию **выключены** (`DEBUG_TRIAL_LOGS=0`). Включать только на время ивента в `deploy/env/.env.runtime`:
 
 ```bash
 DEBUG_TRIAL_LOGS=1
 ```
 
-Без этого в journal останутся только `[socket] disconnected` и системные строки — сводка `post-event-log-summary` будет неполной.
+После ивента верните `0` и `sudo systemctl restart meyouquize`, чтобы не раздувать journal.
 
-После ивента можно вернуть `0`, чтобы не раздувать journal.
+## Лимиты journald на VPS
+
+Чтобы логи не заполняли диск:
+
+```bash
+sudo cp /opt/meyouquize/current/deploy/systemd/journald-meyouquize.conf /etc/systemd/journald.conf.d/meyouquize.conf
+sudo systemctl restart systemd-journald
+```
+
+Лимиты: **500 MB** на диске, хранение до **14 дней** (`deploy/systemd/journald-meyouquize.conf`).
+
+## Socket connect/disconnect
+
+На проде логи `[socket] connected` / `disconnected` **не пишутся** (только в `npm run dev` или при `DEBUG_SOCKET_LOGS=1`).
 
 ## Сводка логов после ивента
 
@@ -87,15 +100,19 @@ ALERT_WEBHOOK_URL=https://your-hook.example/alert
 
 ## Нагрузочный прогон перед ивентом
 
-Профиль **400 одновременных join** (без submit):
+Три сценария имитации ивента (HTTP + сокеты + голосование + вопросы спикерам):
 
 ```bash
-BASE_URL=https://preprod.example.com QUIZ_SLUG=room-slug npm run load:event-400
+BASE_URL=https://meyou.site QUIZ_SLUG=test-load-room npm run load:light    # 100 игроков
+BASE_URL=https://meyou.site QUIZ_SLUG=test-load-room npm run load:normal  # 300 игроков
+BASE_URL=https://meyou.site QUIZ_SLUG=test-load-room npm run load:peak    # 500 — после light
 ```
 
-Профиль: `load/profiles/event-400-join.json` — 400 игроков, ramp 20 с, удержание 60 с.
+Профили: `load/profiles/event-light-100.json`, `event-normal-300.json`, `event-peak-500.json`.
 
-Критерий готовности: `joined_ok` ≥ 396/400 (tolerance 4), без роста `ping timeout` в journal во время прогона.
+Критерий готовности: `joined_ok` близко к `PLAYER_COUNT`, submit fail rate &lt; 5%, без роста `ping timeout` в journal во время прогона.
+
+Подготовка комнаты и правила прогона на prod — в `load/README.md`.
 
 ## Связанные документы
 

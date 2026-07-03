@@ -1,44 +1,47 @@
-import { DEFAULT_PUBLIC_VIEW_STATE } from "@meyouquize/shared";
 import { describe, expect, it } from "vitest";
-import { projectorSessionReducer, initialProjectorSessionState } from "./projectorSessionReducer";
+import { normalizePublicViewState } from "@meyouquize/shared";
+import { initialProjectorSessionState, projectorSessionReducer } from "./projectorSessionReducer";
 
-describe("projectorSessionReducer", () => {
-  it("updates dashboard payload", () => {
-    const next = projectorSessionReducer(initialProjectorSessionState, {
-      type: "dashboard",
-      perQuestion: [
+describe("projectorSessionReducer publicView", () => {
+  it("applies option vote manual overrides without dashboard refresh", () => {
+    const baseView = normalizePublicViewState({
+      mode: "question",
+      questionId: "q1",
+      tagCloudManualByQuestionId: {},
+    });
+    const state = {
+      ...initialProjectorSessionState,
+      view: baseView,
+      questions: [
         {
           questionId: "q1",
-          text: "Q?",
-          optionStats: [],
+          type: "single",
+          optionStats: [
+            { optionId: "o1", count: 10, text: "A" },
+            { optionId: "o2", count: 2, text: "B" },
+          ],
         },
       ],
-      leaderboard: [{ participantId: "p1", nickname: "Ann", score: 3, totalResponseMs: 100 }],
-      leaderboardsBySubQuiz: [],
-    });
-    expect(next.questions).toHaveLength(1);
-    expect(next.leaders[0]?.nickname).toBe("Ann");
-  });
+    };
 
-  it("merges public view and title", () => {
-    const next = projectorSessionReducer(initialProjectorSessionState, {
+    const next = projectorSessionReducer(state, {
       type: "publicView",
       payload: {
-        ...DEFAULT_PUBLIC_VIEW_STATE,
-        mode: "question",
-        questionId: "q1",
-        title: "  Event  ",
+        title: "Demo",
+        tagCloudManualByQuestionId: {
+          q1: {
+            hiddenTagTexts: [],
+            injectedTagWords: [],
+            tagCountOverrides: [],
+            optionVoteCountOverrides: [{ text: "o2", count: 99 }],
+          },
+        },
       },
     });
-    expect(next.view.mode).toBe("question");
-    expect(next.view.questionId).toBe("q1");
-    expect(next.quizTitle).toBe("Event");
-  });
 
-  it("bumps leaderboard animation tick", () => {
-    const next = projectorSessionReducer(initialProjectorSessionState, {
-      type: "bumpLeaderboardAnim",
-    });
-    expect(next.resultsAnimationTick).toBe(1);
+    expect(next).not.toBe(state);
+    expect(next.view.tagCloudManualByQuestionId.q1?.optionVoteCountOverrides).toEqual([
+      { text: "o2", count: 99 },
+    ]);
   });
 });

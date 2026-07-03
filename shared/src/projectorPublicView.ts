@@ -63,6 +63,7 @@ const PROJECTOR_BRANDING_KEYS = [
   "brandTextColor",
   "brandFontFamily",
   "brandFontUrl",
+  "brandFontUrls",
   "brandProjectorBackgroundImageUrl",
   "brandTheme",
   "projectorJoinQrVisible",
@@ -169,6 +170,7 @@ export function pickProjectorPublicViewState(view: PublicViewState): PublicViewS
         mode,
         ...branding,
         ...pickViewKeys(resolved, QUESTION_MODE_KEYS),
+        tagCloudManualByQuestionId: resolved.tagCloudManualByQuestionId,
       } as PublicViewState;
     case "leaderboard":
       return {

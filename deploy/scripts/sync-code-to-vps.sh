@@ -24,6 +24,7 @@ ssh -o ConnectTimeout=15 "$TARGET" 'set -e
 cd /opt/meyouquize/current
 npm ci --include=dev
 npm run build
+npm run prisma:migrate:deploy
 systemctl restart meyouquize
 sleep 4
 curl -sf http://127.0.0.1:4000/healthz

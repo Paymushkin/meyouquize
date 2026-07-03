@@ -9,6 +9,7 @@ import {
   Typography,
 } from "@mui/material";
 import type { Dispatch, SetStateAction } from "react";
+import { buildCloudWordsForDisplay } from "@meyouquize/shared";
 import { VoteCountAdjustControls } from "../../components/admin/VoteCountAdjustControls";
 import type { QuestionForm } from "../../admin/adminEventForm";
 import type { QuestionResult } from "../../admin/adminEventTypes";
@@ -107,16 +108,12 @@ export function AdminEventTagCloudDialogs({
               const injected = question.injectedTagWords ?? [];
               const hiddenTags = question.hiddenTagTexts ?? [];
               const overrides = question.tagCountOverrides ?? [];
-              const merged = new Map<string, number>();
-              [...tags, ...injected].forEach((item) => {
-                merged.set(item.text, (merged.get(item.text) ?? 0) + item.count);
+              const currentTags = buildCloudWordsForDisplay({
+                liveTags: tags,
+                hiddenTagTexts: hiddenTags,
+                injectedTagWords: injected,
+                tagCountOverrides: overrides,
               });
-              overrides.forEach((item) => {
-                merged.set(item.text, item.count);
-              });
-              const currentTags = Array.from(merged.entries())
-                .map(([text, count]) => ({ text, count }))
-                .sort((a, b) => b.count - a.count || a.text.localeCompare(b.text, "ru"));
               const byText = new Map(currentTags.map((item) => [item.text, item]));
               const orderedTags = [
                 ...tagResultsOrder

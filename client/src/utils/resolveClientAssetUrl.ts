@@ -1,3 +1,11 @@
+function resolveMediaAssetOrigin(): string {
+  if (typeof window === "undefined") return "http://localhost:4000";
+  const host = window.location.hostname || "localhost";
+  const protocol = window.location.protocol || "http:";
+  const viteDev = protocol === "http:" && window.location.port === "5173";
+  return viteDev ? `${protocol}//${host}:4000` : window.location.origin;
+}
+
 /**
  * Делает URL ассета доступным с устройства в той же LAN:
  * если в сохранённом URL хост localhost/127.0.0.1, подменяем на текущий контекст.
@@ -12,16 +20,18 @@ export function resolveClientAssetUrl(rawUrl: string): string {
   try {
     const parsed = new URL(value, window.location.origin);
     const viteDev = window.location.protocol === "http:" && window.location.port === "5173";
-    // В vite dev относительный /media/* должен идти на backend :4000.
-    if (
-      viteDev &&
-      parsed.hostname === window.location.hostname &&
-      (parsed.port === window.location.port || !parsed.port) &&
-      parsed.pathname.startsWith("/media/")
-    ) {
-      parsed.port = "4000";
-      return parsed.toString();
+
+    // Любой /media/* — с backend (или текущего origin в prod), не со старых LAN-URL из реестра.
+    if (parsed.pathname.startsWith("/media/")) {
+      if (viteDev) {
+        return `${resolveMediaAssetOrigin()}${parsed.pathname}${parsed.search}${parsed.hash}`;
+      }
+      return new URL(
+        `${parsed.pathname}${parsed.search}${parsed.hash}`,
+        window.location.origin,
+      ).toString();
     }
+
     if (parsed.hostname === "localhost" || parsed.hostname === "127.0.0.1") {
       if (viteDev) {
         parsed.hostname = window.location.hostname || parsed.hostname;

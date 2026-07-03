@@ -4,7 +4,7 @@
 
 ## За 24 часа
 
-- [ ] Pre-prod / staging: `BASE_URL=… QUIZ_SLUG=… npm run load:event-400` — join 400 без массовых ошибок.
+- [ ] Pre-prod / staging: `BASE_URL=… QUIZ_SLUG=… npm run load:light` (или `load:normal`) — без массовых ошибок join/submit.
 - [ ] На проде: `DEBUG_TRIAL_LOGS=1` в `deploy/env/.env.runtime` (для post-event сводки).
 - [ ] `SOCKET_IO_PING_TIMEOUT_MS=90000` на проде (см. `deploy/env/.env.internet.example`).
 - [ ] Деплой только через `deploy/scripts/sync-code-to-vps.sh` (не трогает `media/`).
@@ -53,7 +53,7 @@ BASE_URL=https://ваш-домен ./deploy/scripts/event-day-check.sh
 | Действие               | Команда                                                        |
 | ---------------------- | -------------------------------------------------------------- |
 | Проверка перед стартом | `./deploy/scripts/event-day-check.sh`                          |
-| Нагрузка 400 join      | `BASE_URL=… QUIZ_SLUG=… npm run load:event-400`                |
+| Нагрузка (репетиция)   | `BASE_URL=… QUIZ_SLUG=… npm run load:light` / `load:normal`    |
 | Сводка логов           | `./deploy/scripts/post-event-log-summary.sh --ssh … --since …` |
 | Ручной алерт-чек       | `./deploy/scripts/meyouquize-log-alerts.sh`                    |
 | Статус таймера         | `systemctl status meyouquize-log-alerts.timer`                 |

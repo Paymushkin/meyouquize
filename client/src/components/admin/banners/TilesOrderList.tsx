@@ -104,7 +104,7 @@ export function TilesOrderList({
                           py: 1.5,
                           px: 2,
                           whiteSpace: "pre-line",
-                          fontWeight: 400,
+                          fontWeight: 700,
                           minHeight: 70,
                           position: "relative",
                         }

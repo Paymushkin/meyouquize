@@ -18,8 +18,7 @@
     "prisma:generate": "prisma generate",
     "prisma:migrate": "dotenv -e ../.env -- prisma migrate dev",
     "prisma:migrate:deploy": "dotenv -e ../.env -- prisma migrate deploy",
-    "loadtest:socket": "node scripts/socket-load-burst.mjs",
-    "loadtest:k6": "k6 run ../loadtest/k6-quiz-health.js"
+    "loadtest:event": "node scripts/event-load.mjs"
   },
   "dependencies": {
     "@meyouquize/shared": "*",

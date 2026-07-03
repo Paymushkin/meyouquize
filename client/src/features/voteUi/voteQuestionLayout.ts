@@ -119,6 +119,14 @@ export function playerEventTitleSx(brandFontFamily?: string): SxProps<Theme> {
   };
 }
 
+/** Типографика подписи полноширинных плиток игрока (спикеры, программа). */
+export const playerFullWidthTileLabelSx: SxProps<Theme> = {
+  fontWeight: 700,
+  fontStyle: "normal",
+  fontSize: "clamp(1.3rem, 4.2vw, 2.5rem)",
+  lineHeight: 1.35,
+};
+
 export function voteResultsDialogQuestionSx(): SxProps<Theme> {
   return {
     fontWeight: 700,

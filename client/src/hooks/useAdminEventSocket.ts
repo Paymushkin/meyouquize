@@ -66,6 +66,7 @@ type Params = {
   setBrandInputTextColor: (value: string) => void;
   setBrandFontFamily: (value: string) => void;
   setBrandFontUrl: (value: string) => void;
+  setBrandFontUrls: (value: string[]) => void;
   setBrandLogoUrl: (value: string) => void;
   setBrandPlayerBackgroundImageUrl: (value: string) => void;
   setBrandProjectorBackgroundImageUrl: (value: string) => void;
@@ -134,6 +135,7 @@ export function useAdminEventSocket<TQuestion extends QuestionFormPatchable>(
     setBrandInputTextColor,
     setBrandFontFamily,
     setBrandFontUrl,
+    setBrandFontUrls,
     setBrandLogoUrl,
     setBrandPlayerBackgroundImageUrl,
     setBrandProjectorBackgroundImageUrl,
@@ -197,6 +199,7 @@ export function useAdminEventSocket<TQuestion extends QuestionFormPatchable>(
       setBrandInputTextColor(nextBranding.brandInputTextColor);
       setBrandFontFamily(nextBranding.brandFontFamily);
       setBrandFontUrl(nextBranding.brandFontUrl);
+      setBrandFontUrls(view.brandFontUrls ?? []);
       setBrandLogoUrl(nextBranding.brandLogoUrl);
       setBrandPlayerBackgroundImageUrl(nextBranding.brandPlayerBackgroundImageUrl);
       setBrandProjectorBackgroundImageUrl(nextBranding.brandProjectorBackgroundImageUrl);
@@ -237,6 +240,7 @@ export function useAdminEventSocket<TQuestion extends QuestionFormPatchable>(
       setBrandInputTextColor,
       setBrandFontFamily,
       setBrandFontUrl,
+      setBrandFontUrls,
       setBrandLogoUrl,
       setBrandPlayerBackgroundImageUrl,
       setBrandProjectorBackgroundImageUrl,

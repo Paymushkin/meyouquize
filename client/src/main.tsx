@@ -1,20 +1,24 @@
 /* eslint-disable react-refresh/only-export-components */
 import React from "react";
 import { createRoot } from "react-dom/client";
-import { BrowserRouter, Outlet, Route, Routes } from "react-router-dom";
+import { BrowserRouter, Route, Routes } from "react-router-dom";
 import { CssBaseline, ThemeProvider, createTheme } from "@mui/material";
 import "./styles/jost-local.css";
 import "./styles/roboto-local.css";
 import { QuizPlayPage } from "./pages/QuizPlayPage";
 import { ResultsPage } from "./pages/ResultsPage";
 import { AdminRoomsPage } from "./pages/AdminRoomsPage";
-import { AdminEventPage } from "./pages/AdminEventPage";
+import { AdminThemesPage } from "./pages/AdminThemesPage";
+import { AdminThemeEditorPage } from "./pages/AdminThemeEditorPage";
+import { AdminFontsPage } from "./pages/AdminFontsPage";
+import { AdminEventRoute } from "./pages/AdminEventRoute";
 import { AdminVoteDetailPage } from "./pages/AdminVoteDetailPage";
 import { AdminSubQuizResultsPage } from "./pages/AdminSubQuizResultsPage";
 import { PublicReportPage } from "./pages/PublicReportPage";
 import { LandingPage } from "./pages/LandingPage";
 import { NotFoundPage } from "./pages/NotFoundPage";
 import { ForbiddenPage } from "./pages/ForbiddenPage";
+import { AdminSectionLayout } from "./components/admin/AdminSectionLayout";
 
 const theme = createTheme({
   palette: {
@@ -100,10 +104,6 @@ const theme = createTheme({
   },
 });
 
-function AdminSectionLayout() {
-  return <Outlet />;
-}
-
 function App() {
   return (
     <ThemeProvider theme={theme}>
@@ -116,12 +116,15 @@ function App() {
           <Route path="/report/:slug" element={<PublicReportPage />} />
           <Route path="/admin" element={<AdminSectionLayout />}>
             <Route index element={<AdminRoomsPage />} />
+            <Route path="themes" element={<AdminThemesPage />} />
+            <Route path="themes/:themeId" element={<AdminThemeEditorPage />} />
+            <Route path="fonts" element={<AdminFontsPage />} />
             <Route path=":eventName/votes/:questionId" element={<AdminVoteDetailPage />} />
             <Route
               path=":eventName/sub-quizzes/:subQuizId/results"
               element={<AdminSubQuizResultsPage />}
             />
-            <Route path=":eventName" element={<AdminEventPage />} />
+            <Route path=":eventName" element={<AdminEventRoute />} />
           </Route>
           <Route path="/" element={<LandingPage />} />
           <Route path="/403" element={<ForbiddenPage />} />

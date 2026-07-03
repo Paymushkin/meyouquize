@@ -63,10 +63,10 @@ IP подставляется в `event:init` автоматически (`en0` 
 
 ```bash
 # в другом терминале, подставьте IP и slug
-BASE_URL="http://192.168.x.x" QUIZ_SLUG="your-slug" npm run load:nominal-admin
+BASE_URL="http://192.168.x.x" QUIZ_SLUG="your-slug" npm run load:light
 ```
 
-Профиль `nominal-admin` (~210 игроков) рассчитан на работающую админку. Полный `load:nominal` (500) — без открытой админки.
+Профиль `load:light` (100 игроков) — быстрая репетиция. Для полной нагрузки LAN: `load:normal` (300).
 
 ## Остановка
 

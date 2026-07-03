@@ -1,3 +1,4 @@
+import { Prisma } from "@prisma/client";
 import cookieParser from "cookie-parser";
 import cors from "cors";
 import express from "express";
@@ -11,6 +12,7 @@ import multer from "multer";
 import { adminCredentialMatch } from "./admin-accounts.js";
 import { isAdminAuthBypassed } from "./admin-auth-guard.js";
 import { env } from "./env.js";
+import { logError } from "./logging.js";
 import {
   adminAuthSchema,
   createRoomSchema,
@@ -21,6 +23,8 @@ import {
   replaceRoomContentSchema,
   updateRoomSchema,
   upsertFeedbackFormSchema,
+  createEventThemeSchema,
+  updateEventThemeSchema,
 } from "./schemas.js";
 import { isAdminTokenValid } from "./admin-session-cache.js";
 import { registerSocketHandlers } from "./socket/register-handlers.js";
@@ -36,8 +40,10 @@ import { randomToken } from "./utils.js";
 import {
   readFontLibrary,
   registerFont,
+  deleteFont,
   publicFontEntry,
   updateFontRegistryEntry,
+  isValidWoff2File,
 } from "./font-library.js";
 import { publicViewJsonToState } from "./socket/public-view-store.js";
 import {
@@ -66,6 +72,13 @@ import {
   listFeedbackResultsByQuizId,
   updateFeedbackFormConfig,
 } from "./feedback-service.js";
+import {
+  createEventTheme,
+  deleteEventTheme,
+  getEventThemeById,
+  listEventThemes,
+  updateEventTheme,
+} from "./event-theme-service.js";
 import { renderPublicReportPdf, resolveReportPdfPageOrigin } from "./report-pdf.js";
 import { resetDemoQuizToDefault } from "./demo-seed.js";
 
@@ -247,7 +260,7 @@ export function buildApp() {
         data: { token, expiresAt },
       });
     } catch (err) {
-      console.error("[admin] session create failed", err);
+      logError("[admin] session create failed", err);
       return res.status(503).json(apiError("DB_UNAVAILABLE", "Database temporarily unavailable"));
     }
     const cookieSecure = env.networkMode === "internet" ? true : isRequestHttps(req);
@@ -305,6 +318,11 @@ export function buildApp() {
         return res.status(400).json(apiError("FAMILY_REQUIRED", "Family is required"));
       const kindRaw = req.body?.kind;
       const kind = kindRaw === "variable" ? "variable" : "static";
+      if (kind === "variable" && files.length > 1) {
+        return res
+          .status(400)
+          .json(apiError("INVALID_VARIABLE_BATCH", "Variable font upload accepts only one file"));
+      }
       const origin = `${req.protocol}://${req.get("host") ?? "localhost"}`;
       const created: Array<{
         id: string;
@@ -337,7 +355,20 @@ export function buildApp() {
         kind,
         files: files.length,
       });
+      let rejectedCount = 0;
+      let invalidFormatCount = 0;
       for (const file of files) {
+        if (!isValidWoff2File(file.path)) {
+          invalidFormatCount += 1;
+          fs.unlink(file.path, () => {});
+          details.push({
+            fileName: file.originalname || file.filename,
+            status: "duplicate",
+            family: familyRaw,
+            kind,
+          });
+          continue;
+        }
         const fileUrl = `${origin}/media/${file.filename}`;
         const result = registerFont({
           mediaDir: env.mediaDir,
@@ -347,6 +378,17 @@ export function buildApp() {
           family: familyRaw,
           kind,
         });
+        if (result.rejected === "static_blocked_by_variable") {
+          rejectedCount += 1;
+          fs.unlink(file.path, () => {});
+          details.push({
+            fileName: file.originalname || file.filename,
+            status: "duplicate",
+            family: result.font.family,
+            kind: result.font.kind,
+          });
+          continue;
+        }
         if (result.duplicate) {
           duplicateCount += 1;
           const clientFont = publicFontEntry(result.font, origin);
@@ -382,6 +424,22 @@ export function buildApp() {
         });
       }
       if (!created.length) {
+        if (invalidFormatCount > 0) {
+          return res.status(400).json({
+            error:
+              "Файл не является настоящим WOFF2. Конвертируйте шрифт (например, через fonttools или transfonter) и загрузите снова.",
+            invalidFormatCount,
+            details,
+          });
+        }
+        if (rejectedCount > 0) {
+          return res.status(409).json({
+            error: "Для этого семейства уже загружен вариативный шрифт",
+            duplicateCount,
+            rejectedCount,
+            details,
+          });
+        }
         if (duplicateFonts.length) {
           console.info("[fonts] batch reused existing fonts", {
             family: familyRaw,
@@ -416,6 +474,62 @@ export function buildApp() {
       });
       return res.status(201).json({ fonts: created, replacedFamily, duplicateCount, details });
     });
+  });
+
+  app.delete("/api/admin/fonts/:id", adminAuthMiddleware, async (req, res) => {
+    const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+    const deleted = deleteFont(env.mediaDir, id);
+    if (!deleted) return res.status(404).json({ error: "Not found" });
+    return res.status(204).send();
+  });
+
+  app.get("/api/admin/event-themes", adminAuthMiddleware, async (_req, res) => {
+    const themes = await listEventThemes();
+    return res.json(themes);
+  });
+
+  app.get("/api/admin/event-themes/:id", adminAuthMiddleware, async (req, res) => {
+    const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+    const theme = await getEventThemeById(id);
+    if (!theme) return res.status(404).json({ error: "Not found" });
+    return res.json(theme);
+  });
+
+  app.post("/api/admin/event-themes", adminAuthMiddleware, async (req, res) => {
+    const parsed = createEventThemeSchema.safeParse(req.body);
+    if (!parsed.success) return res.status(400).json({ error: "Invalid payload" });
+    try {
+      const theme = await createEventTheme(parsed.data);
+      return res.status(201).json(theme);
+    } catch (error) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
+        return res.status(409).json({ error: "Theme name already exists" });
+      }
+      throw error;
+    }
+  });
+
+  app.put("/api/admin/event-themes/:id", adminAuthMiddleware, async (req, res) => {
+    const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+    const parsed = updateEventThemeSchema.safeParse(req.body);
+    if (!parsed.success) return res.status(400).json({ error: "Invalid payload" });
+    try {
+      const theme = await updateEventTheme(id, parsed.data);
+      if (!theme) return res.status(404).json({ error: "Not found" });
+      return res.json(theme);
+    } catch (error) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
+        return res.status(409).json({ error: "Theme name already exists" });
+      }
+      throw error;
+    }
+  });
+
+  app.delete("/api/admin/event-themes/:id", adminAuthMiddleware, async (req, res) => {
+    const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+    const ok = await deleteEventTheme(id);
+    if (!ok) return res.status(404).json({ error: "Not found" });
+    return res.status(204).send();
   });
 
   app.get("/api/admin/rooms", adminAuthMiddleware, async (_req, res) => {
@@ -757,6 +871,7 @@ export function buildApp() {
       brandLogoUrl: view.brandLogoUrl,
       brandFontFamily: view.brandFontFamily,
       brandFontUrl: view.brandFontUrl,
+      brandFontUrls: view.brandFontUrls,
       playerAutoJoinRandomNickname: view.playerAutoJoinRandomNickname,
     });
   });
@@ -866,7 +981,7 @@ export async function buildServer() {
       await attachSocketIoRedisAdapter(io, env.redisUrl);
       console.info("[server] Redis: Socket.IO cluster adapter enabled");
     } catch (err) {
-      console.error("[server] Redis init failed, continuing without cluster adapter", err);
+      logError("[server] Redis init failed, continuing without cluster adapter", err);
     }
   }
   setSocketIo(io);

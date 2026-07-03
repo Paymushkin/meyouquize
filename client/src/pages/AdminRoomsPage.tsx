@@ -18,6 +18,7 @@ import {
   Typography,
 } from "@mui/material";
 import { AdminLoginForm } from "../components/AdminLoginForm";
+import { AdminGlobalNav } from "../components/admin/AdminGlobalNav";
 import { API_BASE } from "../config";
 import { useAdminAuth } from "../hooks/useAdminAuth";
 
@@ -103,6 +104,7 @@ export function AdminRoomsPage() {
 
   return (
     <Container maxWidth="lg" sx={{ py: 4 }}>
+      <AdminGlobalNav />
       <Typography variant="h4" gutterBottom>
         Админка: комнаты
       </Typography>

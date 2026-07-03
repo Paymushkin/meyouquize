@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   FEEDBACK_SCALE_TITLE_MAX_PX,
+  playerFullWidthTileLabelSx,
   playerQuestionTitleFontSizeSx,
   resolveFeedbackScaleTitleFontPx,
   resolvePlayerQuestionFontRem,
@@ -34,6 +35,17 @@ describe("resolveFeedbackScaleTitleFontPx", () => {
 describe("playerQuestionTitleFontSizeSx", () => {
   it("returns rem strings for breakpoints", () => {
     expect(playerQuestionTitleFontSizeSx(30)).toEqual({ xs: "1.9rem", sm: "2.25rem" });
+  });
+});
+
+describe("playerFullWidthTileLabelSx", () => {
+  it("uses bold responsive typography for full-width player tiles", () => {
+    expect(playerFullWidthTileLabelSx).toEqual({
+      fontWeight: 700,
+      fontStyle: "normal",
+      fontSize: "clamp(1.3rem, 4.2vw, 2.5rem)",
+      lineHeight: 1.35,
+    });
   });
 });
 

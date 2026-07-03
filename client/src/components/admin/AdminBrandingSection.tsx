@@ -8,6 +8,12 @@ import { BrandProjectorJoinQrSection } from "./branding/BrandProjectorJoinQrSect
 import { BrandScreenColorsSection } from "./branding/BrandScreenColorsSection";
 import { BrandTagCloudSection } from "./branding/BrandTagCloudSection";
 import { BrandThemeSection } from "./branding/BrandThemeSection";
+import { BrandTileColorsSection } from "./branding/BrandTileColorsSection";
+import {
+  EventThemeApplySection,
+  type EventThemeListOption,
+  type EventThemeSelection,
+} from "./branding/EventThemeApplySection";
 import type { BrandThemeId } from "@meyouquize/shared";
 
 type Props = {
@@ -74,13 +80,9 @@ type Props = {
   brandFontFamily: string;
   setBrandFontFamily: (value: string) => void;
   setBrandFontUrl: (value: string) => void;
+  setBrandFontUrls: (value: string[]) => void;
   availableFonts: Array<{ id: string; family: string; url: string; kind: "static" | "variable" }>;
-  onUploadFont: (
-    files: File[],
-    family: string,
-    kind: "static" | "variable",
-  ) => Promise<{ family: string; url: string }>;
-  onUploadFontError: (message: string) => void;
+  onUploadMediaError: (message: string) => void;
   brandLogoUrl: string;
   setBrandLogoUrl: (value: string) => void;
   brandPlayerBackgroundImageUrl: string;
@@ -89,6 +91,22 @@ type Props = {
   setBrandProjectorBackgroundImageUrl: (value: string) => void;
   onUploadMedia: (file: File) => Promise<string>;
   emitBrandingPatch: (patch: PublicViewSetPatch) => void;
+  eventThemeApplyProps?: {
+    customThemes: EventThemeListOption[];
+    themesLoading?: boolean;
+    appliedEventThemeName?: string;
+    onApply: (selection: EventThemeSelection) => void | Promise<void>;
+  };
+  tileColorsProps?: {
+    speakerTileBackgroundColor: string;
+    setSpeakerTileBackgroundColor: (value: string) => void;
+    speakerTileTextColor: string;
+    setSpeakerTileTextColor: (value: string) => void;
+    programTileBackgroundColor: string;
+    setProgramTileBackgroundColor: (value: string) => void;
+    programTileTextColor: string;
+    setProgramTileTextColor: (value: string) => void;
+  };
 };
 
 export function AdminBrandingSection(props: Props) {
@@ -143,9 +161,9 @@ export function AdminBrandingSection(props: Props) {
     brandFontFamily,
     setBrandFontFamily,
     setBrandFontUrl,
+    setBrandFontUrls,
     availableFonts,
-    onUploadFont,
-    onUploadFontError,
+    onUploadMediaError,
     brandLogoUrl,
     setBrandLogoUrl,
     brandPlayerBackgroundImageUrl,
@@ -154,6 +172,8 @@ export function AdminBrandingSection(props: Props) {
     setBrandProjectorBackgroundImageUrl,
     onUploadMedia,
     emitBrandingPatch,
+    eventThemeApplyProps,
+    tileColorsProps,
   } = props;
 
   const colorGridSx = {
@@ -169,7 +189,11 @@ export function AdminBrandingSection(props: Props) {
           Брендирование
         </Typography>
         <Stack spacing={1}>
-          <BrandThemeSection brandTheme={brandTheme} onThemeChange={onBrandThemeChange} />
+          {eventThemeApplyProps ? (
+            <EventThemeApplySection {...eventThemeApplyProps} />
+          ) : (
+            <BrandThemeSection brandTheme={brandTheme} onThemeChange={onBrandThemeChange} />
+          )}
           <BrandScreenColorsSection
             colorGridSx={colorGridSx}
             projectorBackground={projectorBackground}
@@ -217,13 +241,19 @@ export function AdminBrandingSection(props: Props) {
             emitPatch={emitBrandingPatch}
           />
           <BrandProjectorJoinQrSection {...qrSettingsProps} emitPatch={emitBrandingPatch} />
+          {tileColorsProps ? (
+            <BrandTileColorsSection
+              colorGridSx={colorGridSx}
+              {...tileColorsProps}
+              emitPatch={emitBrandingPatch}
+            />
+          ) : null}
           <BrandFontsSection
             brandFontFamily={brandFontFamily}
             setBrandFontFamily={setBrandFontFamily}
             setBrandFontUrl={setBrandFontUrl}
+            setBrandFontUrls={setBrandFontUrls}
             availableFonts={availableFonts}
-            onUploadFont={onUploadFont}
-            onUploadFontError={onUploadFontError}
             emitPatch={emitBrandingPatch}
           />
           <BrandImagesSection
@@ -245,7 +275,7 @@ export function AdminBrandingSection(props: Props) {
             brandProjectorBackgroundImageUrl={brandProjectorBackgroundImageUrl}
             setBrandProjectorBackgroundImageUrl={setBrandProjectorBackgroundImageUrl}
             onUploadMedia={onUploadMedia}
-            onUploadFontError={onUploadFontError}
+            onUploadFontError={onUploadMediaError}
             emitPatch={emitBrandingPatch}
           />
         </Stack>

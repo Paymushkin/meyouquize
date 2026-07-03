@@ -137,6 +137,7 @@ type UsePublicViewEmitterParams = {
   brandInputTextColor: string;
   brandFontFamily: string;
   brandFontUrl: string;
+  brandFontUrls: string[];
   brandLogoUrl: string;
   brandPlayerBackgroundImageUrl: string;
   brandProjectorBackgroundImageUrl: string;
@@ -232,6 +233,7 @@ export function usePublicViewEmitter(params: UsePublicViewEmitterParams) {
     brandInputTextColor,
     brandFontFamily,
     brandFontUrl,
+    brandFontUrls,
     brandLogoUrl,
     brandPlayerBackgroundImageUrl,
     brandProjectorBackgroundImageUrl,
@@ -376,6 +378,7 @@ export function usePublicViewEmitter(params: UsePublicViewEmitterParams) {
         brandInputTextColor: patch.brandInputTextColor ?? brandInputTextColor,
         brandFontFamily: patchStringField(patch, "brandFontFamily", brandFontFamily),
         brandFontUrl: patchStringField(patch, "brandFontUrl", brandFontUrl),
+        brandFontUrls: patch.brandFontUrls ?? brandFontUrls,
         brandLogoUrl: patchStringField(patch, "brandLogoUrl", brandLogoUrl),
         brandPlayerBackgroundImageUrl: patchStringField(
           patch,

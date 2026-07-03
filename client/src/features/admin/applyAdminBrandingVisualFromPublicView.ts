@@ -1,4 +1,5 @@
-import type { PublicViewPayload } from "@meyouquize/shared";
+import { normalizePublicViewState, type BrandThemeId } from "@meyouquize/shared";
+import type { ProjectorJoinQrOverlayCorner, PublicViewPayload } from "../../publicViewContract";
 import { toBrandingState } from "../../publicViewContract";
 
 function clampInt(value: number, min: number, max: number): number {
@@ -30,16 +31,39 @@ export type AdminBrandingVisualSetters = {
   setBrandInputTextColor: (value: string) => void;
   setBrandFontFamily: (value: string) => void;
   setBrandFontUrl: (value: string) => void;
+  setBrandFontUrls: (value: string[]) => void;
   setBrandLogoUrl: (value: string) => void;
   setBrandPlayerBackgroundImageUrl: (value: string) => void;
   setBrandProjectorBackgroundImageUrl: (value: string) => void;
   setBrandBodyBackgroundColor: (value: string) => void;
-  setBrandTheme: (value: import("@meyouquize/shared").BrandThemeId) => void;
+  setBrandTheme: (value: BrandThemeId) => void;
+};
+
+export type AdminBrandingQrSetters = {
+  setProjectorJoinQrVisible: (value: boolean) => void;
+  setProjectorJoinQrText: (value: string) => void;
+  setProjectorJoinQrTextColor: (value: string) => void;
+  setProjectorJoinQrOverlaySizePx: (value: number) => void;
+  setProjectorJoinQrOverlayInsetPx: (value: number) => void;
+  setProjectorJoinQrOverlayCorner: (value: ProjectorJoinQrOverlayCorner) => void;
+};
+
+export type AdminBrandingTileSetters = {
+  setSpeakerTileBackgroundColor: (value: string) => void;
+  setSpeakerTileTextColor: (value: string) => void;
+  setProgramTileBackgroundColor: (value: string) => void;
+  setProgramTileTextColor: (value: string) => void;
+};
+
+type ApplyOptions = {
+  qrSetters?: AdminBrandingQrSetters;
+  tileSetters?: AdminBrandingTileSetters;
 };
 
 export function applyAdminBrandingVisualFromPublicView(
   pv: PublicViewPayload,
   setters: AdminBrandingVisualSetters,
+  options?: ApplyOptions,
 ) {
   const b = toBrandingState(pv);
   setters.setProjectorBackground(b.projectorBackground);
@@ -66,9 +90,29 @@ export function applyAdminBrandingVisualFromPublicView(
   setters.setBrandInputTextColor(b.brandInputTextColor);
   setters.setBrandFontFamily(b.brandFontFamily);
   setters.setBrandFontUrl(b.brandFontUrl);
+  const normalized = normalizePublicViewState(pv);
+  setters.setBrandFontUrls(normalized.brandFontUrls ?? []);
   setters.setBrandLogoUrl(b.brandLogoUrl);
   setters.setBrandPlayerBackgroundImageUrl(b.brandPlayerBackgroundImageUrl);
   setters.setBrandProjectorBackgroundImageUrl(b.brandProjectorBackgroundImageUrl);
   setters.setBrandBodyBackgroundColor(b.brandBodyBackgroundColor);
   setters.setBrandTheme(b.brandTheme);
+
+  if (options?.qrSetters || options?.tileSetters) {
+    const normalized = normalizePublicViewState(pv);
+    if (options.qrSetters) {
+      options.qrSetters.setProjectorJoinQrVisible(normalized.projectorJoinQrVisible);
+      options.qrSetters.setProjectorJoinQrText(normalized.projectorJoinQrText);
+      options.qrSetters.setProjectorJoinQrTextColor(normalized.projectorJoinQrTextColor);
+      options.qrSetters.setProjectorJoinQrOverlaySizePx(normalized.projectorJoinQrOverlaySizePx);
+      options.qrSetters.setProjectorJoinQrOverlayInsetPx(normalized.projectorJoinQrOverlayInsetPx);
+      options.qrSetters.setProjectorJoinQrOverlayCorner(normalized.projectorJoinQrOverlayCorner);
+    }
+    if (options.tileSetters) {
+      options.tileSetters.setSpeakerTileBackgroundColor(normalized.speakerTileBackgroundColor);
+      options.tileSetters.setSpeakerTileTextColor(normalized.speakerTileTextColor);
+      options.tileSetters.setProgramTileBackgroundColor(normalized.programTileBackgroundColor);
+      options.tileSetters.setProgramTileTextColor(normalized.programTileTextColor);
+    }
+  }
 }

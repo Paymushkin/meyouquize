@@ -92,4 +92,17 @@ describe("useAdminEventBootstrap", () => {
     expect(params.checkSession).not.toHaveBeenCalled();
     expect(params.loadRoom).not.toHaveBeenCalled();
   });
+
+  it("does nothing for reserved global admin segments", async () => {
+    const params = makeParams({ eventName: "fonts", isAuth: true });
+
+    renderHook(() => useAdminEventBootstrap(params));
+
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    expect(params.checkSession).not.toHaveBeenCalled();
+    expect(params.loadRoom).not.toHaveBeenCalled();
+  });
 });

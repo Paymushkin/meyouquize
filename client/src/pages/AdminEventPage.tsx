@@ -19,6 +19,9 @@ import {
 import { useAdminReport } from "../features/admin/useAdminReport";
 import { useAdminReactions } from "../features/admin/useAdminReactions";
 import { useAdminBrandingVisual } from "../features/admin/useAdminBrandingVisual";
+import { applyEventThemeSelection } from "../features/branding/applyEventThemeSelection";
+import type { EventThemeSelection } from "../components/admin/branding/EventThemeApplySection";
+import { useEventThemeCatalog } from "../features/branding/useEventThemeCatalog";
 import { useAdminQuestionEditor } from "../features/admin/useAdminQuestionEditor";
 import { buildAdminQuestionsSectionSharedBindings } from "../features/admin/adminQuestionsSectionSharedBindings";
 import { AdminEventSectionRouter } from "./adminEvent/AdminEventSectionRouter";
@@ -41,7 +44,7 @@ import { useAdminEventSocket } from "../hooks/useAdminEventSocket";
 import { useAdminEventApi } from "../hooks/useAdminEventApi";
 import { useAdminBrandingProps } from "../hooks/useAdminBrandingProps";
 import { useBodyBrandBackground } from "../hooks/useBodyBrandBackground";
-import { useProjectorJoinQrAdminSettings } from "../hooks/useProjectorJoinQrAdminSettings";
+import { buildBrandFontFacesForFamily, useBrandFont } from "../hooks/useBrandFont";
 import { usePublicViewEmitter } from "../hooks/usePublicViewEmitter";
 import { recordServerPublicView } from "../features/publicView/publicViewEmitCoordination";
 import { useSpeakerQuestionsAdminActions } from "../hooks/useSpeakerQuestionsAdminActions";
@@ -214,25 +217,13 @@ export function AdminEventPage() {
   });
   const [showFirstCorrectAnswerer, setShowFirstCorrectAnswerer] = useState(false);
   const [firstCorrectWinnersCount, setFirstCorrectWinnersCount] = useState(1);
-  const {
-    projectorJoinQrVisible,
-    setProjectorJoinQrVisible,
-    projectorJoinQrText,
-    setProjectorJoinQrText,
-    projectorJoinQrTextColor,
-    setProjectorJoinQrTextColor,
-    projectorJoinQrOverlaySizePx,
-    setProjectorJoinQrOverlaySizePx,
-    projectorJoinQrOverlayInsetPx,
-    setProjectorJoinQrOverlayInsetPx,
-    projectorJoinQrOverlayCorner,
-    setProjectorJoinQrOverlayCorner,
-  } = useProjectorJoinQrAdminSettings();
+  const [appliedEventThemeName, setAppliedEventThemeName] = useState<string | undefined>();
   const branding = useAdminBrandingVisual({
     emitBrandingPatchRef,
     tileBrandSettersRef: playerTileBrandSettersRef,
   });
   const { availableFonts, setAvailableFonts, loadFontLibrary } = useAdminFontLibrary();
+  const { customThemes, themesLoading, loadEventThemes } = useEventThemeCatalog();
   const [editableTitle, setEditableTitle] = useState("");
   const [message, setMessage] = useState("");
   const [onlineUsersCount, setOnlineUsersCount] = useState(0);
@@ -251,6 +242,22 @@ export function AdminEventPage() {
     clearRootBackground: true,
     resetOverflowX: true,
   });
+
+  const brandFontFaces = useMemo(
+    () =>
+      buildBrandFontFacesForFamily(
+        branding.brandFontFamily,
+        branding.brandFontUrls,
+        availableFonts,
+      ),
+    [availableFonts, branding.brandFontFamily, branding.brandFontUrls],
+  );
+  useBrandFont(
+    branding.brandFontFamily,
+    branding.brandFontUrl,
+    branding.brandFontUrls,
+    brandFontFaces,
+  );
 
   const {
     authChecked,
@@ -637,12 +644,12 @@ export function AdminEventPage() {
     setPlayerVoteOptionTextColor: branding.setPlayerVoteOptionTextColor,
     setPlayerVoteProgressTrackColor: branding.setPlayerVoteProgressTrackColor,
     setPlayerVoteProgressBarColor: branding.setPlayerVoteProgressBarColor,
-    setProjectorJoinQrVisible,
-    setProjectorJoinQrText,
-    setProjectorJoinQrTextColor,
-    setProjectorJoinQrOverlaySizePx,
-    setProjectorJoinQrOverlayInsetPx,
-    setProjectorJoinQrOverlayCorner,
+    setProjectorJoinQrVisible: branding.setProjectorJoinQrVisible,
+    setProjectorJoinQrText: branding.setProjectorJoinQrText,
+    setProjectorJoinQrTextColor: branding.setProjectorJoinQrTextColor,
+    setProjectorJoinQrOverlaySizePx: branding.setProjectorJoinQrOverlaySizePx,
+    setProjectorJoinQrOverlayInsetPx: branding.setProjectorJoinQrOverlayInsetPx,
+    setProjectorJoinQrOverlayCorner: branding.setProjectorJoinQrOverlayCorner,
     setBrandPrimaryColor: branding.setBrandPrimaryColor,
     setBrandAccentColor: branding.setBrandAccentColor,
     setBrandSurfaceColor: branding.setBrandSurfaceColor,
@@ -650,6 +657,7 @@ export function AdminEventPage() {
     setBrandInputTextColor: branding.setBrandInputTextColor,
     setBrandFontFamily: branding.setBrandFontFamily,
     setBrandFontUrl: branding.setBrandFontUrl,
+    setBrandFontUrls: branding.setBrandFontUrls,
     setBrandLogoUrl: branding.setBrandLogoUrl,
     setBrandPlayerBackgroundImageUrl: branding.setBrandPlayerBackgroundImageUrl,
     setBrandProjectorBackgroundImageUrl: branding.setBrandProjectorBackgroundImageUrl,
@@ -692,12 +700,12 @@ export function AdminEventPage() {
     playerVoteOptionTextColor: branding.playerVoteOptionTextColor,
     playerVoteProgressTrackColor: branding.playerVoteProgressTrackColor,
     playerVoteProgressBarColor: branding.playerVoteProgressBarColor,
-    projectorJoinQrVisible,
-    projectorJoinQrText,
-    projectorJoinQrTextColor,
-    projectorJoinQrOverlaySizePx,
-    projectorJoinQrOverlayInsetPx,
-    projectorJoinQrOverlayCorner,
+    projectorJoinQrVisible: branding.projectorJoinQrVisible,
+    projectorJoinQrText: branding.projectorJoinQrText,
+    projectorJoinQrTextColor: branding.projectorJoinQrTextColor,
+    projectorJoinQrOverlaySizePx: branding.projectorJoinQrOverlaySizePx,
+    projectorJoinQrOverlayInsetPx: branding.projectorJoinQrOverlayInsetPx,
+    projectorJoinQrOverlayCorner: branding.projectorJoinQrOverlayCorner,
     showFirstCorrectAnswerer,
     firstCorrectWinnersCount,
     showEventTitleOnPlayer: playerTiles.showEventTitleOnPlayer,
@@ -754,6 +762,7 @@ export function AdminEventPage() {
     brandInputTextColor: branding.brandInputTextColor,
     brandFontFamily: branding.brandFontFamily,
     brandFontUrl: branding.brandFontUrl,
+    brandFontUrls: branding.brandFontUrls,
     brandLogoUrl: branding.brandLogoUrl,
     brandPlayerBackgroundImageUrl: branding.brandPlayerBackgroundImageUrl,
     brandProjectorBackgroundImageUrl: branding.brandProjectorBackgroundImageUrl,
@@ -858,16 +867,20 @@ export function AdminEventPage() {
   }, [isAuth, activeSection, roomQuestionsTab, feedbackCatalog.ensureCatalogLoaded]);
 
   useEffect(() => {
-    if (isAuth && activeSection === "branding") void loadFontLibrary();
-  }, [isAuth, activeSection, loadFontLibrary]);
+    if (isAuth && activeSection === "branding") {
+      void loadFontLibrary();
+      void loadEventThemes();
+    }
+  }, [isAuth, activeSection, loadFontLibrary, loadEventThemes]);
 
   const prevOnlineUsersCountRef = useRef(0);
   useEffect(() => {
+    if (!participantNicknamesPollEnabled) return;
     if (onlineUsersCount > prevOnlineUsersCountRef.current) {
       void refreshEventParticipantNicknames();
     }
     prevOnlineUsersCountRef.current = onlineUsersCount;
-  }, [onlineUsersCount, refreshEventParticipantNicknames]);
+  }, [onlineUsersCount, refreshEventParticipantNicknames, participantNicknamesPollEnabled]);
 
   useEffect(() => {
     setupSocketListeners();
@@ -942,6 +955,11 @@ export function AdminEventPage() {
     const cloudManual = readCloudManualFromPublicView(pv);
     setQuestionForms((prev) => applyCloudManualToQuestions(prev, cloudManual));
     branding.applyFromPublicView(pv);
+    if (typeof pv.appliedEventThemeName === "string" && pv.appliedEventThemeName.trim()) {
+      setAppliedEventThemeName(pv.appliedEventThemeName.trim());
+    } else {
+      setAppliedEventThemeName(undefined);
+    }
     if (typeof pv.showFirstCorrectAnswerer === "boolean") {
       setShowFirstCorrectAnswerer(pv.showFirstCorrectAnswerer);
     }
@@ -985,10 +1003,30 @@ export function AdminEventPage() {
   const currentPublicScreenText = useMemo(() => {
     return getCurrentPublicScreenText({
       mode: publicViewMode,
-      projectorJoinQrVisible,
+      projectorJoinQrVisible: branding.projectorJoinQrVisible,
       eventTitle: room?.title,
     });
-  }, [publicViewMode, projectorJoinQrVisible, room?.title]);
+  }, [publicViewMode, branding.projectorJoinQrVisible, room?.title]);
+  const handleApplyEventTheme = useCallback(
+    async (selection: EventThemeSelection) => {
+      try {
+        await applyEventThemeSelection({
+          selection,
+          apiBase: API_BASE,
+          emitBrandingPatch,
+          applyFromEventThemeBranding: branding.applyFromEventThemeBranding,
+          applyBrandThemeLocally: branding.applyBrandThemeLocally,
+          brandThemeVisualSetters: branding.brandThemeVisualSetters,
+          tileBrandSetters: playerTileBrandSettersRef.current,
+          onAppliedName: setAppliedEventThemeName,
+        });
+        setMessage("Тема применена");
+      } catch (error) {
+        setMessage(error instanceof Error ? error.message : "Не удалось применить тему");
+      }
+    },
+    [branding, emitBrandingPatch],
+  );
   const brandingProps = useAdminBrandingProps({
     brandTheme: branding.brandTheme,
     onBrandThemeChange: branding.handleBrandThemeChange,
@@ -1010,18 +1048,18 @@ export function AdminEventPage() {
     setPlayerVoteOptionTextColor: branding.setPlayerVoteOptionTextColor,
     playerVoteProgressBarColor: branding.playerVoteProgressBarColor,
     setPlayerVoteProgressBarColor: branding.setPlayerVoteProgressBarColor,
-    projectorJoinQrVisible,
-    setProjectorJoinQrVisible,
-    projectorJoinQrText,
-    setProjectorJoinQrText,
-    projectorJoinQrTextColor,
-    setProjectorJoinQrTextColor,
-    projectorJoinQrOverlaySizePx,
-    setProjectorJoinQrOverlaySizePx,
-    projectorJoinQrOverlayInsetPx,
-    setProjectorJoinQrOverlayInsetPx,
-    projectorJoinQrOverlayCorner,
-    setProjectorJoinQrOverlayCorner,
+    projectorJoinQrVisible: branding.projectorJoinQrVisible,
+    setProjectorJoinQrVisible: branding.setProjectorJoinQrVisible,
+    projectorJoinQrText: branding.projectorJoinQrText,
+    setProjectorJoinQrText: branding.setProjectorJoinQrText,
+    projectorJoinQrTextColor: branding.projectorJoinQrTextColor,
+    setProjectorJoinQrTextColor: branding.setProjectorJoinQrTextColor,
+    projectorJoinQrOverlaySizePx: branding.projectorJoinQrOverlaySizePx,
+    setProjectorJoinQrOverlaySizePx: branding.setProjectorJoinQrOverlaySizePx,
+    projectorJoinQrOverlayInsetPx: branding.projectorJoinQrOverlayInsetPx,
+    setProjectorJoinQrOverlayInsetPx: branding.setProjectorJoinQrOverlayInsetPx,
+    projectorJoinQrOverlayCorner: branding.projectorJoinQrOverlayCorner,
+    setProjectorJoinQrOverlayCorner: branding.setProjectorJoinQrOverlayCorner,
     cloudQuestionColor: branding.cloudQuestionColor,
     setCloudQuestionColor: branding.setCloudQuestionColor,
     cloudTopTagColor: branding.cloudTopTagColor,
@@ -1051,9 +1089,9 @@ export function AdminEventPage() {
     brandFontFamily: branding.brandFontFamily,
     setBrandFontFamily: branding.setBrandFontFamily,
     setBrandFontUrl: branding.setBrandFontUrl,
+    setBrandFontUrls: branding.setBrandFontUrls,
     availableFonts,
-    onUploadFont: uploadCustomFont,
-    onUploadFontError: setMessage,
+    onUploadMediaError: setMessage,
     brandLogoUrl: branding.brandLogoUrl,
     setBrandLogoUrl: branding.setBrandLogoUrl,
     brandPlayerBackgroundImageUrl: branding.brandPlayerBackgroundImageUrl,
@@ -1062,6 +1100,12 @@ export function AdminEventPage() {
     setBrandProjectorBackgroundImageUrl: branding.setBrandProjectorBackgroundImageUrl,
     onUploadMedia: uploadBannerMedia,
     emitBrandingPatch,
+    eventThemeApplyProps: {
+      customThemes,
+      themesLoading,
+      appliedEventThemeName,
+      onApply: handleApplyEventTheme,
+    },
   });
 
   function resetAllAnswers() {
@@ -1142,89 +1186,6 @@ export function AdminEventPage() {
     if (!payload?.url) throw new Error("Сервер не вернул URL файла");
     setMessage("Картинка загружена");
     return payload.url;
-  }
-
-  async function uploadCustomFont(
-    files: File[],
-    family: string,
-    kind: "static" | "variable",
-  ): Promise<{ family: string; url: string }> {
-    const form = new FormData();
-    files.forEach((file) => form.append("files", file));
-    form.append("family", family);
-    form.append("kind", kind);
-    const response = await fetch(`${API_BASE}/api/admin/fonts/upload`, {
-      method: "POST",
-      credentials: "include",
-      body: form,
-    });
-    const payload = (await response.json().catch(() => ({}))) as {
-      error?: string;
-      reused?: boolean;
-      fonts?: Array<{ id: string; family: string; url: string; kind?: "static" | "variable" }>;
-      replacedFamily?: boolean;
-      duplicateCount?: number;
-      details?: Array<{
-        fileName: string;
-        status: "created" | "duplicate";
-        family: string;
-        kind: "static" | "variable";
-      }>;
-    };
-    if (!response.ok) {
-      console.error("[fonts] upload failed", {
-        status: response.status,
-        error: payload.error,
-      });
-      throw new Error(payload.error || "Не удалось загрузить шрифт");
-    }
-    if (
-      !Array.isArray(payload.fonts) ||
-      payload.fonts.length === 0 ||
-      !payload.fonts[0]?.family ||
-      !payload.fonts[0]?.url
-    ) {
-      throw new Error("Сервер не вернул данные шрифта");
-    }
-    const normalizedFonts: Array<{
-      id: string;
-      family: string;
-      url: string;
-      kind: "static" | "variable";
-    }> = payload.fonts.map((font) => ({
-      ...font,
-      url: resolveClientAssetUrl(font.url),
-      kind: font.kind === "variable" ? "variable" : "static",
-    }));
-    setAvailableFonts((prev) => {
-      const next = [
-        ...normalizedFonts,
-        ...prev.filter(
-          (x) =>
-            !normalizedFonts.some((n) => n.id === x.id) &&
-            !normalizedFonts.some((n) => n.kind === "variable" && n.family === x.family),
-        ),
-      ];
-      return next;
-    });
-    console.info("[fonts] upload result", {
-      created: normalizedFonts.length,
-      duplicateCount: payload.duplicateCount ?? 0,
-      replacedFamily: !!payload.replacedFamily,
-      details: payload.details ?? [],
-    });
-    const duplicateText = payload.duplicateCount
-      ? `, пропущено дублей: ${payload.duplicateCount}`
-      : "";
-    setMessage(
-      payload.reused
-        ? "Шрифт уже в библиотеке — подключён существующий файл"
-        : payload.replacedFamily
-          ? `Семейство заменено на вариативный шрифт${duplicateText}`
-          : `Шрифты загружены${duplicateText}`,
-    );
-    const selected = normalizedFonts[0]!;
-    return { family: selected.family, url: selected.url };
   }
 
   const {

@@ -147,7 +147,7 @@ describe("migrateLegacyTagCloudManualIntoMap", () => {
 });
 
 describe("applyQuestionResultManualDisplay", () => {
-  it("applies option vote count overrides for single choice", () => {
+  it("applies absolute option vote count overrides for single choice (legacy)", () => {
     const row = {
       questionId: "q-1",
       type: "single",
@@ -170,6 +170,33 @@ describe("applyQuestionResultManualDisplay", () => {
       optionStats: [
         { optionId: "o1", count: 2 },
         { optionId: "o2", count: 99 },
+      ],
+    });
+  });
+
+  it("adds delta overrides on top of live vote counts", () => {
+    const row = {
+      questionId: "q-1",
+      type: "single",
+      optionStats: [
+        { optionId: "o1", text: "A", count: 10, isCorrect: true },
+        { optionId: "o2", text: "B", count: 5, isCorrect: false },
+      ],
+      tagCloud: [],
+    };
+    expect(
+      applyQuestionResultManualDisplay(row, {
+        "q-1": {
+          hiddenTagTexts: [],
+          injectedTagWords: [],
+          tagCountOverrides: [],
+          optionVoteCountOverrides: [{ text: "o2", count: 3, mode: "delta" }],
+        },
+      }),
+    ).toMatchObject({
+      optionStats: [
+        { optionId: "o1", count: 10 },
+        { optionId: "o2", count: 8 },
       ],
     });
   });

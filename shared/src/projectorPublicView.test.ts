@@ -35,6 +35,25 @@ describe("projectorPublicViewChanged", () => {
     expect(projectorPublicViewChanged(prev, next)).toBe(true);
   });
 
+  it("returns true when option vote count overrides change in tagCloudManualByQuestionId", () => {
+    const prev = normalizePublicViewState({
+      mode: "question",
+      questionId: "q1",
+      tagCloudManualByQuestionId: {},
+    });
+    const next = mergePublicViewState(prev, {
+      tagCloudManualByQuestionId: {
+        q1: {
+          hiddenTagTexts: [],
+          injectedTagWords: [],
+          tagCountOverrides: [],
+          optionVoteCountOverrides: [{ text: "opt-1", count: 42 }],
+        },
+      },
+    });
+    expect(projectorPublicViewChanged(prev, next)).toBe(true);
+  });
+
   it("returns true when tag cloud manual overrides change", () => {
     const prev = normalizePublicViewState({
       mode: "question",

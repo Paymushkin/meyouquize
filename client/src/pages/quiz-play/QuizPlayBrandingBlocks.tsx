@@ -3,7 +3,10 @@ import { ruBallLabel } from "@meyouquize/shared";
 import { PlayerQuizResultsTile } from "../../components/quiz/PlayerQuizResultsTile";
 import { isQuizResultsTileId, PROGRAM_TILE_ID, SPEAKER_TILE_ID } from "../../publicViewContract";
 import type { PlayerQuizResultsTileModel } from "../../features/quizPlay/playerQuizResults";
-import { playerEventTitleSx } from "../../features/voteUi/voteQuestionLayout";
+import {
+  playerEventTitleSx,
+  playerFullWidthTileLabelSx,
+} from "../../features/voteUi/voteQuestionLayout";
 import CloseIcon from "@mui/icons-material/Close";
 import EditOutlinedIcon from "@mui/icons-material/EditOutlined";
 import EmojiEventsIcon from "@mui/icons-material/EmojiEvents";
@@ -300,15 +303,7 @@ export function PlayerTilesGrid(props: PlayerTilesGridProps) {
                 }}
                 aria-hidden
               />
-              <Typography
-                component="span"
-                sx={{
-                  fontWeight: 400,
-                  fontStyle: "normal",
-                  fontSize: "clamp(1.3rem, 4.2vw, 2.5rem)",
-                  lineHeight: 1.35,
-                }}
-              >
+              <Typography component="span" sx={playerFullWidthTileLabelSx}>
                 {speakerTileText}
               </Typography>
             </Box>
@@ -366,15 +361,7 @@ export function PlayerTilesGrid(props: PlayerTilesGridProps) {
                 }}
                 aria-hidden
               />
-              <Typography
-                component="span"
-                sx={{
-                  fontWeight: 400,
-                  fontStyle: "normal",
-                  fontSize: "clamp(1.3rem, 4.2vw, 2.5rem)",
-                  lineHeight: 1.35,
-                }}
-              >
+              <Typography component="span" sx={playerFullWidthTileLabelSx}>
                 {programTileText}
               </Typography>
             </Box>

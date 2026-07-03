@@ -33,6 +33,20 @@ describe("buildCloudWordsForDisplay", () => {
     ).toEqual([{ text: "shown", count: 9 }]);
   });
 
+  it("merges tags case-insensitively", () => {
+    expect(
+      buildCloudWordsForDisplay({
+        liveTags: [
+          { text: "Сантехник", count: 10 },
+          { text: "сантехник", count: 3 },
+        ],
+        hiddenTagTexts: [],
+        injectedTagWords: [],
+        tagCountOverrides: [],
+      }),
+    ).toEqual([{ text: "сантехник", count: 13 }]);
+  });
+
   it("falls back to live tags when overrides zero everything", () => {
     expect(
       buildCloudWordsForDisplay({

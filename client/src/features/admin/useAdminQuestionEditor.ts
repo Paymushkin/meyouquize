@@ -17,6 +17,7 @@ import {
   mergeInjectedTagWords,
   parseInjectedTagLines,
   setTagCountOverrideRow,
+  setOptionVoteCountOverrideRow,
   toggleHiddenTagText,
 } from "../tagCloudAdmin";
 import {
@@ -937,13 +938,15 @@ export function useAdminQuestionEditor({
   function updateOptionVoteCountOverride(
     questionIndex: number,
     optionId: string,
-    nextCount: number,
+    liveCount: number,
+    nextDisplayCount: number,
   ) {
     const question = questionForms[questionIndex];
-    const nextOverrides = setTagCountOverrideRow(
+    const nextOverrides = setOptionVoteCountOverrideRow(
       question.optionVoteCountOverrides ?? [],
       optionId,
-      nextCount,
+      liveCount,
+      nextDisplayCount,
     );
     setQuestionForms((prev) => {
       const next = prev.map((q, idx) =>

@@ -606,6 +606,7 @@ export const setPublicViewSchema = z.object({
     .optional(),
   brandFontFamily: z.string().trim().max(200).optional(),
   brandFontUrl: optionalClientAssetUrlSchema,
+  brandFontUrls: z.array(optionalClientAssetUrlSchema).max(30).optional(),
   brandLogoUrl: optionalClientAssetUrlSchema,
   brandPlayerBackgroundImageUrl: optionalClientAssetUrlSchema,
   brandProjectorBackgroundImageUrl: optionalClientAssetUrlSchema,
@@ -614,9 +615,26 @@ export const setPublicViewSchema = z.object({
     .regex(/^#([0-9a-fA-F]{6})$/)
     .optional(),
   brandTheme: z.enum(["default", "meyou"]).optional(),
+  appliedEventThemeName: z.string().trim().max(120).optional(),
   /** @deprecated */
   brandBackgroundImageUrl: optionalClientAssetUrlSchema,
 });
+
+export const eventThemeNameSchema = z.string().trim().min(1).max(120);
+
+export const createEventThemeSchema = z.object({
+  name: eventThemeNameSchema,
+  branding: z.record(z.string(), z.unknown()),
+});
+
+export const updateEventThemeSchema = z
+  .object({
+    name: eventThemeNameSchema.optional(),
+    branding: z.record(z.string(), z.unknown()).optional(),
+  })
+  .refine((value) => value.name !== undefined || value.branding !== undefined, {
+    message: "At least one of name or branding is required",
+  });
 
 export const subscribeSpeakerQuestionsSchema = z.object({
   slug: z.string().min(1),
@@ -822,7 +840,8 @@ const tagCloudQuestionManualSchema = z.object({
     .array(
       z.object({
         text: z.string().min(1).max(80),
-        count: z.number().int().min(0).max(100000),
+        count: z.number().int().min(-100000).max(100000),
+        mode: z.enum(["absolute", "delta"]).optional(),
       }),
     )
     .max(100),

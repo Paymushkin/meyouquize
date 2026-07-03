@@ -1,11 +1,23 @@
 import type { BrandThemeId } from "./brandThemes.js";
+import type { EventThemeBranding } from "./eventThemeBranding.js";
+import {
+  eventThemeBrandingToPublicViewPatch,
+  pickEventThemeBrandingFromPublicView,
+} from "./eventThemeBranding.js";
 import { sanitizeBrandThemeId } from "./brandThemes.js";
 import {
   migrateLegacyTagCloudManualIntoMap,
   withProjectorTagCloudFields,
   type TagCloudManualByQuestionId,
   type TagCloudQuestionManualState,
+  type OptionVoteCountOverride,
 } from "./tagCloudManual.js";
+import {
+  filterMediaBrandFontUrls,
+  isBuiltinBrandFontFamily,
+  isMediaBrandFontUrl,
+  sanitizeBrandFontUrls,
+} from "./brandFontFaces.js";
 import { sanitizeVoteOptionBorderColor } from "./voteOptionBorderColor.js";
 import { sanitizeVoteFillColor, sanitizeVoteQuestionTextColor } from "./voteQuestionTextStyle.js";
 
@@ -119,7 +131,11 @@ export type ReportModuleId =
 
 export type CloudWordCount = { text: string; count: number };
 
-export type { TagCloudQuestionManualState, TagCloudManualByQuestionId } from "./tagCloudManual.js";
+export type {
+  TagCloudQuestionManualState,
+  TagCloudManualByQuestionId,
+  OptionVoteCountOverride,
+} from "./tagCloudManual.js";
 export {
   EMPTY_TAG_CLOUD_QUESTION_MANUAL,
   hasTagCloudManualContent,
@@ -131,7 +147,7 @@ export {
   applyOptionVoteCountOverrides,
   applyQuestionResultManualDisplay,
 } from "./tagCloudManual.js";
-export { buildCloudWordsForDisplay } from "./tagCloudMerge.js";
+export { buildCloudWordsForDisplay, aggregateTagCloudWordCounts } from "./tagCloudMerge.js";
 export type PublicBanner = {
   id: string;
   linkUrl: string;
@@ -346,6 +362,8 @@ export interface PublicViewState {
   brandFontFamily: string;
   /** Бренд: URL файла кастомного шрифта (если используется) */
   brandFontUrl: string;
+  /** Бренд: все URL начертаний выбранного семейства (снимок). */
+  brandFontUrls?: string[];
   /** Бренд: URL логотипа */
   brandLogoUrl: string;
   /** Бренд: URL фона интерфейса игрока */
@@ -356,6 +374,8 @@ export interface PublicViewState {
   brandBodyBackgroundColor: string;
   /** Пресет оформления: стандартный или MeYOU (как demo, только визуал). */
   brandTheme?: BrandThemeId;
+  /** Метка последней применённой темы (только для UI, без синхронизации). */
+  appliedEventThemeName?: string;
   /** @deprecated legacy поле, используйте раздельные player/projector */
   brandBackgroundImageUrl?: string;
 }
@@ -529,12 +549,8 @@ function clampInt(value: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, Math.trunc(value)));
 }
 
-/** Сравнение эталонных тегов и отображаемого тега: NFKC, регистр, пробелы, завершающая точка. Согласовано с сервером при зачёте ответов. */
-export function normalizeTagComparable(value: string): string {
-  let s = value.normalize("NFKC").trim().toLowerCase().replace(/\s+/g, " ").trim();
-  s = s.replace(/\.+$/u, "").trim();
-  return s;
-}
+export { normalizeTagComparable } from "./tagCloudText.js";
+import { normalizeTagComparable } from "./tagCloudText.js";
 
 /** Синонимы в одной строке эталона: «синий; голубой» или «синий, голубой». */
 export function parseTagCloudReferenceAliases(optionText: string): string[] {
@@ -689,13 +705,31 @@ function sanitizeHiddenTagTexts(items: string[] | undefined): string[] {
     .map((item) => item.trim().slice(0, 120));
 }
 
+function sanitizeOptionVoteCountOverrides(
+  items: OptionVoteCountOverride[] | undefined,
+): OptionVoteCountOverride[] {
+  if (!Array.isArray(items)) return [];
+  return items
+    .filter((item) => item && typeof item.text === "string" && item.text.trim().length > 0)
+    .map((item) => {
+      const mode =
+        item.mode === "delta" ? "delta" : item.mode === "absolute" ? "absolute" : undefined;
+      const minCount = mode === "delta" ? -100000 : 0;
+      return {
+        text: item.text.trim().slice(0, 80),
+        count: clampInt(item.count, minCount, 100000),
+        ...(mode ? { mode } : {}),
+      };
+    });
+}
+
 function sanitizeTagCloudQuestionManualState(value: unknown): TagCloudQuestionManualState | null {
   if (!value || typeof value !== "object" || Array.isArray(value)) return null;
   const row = value as Partial<TagCloudQuestionManualState>;
   const hiddenTagTexts = sanitizeHiddenTagTexts(row.hiddenTagTexts);
   const injectedTagWords = sanitizeCloudWords(row.injectedTagWords, 1);
   const tagCountOverrides = sanitizeCloudWords(row.tagCountOverrides, 0);
-  const optionVoteCountOverrides = sanitizeCloudWords(row.optionVoteCountOverrides, 0);
+  const optionVoteCountOverrides = sanitizeOptionVoteCountOverrides(row.optionVoteCountOverrides);
   if (
     hiddenTagTexts.length === 0 &&
     injectedTagWords.length === 0 &&
@@ -1478,7 +1512,22 @@ export function normalizePublicViewState(
     brandTextColor: sanitizeHex6(value?.brandTextColor, base.brandTextColor),
     brandInputTextColor: sanitizeHex6(value?.brandInputTextColor, base.brandInputTextColor),
     brandFontFamily: sanitizeBrandFontFamily(value?.brandFontFamily, base.brandFontFamily),
-    brandFontUrl: sanitizeBrandUrl(value?.brandFontUrl),
+    brandFontUrl: (() => {
+      const family = sanitizeBrandFontFamily(value?.brandFontFamily, base.brandFontFamily);
+      const url = sanitizeBrandUrl(value?.brandFontUrl ?? base.brandFontUrl);
+      if (isBuiltinBrandFontFamily(family) && isMediaBrandFontUrl(url)) return "";
+      return url;
+    })(),
+    brandFontUrls: (() => {
+      const family = sanitizeBrandFontFamily(value?.brandFontFamily, base.brandFontFamily);
+      if (isBuiltinBrandFontFamily(family)) return [];
+      const fromPatch = filterMediaBrandFontUrls(
+        sanitizeBrandFontUrls(value?.brandFontUrls, base.brandFontUrls ?? []),
+      );
+      if (fromPatch.length > 0) return fromPatch;
+      const primary = sanitizeBrandUrl(value?.brandFontUrl ?? base.brandFontUrl);
+      return isMediaBrandFontUrl(primary) ? [primary] : [];
+    })(),
     brandLogoUrl: sanitizeBrandUrl(value?.brandLogoUrl),
     brandPlayerBackgroundImageUrl: sanitizeBrandUrl(
       value?.brandPlayerBackgroundImageUrl ?? value?.brandBackgroundImageUrl,
@@ -1491,6 +1540,10 @@ export function normalizePublicViewState(
       base.brandBodyBackgroundColor,
     ),
     brandTheme: sanitizeBrandThemeId(value?.brandTheme ?? base.brandTheme),
+    appliedEventThemeName:
+      typeof value?.appliedEventThemeName === "string"
+        ? value.appliedEventThemeName.trim().slice(0, 120)
+        : undefined,
   };
 }
 
@@ -1570,6 +1623,20 @@ export {
   sanitizeBrandThemeId,
 } from "./brandThemes.js";
 
+export type { EventThemeBranding, EventThemeBrandingPatch } from "./eventThemeBranding.js";
+export {
+  eventThemeBrandingToPublicViewPatch,
+  pickEventThemeBrandingFromPublicView,
+} from "./eventThemeBranding.js";
+
+export function normalizeEventThemeBranding(raw: unknown): EventThemeBranding {
+  const partial =
+    raw && typeof raw === "object" && !Array.isArray(raw)
+      ? (raw as Partial<PublicViewState>)
+      : undefined;
+  return pickEventThemeBrandingFromPublicView(normalizePublicViewState(partial));
+}
+
 export function mergePublicViewState(
   prev: PublicViewState,
   patch: PublicViewPatch,
@@ -1597,6 +1664,17 @@ export function mergePublicViewState(
   }
   return withProjectorTagCloudFields(merged);
 }
+
+export {
+  BUILTIN_BRAND_FONT_FAMILIES,
+  filterMediaBrandFontUrls,
+  inferCssFontFormat,
+  inferFontFaceDescriptor,
+  isBuiltinBrandFontFamily,
+  isMediaBrandFontUrl,
+  sanitizeBrandFontUrls,
+  type BrandFontFaceDescriptor,
+} from "./brandFontFaces.js";
 
 export {
   prunePlayerUiRefsForRoom,

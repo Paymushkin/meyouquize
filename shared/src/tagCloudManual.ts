@@ -3,12 +3,18 @@ import { computeTemperatureWeightedAverage } from "./temperatureVote.js";
 
 export type CloudWordCount = { text: string; count: number };
 
+/** optionId в text; count — дельта к live (mode delta) или абсолют (legacy absolute). */
+export type OptionVoteCountOverride = {
+  text: string;
+  count: number;
+  mode?: "absolute" | "delta";
+};
+
 export type TagCloudQuestionManualState = {
   hiddenTagTexts: string[];
   injectedTagWords: CloudWordCount[];
   tagCountOverrides: CloudWordCount[];
-  /** Для single/multi/temperature: optionId в поле text, count — отображаемое число голосов. */
-  optionVoteCountOverrides: CloudWordCount[];
+  optionVoteCountOverrides: OptionVoteCountOverride[];
 };
 
 export type TagCloudManualByQuestionId = Record<string, TagCloudQuestionManualState>;
@@ -103,31 +109,53 @@ export function migrateLegacyTagCloudManualIntoMap(
   return { ...manual, [qid]: legacy };
 }
 
+function resolveOptionOverrideDisplayCount(
+  liveCount: number,
+  row: OptionVoteCountOverride,
+): number {
+  const safeLive = Math.max(0, Math.trunc(liveCount));
+  const safeCount = Math.trunc(row.count);
+  if (row.mode === "delta") {
+    return Math.max(0, safeLive + safeCount);
+  }
+  // legacy: абсолютное отображаемое число (замораживает live)
+  return Math.max(0, safeCount);
+}
+
 export function resolveOptionDisplayCount(
   optionId: string,
   liveCount: number,
-  overrides: CloudWordCount[],
+  overrides: OptionVoteCountOverride[],
 ): number {
   const row = overrides.find((item) => item.text === optionId);
-  return row !== undefined ? row.count : liveCount;
+  return row !== undefined ? resolveOptionOverrideDisplayCount(liveCount, row) : liveCount;
 }
 
-export function hasOptionVoteCountOverride(overrides: CloudWordCount[], optionId: string): boolean {
+export function hasOptionVoteCountOverride(
+  overrides: OptionVoteCountOverride[],
+  optionId: string,
+): boolean {
   return overrides.some((item) => item.text === optionId);
 }
 
 export function applyOptionVoteCountOverrides<T extends { optionId: string; count: number }>(
   optionStats: T[],
-  overrides: CloudWordCount[],
+  overrides: OptionVoteCountOverride[],
 ): T[] {
   if (overrides.length === 0) return optionStats;
-  const map = new Map(
-    overrides.map((item) => [item.text, Math.max(0, Math.trunc(item.count))] as const),
-  );
-  return optionStats.map((stat) => {
-    const next = map.get(stat.optionId);
-    return next === undefined ? stat : { ...stat, count: next };
+  const overrideById = new Map(overrides.map((item) => [item.text, item] as const));
+  const seen = new Set<string>();
+  const next = optionStats.map((stat) => {
+    const row = overrideById.get(stat.optionId);
+    if (row === undefined) return stat;
+    seen.add(stat.optionId);
+    return { ...stat, count: resolveOptionOverrideDisplayCount(stat.count, row) };
   });
+  for (const row of overrides) {
+    if (seen.has(row.text)) continue;
+    next.push({ optionId: row.text, count: resolveOptionOverrideDisplayCount(0, row) } as T);
+  }
+  return next;
 }
 
 export type QuestionResultManualDisplayRow = {

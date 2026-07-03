@@ -1,4 +1,10 @@
-import { sanitizeTagCloudManualByQuestionId, type CloudWordCount } from "@meyouquize/shared";
+import {
+  buildCloudWordsForDisplay,
+  normalizeTagComparable,
+  sanitizeTagCloudManualByQuestionId,
+  type CloudWordCount,
+  type OptionVoteCountOverride,
+} from "@meyouquize/shared";
 import type { CloudManualStateByQuestion } from "../publicViewContract";
 
 /**
@@ -13,7 +19,7 @@ export function parseInjectedTagLines(value: string): CloudWordCount[] {
     .forEach((line) => {
       const match = line.match(/^(.*?)[\s:;,\-–—()]+(\d+)$/);
       if (!match) return;
-      const text = match[1].trim();
+      const text = normalizeTagComparable(match[1].trim());
       const count = Number.parseInt(match[2], 10);
       if (!text || !Number.isFinite(count) || count < 1) return;
       map.set(text, (map.get(text) ?? 0) + count);
@@ -26,13 +32,18 @@ export function mergeInjectedTagWords(
   existing: CloudWordCount[],
   parsed: CloudWordCount[],
 ): CloudWordCount[] {
-  const nextWords = [...existing];
-  parsed.forEach((item) => {
-    const idx = nextWords.findIndex((w) => w.text === item.text);
-    if (idx === -1) nextWords.push(item);
-    else nextWords[idx] = { text: item.text, count: nextWords[idx].count + item.count };
+  const merged = new Map<string, CloudWordCount>();
+  [...existing, ...parsed].forEach((item) => {
+    const key = normalizeTagComparable(item.text);
+    if (!key) return;
+    const prev = merged.get(key);
+    if (prev) {
+      prev.count += item.count;
+      return;
+    }
+    merged.set(key, { text: key, count: item.count });
   });
-  return nextWords;
+  return Array.from(merged.values());
 }
 
 export function toggleHiddenTagText(hidden: string[], tagText: string): string[] {
@@ -55,6 +66,24 @@ export function clearCountOverrideRow(current: CloudWordCount[], key: string): C
   return current.filter((item) => item.text !== key);
 }
 
+/** Сохраняет дельту к live-голосам (новые голоса участников продолжают накапливаться). */
+export function setOptionVoteCountOverrideRow(
+  current: OptionVoteCountOverride[],
+  optionId: string,
+  liveCount: number,
+  nextDisplayCount: number,
+): OptionVoteCountOverride[] {
+  const safeLive = Math.max(0, Math.trunc(Number.isFinite(liveCount) ? liveCount : 0));
+  const safeDisplay = Math.max(
+    0,
+    Math.trunc(Number.isFinite(nextDisplayCount) ? nextDisplayCount : 0),
+  );
+  const delta = safeDisplay - safeLive;
+  const without = current.filter((item) => item.text !== optionId);
+  if (delta === 0) return without;
+  return [...without, { text: optionId, count: delta, mode: "delta" }];
+}
+
 /**
  * Порядок тегов для диалога результатов (как при живых данных + инжект + overrides).
  */
@@ -63,18 +92,12 @@ export function buildTagResultsDisplayOrder(params: {
   injected: CloudWordCount[];
   overrides: CloudWordCount[];
 }): string[] {
-  const { liveTags, injected, overrides } = params;
-  const merged = new Map<string, number>();
-  [...liveTags, ...injected].forEach((item) => {
-    merged.set(item.text, (merged.get(item.text) ?? 0) + item.count);
-  });
-  overrides.forEach((item) => {
-    merged.set(item.text, item.count);
-  });
-  return Array.from(merged.entries())
-    .map(([text, count]) => ({ text, count }))
-    .sort((a, b) => b.count - a.count || a.text.localeCompare(b.text, "ru"))
-    .map((item) => item.text);
+  return buildCloudWordsForDisplay({
+    liveTags: params.liveTags,
+    hiddenTagTexts: [],
+    injectedTagWords: params.injected,
+    tagCountOverrides: params.overrides,
+  }).map((item) => item.text);
 }
 
 type CloudManualQuestionFields = {

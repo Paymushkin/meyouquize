@@ -1,4 +1,4 @@
-import { type ReactNode } from "react";
+import { type ReactNode, useEffect, useMemo, useState } from "react";
 import {
   FormControlLabel,
   IconButton,
@@ -8,7 +8,9 @@ import {
   TableBody,
   TableCell,
   TableContainer,
+  TableFooter,
   TableHead,
+  TablePagination,
   TableRow,
   TableSortLabel,
   TextField,
@@ -24,6 +26,8 @@ import {
   type SortState,
 } from "../../features/speakerQuestionsAdmin/speakerQuestionsSort";
 import { useSpeakerQuestionsTableState } from "../../features/speakerQuestionsAdmin/useSpeakerQuestionsTableState";
+
+const PAGE_SIZE = 50;
 
 type Props = {
   rows: SpeakerQuestionItem[];
@@ -80,10 +84,24 @@ export function SpeakerQuestionsTable({
 }: Props) {
   const { sort, setSort, sortedRows, getDraftValue, setDraftValue, canSaveDraft, getTrimmedDraft } =
     useSpeakerQuestionsTableState(rows);
+  const [page, setPage] = useState(0);
+  const pageCount = Math.max(1, Math.ceil(sortedRows.length / PAGE_SIZE));
+
+  useEffect(() => {
+    setPage((prev) => Math.min(prev, pageCount - 1));
+  }, [pageCount]);
+
+  const pagedRows = useMemo(() => {
+    const start = page * PAGE_SIZE;
+    return sortedRows.slice(start, start + PAGE_SIZE);
+  }, [page, sortedRows]);
 
   return (
     <Stack spacing={1}>
-      <Typography variant="h6">{title}</Typography>
+      <Typography variant="h6">
+        {title}
+        {rows.length > 0 ? ` (${rows.length})` : ""}
+      </Typography>
       <TableContainer>
         <Table size="small">
           <TableHead>
@@ -125,9 +143,9 @@ export function SpeakerQuestionsTable({
             </TableRow>
           </TableHead>
           <TableBody>
-            {sortedRows.map((q, idx) => (
+            {pagedRows.map((q, idx) => (
               <TableRow key={q.id} hover>
-                <TableCell>{idx + 1}</TableCell>
+                <TableCell>{page * PAGE_SIZE + idx + 1}</TableCell>
                 <TableCell>
                   <Typography variant="body2">{q.authorNickname}</Typography>
                 </TableCell>
@@ -214,6 +232,23 @@ export function SpeakerQuestionsTable({
               </TableRow>
             ))}
           </TableBody>
+          {sortedRows.length > PAGE_SIZE ? (
+            <TableFooter>
+              <TableRow>
+                <TablePagination
+                  colSpan={showScreenColumn ? 9 : 8}
+                  count={sortedRows.length}
+                  page={page}
+                  onPageChange={(_, nextPage) => setPage(nextPage)}
+                  rowsPerPage={PAGE_SIZE}
+                  rowsPerPageOptions={[PAGE_SIZE]}
+                  labelDisplayedRows={({ from, to, count }) =>
+                    `${from}–${to} из ${count !== -1 ? count : `более ${to}`}`
+                  }
+                />
+              </TableRow>
+            </TableFooter>
+          ) : null}
         </Table>
       </TableContainer>
     </Stack>

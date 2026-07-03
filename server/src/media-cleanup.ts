@@ -3,6 +3,7 @@ import path from "node:path";
 import type { Prisma } from "@prisma/client";
 import { readFontLibrary } from "./font-library.js";
 import { env } from "./env.js";
+import { formatErrorForLog } from "./logging.js";
 import { prisma } from "./prisma.js";
 
 /** Извлекает имя файла из локального URL `/media/...` или абсолютного с тем же путём. */
@@ -112,7 +113,10 @@ export async function cleanupUnusedQuestionMedia(previousUrls: Iterable<string>)
     } catch (error) {
       const code = (error as NodeJS.ErrnoException | undefined)?.code;
       if (code !== "ENOENT") {
-        console.warn("[media-cleanup] failed to delete file", { filename, error });
+        console.warn("[media-cleanup] failed to delete file", {
+          filename,
+          ...formatErrorForLog(error),
+        });
       }
     }
   }

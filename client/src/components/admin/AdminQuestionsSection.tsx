@@ -89,7 +89,12 @@ type Props = {
   updateQuestionShowCorrectOption: (globalIndex: number, next: boolean) => void;
   openTagInputDialog: (globalIndex: number) => void;
   openTagResultsDialog: (globalIndex: number) => void;
-  updateOptionVoteCountOverride: (globalIndex: number, optionId: string, nextCount: number) => void;
+  updateOptionVoteCountOverride: (
+    globalIndex: number,
+    optionId: string,
+    liveCount: number,
+    nextDisplayCount: number,
+  ) => void;
   clearOptionVoteCountOverride: (globalIndex: number, optionId: string) => void;
   resetOptionVoteCountOverrides: (globalIndex: number) => void;
   confirmResetQuestionAnswersByIndex: (globalIndex: number) => void;
@@ -808,6 +813,7 @@ export function AdminQuestionsSection(props: Props) {
                                   optionId,
                                   text: option.text || `Вариант ${index + 1}`,
                                   weight: option.weight ?? liveOption?.weight,
+                                  liveCount,
                                   count: resolveOptionDisplayCount(optionId, liveCount, overrides),
                                 };
                               });
@@ -860,6 +866,7 @@ export function AdminQuestionsSection(props: Props) {
                                                 updateOptionVoteCountOverride(
                                                   g,
                                                   option.optionId,
+                                                  option.liveCount,
                                                   option.count - 1,
                                                 )
                                               }
@@ -867,6 +874,7 @@ export function AdminQuestionsSection(props: Props) {
                                                 updateOptionVoteCountOverride(
                                                   g,
                                                   option.optionId,
+                                                  option.liveCount,
                                                   option.count + 1,
                                                 )
                                               }
@@ -905,6 +913,7 @@ export function AdminQuestionsSection(props: Props) {
                                 optionId,
                                 text: option.text || `Вариант ${index + 1}`,
                                 isCorrect: option.isCorrect,
+                                liveCount,
                                 count: resolveOptionDisplayCount(optionId, liveCount, overrides),
                               };
                             });
@@ -941,6 +950,7 @@ export function AdminQuestionsSection(props: Props) {
                                               updateOptionVoteCountOverride(
                                                 g,
                                                 option.optionId,
+                                                option.liveCount,
                                                 option.count - 1,
                                               )
                                             }
@@ -948,6 +958,7 @@ export function AdminQuestionsSection(props: Props) {
                                               updateOptionVoteCountOverride(
                                                 g,
                                                 option.optionId,
+                                                option.liveCount,
                                                 option.count + 1,
                                               )
                                             }

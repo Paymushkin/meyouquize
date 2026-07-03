@@ -1,21 +1,13 @@
 import type { BrandThemeId, PublicViewPayload } from "@meyouquize/shared";
-import { useCallback, useMemo, useRef, useState, type MutableRefObject } from "react";
+import { getBrandThemePatchForTheme } from "../branding/applyBrandThemeVisual";
+import { useBrandingEditorState } from "../branding/useBrandingEditorState";
+import { useCallback, type MutableRefObject } from "react";
 import type { PublicViewSetPatch } from "../../publicViewContract";
-import {
-  applyBrandThemeVisualSetters,
-  getBrandThemePatchForTheme,
-  type BrandThemeVisualSetters,
-} from "../branding/applyBrandThemeVisual";
-import { applyAdminBrandingVisualFromPublicView } from "./applyAdminBrandingVisualFromPublicView";
+import type { AdminBrandingTileSetters } from "./applyAdminBrandingVisualFromPublicView";
 
 type EmitBrandingPatch = (patch: PublicViewSetPatch) => void;
 
-type TileBrandSettersRef = MutableRefObject<{
-  setSpeakerTileBackgroundColor: (value: string) => void;
-  setSpeakerTileTextColor: (value: string) => void;
-  setProgramTileBackgroundColor: (value: string) => void;
-  setProgramTileTextColor: (value: string) => void;
-}>;
+type TileBrandSettersRef = MutableRefObject<AdminBrandingTileSetters>;
 
 type Params = {
   emitBrandingPatchRef: MutableRefObject<EmitBrandingPatch>;
@@ -23,233 +15,101 @@ type Params = {
 };
 
 export function useAdminBrandingVisual({ emitBrandingPatchRef, tileBrandSettersRef }: Params) {
-  const [projectorBackground, setProjectorBackground] = useState("#7c5acb");
-  const [cloudQuestionColor, setCloudQuestionColor] = useState("#1f1f1f");
-  const [cloudTagColors, setCloudTagColors] = useState<string[]>([
-    "#1f1f1f",
-    "#1976d2",
-    "#2e7d32",
-    "#ef6c00",
-    "#6a1b9a",
-  ]);
-  const [cloudTopTagColor, setCloudTopTagColor] = useState("#d32f2f");
-  const [cloudCorrectTagColor, setCloudCorrectTagColor] = useState("#2e7d32");
-  const [cloudDensity, setCloudDensity] = useState(60);
-  const [cloudTagPadding, setCloudTagPadding] = useState(5);
-  const [cloudSpiral, setCloudSpiral] = useState<"archimedean" | "rectangular">("archimedean");
-  const [cloudAnimationStrength, setCloudAnimationStrength] = useState(30);
-  const [voteQuestionTextColor, setVoteQuestionTextColor] = useState("#1f1f1f");
-  const [voteOptionTextColor, setVoteOptionTextColor] = useState("#1f1f1f");
-  const [voteOptionBorderColor, setVoteOptionBorderColor] = useState("rgba(255,255,255,0.4)");
-  const [voteProgressTrackColor, setVoteProgressTrackColor] = useState("#e3e3e3");
-  const [voteProgressBarColor, setVoteProgressBarColor] = useState("#1976d2");
-  const [playerVoteOptionTextColor, setPlayerVoteOptionTextColor] = useState("#ffffff");
-  const [playerVoteProgressTrackColor, setPlayerVoteProgressTrackColor] = useState("#6a5600");
-  const [playerVoteProgressBarColor, setPlayerVoteProgressBarColor] = useState("#F3F722");
-  const [brandPrimaryColor, setBrandPrimaryColor] = useState("#7c5acb");
-  const [brandAccentColor, setBrandAccentColor] = useState("#1976d2");
-  const [brandSurfaceColor, setBrandSurfaceColor] = useState("#ffffff");
-  const [brandTextColor, setBrandTextColor] = useState("#1f1f1f");
-  const [brandInputTextColor, setBrandInputTextColor] = useState("#ffffff");
-  const [brandFontFamily, setBrandFontFamily] = useState("Jost, Arial, sans-serif");
-  const [brandFontUrl, setBrandFontUrl] = useState("");
-  const [brandLogoUrl, setBrandLogoUrl] = useState("");
-  const [brandPlayerBackgroundImageUrl, setBrandPlayerBackgroundImageUrl] = useState("");
-  const [brandProjectorBackgroundImageUrl, setBrandProjectorBackgroundImageUrl] = useState("");
-  const [brandBodyBackgroundColor, setBrandBodyBackgroundColor] = useState("#000000");
-  const [brandTheme, setBrandTheme] = useState<BrandThemeId>("default");
+  const editor = useBrandingEditorState();
 
-  const visualSettersRef = useRef({
-    setProjectorBackground,
-    setCloudQuestionColor,
-    setCloudTagColors,
-    setCloudTopTagColor,
-    setCloudCorrectTagColor,
-    setCloudDensity,
-    setCloudTagPadding,
-    setCloudSpiral,
-    setCloudAnimationStrength,
-    setVoteQuestionTextColor,
-    setVoteOptionTextColor,
-    setVoteOptionBorderColor,
-    setVoteProgressTrackColor,
-    setVoteProgressBarColor,
-    setPlayerVoteOptionTextColor,
-    setPlayerVoteProgressTrackColor,
-    setPlayerVoteProgressBarColor,
-    setBrandPrimaryColor,
-    setBrandAccentColor,
-    setBrandSurfaceColor,
-    setBrandTextColor,
-    setBrandInputTextColor,
-    setBrandFontFamily,
-    setBrandFontUrl,
-    setBrandLogoUrl,
-    setBrandPlayerBackgroundImageUrl,
-    setBrandProjectorBackgroundImageUrl,
-    setBrandBodyBackgroundColor,
-    setBrandTheme,
-  });
-  visualSettersRef.current = {
-    setProjectorBackground,
-    setCloudQuestionColor,
-    setCloudTagColors,
-    setCloudTopTagColor,
-    setCloudCorrectTagColor,
-    setCloudDensity,
-    setCloudTagPadding,
-    setCloudSpiral,
-    setCloudAnimationStrength,
-    setVoteQuestionTextColor,
-    setVoteOptionTextColor,
-    setVoteOptionBorderColor,
-    setVoteProgressTrackColor,
-    setVoteProgressBarColor,
-    setPlayerVoteOptionTextColor,
-    setPlayerVoteProgressTrackColor,
-    setPlayerVoteProgressBarColor,
-    setBrandPrimaryColor,
-    setBrandAccentColor,
-    setBrandSurfaceColor,
-    setBrandTextColor,
-    setBrandInputTextColor,
-    setBrandFontFamily,
-    setBrandFontUrl,
-    setBrandLogoUrl,
-    setBrandPlayerBackgroundImageUrl,
-    setBrandProjectorBackgroundImageUrl,
-    setBrandBodyBackgroundColor,
-    setBrandTheme,
-  };
-
-  const applyFromPublicView = useCallback((pv: PublicViewPayload) => {
-    applyAdminBrandingVisualFromPublicView(pv, visualSettersRef.current);
-  }, []);
-
-  const brandThemeVisualSetters = useMemo((): BrandThemeVisualSetters => {
-    return {
-      setProjectorBackground,
-      setVoteQuestionTextColor,
-      setVoteOptionTextColor,
-      setVoteProgressTrackColor,
-      setVoteProgressBarColor,
-      setPlayerVoteOptionTextColor,
-      setPlayerVoteProgressTrackColor,
-      setPlayerVoteProgressBarColor,
-      setBrandPrimaryColor,
-      setBrandAccentColor,
-      setBrandSurfaceColor,
-      setBrandTextColor,
-      setBrandInputTextColor,
-      setBrandFontFamily,
-      setBrandFontUrl,
-      setBrandLogoUrl,
-      setBrandPlayerBackgroundImageUrl,
-      setBrandProjectorBackgroundImageUrl,
-      setBrandBodyBackgroundColor,
-      setSpeakerTileBackgroundColor: (value) =>
-        tileBrandSettersRef.current.setSpeakerTileBackgroundColor(value),
-      setSpeakerTileTextColor: (value) =>
-        tileBrandSettersRef.current.setSpeakerTileTextColor(value),
-      setProgramTileBackgroundColor: (value) =>
-        tileBrandSettersRef.current.setProgramTileBackgroundColor(value),
-      setProgramTileTextColor: (value) =>
-        tileBrandSettersRef.current.setProgramTileTextColor(value),
-    };
-  }, [
-    setProjectorBackground,
-    setVoteQuestionTextColor,
-    setVoteOptionTextColor,
-    setVoteProgressTrackColor,
-    setVoteProgressBarColor,
-    setPlayerVoteOptionTextColor,
-    setPlayerVoteProgressTrackColor,
-    setPlayerVoteProgressBarColor,
-    setBrandPrimaryColor,
-    setBrandAccentColor,
-    setBrandSurfaceColor,
-    setBrandTextColor,
-    setBrandInputTextColor,
-    setBrandFontFamily,
-    setBrandFontUrl,
-    setBrandLogoUrl,
-    setBrandPlayerBackgroundImageUrl,
-    setBrandProjectorBackgroundImageUrl,
-    setBrandBodyBackgroundColor,
-    tileBrandSettersRef,
-  ]);
+  const applyFromPublicView = useCallback(
+    (pv: PublicViewPayload) => {
+      editor.applyFromPublicView(pv, tileBrandSettersRef.current);
+    },
+    [editor.applyFromPublicView, tileBrandSettersRef],
+  );
 
   const handleBrandThemeChange = useCallback(
     (theme: BrandThemeId) => {
-      if (theme === brandTheme) return;
-      const patch = getBrandThemePatchForTheme(theme);
-      setBrandTheme(theme);
-      applyBrandThemeVisualSetters(patch, brandThemeVisualSetters);
-      emitBrandingPatchRef.current(patch);
+      if (theme === editor.brandTheme) return;
+      editor.applyBrandThemeLocally(theme);
+      emitBrandingPatchRef.current(getBrandThemePatchForTheme(theme));
     },
-    [brandTheme, brandThemeVisualSetters, emitBrandingPatchRef],
+    [editor, emitBrandingPatchRef],
   );
 
   return {
-    projectorBackground,
-    setProjectorBackground,
-    cloudQuestionColor,
-    setCloudQuestionColor,
-    cloudTagColors,
-    setCloudTagColors,
-    cloudTopTagColor,
-    setCloudTopTagColor,
-    cloudCorrectTagColor,
-    setCloudCorrectTagColor,
-    cloudDensity,
-    setCloudDensity,
-    cloudTagPadding,
-    setCloudTagPadding,
-    cloudSpiral,
-    setCloudSpiral,
-    cloudAnimationStrength,
-    setCloudAnimationStrength,
-    voteQuestionTextColor,
-    setVoteQuestionTextColor,
-    voteOptionTextColor,
-    setVoteOptionTextColor,
-    voteOptionBorderColor,
-    setVoteOptionBorderColor,
-    voteProgressTrackColor,
-    setVoteProgressTrackColor,
-    voteProgressBarColor,
-    setVoteProgressBarColor,
-    playerVoteOptionTextColor,
-    setPlayerVoteOptionTextColor,
-    playerVoteProgressTrackColor,
-    setPlayerVoteProgressTrackColor,
-    playerVoteProgressBarColor,
-    setPlayerVoteProgressBarColor,
-    brandPrimaryColor,
-    setBrandPrimaryColor,
-    brandAccentColor,
-    setBrandAccentColor,
-    brandSurfaceColor,
-    setBrandSurfaceColor,
-    brandTextColor,
-    setBrandTextColor,
-    brandInputTextColor,
-    setBrandInputTextColor,
-    brandFontFamily,
-    setBrandFontFamily,
-    brandFontUrl,
-    setBrandFontUrl,
-    brandLogoUrl,
-    setBrandLogoUrl,
-    brandPlayerBackgroundImageUrl,
-    setBrandPlayerBackgroundImageUrl,
-    brandProjectorBackgroundImageUrl,
-    setBrandProjectorBackgroundImageUrl,
-    brandBodyBackgroundColor,
-    setBrandBodyBackgroundColor,
-    brandTheme,
-    setBrandTheme,
+    projectorBackground: editor.projectorBackground,
+    setProjectorBackground: editor.setProjectorBackground,
+    cloudQuestionColor: editor.cloudQuestionColor,
+    setCloudQuestionColor: editor.setCloudQuestionColor,
+    cloudTagColors: editor.cloudTagColors,
+    setCloudTagColors: editor.setCloudTagColors,
+    cloudTopTagColor: editor.cloudTopTagColor,
+    setCloudTopTagColor: editor.setCloudTopTagColor,
+    cloudCorrectTagColor: editor.cloudCorrectTagColor,
+    setCloudCorrectTagColor: editor.setCloudCorrectTagColor,
+    cloudDensity: editor.cloudDensity,
+    setCloudDensity: editor.setCloudDensity,
+    cloudTagPadding: editor.cloudTagPadding,
+    setCloudTagPadding: editor.setCloudTagPadding,
+    cloudSpiral: editor.cloudSpiral,
+    setCloudSpiral: editor.setCloudSpiral,
+    cloudAnimationStrength: editor.cloudAnimationStrength,
+    setCloudAnimationStrength: editor.setCloudAnimationStrength,
+    voteQuestionTextColor: editor.voteQuestionTextColor,
+    setVoteQuestionTextColor: editor.setVoteQuestionTextColor,
+    voteOptionTextColor: editor.voteOptionTextColor,
+    setVoteOptionTextColor: editor.setVoteOptionTextColor,
+    voteOptionBorderColor: editor.voteOptionBorderColor,
+    setVoteOptionBorderColor: editor.setVoteOptionBorderColor,
+    voteProgressTrackColor: editor.voteProgressTrackColor,
+    setVoteProgressTrackColor: editor.setVoteProgressTrackColor,
+    voteProgressBarColor: editor.voteProgressBarColor,
+    setVoteProgressBarColor: editor.setVoteProgressBarColor,
+    playerVoteOptionTextColor: editor.playerVoteOptionTextColor,
+    setPlayerVoteOptionTextColor: editor.setPlayerVoteOptionTextColor,
+    playerVoteProgressTrackColor: editor.playerVoteProgressTrackColor,
+    setPlayerVoteProgressTrackColor: editor.setPlayerVoteProgressTrackColor,
+    playerVoteProgressBarColor: editor.playerVoteProgressBarColor,
+    setPlayerVoteProgressBarColor: editor.setPlayerVoteProgressBarColor,
+    brandPrimaryColor: editor.brandPrimaryColor,
+    setBrandPrimaryColor: editor.setBrandPrimaryColor,
+    brandAccentColor: editor.brandAccentColor,
+    setBrandAccentColor: editor.setBrandAccentColor,
+    brandSurfaceColor: editor.brandSurfaceColor,
+    setBrandSurfaceColor: editor.setBrandSurfaceColor,
+    brandTextColor: editor.brandTextColor,
+    setBrandTextColor: editor.setBrandTextColor,
+    brandInputTextColor: editor.brandInputTextColor,
+    setBrandInputTextColor: editor.setBrandInputTextColor,
+    brandFontFamily: editor.brandFontFamily,
+    setBrandFontFamily: editor.setBrandFontFamily,
+    brandFontUrl: editor.brandFontUrl,
+    setBrandFontUrl: editor.setBrandFontUrl,
+    brandFontUrls: editor.brandFontUrls,
+    setBrandFontUrls: editor.setBrandFontUrls,
+    brandLogoUrl: editor.brandLogoUrl,
+    setBrandLogoUrl: editor.setBrandLogoUrl,
+    brandPlayerBackgroundImageUrl: editor.brandPlayerBackgroundImageUrl,
+    setBrandPlayerBackgroundImageUrl: editor.setBrandPlayerBackgroundImageUrl,
+    brandProjectorBackgroundImageUrl: editor.brandProjectorBackgroundImageUrl,
+    setBrandProjectorBackgroundImageUrl: editor.setBrandProjectorBackgroundImageUrl,
+    brandBodyBackgroundColor: editor.brandBodyBackgroundColor,
+    setBrandBodyBackgroundColor: editor.setBrandBodyBackgroundColor,
+    brandTheme: editor.brandTheme,
+    setBrandTheme: editor.setBrandTheme,
+    projectorJoinQrVisible: editor.projectorJoinQrVisible,
+    setProjectorJoinQrVisible: editor.setProjectorJoinQrVisible,
+    projectorJoinQrText: editor.projectorJoinQrText,
+    setProjectorJoinQrText: editor.setProjectorJoinQrText,
+    projectorJoinQrTextColor: editor.projectorJoinQrTextColor,
+    setProjectorJoinQrTextColor: editor.setProjectorJoinQrTextColor,
+    projectorJoinQrOverlaySizePx: editor.projectorJoinQrOverlaySizePx,
+    setProjectorJoinQrOverlaySizePx: editor.setProjectorJoinQrOverlaySizePx,
+    projectorJoinQrOverlayInsetPx: editor.projectorJoinQrOverlayInsetPx,
+    setProjectorJoinQrOverlayInsetPx: editor.setProjectorJoinQrOverlayInsetPx,
+    projectorJoinQrOverlayCorner: editor.projectorJoinQrOverlayCorner,
+    setProjectorJoinQrOverlayCorner: editor.setProjectorJoinQrOverlayCorner,
     applyFromPublicView,
     handleBrandThemeChange,
+    applyFromEventThemeBranding: editor.applyFromEventThemeBranding,
+    applyBrandThemeLocally: editor.applyBrandThemeLocally,
+    brandThemeVisualSetters: editor.brandThemeVisualSetters,
   };
 }

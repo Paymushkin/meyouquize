@@ -134,6 +134,7 @@ export type QuizState = {
   brandInputTextColor?: string;
   brandFontFamily?: string;
   brandFontUrl?: string;
+  brandFontUrls?: string[];
   brandLogoUrl?: string;
   brandPlayerBackgroundImageUrl?: string;
   brandProjectorBackgroundImageUrl?: string;

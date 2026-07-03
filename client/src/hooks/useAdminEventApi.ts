@@ -24,6 +24,7 @@ import { readCloudManualFromPublicView } from "../features/tagCloudAdmin";
 import type { CloudManualStateByQuestion } from "../publicViewContract";
 import { socket } from "../socket";
 import { parseApiErrorMessage } from "../utils/apiError";
+import { isReservedAdminEventName } from "../features/admin/reservedAdminSegments";
 
 const TAG_CLOUD_MANUAL_DEBOUNCE_MS = 400;
 
@@ -90,6 +91,7 @@ export function useAdminEventApi(params: Params) {
     }
     const promise = (async () => {
       try {
+        if (isReservedAdminEventName(eventName)) return;
         const response = await fetch(`${API_BASE}/api/admin/rooms/${eventName}`, {
           credentials: "include",
         });

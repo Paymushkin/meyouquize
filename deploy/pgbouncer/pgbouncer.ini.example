@@ -12,10 +12,12 @@ listen_addr = 127.0.0.1
 listen_port = 6432
 auth_type = trust
 pool_mode = transaction
-max_client_conn = 300
-default_pool_size = 25
-min_pool_size = 2
-reserve_pool_size = 8
+max_client_conn = 400
+;; Пик submit: сотни параллельных транзакций; cap по max_connections Postgres (оставьте ~30 на superuser/резерв).
+;; 8 CPU / 16 GB, Postgres max_connections≈100: default 50 + reserve 10.
+default_pool_size = 50
+min_pool_size = 5
+reserve_pool_size = 10
 reserve_pool_timeout = 5
 server_reset_query = DISCARD ALL
 ignore_startup_parameters = extra_float_digits,search_path,statement_timeout,lock_timeout,idle_in_transaction_session_timeout

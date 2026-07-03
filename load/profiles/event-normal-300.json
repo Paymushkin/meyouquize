@@ -1,0 +1,19 @@
+{
+  "target_duration_min": 2,
+  "player_count": 300,
+  "join_ramp_ms": 20000,
+  "join_ack_timeout_ms": 25000,
+  "join_fail_tolerance": 2,
+  "vote_window_ms": 63000,
+  "vote_distribution": "normal",
+  "submit_timeout_ms": 45000,
+  "submit_fail_max_rate": 0.05,
+  "post_vote_pause_ms": 1500,
+  "speaker_create_spread_ms": 3500,
+  "speaker_react_spread_ms": 3500,
+  "reaction_spread_ms": 2500,
+  "hold_ms": 26000,
+  "speaker_create_ratio": 0.1,
+  "speaker_react_ratio": 0.3,
+  "reaction_ratio": 0.15
+}

@@ -306,6 +306,7 @@ export function QuizPlayPage() {
     brandLogoUrl,
     brandFontFamily,
     brandFontUrl,
+    brandFontUrls,
     joinMetaLoaded,
     playerAutoJoinRandomNickname,
   } = useQuizPlayMetaBranding({
@@ -504,7 +505,7 @@ export function QuizPlayPage() {
   ]);
   const playerVoteOptionTextColor = quiz?.playerVoteOptionTextColor?.trim() || "#ffffff";
   const playerVoteProgressBarColor = quiz?.playerVoteProgressBarColor?.trim() || "#F3F722";
-  useBrandFont(brandFontFamily, brandFontUrl);
+  useBrandFont(brandFontFamily, brandFontUrl, brandFontUrls);
   useEventFavicon(brandLogoUrl);
   const tileOrder = useMemo(
     () => buildPlayerTilesOrder(quiz?.playerTilesOrder, visiblePlayerBanners),

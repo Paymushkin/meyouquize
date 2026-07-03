@@ -1,4 +1,5 @@
 import { useEffect, useRef } from "react";
+import { isReservedAdminEventName } from "./reservedAdminSegments";
 
 type Params = {
   eventName: string;
@@ -15,12 +16,12 @@ export function useAdminEventBootstrap({ eventName, isAuth, checkSession, loadRo
   loadRoomRef.current = loadRoom;
 
   useEffect(() => {
-    if (!eventName) return;
+    if (!eventName || isReservedAdminEventName(eventName)) return;
     void checkSessionRef.current();
   }, [eventName]);
 
   useEffect(() => {
-    if (!eventName || !isAuth) return;
+    if (!eventName || isReservedAdminEventName(eventName) || !isAuth) return;
 
     let active = true;
     void (async () => {

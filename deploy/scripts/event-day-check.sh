@@ -90,7 +90,7 @@ echo "Ручной чеклист (см. deploy/EVENT-DAY-CHECKLIST.md):"
 echo "  - Hard refresh админки и проектора (Ctrl+Shift+R)"
 echo "  - QR на проекторе / join URL проверен с телефона"
 echo "  - Плитка «Вопросы спикерам» выключена, если не нужна"
-echo "  - Репетиция join: npm run load:event-400 (на preprod)"
+echo "  - Репетиция: npm run load:light (на preprod или тестовой комнате)"
 echo "  - Таймер алертов: systemctl status meyouquize-log-alerts.timer"
 
 exit "${fail}"

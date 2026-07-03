@@ -7,6 +7,7 @@ export type AdminFontEntry = {
   family: string;
   url: string;
   kind: "static" | "variable";
+  fileName?: string;
 };
 
 export function useAdminFontLibrary() {
@@ -21,7 +22,13 @@ export function useAdminFontLibrary() {
     });
     if (!response.ok) return;
     const payload = (await response.json()) as {
-      fonts?: Array<{ id: string; family: string; url: string; kind?: "static" | "variable" }>;
+      fonts?: Array<{
+        id: string;
+        family: string;
+        url: string;
+        kind?: "static" | "variable";
+        fileName?: string;
+      }>;
     };
     setAvailableFonts(
       Array.isArray(payload.fonts)
@@ -29,6 +36,7 @@ export function useAdminFontLibrary() {
             ...font,
             url: resolveClientAssetUrl(font.url),
             kind: font.kind === "variable" ? "variable" : "static",
+            fileName: font.fileName,
           }))
         : [],
     );

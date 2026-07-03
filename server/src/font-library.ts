@@ -2,6 +2,21 @@ import fs from "node:fs";
 import crypto from "node:crypto";
 import path from "node:path";
 
+export function isValidWoff2File(filePath: string): boolean {
+  try {
+    const fd = fs.openSync(filePath, "r");
+    try {
+      const header = Buffer.alloc(4);
+      const bytesRead = fs.readSync(fd, header, 0, 4, 0);
+      return bytesRead === 4 && header.toString("ascii") === "wOF2";
+    } finally {
+      fs.closeSync(fd);
+    }
+  } catch {
+    return false;
+  }
+}
+
 export type StoredFont = {
   id: string;
   family: string;
@@ -101,6 +116,31 @@ export function updateFontRegistryEntry(mediaDir: string, updated: StoredFont) {
   writeFontLibrary(mediaDir, fonts);
 }
 
+export type RegisterFontResult = {
+  font: StoredFont;
+  duplicate: boolean;
+  replacedFamily: boolean;
+  rejected?: "static_blocked_by_variable";
+};
+
+export function deleteFont(mediaDir: string, id: string): StoredFont | null {
+  const current = pruneStaleFontRegistry(mediaDir);
+  const font = current.find((item) => item.id === id);
+  if (!font) return null;
+  const name = localMediaFilename(font.url);
+  if (name) {
+    const filePath = path.join(mediaDir, name);
+    if (fs.existsSync(filePath)) {
+      fs.unlinkSync(filePath);
+    }
+  }
+  writeFontLibrary(
+    mediaDir,
+    current.filter((item) => item.id !== id),
+  );
+  return font;
+}
+
 export function registerFont(params: {
   mediaDir: string;
   fileName: string;
@@ -108,7 +148,7 @@ export function registerFont(params: {
   fileUrl: string;
   family: string;
   kind: "static" | "variable";
-}): { font: StoredFont; duplicate: boolean; replacedFamily: boolean } {
+}): RegisterFontResult {
   const { mediaDir, fileName, filePath, fileUrl, family, kind } = params;
   const bytes = fs.readFileSync(filePath);
   const sha256 = crypto.createHash("sha256").update(bytes).digest("hex");
@@ -131,8 +171,9 @@ export function registerFont(params: {
   ) {
     return {
       font: variableForFamily,
-      duplicate: true,
+      duplicate: false,
       replacedFamily: false,
+      rejected: "static_blocked_by_variable",
     };
   }
   const next: StoredFont = {

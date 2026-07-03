@@ -14,6 +14,12 @@ export default defineConfig({
   },
   server: {
     host: true,
+    proxy: {
+      "/media": {
+        target: "http://localhost:4000",
+        changeOrigin: true,
+      },
+    },
     /**
      * Иначе с http://192.168.x.x:5173 Vite отвечает 403 на /@fs/... (проверка Host).
      * В production-сборке не используется. Узко: allowedHosts: ["192.168.1.8"].

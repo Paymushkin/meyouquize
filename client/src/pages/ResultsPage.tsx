@@ -153,10 +153,17 @@ export function ResultsPage() {
   const brandFontUrl = view.brandFontUrl?.trim()
     ? resolveClientAssetUrl(view.brandFontUrl)
     : undefined;
+  const brandFontUrls = (view.brandFontUrls ?? [])
+    .map((url) => resolveClientAssetUrl(url))
+    .filter((url): url is string => Boolean(url));
   const brandLogoUrl = view.brandLogoUrl?.trim()
     ? resolveClientAssetUrl(view.brandLogoUrl)
     : undefined;
-  useBrandFont(view.brandFontFamily, brandFontUrl);
+  useBrandFont(
+    view.brandFontFamily,
+    brandFontUrl,
+    brandFontUrls.length > 0 ? brandFontUrls : undefined,
+  );
   useEventFavicon(brandLogoUrl);
   const screenSpeakerQuestions = (speakerQuestions?.items ?? [])
     .filter((item) => item.isOnScreen)

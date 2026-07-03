@@ -33,9 +33,22 @@ sudo systemctl enable --now pgbouncer
 3. Переменные в `deploy/env/.env.runtime`:
 
 - **`DATABASE_URL`** — на PgBouncer, **обязательно** параметр `pgbouncer=true` (требование Prisma при `pool_mode=transaction`). Пример:  
-  `postgresql://USER:PASSWORD@127.0.0.1:6432/meyouquize?pgbouncer=true&connection_limit=12`
+  `postgresql://USER:PASSWORD@127.0.0.1:6432/meyouquize?pgbouncer=true&connection_limit=8`
 - **`DIRECT_URL`** — прямое подключение к Postgres для миграций (порт **5432**, без `pgbouncer=true`):  
   `postgresql://USER:PASSWORD@127.0.0.1:5432/meyouquize`
+
+**Размер пула (8 воркеров, peak ~500 submit):**
+
+| Параметр            | Где             | Рекомендация                                                    |
+| ------------------- | --------------- | --------------------------------------------------------------- |
+| `default_pool_size` | `pgbouncer.ini` | **50** (было 25 — узкое горлышко при пике голосования)          |
+| `reserve_pool_size` | `pgbouncer.ini` | **10**                                                          |
+| `max_client_conn`   | `pgbouncer.ini` | **400**                                                         |
+| `connection_limit`  | `DATABASE_URL`  | **8** на воркер (8×8=64 клиента → мультиплексируются в pool 50) |
+
+Правило: `default_pool_size + reserve_pool_size + 15` должно быть **&lt;** `max_connections` Postgres. Клиентов Prisma (`воркеры × connection_limit`) может быть больше pool_size — PgBouncer в `transaction` mode переиспользует backend-соединения.
+
+После правки `pgbouncer.ini`: `sudo systemctl reload pgbouncer` (или `restart`), затем `sudo systemctl restart meyouquize`.
 
 Локально без пула оба URL указывают на один и тот же `:5432`.
 

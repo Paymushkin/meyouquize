@@ -26,6 +26,7 @@ export function useQuizPlayMetaBranding({ slug, quiz }: Params) {
   const [metaBrandLogoUrl, setMetaBrandLogoUrl] = useState("");
   const [metaBrandFontFamily, setMetaBrandFontFamily] = useState("");
   const [metaBrandFontUrl, setMetaBrandFontUrl] = useState("");
+  const [metaBrandFontUrls, setMetaBrandFontUrls] = useState<string[]>([]);
   const [joinMetaLoaded, setJoinMetaLoaded] = useState(!slug);
   const [playerAutoJoinRandomNickname, setPlayerAutoJoinRandomNickname] = useState(false);
 
@@ -63,6 +64,7 @@ export function useQuizPlayMetaBranding({ slug, quiz }: Params) {
           brandLogoUrl?: string;
           brandFontFamily?: string;
           brandFontUrl?: string;
+          brandFontUrls?: string[];
           playerAutoJoinRandomNickname?: boolean;
         };
         if (typeof payload.title === "string") {
@@ -98,6 +100,11 @@ export function useQuizPlayMetaBranding({ slug, quiz }: Params) {
         if (typeof payload.brandFontUrl === "string") {
           setMetaBrandFontUrl(payload.brandFontUrl);
         }
+        if (Array.isArray(payload.brandFontUrls)) {
+          setMetaBrandFontUrls(
+            payload.brandFontUrls.filter((item): item is string => typeof item === "string"),
+          );
+        }
         if (typeof payload.playerAutoJoinRandomNickname === "boolean") {
           setPlayerAutoJoinRandomNickname(payload.playerAutoJoinRandomNickname);
         }
@@ -131,9 +138,13 @@ export function useQuizPlayMetaBranding({ slug, quiz }: Params) {
     if (typeof quiz?.brandFontUrl === "string") {
       setMetaBrandFontUrl(quiz.brandFontUrl);
     }
+    if (Array.isArray(quiz?.brandFontUrls)) {
+      setMetaBrandFontUrls(quiz.brandFontUrls);
+    }
   }, [
     quiz?.brandFontFamily,
     quiz?.brandFontUrl,
+    quiz?.brandFontUrls,
     quiz?.brandLogoUrl,
     quiz?.brandPlayerBackgroundImageUrl,
   ]);
@@ -188,6 +199,13 @@ export function useQuizPlayMetaBranding({ slug, quiz }: Params) {
     () => quiz?.brandFontUrl?.trim() || metaBrandFontUrl.trim() || "",
     [metaBrandFontUrl, quiz?.brandFontUrl],
   );
+  const brandFontUrls = useMemo(() => {
+    if (Array.isArray(quiz?.brandFontUrls) && quiz.brandFontUrls.length > 0) {
+      return quiz.brandFontUrls;
+    }
+    if (metaBrandFontUrls.length > 0) return metaBrandFontUrls;
+    return brandFontUrl ? [brandFontUrl] : [];
+  }, [brandFontUrl, metaBrandFontUrls, quiz?.brandFontUrls]);
 
   return {
     titleText,
@@ -201,6 +219,7 @@ export function useQuizPlayMetaBranding({ slug, quiz }: Params) {
     brandLogoUrl,
     brandFontFamily,
     brandFontUrl,
+    brandFontUrls,
     joinMetaLoaded,
     playerAutoJoinRandomNickname,
   };
