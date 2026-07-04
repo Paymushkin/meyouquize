@@ -196,4 +196,29 @@ describe("useQuizPlayQuestionFlow", () => {
     act(() => result.current.toggleOption("o2"));
     expect(result.current.canSubmit).toBe(false);
   });
+
+  it("shows room votes in LIFO order and advances after submit", () => {
+    const q1 = makeQuestion({ id: "q1", text: "First enabled" });
+    const q2 = makeQuestion({ id: "q2", text: "Second enabled" });
+    const quiz = makeQuiz({
+      quizProgress: undefined,
+      activeQuestion: q2,
+      activeQuestions: [q2, q1],
+    });
+    const { result, rerender } = renderHook(
+      ({ submittedQuestionIds }) =>
+        useQuizPlayQuestionFlow({
+          quiz,
+          submittedQuestionIds,
+          submittedAnswers: {},
+          playerAnswersHydrated: true,
+        }),
+      { initialProps: { submittedQuestionIds: [] as string[] } },
+    );
+
+    expect(result.current.nonQuizActiveQuestion?.id).toBe("q2");
+
+    rerender({ submittedQuestionIds: ["q2"] });
+    expect(result.current.nonQuizActiveQuestion?.id).toBe("q1");
+  });
 });

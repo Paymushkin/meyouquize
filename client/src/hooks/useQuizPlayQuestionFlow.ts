@@ -2,6 +2,7 @@ import { expandTagCloudSubmitLines } from "@meyouquize/shared";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { socket } from "../socket";
 import {
+  isRoomMultiActiveFlow,
   isSubQuizAutoFlow,
   resolveQuizProgressForQuestion,
 } from "../pages/quiz-play/resolveQuizProgressDisplay";
@@ -57,11 +58,14 @@ export function useQuizPlayQuestionFlow(params: Params) {
         ? [quiz.activeQuestion]
         : [];
     if (activeList.length === 0) return null;
-    const autoFlow = isSubQuizAutoFlow(quiz.quizProgress) || activeList.length > 1;
-    if (!quiz.quizProgress || autoFlow) {
+    const queueFlow =
+      !quiz.quizProgress ||
+      isSubQuizAutoFlow(quiz.quizProgress) ||
+      isRoomMultiActiveFlow(quiz.quizProgress, activeList.length);
+    if (queueFlow) {
       return activeList.find((q) => !submittedQuestionIds.includes(q.id)) ?? null;
     }
-    return quiz.activeQuestion;
+    return quiz.activeQuestion ?? null;
   }, [quiz, submittedQuestionIds]);
 
   useEffect(() => {

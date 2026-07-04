@@ -82,6 +82,7 @@ function parseTagAnswers(raw: string, comparable: boolean) {
   return tags;
 }
 
+/** Сабквиз: порядок по времени включения (старые раньше в списке). */
 function sortActiveQuestionsByActivation<T extends { activatedAt: Date | null; order: number }>(
   questions: T[],
 ): T[] {
@@ -89,6 +90,18 @@ function sortActiveQuestionsByActivation<T extends { activatedAt: Date | null; o
     const aTs = a.activatedAt?.getTime() ?? Number.POSITIVE_INFINITY;
     const bTs = b.activatedAt?.getTime() ?? Number.POSITIVE_INFINITY;
     if (aTs !== bTs) return aTs - bTs;
+    return a.order - b.order;
+  });
+}
+
+/** Голосования комнаты: последнее включённое — первым в очереди игрока (LIFO). */
+function sortActiveRoomQuestionsByActivationLifo<
+  T extends { activatedAt: Date | null; order: number },
+>(questions: T[]): T[] {
+  return [...questions].sort((a, b) => {
+    const aTs = a.activatedAt?.getTime() ?? 0;
+    const bTs = b.activatedAt?.getTime() ?? 0;
+    if (bTs !== aTs) return bTs - aTs;
     return a.order - b.order;
   });
 }
@@ -891,8 +904,15 @@ export async function getQuizPublicState(quizId: string) {
     orderBy: { sortOrder: "asc" },
     select: { id: true, title: true },
   });
-  const activeQuestions = sortActiveQuestionsByActivation(quiz.questions.filter((q) => q.isActive));
+  const allActiveQuestions = quiz.questions.filter((q) => q.isActive);
   const primarySubQuizQuestion = pickPrimaryActiveSubQuizQuestion(quiz.questions);
+  const activeQuestions = primarySubQuizQuestion
+    ? sortActiveQuestionsByActivation(
+        allActiveQuestions.filter((q) => q.subQuizId === primarySubQuizQuestion.subQuizId),
+      )
+    : sortActiveRoomQuestionsByActivationLifo(
+        allActiveQuestions.filter((q) => q.subQuizId == null),
+      );
   const activeQuestion = primarySubQuizQuestion ?? activeQuestions[0];
   let quizProgress: QuizProgressPayload | null = null;
   const view = prunePublicViewForRoomContent(
@@ -2390,20 +2410,37 @@ export async function setQuestionEnabled(quizId: string, questionId: string, ena
   if (!question) throw new Error("Question not found");
 
   if (enabled) {
-    await prisma.$transaction([
-      prisma.question.updateMany({
-        where: { quizId, id: { not: questionId } },
-        data: { isActive: false, isClosed: true },
-      }),
-      prisma.question.update({
-        where: { id: questionId },
-        data: { isActive: true, isClosed: false, activatedAt: new Date() },
-      }),
-      prisma.quiz.update({
-        where: { id: quizId },
-        data: { status: QuizStatus.LIVE },
-      }),
-    ]);
+    if (question.subQuizId == null) {
+      await prisma.$transaction([
+        prisma.question.updateMany({
+          where: { quizId, subQuizId: { not: null } },
+          data: { isActive: false, isClosed: true },
+        }),
+        prisma.question.update({
+          where: { id: questionId },
+          data: { isActive: true, isClosed: false, activatedAt: new Date() },
+        }),
+        prisma.quiz.update({
+          where: { id: quizId },
+          data: { status: QuizStatus.LIVE },
+        }),
+      ]);
+    } else {
+      await prisma.$transaction([
+        prisma.question.updateMany({
+          where: { quizId, id: { not: questionId } },
+          data: { isActive: false, isClosed: true },
+        }),
+        prisma.question.update({
+          where: { id: questionId },
+          data: { isActive: true, isClosed: false, activatedAt: new Date() },
+        }),
+        prisma.quiz.update({
+          where: { id: quizId },
+          data: { status: QuizStatus.LIVE },
+        }),
+      ]);
+    }
     if (question.subQuizId) {
       const ordered = await prisma.question.findMany({
         where: { subQuizId: question.subQuizId },

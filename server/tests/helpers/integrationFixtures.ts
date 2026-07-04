@@ -44,6 +44,31 @@ export async function seedSingleChoiceQuiz(slug?: string) {
   return { eventName, quizId: room.id, subQuizId: subQuiz.id, question, room };
 }
 
+export async function seedStandaloneVoteRoom(voteCount = 3, slug?: string) {
+  const eventName = slug ?? uniqueSlug("room-votes");
+  await createRoom({ eventName, title: `Room ${eventName}` });
+  await replaceRoomContent(eventName, {
+    subQuizzes: [],
+    standaloneQuestions: Array.from({ length: voteCount }, (_, index) => ({
+      text: `Vote ${index + 1}`,
+      type: "single" as const,
+      points: 0,
+      scoringMode: "poll" as const,
+      options: [
+        { text: "Option A", isCorrect: false },
+        { text: "Option B", isCorrect: false },
+      ],
+    })),
+  });
+  const room = await getRoomByEventName(eventName);
+  if (!room) throw new Error("Room not found after seed");
+  const questions = room.questions.filter((q) => q.subQuizId == null);
+  if (questions.length !== voteCount) {
+    throw new Error(`Expected ${voteCount} standalone questions`);
+  }
+  return { eventName, quizId: room.id, questions, room };
+}
+
 export async function activateQuestion(quizId: string, questionId: string) {
   await setQuestionEnabled(quizId, questionId, true);
 }

@@ -25,6 +25,12 @@ describe("resolveQuizProgressDisplay", () => {
     expect(isRoomMultiActiveFlow({ ...baseProgress, questionFlowMode: "manual" }, 3)).toBe(false);
   });
 
+  it("detects room multi-vote flow without sub-quiz progress", () => {
+    expect(isRoomMultiActiveFlow(null, 1)).toBe(false);
+    expect(isRoomMultiActiveFlow(undefined, 2)).toBe(true);
+    expect(isRoomMultiActiveFlow(undefined, 5)).toBe(true);
+  });
+
   it("uses stepIndex on activeQuestion when order list is missing", () => {
     const progress = { ...baseProgress, orderedQuestionIds: undefined as unknown as string[] };
     const out = resolveQuizProgressForQuestion(progress, "q2", {

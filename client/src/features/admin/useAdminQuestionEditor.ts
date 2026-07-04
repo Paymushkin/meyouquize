@@ -556,11 +556,13 @@ export function useAdminQuestionEditor({
     });
     if (enabled) {
       setQuestionId(question.id);
+      const isStandaloneVote = question.subQuizId == null;
       setQuestionForms((prev) =>
-        prev.map((q, idx) => ({
-          ...q,
-          isActive: idx === questionIndex,
-        })),
+        prev.map((q, idx) => {
+          if (idx === questionIndex) return { ...q, isActive: true };
+          if (isStandaloneVote && q.subQuizId == null) return q;
+          return { ...q, isActive: false };
+        }),
       );
     } else {
       setQuestionForms((prev) =>
