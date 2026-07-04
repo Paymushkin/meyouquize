@@ -1,4 +1,3 @@
-import { Typography } from "@mui/material";
 import { AdminPhotoWallSection } from "../../components/admin/AdminPhotoWallSection";
 import type { useAdminPhotoWall } from "../../features/admin/useAdminPhotoWall";
 import type { PublicViewMode } from "../../publicViewContract";
@@ -29,9 +28,6 @@ export function AdminEventPhotoWallTab({
 }: AdminEventPhotoWallTabProps) {
   return (
     <>
-      <Typography variant="h6" sx={{ mb: 2 }}>
-        Фотостена
-      </Typography>
       <AdminPhotoWallSection
         baseUrl={baseUrl}
         imageCount={imageCount}

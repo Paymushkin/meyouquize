@@ -1,26 +1,12 @@
 import { useCallback, useState } from "react";
 import CloseIcon from "@mui/icons-material/Close";
 import DownloadIcon from "@mui/icons-material/Download";
-import {
-  Box,
-  CircularProgress,
-  Dialog,
-  DialogContent,
-  DialogTitle,
-  IconButton,
-  Stack,
-  Typography,
-} from "@mui/material";
+import { Box, Dialog, DialogContent, IconButton, Typography } from "@mui/material";
 import type { PhotoWallAlbumPhoto } from "@meyouquize/shared";
-import {
-  downloadPhotoWallImage,
-  photoWallDownloadFilename,
-} from "../../features/quizPlay/downloadPhotoWallImage";
-import {
-  PLAYER_DIALOG_SECONDARY_TEXT,
-  PLAYER_DIALOG_TITLE_SX,
-  buildPlayerDialogPaperSx,
-} from "./playerDialogStyles";
+import Lightbox from "yet-another-react-lightbox";
+import "yet-another-react-lightbox/styles.css";
+import { photoWallDownloadFilename } from "../../features/quizPlay/downloadPhotoWallImage";
+import { PLAYER_DIALOG_SECONDARY_TEXT, buildPlayerDialogPaperSx } from "./playerDialogStyles";
 
 type Props = {
   open: boolean;
@@ -30,96 +16,92 @@ type Props = {
 };
 
 export function PlayerPhotoWallDialog({ open, photos, brandFontFamily, onClose }: Props) {
-  const [downloadingKey, setDownloadingKey] = useState<string | null>(null);
+  const [lightboxIndex, setLightboxIndex] = useState(-1);
 
-  const handleDownload = useCallback(async (photo: PhotoWallAlbumPhoto) => {
-    setDownloadingKey(photo.key);
-    try {
-      await downloadPhotoWallImage(photo);
-    } finally {
-      setDownloadingKey((current) => (current === photo.key ? null : current));
-    }
-  }, []);
+  const handleCloseDialog = useCallback(() => {
+    setLightboxIndex(-1);
+    onClose();
+  }, [onClose]);
+
+  const slides = photos.map((photo) => ({
+    src: photo.src,
+    alt: `Фото ${photo.index}`,
+  }));
 
   return (
-    <Dialog
-      open={open}
-      onClose={onClose}
-      fullScreen
-      scroll="paper"
-      PaperProps={{
-        sx: {
-          ...buildPlayerDialogPaperSx(brandFontFamily),
-          borderRadius: 0,
-        },
-      }}
-    >
-      <DialogTitle sx={{ ...PLAYER_DIALOG_TITLE_SX, flexShrink: 0, px: 2, pt: 2, pb: 1 }}>
-        <Stack spacing={0.25}>
-          <Typography component="span" variant="h6" sx={{ fontSize: "1.05rem", fontWeight: 600 }}>
-            Фотографии
-          </Typography>
-          {photos.length > 0 ? (
-            <Typography component="span" variant="caption" sx={PLAYER_DIALOG_SECONDARY_TEXT}>
-              {photos.length} фото
-            </Typography>
-          ) : null}
-        </Stack>
-        <IconButton aria-label="Закрыть" onClick={onClose} size="small" sx={{ color: "#fff" }}>
-          <CloseIcon fontSize="small" />
-        </IconButton>
-      </DialogTitle>
-      <DialogContent
-        sx={{
-          flex: 1,
-          px: { xs: 1.5, sm: 2 },
-          pt: 0,
-          pb: { xs: 2, sm: 2.5 },
-          color: "#fff",
-          overflow: "auto",
+    <>
+      <Dialog
+        open={open}
+        onClose={handleCloseDialog}
+        fullScreen
+        scroll="paper"
+        PaperProps={{
+          sx: {
+            ...buildPlayerDialogPaperSx(brandFontFamily),
+            borderRadius: 0,
+          },
         }}
       >
-        {photos.length === 0 ? (
-          <Typography variant="body2" sx={PLAYER_DIALOG_SECONDARY_TEXT}>
-            Фотографии недоступны
-          </Typography>
-        ) : (
-          <Box
-            sx={{
-              display: "grid",
-              gridTemplateColumns: {
-                xs: "repeat(3, minmax(0, 1fr))",
-                sm: "repeat(4, minmax(0, 1fr))",
-                md: "repeat(5, minmax(0, 1fr))",
-              },
-              gap: { xs: 0.75, sm: 1 },
-            }}
+        <Box
+          sx={{
+            position: "sticky",
+            top: 0,
+            zIndex: 1,
+            display: "flex",
+            justifyContent: "flex-end",
+            px: 1,
+            pt: 1,
+            pb: 0.5,
+          }}
+        >
+          <IconButton
+            aria-label="Закрыть"
+            onClick={handleCloseDialog}
+            size="small"
+            sx={{ color: "#fff" }}
           >
-            {photos.map((photo) => {
-              const isDownloading = downloadingKey === photo.key;
-              const downloadName = photoWallDownloadFilename(photo);
-              return (
-                <Box
-                  key={photo.key}
-                  sx={{
-                    position: "relative",
-                    aspectRatio: "1 / 1",
-                    overflow: "hidden",
-                    borderRadius: 1,
-                  }}
-                >
+            <CloseIcon fontSize="small" />
+          </IconButton>
+        </Box>
+        <DialogContent
+          sx={{
+            flex: 1,
+            px: { xs: 1.5, sm: 2 },
+            pt: 0,
+            pb: { xs: 2, sm: 2.5 },
+            color: "#fff",
+            overflow: "auto",
+          }}
+        >
+          {photos.length === 0 ? (
+            <Typography variant="body2" sx={PLAYER_DIALOG_SECONDARY_TEXT}>
+              Фотографии недоступны
+            </Typography>
+          ) : (
+            <Box
+              sx={{
+                display: "grid",
+                gridTemplateColumns: {
+                  xs: "repeat(3, minmax(0, 1fr))",
+                  sm: "repeat(4, minmax(0, 1fr))",
+                  md: "repeat(5, minmax(0, 1fr))",
+                },
+                gap: { xs: 0.75, sm: 1 },
+              }}
+            >
+              {photos.map((photo, index) => {
+                const downloadName = photoWallDownloadFilename(photo);
+                return (
                   <Box
-                    component="a"
-                    href={photo.src}
-                    download={downloadName}
-                    rel="noopener noreferrer"
+                    key={photo.key}
                     sx={{
-                      display: "block",
-                      width: "100%",
-                      height: "100%",
-                      textDecoration: "none",
-                      color: "inherit",
+                      position: "relative",
+                      aspectRatio: "1 / 1",
+                      overflow: "hidden",
+                      borderRadius: 1,
+                      cursor: "pointer",
                     }}
+                    onClick={() => setLightboxIndex(index)}
                   >
                     <Box
                       component="img"
@@ -134,49 +116,47 @@ export function PlayerPhotoWallDialog({ open, photos, brandFontFamily, onClose }
                         objectPosition: "center",
                       }}
                     />
-                  </Box>
-                  <IconButton
-                    component="a"
-                    href={photo.src}
-                    download={downloadName}
-                    rel="noopener noreferrer"
-                    aria-label={`Скачать фото ${photo.index}`}
-                    size="small"
-                    disabled={isDownloading}
-                    onClick={(event) => {
-                      event.preventDefault();
-                      void handleDownload(photo);
-                    }}
-                    sx={{
-                      position: "absolute",
-                      right: 4,
-                      bottom: 4,
-                      width: 28,
-                      height: 28,
-                      p: 0.5,
-                      bgcolor: "rgba(0, 0, 0, 0.45)",
-                      color: "#fff",
-                      "&:hover": {
-                        bgcolor: "rgba(0, 0, 0, 0.62)",
-                      },
-                      "&.Mui-disabled": {
+                    <IconButton
+                      component="a"
+                      href={photo.src}
+                      download={downloadName}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      aria-label={`Скачать фото ${photo.index}`}
+                      size="small"
+                      onClick={(event) => event.stopPropagation()}
+                      sx={{
+                        position: "absolute",
+                        right: 4,
+                        bottom: 4,
+                        width: 28,
+                        height: 28,
+                        p: 0.5,
                         bgcolor: "rgba(0, 0, 0, 0.45)",
                         color: "#fff",
-                      },
-                    }}
-                  >
-                    {isDownloading ? (
-                      <CircularProgress size={14} color="inherit" />
-                    ) : (
+                        "&:hover": {
+                          bgcolor: "rgba(0, 0, 0, 0.62)",
+                        },
+                      }}
+                    >
                       <DownloadIcon sx={{ width: 16, height: 16 }} />
-                    )}
-                  </IconButton>
-                </Box>
-              );
-            })}
-          </Box>
-        )}
-      </DialogContent>
-    </Dialog>
+                    </IconButton>
+                  </Box>
+                );
+              })}
+            </Box>
+          )}
+        </DialogContent>
+      </Dialog>
+      <Lightbox
+        open={lightboxIndex >= 0}
+        index={lightboxIndex}
+        close={() => setLightboxIndex(-1)}
+        slides={slides}
+        carousel={{ finite: false }}
+        controller={{ closeOnBackdropClick: true }}
+        on={{ view: ({ index }) => setLightboxIndex(index) }}
+      />
+    </>
   );
 }
