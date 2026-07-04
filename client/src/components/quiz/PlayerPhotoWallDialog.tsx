@@ -8,6 +8,17 @@ import "yet-another-react-lightbox/styles.css";
 import { photoWallDownloadFilename } from "../../features/quizPlay/downloadPhotoWallImage";
 import { PLAYER_DIALOG_SECONDARY_TEXT, buildPlayerDialogPaperSx } from "./playerDialogStyles";
 
+const PHOTO_DOWNLOAD_BUTTON_SX = {
+  width: 36,
+  height: 36,
+  p: 0.75,
+  bgcolor: "rgba(0, 0, 0, 0.45)",
+  color: "#fff",
+  "&:hover": {
+    bgcolor: "rgba(0, 0, 0, 0.62)",
+  },
+} as const;
+
 type Props = {
   open: boolean;
   photos: PhotoWallAlbumPhoto[];
@@ -27,6 +38,29 @@ export function PlayerPhotoWallDialog({ open, photos, brandFontFamily, onClose }
     src: photo.src,
     alt: `Фото ${photo.index}`,
   }));
+
+  const renderPhotoDownloadButton = (photo: PhotoWallAlbumPhoto, size: number) => {
+    const downloadName = photoWallDownloadFilename(photo);
+    return (
+      <IconButton
+        component="a"
+        href={photo.src}
+        download={downloadName}
+        target="_blank"
+        rel="noopener noreferrer"
+        aria-label={`Скачать фото ${photo.index}`}
+        size="small"
+        onClick={(event) => event.stopPropagation()}
+        sx={{
+          ...PHOTO_DOWNLOAD_BUTTON_SX,
+          width: size,
+          height: size,
+        }}
+      >
+        <DownloadIcon sx={{ width: size * 0.57, height: size * 0.57 }} />
+      </IconButton>
+    );
+  };
 
   return (
     <>
@@ -90,7 +124,6 @@ export function PlayerPhotoWallDialog({ open, photos, brandFontFamily, onClose }
               }}
             >
               {photos.map((photo, index) => {
-                const downloadName = photoWallDownloadFilename(photo);
                 return (
                   <Box
                     key={photo.key}
@@ -116,31 +149,9 @@ export function PlayerPhotoWallDialog({ open, photos, brandFontFamily, onClose }
                         objectPosition: "center",
                       }}
                     />
-                    <IconButton
-                      component="a"
-                      href={photo.src}
-                      download={downloadName}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      aria-label={`Скачать фото ${photo.index}`}
-                      size="small"
-                      onClick={(event) => event.stopPropagation()}
-                      sx={{
-                        position: "absolute",
-                        right: 4,
-                        bottom: 4,
-                        width: 28,
-                        height: 28,
-                        p: 0.5,
-                        bgcolor: "rgba(0, 0, 0, 0.45)",
-                        color: "#fff",
-                        "&:hover": {
-                          bgcolor: "rgba(0, 0, 0, 0.62)",
-                        },
-                      }}
-                    >
-                      <DownloadIcon sx={{ width: 16, height: 16 }} />
-                    </IconButton>
+                    <Box sx={{ position: "absolute", right: 4, bottom: 4 }}>
+                      {renderPhotoDownloadButton(photo, 28)}
+                    </Box>
                   </Box>
                 );
               })}
@@ -156,6 +167,17 @@ export function PlayerPhotoWallDialog({ open, photos, brandFontFamily, onClose }
         carousel={{ finite: false }}
         controller={{ closeOnBackdropClick: true }}
         on={{ view: ({ index }) => setLightboxIndex(index) }}
+        render={{
+          slideFooter: ({ slide }) => {
+            const photo = photos.find((item) => item.src === slide.src);
+            if (!photo) return null;
+            return (
+              <Box sx={{ position: "absolute", right: 16, bottom: 20, zIndex: 2 }}>
+                {renderPhotoDownloadButton(photo, 36)}
+              </Box>
+            );
+          },
+        }}
       />
     </>
   );
