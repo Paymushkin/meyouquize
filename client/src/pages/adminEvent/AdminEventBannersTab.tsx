@@ -7,6 +7,7 @@ export type AdminEventBannersTabProps = {
   subQuizzesForReport: Array<{ id: string; title: string }>;
   brandPrimaryColor: string;
   playerVoteOptionTextColor: string;
+  photoWallCollageSrcs: string[];
   uploadBannerMedia: (file: File) => Promise<string>;
   onUploadError: (message: string) => void;
 };
@@ -17,6 +18,7 @@ export function AdminEventBannersTab({
   subQuizzesForReport,
   brandPrimaryColor,
   playerVoteOptionTextColor,
+  photoWallCollageSrcs,
   uploadBannerMedia,
   onUploadError,
 }: AdminEventBannersTabProps) {
@@ -44,6 +46,7 @@ export function AdminEventBannersTab({
       subQuizzesForReport={subQuizzesForReport}
       brandPrimaryColor={brandPrimaryColor}
       playerVoteOptionTextColor={playerVoteOptionTextColor}
+      photoWallCollageSrcs={photoWallCollageSrcs}
       bannerClickCounts={playerTiles.bannerClickCounts}
       tilesOrder={playerTiles.playerTilesOrder}
       onMoveTileUp={(id) => playerTiles.moveTile(id, -1)}

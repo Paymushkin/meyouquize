@@ -8,6 +8,7 @@ import {
   projectorPublicViewChanged,
   isPlayerOnlyPublicViewPatch,
   isPlayerOnlyPublicViewStateKey,
+  pickProjectorPublicViewState,
 } from "./projectorPublicView.js";
 
 describe("projectorPublicViewChanged", () => {
@@ -152,6 +153,24 @@ describe("projectorPublicViewChanged", () => {
     });
     const next = mergePublicViewState(prev, { randomizerTitle: "Новый" });
     expect(projectorPublicViewChanged(prev, next)).toBe(false);
+  });
+
+  it("returns true when photo wall settings change", () => {
+    const prev = normalizePublicViewState({ mode: "photo_wall", photoWallImageCount: 3 });
+    const next = mergePublicViewState(prev, { photoWallImageCount: 5 });
+    expect(projectorPublicViewChanged(prev, next)).toBe(true);
+  });
+
+  it("picks photo_wall mode keys for projector", () => {
+    const view = normalizePublicViewState({
+      mode: "photo_wall",
+      photoWallBaseUrl: "https://storage.yandexcloud.net/b/w/",
+      photoWallImageCount: 2,
+    });
+    const picked = pickProjectorPublicViewState(view);
+    expect(picked.mode).toBe("photo_wall");
+    expect(picked.photoWallImageCount).toBe(2);
+    expect(picked.photoWallBaseUrl).toBe("https://storage.yandexcloud.net/b/w/");
   });
 });
 

@@ -15,7 +15,14 @@ import {
 type EmitPatch = (patch: PublicViewSetPatch) => void;
 
 type SetPublicResultsView = (
-  mode: "title" | "question" | "leaderboard" | "speaker_questions" | "reactions" | "randomizer",
+  mode:
+    | "title"
+    | "question"
+    | "leaderboard"
+    | "speaker_questions"
+    | "reactions"
+    | "randomizer"
+    | "photo_wall",
   questionId?: string,
   patch?: PublicViewSetPatch,
 ) => void;

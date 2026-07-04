@@ -7,6 +7,7 @@ import { ProjectorJoinQrBlock } from "../components/projector/ProjectorJoinQrBlo
 import { ProjectorJoinQrOverlay } from "../components/projector/ProjectorJoinQrOverlay";
 import { ProjectorQuestionSection } from "../components/projector/ProjectorQuestionSection";
 import { ProjectorRandomizerSection } from "../components/projector/ProjectorRandomizerSection";
+import { ProjectorPhotoWallSection } from "../components/projector/ProjectorPhotoWallSection";
 import { useResultsProjectorSession } from "../hooks/useResultsProjectorSession";
 import { useProjectorJoinQr } from "../hooks/useProjectorJoinQr";
 import { ProjectorViewportBackground } from "../components/projector/ProjectorViewportBackground";
@@ -146,7 +147,8 @@ export function ResultsPage() {
     view.mode === "leaderboard" ||
     view.mode === "speaker_questions" ||
     view.mode === "reactions" ||
-    view.mode === "randomizer";
+    view.mode === "randomizer" ||
+    view.mode === "photo_wall";
   const brandProjectorBackgroundImageUrl = view.brandProjectorBackgroundImageUrl?.trim()
     ? resolveClientAssetUrl(view.brandProjectorBackgroundImageUrl)
     : undefined;
@@ -206,7 +208,7 @@ export function ResultsPage() {
       ) : null}
       <Container
         maxWidth={false}
-        disableGutters={fullScreenContainer}
+        disableGutters={fullScreenContainer || isFullScreenWidgetMode}
         sx={{
           position: "relative",
           zIndex: 1,
@@ -216,7 +218,7 @@ export function ResultsPage() {
             {
               fontFamily: view.brandFontFamily,
             },
-          ...(!fullScreenContainer
+          ...(!fullScreenContainer && !isFullScreenWidgetMode
             ? {
                 width: "100%",
                 maxWidth: containerContentMaxPx,
@@ -254,10 +256,11 @@ export function ResultsPage() {
                 ? {
                     minHeight: "100dvh",
                     height: "100dvh",
+                    width: "100vw",
+                    maxWidth: "100vw",
                     py: 0,
                     px: 0,
                     overflow: "hidden",
-                    maxWidth: "none",
                     mx: 0,
                   }
                 : { py: 4 }),
@@ -615,6 +618,7 @@ export function ResultsPage() {
           </Stack>
         )}
         {view.mode === "randomizer" && <ProjectorRandomizerSection view={view} />}
+        {view.mode === "photo_wall" && <ProjectorPhotoWallSection view={view} />}
       </Container>
     </>
   );

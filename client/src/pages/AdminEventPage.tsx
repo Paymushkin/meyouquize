@@ -16,6 +16,7 @@ import {
   useAdminRandomizer,
   type AdminSetPublicResultsView,
 } from "../features/admin/useAdminRandomizer";
+import { useAdminPhotoWall } from "../features/admin/useAdminPhotoWall";
 import { useAdminReport } from "../features/admin/useAdminReport";
 import { useAdminReactions } from "../features/admin/useAdminReactions";
 import { useAdminBrandingVisual } from "../features/admin/useAdminBrandingVisual";
@@ -40,6 +41,7 @@ import {
   applyCloudManualToQuestions,
   readCloudManualFromPublicView,
 } from "../features/tagCloudAdmin";
+import { buildPhotoWallAlbumPhotos, photoWallCollagePhotoIndices } from "@meyouquize/shared";
 import { useAdminEventSocket } from "../hooks/useAdminEventSocket";
 import { useAdminEventApi } from "../hooks/useAdminEventApi";
 import { useAdminBrandingProps } from "../hooks/useAdminBrandingProps";
@@ -92,6 +94,7 @@ function isSupportedPublicMode(mode: unknown): mode is PublicViewMode {
     mode === "speaker_questions" ||
     mode === "reactions" ||
     mode === "randomizer" ||
+    mode === "photo_wall" ||
     mode === "report"
   );
 }
@@ -191,7 +194,8 @@ export function AdminEventPage() {
       return parsed.publicViewMode === "leaderboard" ||
         parsed.publicViewMode === "speaker_questions" ||
         parsed.publicViewMode === "reactions" ||
-        parsed.publicViewMode === "randomizer"
+        parsed.publicViewMode === "randomizer" ||
+        parsed.publicViewMode === "photo_wall"
         ? parsed.publicViewMode
         : "title";
     } catch {
@@ -309,6 +313,21 @@ export function AdminEventPage() {
     eventParticipantNicknames,
   });
 
+  const photoWall = useAdminPhotoWall({
+    emitPublicViewPatch: (patch) => emitPublicViewPatchRef.current(patch),
+    setPublicResultsView: (mode, questionId, patch) =>
+      setPublicResultsViewRef.current(mode, questionId, patch),
+  });
+
+  const photoWallCollageSrcs = useMemo(() => {
+    const photos = buildPhotoWallAlbumPhotos({
+      baseUrl: photoWall.baseUrl,
+      count: photoWall.imageCount,
+      ext: photoWall.imageExt,
+    });
+    return photoWallCollagePhotoIndices(photos.length).map((index) => photos[index]!.src);
+  }, [photoWall.baseUrl, photoWall.imageCount, photoWall.imageExt]);
+
   const adminReactions = useAdminReactions({
     eventName,
     quizId,
@@ -332,6 +351,7 @@ export function AdminEventPage() {
   const onPublicViewSocketExtrasRef = useRef<(payload: PublicViewPayload) => void>(() => {});
   applyPublicViewReportRandomizerRef.current = (payload) => {
     randomizer.applyFromPublicView(payload);
+    photoWall.applyFromPublicView(payload);
     adminReport.applyFromPublicView(payload);
   };
   onPublicViewSocketExtrasRef.current = (payload) => {
@@ -744,6 +764,13 @@ export function AdminEventPage() {
     randomizerAnimationPool: randomizer.animationPool,
     randomizerHistory: randomizer.history,
     randomizerRunId: randomizer.runId,
+    photoWallBaseUrl: photoWall.baseUrl,
+    photoWallImageCount: photoWall.imageCount,
+    photoWallImageExt: photoWall.imageExt,
+    photoWallGridColumns: photoWall.gridColumns,
+    photoWallAnimate: photoWall.animate,
+    photoWallKenBurns: photoWall.kenBurns,
+    photoWallTileVisible: photoWall.tileVisible,
     reportTitle: adminReport.reportTitle,
     reportModules: adminReport.reportModules,
     reportVoteQuestionIds: adminReport.reportVoteQuestionIds,
@@ -968,6 +995,7 @@ export function AdminEventPage() {
     }
     speakerQuestions.applyRoomPublicViewSlice(pv);
     randomizer.applyFromPublicView(pv, { roomLoad: true });
+    photoWall.applyFromPublicView(pv);
     adminReport.applyFromPublicView(pv);
     adminReactions.applyFromPublicView(pv);
     const nextBanners = getPublicBanners(pv.playerBanners);
@@ -1552,8 +1580,13 @@ export function AdminEventPage() {
                   subQuizzesForReport,
                   brandPrimaryColor: branding.brandPrimaryColor,
                   playerVoteOptionTextColor: branding.playerVoteOptionTextColor,
+                  photoWallCollageSrcs,
                   uploadBannerMedia,
                   onUploadError: setMessage,
+                }}
+                photoWall={{
+                  publicViewMode,
+                  ...photoWall,
                 }}
                 branding={brandingProps}
                 results={{

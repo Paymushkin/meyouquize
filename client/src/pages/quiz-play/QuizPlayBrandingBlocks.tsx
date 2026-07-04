@@ -1,7 +1,13 @@
 /* eslint-disable react-refresh/only-export-components */
-import { ruBallLabel } from "@meyouquize/shared";
+import {
+  PHOTO_WALL_TILE_ID,
+  PROGRAM_TILE_ID,
+  SPEAKER_TILE_ID,
+  ruBallLabel,
+} from "@meyouquize/shared";
+import { isQuizResultsTileId } from "../../publicViewContract";
+import { PlayerPhotoWallCollageTile } from "../../components/quiz/PlayerPhotoWallCollageTile";
 import { PlayerQuizResultsTile } from "../../components/quiz/PlayerQuizResultsTile";
-import { isQuizResultsTileId, PROGRAM_TILE_ID, SPEAKER_TILE_ID } from "../../publicViewContract";
 import type { PlayerQuizResultsTileModel } from "../../features/quizPlay/playerQuizResults";
 import {
   playerEventTitleSx,
@@ -202,6 +208,9 @@ type PlayerTilesGridProps = {
   programTileTextColor: string;
   programTileLinkUrl: string;
   programTileVisible: boolean;
+  photoWallTileVisible: boolean;
+  photoWallCollageSrcs: string[];
+  onOpenPhotoWall: () => void;
   playerQuizResultsTilesBySubQuizId: Map<string, PlayerQuizResultsTileModel>;
   onOpenQuizReport: (subQuizId: string) => void;
   playerVoteOptionTextColor: string;
@@ -226,6 +235,9 @@ export function PlayerTilesGrid(props: PlayerTilesGridProps) {
     programTileTextColor,
     programTileLinkUrl,
     programTileVisible,
+    photoWallTileVisible,
+    photoWallCollageSrcs,
+    onOpenPhotoWall,
     playerQuizResultsTilesBySubQuizId,
     onOpenQuizReport,
     playerVoteOptionTextColor,
@@ -307,6 +319,16 @@ export function PlayerTilesGrid(props: PlayerTilesGridProps) {
                 {speakerTileText}
               </Typography>
             </Box>
+          );
+        }
+        if (tileId === PHOTO_WALL_TILE_ID) {
+          if (!photoWallTileVisible || photoWallCollageSrcs.length === 0) return null;
+          return (
+            <PlayerPhotoWallCollageTile
+              key={PHOTO_WALL_TILE_ID}
+              photoSrcs={photoWallCollageSrcs}
+              onClick={onOpenPhotoWall}
+            />
           );
         }
         if (tileId === PROGRAM_TILE_ID) {

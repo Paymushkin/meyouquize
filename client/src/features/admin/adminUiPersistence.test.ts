@@ -34,4 +34,16 @@ describe("adminUiPersistence", () => {
       bannersTab: "banner",
     });
   });
+
+  it("migrates legacy photo_wall questions tab to photo_wall section", () => {
+    localStorage.setItem(
+      "mq_admin_ui_v1_demo",
+      JSON.stringify({ tabs: { questions: "photo_wall" } }),
+    );
+
+    expect(readAdminUiPersistence("demo")).toMatchObject({
+      section: "photo_wall",
+      questionsTab: "quizzes",
+    });
+  });
 });

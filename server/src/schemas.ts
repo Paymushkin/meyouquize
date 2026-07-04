@@ -328,6 +328,7 @@ export const setPublicViewSchema = z.object({
       "speaker_questions",
       "reactions",
       "randomizer",
+      "photo_wall",
       "report",
     ])
     .optional(),
@@ -482,6 +483,7 @@ export const setPublicViewSchema = z.object({
     .optional(),
   programTileLinkUrl: optionalExternalHttpUrlSchema,
   programTileVisible: z.boolean().optional(),
+  photoWallTileVisible: z.boolean().optional(),
   playerQuizResultsTileVisible: z.boolean().optional(),
   playerQuizResultsTileText: z.string().trim().max(120).optional(),
   playerQuizResultsTileBackgroundColor: z
@@ -552,6 +554,12 @@ export const setPublicViewSchema = z.object({
     .max(200)
     .optional(),
   randomizerRunId: z.number().int().min(0).max(1000000000).optional(),
+  photoWallBaseUrl: z.string().trim().max(500).optional(),
+  photoWallImageCount: z.number().int().min(0).max(200).optional(),
+  photoWallImageExt: z.enum(["jpeg", "jpg", "png", "webp"]).optional(),
+  photoWallGridColumns: z.number().int().min(0).max(12).optional(),
+  photoWallAnimate: z.boolean().optional(),
+  photoWallKenBurns: z.boolean().optional(),
   reportTitle: z.string().trim().max(120).optional(),
   reportModules: z
     .array(

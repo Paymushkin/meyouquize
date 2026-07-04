@@ -18,6 +18,7 @@ const PLAYER_ONLY_PUBLIC_VIEW_KEYS = [
   "programTileTextColor",
   "programTileLinkUrl",
   "programTileVisible",
+  "photoWallTileVisible",
   "playerQuizResultsTileVisible",
   "playerQuizResultsTileText",
   "playerQuizResultsTileBackgroundColor",
@@ -131,6 +132,15 @@ const RANDOMIZER_MODE_KEYS = [
   "randomizerRunId",
 ] as const satisfies ReadonlyArray<keyof PublicViewState>;
 
+const PHOTO_WALL_MODE_KEYS = [
+  "photoWallBaseUrl",
+  "photoWallImageCount",
+  "photoWallImageExt",
+  "photoWallGridColumns",
+  "photoWallAnimate",
+  "photoWallKenBurns",
+] as const satisfies ReadonlyArray<keyof PublicViewState>;
+
 const REPORT_MODE_KEYS = [
   "reportTitle",
   "reportModules",
@@ -195,6 +205,12 @@ export function pickProjectorPublicViewState(view: PublicViewState): PublicViewS
         mode,
         ...branding,
         ...pickViewKeys(resolved, RANDOMIZER_MODE_KEYS),
+      } as PublicViewState;
+    case "photo_wall":
+      return {
+        mode,
+        ...branding,
+        ...pickViewKeys(resolved, PHOTO_WALL_MODE_KEYS),
       } as PublicViewState;
     case "report":
       return {

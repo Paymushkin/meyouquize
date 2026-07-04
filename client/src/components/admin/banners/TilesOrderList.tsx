@@ -18,6 +18,7 @@ import KeyboardArrowDownIcon from "@mui/icons-material/KeyboardArrowDown";
 import QuestionAnswerIcon from "@mui/icons-material/QuestionAnswer";
 import EventNoteIcon from "@mui/icons-material/EventNote";
 import { isQuizResultsTileId } from "../../../publicViewContract";
+import { PlayerPhotoWallCollageTile } from "../../quiz/PlayerPhotoWallCollageTile";
 import { PlayerQuizResultsTile } from "../../quiz/PlayerQuizResultsTile";
 import type { BannerEditorState, BannerSize, OrderedTile } from "./types";
 
@@ -110,22 +111,24 @@ export function TilesOrderList({
                         }
                       : tile.kind === "quiz_results"
                         ? { flexShrink: 0 }
-                        : {
-                            width: tile.size === "1x1" ? 100 : tile.size === "full" ? 320 : 200,
-                            aspectRatio:
-                              tile.size === "1x1"
-                                ? "1 / 1"
-                                : tile.size === "full"
-                                  ? "4 / 1"
-                                  : "2 / 1",
-                            borderRadius: 1,
-                            border: "1px solid",
-                            borderColor: "divider",
-                            backgroundImage: `url("${tile.previewUrl}")`,
-                            backgroundSize: "cover",
-                            backgroundPosition: "center",
-                            backgroundRepeat: "no-repeat",
-                          }
+                        : tile.kind === "photo_wall"
+                          ? { flexShrink: 0 }
+                          : {
+                              width: tile.size === "1x1" ? 100 : tile.size === "full" ? 320 : 200,
+                              aspectRatio:
+                                tile.size === "1x1"
+                                  ? "1 / 1"
+                                  : tile.size === "full"
+                                    ? "4 / 1"
+                                    : "2 / 1",
+                              borderRadius: 1,
+                              border: "1px solid",
+                              borderColor: "divider",
+                              backgroundImage: `url("${tile.previewUrl}")`,
+                              backgroundSize: "cover",
+                              backgroundPosition: "center",
+                              backgroundRepeat: "no-repeat",
+                            }
                   }
                 >
                   {tile.kind === "speaker" ? (
@@ -180,6 +183,13 @@ export function TilesOrderList({
                       textColor={tile.brandTextColor}
                     />
                   ) : null}
+                  {tile.kind === "photo_wall" ? (
+                    <PlayerPhotoWallCollageTile
+                      preview
+                      previewWidth={100}
+                      photoSrcs={tile.photoSrcs}
+                    />
+                  ) : null}
                 </Box>
                 <Stack spacing={0.5} sx={{ flex: 1, minWidth: 0 }}>
                   <Typography variant="body2">{tile.label}</Typography>
@@ -226,6 +236,11 @@ export function TilesOrderList({
                   {tile.kind === "quiz_results" ? (
                     <Typography variant="caption" color="text.secondary">
                       Плитка 1×1: вкл/выкл в блоке управления квизом («Отчёт игрокам»)
+                    </Typography>
+                  ) : null}
+                  {tile.kind === "photo_wall" ? (
+                    <Typography variant="caption" color="text.secondary">
+                      Плитка 1×1: вкл/выкл на вкладке «Фотостена»
                     </Typography>
                   ) : null}
                   {tile.kind === "banner" && editor.editingId === tile.banner.id ? (

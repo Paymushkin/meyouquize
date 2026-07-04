@@ -6,6 +6,7 @@ import QuizIcon from "@mui/icons-material/Quiz";
 import RecordVoiceOverIcon from "@mui/icons-material/RecordVoiceOver";
 import ReportProblemIcon from "@mui/icons-material/ReportProblem";
 import SettingsSuggestIcon from "@mui/icons-material/SettingsSuggest";
+import PhotoLibraryIcon from "@mui/icons-material/PhotoLibrary";
 import ViewCarouselIcon from "@mui/icons-material/ViewCarousel";
 import type { AdminSection } from "../../features/admin/adminUiPersistence";
 
@@ -20,6 +21,7 @@ export const ADMIN_EVENT_NAV: AdminEventNavItem[] = [
   { id: "questions", label: "Вопросы", icon: <QuizIcon fontSize="small" /> },
   { id: "speakers", label: "Спикеры", icon: <RecordVoiceOverIcon fontSize="small" /> },
   { id: "banners", label: "Баннеры", icon: <ViewCarouselIcon fontSize="small" /> },
+  { id: "photo_wall", label: "Фотостена", icon: <PhotoLibraryIcon fontSize="small" /> },
   { id: "results", label: "Результаты", icon: <InsightsIcon fontSize="small" /> },
   { id: "report", label: "Отчет", icon: <DescriptionIcon fontSize="small" /> },
   { id: "branding", label: "Брендирование", icon: <BrandingWatermarkIcon fontSize="small" /> },

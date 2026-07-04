@@ -30,6 +30,12 @@ export type OrderedTile =
     }
   | {
       id: string;
+      kind: "photo_wall";
+      label: string;
+      photoSrcs: string[];
+    }
+  | {
+      id: string;
       kind: "banner";
       label: string;
       previewUrl: string;

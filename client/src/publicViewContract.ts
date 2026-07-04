@@ -87,6 +87,7 @@ type PublicReactionWidget = {
 };
 
 export const PROGRAM_TILE_ID = "program_tile";
+export { PHOTO_WALL_TILE_ID } from "@meyouquize/shared";
 
 export type PublicViewPayload = SharedPublicViewPayload & {
   reactionsWidgets?: PublicReactionWidget[];

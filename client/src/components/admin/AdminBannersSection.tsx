@@ -47,6 +47,7 @@ type Props = {
   subQuizzesForReport: Array<{ id: string; title: string }>;
   brandPrimaryColor: string;
   playerVoteOptionTextColor: string;
+  photoWallCollageSrcs: string[];
   bannerClickCounts: Record<string, number>;
   tilesOrder: string[];
   onMoveTileUp: (id: string) => void;
@@ -79,6 +80,7 @@ export function AdminBannersSection({
   subQuizzesForReport,
   brandPrimaryColor,
   playerVoteOptionTextColor,
+  photoWallCollageSrcs,
   bannerClickCounts,
   tilesOrder,
   onMoveTileUp,
@@ -102,6 +104,7 @@ export function AdminBannersSection({
     subQuizzesForReport,
     brandPrimaryColor,
     playerVoteOptionTextColor,
+    photoWallCollageSrcs,
     onCreate,
     onUpdate,
     onUploadMedia,

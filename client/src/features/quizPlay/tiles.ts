@@ -1,5 +1,6 @@
 import {
   isQuizResultsTileId,
+  PHOTO_WALL_TILE_ID,
   PROGRAM_TILE_ID,
   SPEAKER_TILE_ID,
   withQuizResultsTileLast,
@@ -37,5 +38,6 @@ export function buildPlayerTilesOrder(
   }
   if (!deduped.includes(SPEAKER_TILE_ID)) deduped.push(SPEAKER_TILE_ID);
   if (!deduped.includes(PROGRAM_TILE_ID)) deduped.push(PROGRAM_TILE_ID);
+  if (!deduped.includes(PHOTO_WALL_TILE_ID)) deduped.push(PHOTO_WALL_TILE_ID);
   return withQuizResultsTileLast([...deduped, ...quizTiles]);
 }

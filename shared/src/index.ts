@@ -1,3 +1,10 @@
+import {
+  clampPhotoWallGridColumns,
+  clampPhotoWallImageCount,
+  sanitizePhotoWallBaseUrl,
+  sanitizePhotoWallImageExt,
+  type PhotoWallImageExt,
+} from "./photoWall.js";
 import type { BrandThemeId } from "./brandThemes.js";
 import type { EventThemeBranding } from "./eventThemeBranding.js";
 import {
@@ -25,6 +32,7 @@ export type QuestionType = "single" | "multi" | "tag_cloud" | "ranking" | "tempe
 export type QuizStatus = "draft" | "live" | "finished";
 export const SPEAKER_TILE_ID = "speaker_tile";
 export const PROGRAM_TILE_ID = "program_tile";
+export const PHOTO_WALL_TILE_ID = "photo_wall_tile";
 /** Плитка 1×1 «Мой квиз» с личным отчётом по сабквизу в интерфейсе игрока */
 export const QUIZ_RESULTS_TILE_ID = "quiz_results_tile";
 
@@ -114,6 +122,7 @@ export type PublicViewMode =
   | "speaker_questions"
   | "reactions"
   | "randomizer"
+  | "photo_wall"
   | "report";
 export type QuestionRevealStage = "options" | "results";
 export type RandomizerMode = "names" | "numbers";
@@ -148,6 +157,40 @@ export {
   applyQuestionResultManualDisplay,
 } from "./tagCloudManual.js";
 export { buildCloudWordsForDisplay, aggregateTagCloudWordCounts } from "./tagCloudMerge.js";
+export type {
+  PhotoWallImageExt,
+  PhotoWallAlbumPhoto,
+  PhotoWallCollageLayout,
+  PhotoWallCollageGridCell,
+} from "./photoWall.js";
+export {
+  PHOTO_WALL_MAX_IMAGE_COUNT,
+  PHOTO_WALL_DEFAULT_IMAGE_EXT,
+  PHOTO_WALL_PHOTO_WIDTH,
+  PHOTO_WALL_PHOTO_HEIGHT,
+  PHOTO_WALL_WATERFALL_MIN_TILES_PER_COLUMN,
+  PHOTO_WALL_COLLAGE_PHOTO_COUNT,
+  PHOTO_WALL_COLLAGE_GAP_PX,
+  PHOTO_WALL_INSERT_INTERVAL_MS,
+  PHOTO_WALL_INSERT_RETRY_MS,
+  PHOTO_WALL_INSERT_DURATION_MS,
+  buildPhotoWallAlbumPhotos,
+  buildPhotoWallImageUrl,
+  buildPhotoWallWaterfallColumnPhotos,
+  clampPhotoWallGridColumns,
+  clampPhotoWallImageCount,
+  photoWallCollagePhotoIndices,
+  resolvePhotoWallCollageLayout,
+  photoWallKenBurnsVariant,
+  photoWallColumnPhotoIndices,
+  photoWallPickInsertPhotoIndex,
+  photoWallSlotPhotoIndex,
+  photoWallTileAspectRatio,
+  photoWallWaterfallScrollDurationSec,
+  resolvePhotoWallColumnCount,
+  sanitizePhotoWallBaseUrl,
+  sanitizePhotoWallImageExt,
+} from "./photoWall.js";
 export type PublicBanner = {
   id: string;
   linkUrl: string;
@@ -255,6 +298,8 @@ export interface PublicViewState {
   programTileLinkUrl: string;
   /** Показывать кнопку "Программа" у пользователя */
   programTileVisible: boolean;
+  /** Показывать плитку фотостены (коллаж) у пользователя */
+  photoWallTileVisible: boolean;
   /** Плитка 1×1 с личным отчётом по квизу (сабквиз) */
   playerQuizResultsTileVisible: boolean;
   playerQuizResultsTileText: string;
@@ -320,6 +365,15 @@ export interface PublicViewState {
   randomizerHistory: RandomizerHistoryEntry[];
   /** Рандомайзер: счётчик запусков (триггер анимации на проекторе) */
   randomizerRunId: number;
+  /** Фотостена: HTTPS-префикс папки в object storage (с / в конце) */
+  photoWallBaseUrl: string;
+  /** Фотостена: число файлов 1..N в папке */
+  photoWallImageCount: number;
+  photoWallImageExt: PhotoWallImageExt;
+  /** 0 = auto-fill по ширине экрана */
+  photoWallGridColumns: number;
+  photoWallAnimate: boolean;
+  photoWallKenBurns: boolean;
   /** Отчет: заголовок публичной страницы */
   reportTitle: string;
   /** Отчет: включенные блоки и их порядок */
@@ -476,13 +530,14 @@ export const DEFAULT_PUBLIC_VIEW_STATE: PublicViewState = {
   programTileTextColor: "#ffffff",
   programTileLinkUrl: "",
   programTileVisible: false,
+  photoWallTileVisible: false,
   playerQuizResultsTileVisible: false,
   playerQuizResultsTileText: "Мой квиз",
   playerQuizResultsTileBackgroundColor: "#2e7d32",
   playerQuizResultsTileTextColor: "#ffffff",
   playerQuizResultsSubQuizId: "",
   playerQuizResultsSubQuizIds: [],
-  playerTilesOrder: [SPEAKER_TILE_ID, PROGRAM_TILE_ID],
+  playerTilesOrder: [SPEAKER_TILE_ID, PROGRAM_TILE_ID, PHOTO_WALL_TILE_ID],
   reactionsOverlayText: "Реакции аудитории",
   reactionsWidgets: [],
   reactionsWidgetStats: [],
@@ -509,6 +564,12 @@ export const DEFAULT_PUBLIC_VIEW_STATE: PublicViewState = {
   randomizerAnimationPool: [],
   randomizerHistory: [],
   randomizerRunId: 0,
+  photoWallBaseUrl: "",
+  photoWallImageCount: 0,
+  photoWallImageExt: "jpeg",
+  photoWallGridColumns: 0,
+  photoWallAnimate: true,
+  photoWallKenBurns: true,
   reportTitle: "Отчет мероприятия",
   reportModules: [
     "event_header",
@@ -1066,6 +1127,7 @@ export function normalizePublicViewState(
     value?.mode === "speaker_questions" ||
     value?.mode === "reactions" ||
     value?.mode === "randomizer" ||
+    value?.mode === "photo_wall" ||
     value?.mode === "report"
       ? value.mode
       : base.mode;
@@ -1095,6 +1157,7 @@ export function normalizePublicViewState(
   const isAllowedTileId = (id: string) =>
     id === SPEAKER_TILE_ID ||
     id === PROGRAM_TILE_ID ||
+    id === PHOTO_WALL_TILE_ID ||
     id === QUIZ_RESULTS_TILE_ID ||
     isQuizResultsTileId(id) ||
     playerBanners.some((x) => x.id === id);
@@ -1118,6 +1181,7 @@ export function normalizePublicViewState(
   }
   if (!deduped.includes(SPEAKER_TILE_ID)) deduped.push(SPEAKER_TILE_ID);
   if (!deduped.includes(PROGRAM_TILE_ID)) deduped.push(PROGRAM_TILE_ID);
+  if (!deduped.includes(PHOTO_WALL_TILE_ID)) deduped.push(PHOTO_WALL_TILE_ID);
   let playerQuizResultsSubQuizIds = sanitizeSubQuizIdList(value?.playerQuizResultsSubQuizIds, 20);
   const legacyReportVisible =
     typeof value?.playerQuizResultsTileVisible === "boolean"
@@ -1306,6 +1370,10 @@ export function normalizePublicViewState(
       typeof value?.programTileVisible === "boolean"
         ? value.programTileVisible
         : base.programTileVisible,
+    photoWallTileVisible:
+      typeof value?.photoWallTileVisible === "boolean"
+        ? value.photoWallTileVisible
+        : base.photoWallTileVisible,
     playerQuizResultsTileText:
       typeof value?.playerQuizResultsTileText === "string"
         ? value.playerQuizResultsTileText.trim().slice(0, 120)
@@ -1443,6 +1511,16 @@ export function normalizePublicViewState(
       : [...base.randomizerAnimationPool],
     randomizerHistory: sanitizeRandomizerHistory(value?.randomizerHistory),
     randomizerRunId: clampInt(value?.randomizerRunId ?? base.randomizerRunId, 0, 1000000000),
+    photoWallBaseUrl: sanitizePhotoWallBaseUrl(value?.photoWallBaseUrl),
+    photoWallImageCount: clampPhotoWallImageCount(value?.photoWallImageCount),
+    photoWallImageExt: sanitizePhotoWallImageExt(value?.photoWallImageExt),
+    photoWallGridColumns: clampPhotoWallGridColumns(value?.photoWallGridColumns),
+    photoWallAnimate:
+      typeof value?.photoWallAnimate === "boolean" ? value.photoWallAnimate : base.photoWallAnimate,
+    photoWallKenBurns:
+      typeof value?.photoWallKenBurns === "boolean"
+        ? value.photoWallKenBurns
+        : base.photoWallKenBurns,
     reportTitle:
       typeof value?.reportTitle === "string"
         ? value.reportTitle.trim().slice(0, 120)

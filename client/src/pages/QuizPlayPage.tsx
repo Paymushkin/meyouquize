@@ -15,7 +15,12 @@ import {
   TextField,
   Typography,
 } from "@mui/material";
-import { ruBallLabel, SPEAKER_TILE_ID } from "@meyouquize/shared";
+import {
+  buildPhotoWallAlbumPhotos,
+  photoWallCollagePhotoIndices,
+  ruBallLabel,
+  SPEAKER_TILE_ID,
+} from "@meyouquize/shared";
 import {
   buildPlayerQuizResultsTilesForPlayer,
   resolveEnabledQuizReportSubQuizIds,
@@ -31,6 +36,7 @@ import {
 } from "../features/speakerQuestions/speakerTargetUi";
 import { PlayerVoteResultsDialog } from "../components/quiz/PlayerVoteResultsDialog";
 import { PlayerQuizReportDialog } from "../components/quiz/PlayerQuizReportDialog";
+import { PlayerPhotoWallDialog } from "../components/quiz/PlayerPhotoWallDialog";
 import {
   PLAYER_DIALOG_CONTENT_SX,
   PLAYER_DIALOG_TITLE_SX,
@@ -101,6 +107,7 @@ export function QuizPlayPage() {
   const [resultsDialogQuestionId, setResultsDialogQuestionId] = useState<string | null>(null);
   const [quizReportOpen, setQuizReportOpen] = useState(false);
   const [quizReportSubQuizId, setQuizReportSubQuizId] = useState("");
+  const [photoWallDialogOpen, setPhotoWallDialogOpen] = useState(false);
   const [bootLoading, setBootLoading] = useState(() => Boolean(slug));
   const nicknameInputRef = useRef<HTMLInputElement | null>(null);
   const autoJoinStartedRef = useRef(false);
@@ -473,6 +480,22 @@ export function QuizPlayPage() {
   const programTileTextColor = quiz?.programTileTextColor?.trim() || "#ffffff";
   const programTileLinkUrl = quiz?.programTileLinkUrl?.trim() || "";
   const programTileVisible = quiz?.programTileVisible ?? false;
+  const photoWallTileVisible = quiz?.photoWallTileVisible ?? false;
+  const photoWallAlbumPhotos = useMemo(
+    () =>
+      buildPhotoWallAlbumPhotos({
+        baseUrl: quiz?.photoWallBaseUrl ?? "",
+        count: quiz?.photoWallImageCount ?? 0,
+        ext: quiz?.photoWallImageExt,
+      }),
+    [quiz?.photoWallBaseUrl, quiz?.photoWallImageCount, quiz?.photoWallImageExt],
+  );
+  const photoWallCollageSrcs = useMemo(() => {
+    if (photoWallAlbumPhotos.length === 0) return [];
+    return photoWallCollagePhotoIndices(photoWallAlbumPhotos.length).map(
+      (index) => photoWallAlbumPhotos[index]!.src,
+    );
+  }, [photoWallAlbumPhotos]);
   const enabledQuizReportSubQuizIds = useMemo(
     () =>
       resolveEnabledQuizReportSubQuizIds({
@@ -530,6 +553,7 @@ export function QuizPlayPage() {
     speakerTileVisible ||
     visiblePlayerBanners.length > 0 ||
     (programTileVisible && programTileLinkUrl.length > 0) ||
+    (photoWallTileVisible && photoWallCollageSrcs.length > 0) ||
     enabledQuizReportSubQuizIds.length > 0;
   const visibleResultTiles = useMemo(
     () => quiz?.playerVisibleResults ?? [],
@@ -650,6 +674,9 @@ export function QuizPlayPage() {
                 programTileTextColor={programTileTextColor}
                 programTileLinkUrl={programTileLinkUrl}
                 programTileVisible={programTileVisible}
+                photoWallTileVisible={photoWallTileVisible}
+                photoWallCollageSrcs={photoWallCollageSrcs}
+                onOpenPhotoWall={() => setPhotoWallDialogOpen(true)}
                 playerQuizResultsTilesBySubQuizId={playerQuizResultsTilesBySubQuizId}
                 onOpenQuizReport={(subQuizId) => {
                   setQuizReportSubQuizId(subQuizId);
@@ -715,6 +742,12 @@ export function QuizPlayPage() {
                 }}
               />
             ) : null}
+            <PlayerPhotoWallDialog
+              open={photoWallDialogOpen}
+              photos={photoWallAlbumPhotos}
+              brandFontFamily={brandFontFamily}
+              onClose={() => setPhotoWallDialogOpen(false)}
+            />
             {showQuestionPopup && (
               <QuestionPopupCard
                 brandPrimaryColor={brandPrimaryColor}

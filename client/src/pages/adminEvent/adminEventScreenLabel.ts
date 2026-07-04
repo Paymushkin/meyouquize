@@ -5,6 +5,7 @@ function publicScreenModeLabel(mode: PublicViewMode): string {
   if (mode === "speaker_questions") return "вопросы спикерам";
   if (mode === "reactions") return "реакции";
   if (mode === "randomizer") return "рандомайзер";
+  if (mode === "photo_wall") return "фотостена";
   if (mode === "report") return "отчет";
   if (mode === "question") return "вопрос";
   return "название";

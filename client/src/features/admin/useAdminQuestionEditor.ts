@@ -576,7 +576,14 @@ export function useAdminQuestionEditor({
 
   const setPublicResultsView = useCallback(
     (
-      mode: "title" | "question" | "leaderboard" | "speaker_questions" | "reactions" | "randomizer",
+      mode:
+        | "title"
+        | "question"
+        | "leaderboard"
+        | "speaker_questions"
+        | "reactions"
+        | "randomizer"
+        | "photo_wall",
       questionIdForMode?: string,
       extraPatch?: PublicViewSetPatch,
     ) => {

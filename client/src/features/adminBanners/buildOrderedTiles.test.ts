@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { SPEAKER_TILE_ID, quizResultsTileIdForSubQuiz } from "@meyouquize/shared";
+import { PHOTO_WALL_TILE_ID } from "../../publicViewContract";
 import { buildOrderedTiles } from "./buildOrderedTiles";
+
+const emptyPhotoWallCollage: string[] = [];
 
 describe("buildOrderedTiles", () => {
   const bannerA = {
@@ -34,6 +37,7 @@ describe("buildOrderedTiles", () => {
       [],
       "#7c5acb",
       "#ffffff",
+      emptyPhotoWallCollage,
     );
     expect(rows.map((x) => x.id)).toEqual([bannerB.id, SPEAKER_TILE_ID, bannerA.id]);
   });
@@ -54,6 +58,7 @@ describe("buildOrderedTiles", () => {
       [{ id: "sq1", title: "Квиз 1" }],
       "#7c5acb",
       "#ffffff",
+      emptyPhotoWallCollage,
     );
     expect(rows.map((x) => x.id)).toEqual([SPEAKER_TILE_ID, bannerA.id, bannerB.id]);
   });
@@ -75,11 +80,37 @@ describe("buildOrderedTiles", () => {
       [{ id: "sq2", title: "География" }],
       "#7c5acb",
       "#ffffff",
+      emptyPhotoWallCollage,
     );
     const report = rows.find((x) => x.kind === "quiz_results");
     expect(report?.kind).toBe("quiz_results");
     if (report?.kind === "quiz_results") {
       expect(report.title).toBe("География");
+    }
+  });
+
+  it("renders photo wall collage tile", () => {
+    const rows = buildOrderedTiles(
+      [PHOTO_WALL_TILE_ID],
+      [],
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "Мой квиз",
+      [],
+      [],
+      "#7c5acb",
+      "#ffffff",
+      ["https://example.com/1.jpg", "https://example.com/2.jpg"],
+    );
+    const tile = rows.find((x) => x.kind === "photo_wall");
+    expect(tile?.kind).toBe("photo_wall");
+    if (tile?.kind === "photo_wall") {
+      expect(tile.photoSrcs).toHaveLength(2);
     }
   });
 });

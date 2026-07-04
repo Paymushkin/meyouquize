@@ -3,6 +3,7 @@ export type AdminSection =
   | "questions"
   | "speakers"
   | "banners"
+  | "photo_wall"
   | "branding"
   | "report"
   | "results"
@@ -13,6 +14,7 @@ export const ADMIN_SECTION_IDS: AdminSection[] = [
   "questions",
   "speakers",
   "banners",
+  "photo_wall",
   "branding",
   "report",
   "results",
@@ -72,6 +74,7 @@ function parseSection(raw: string | undefined): AdminSection {
 }
 
 function parseQuestionsTab(raw: string | undefined): RoomQuestionsTab {
+  if (raw === "photo_wall") return DEFAULTS.questionsTab;
   if (raw && ROOM_QUESTIONS_TABS.includes(raw as RoomQuestionsTab)) {
     return raw as RoomQuestionsTab;
   }
@@ -142,9 +145,14 @@ export function readAdminUiPersistence(eventName: string): AdminUiPersistence {
     return { ...DEFAULTS, ...legacy };
   }
   const stored = readStoredV1(eventName);
+  const questionsTabRaw = stored.tabs?.questions ?? legacy.questionsTab;
+  let section = parseSection(stored.section ?? legacy.section);
+  if (questionsTabRaw === "photo_wall" && section !== "photo_wall") {
+    section = "photo_wall";
+  }
   return {
-    section: parseSection(stored.section ?? legacy.section),
-    questionsTab: parseQuestionsTab(stored.tabs?.questions ?? legacy.questionsTab),
+    section,
+    questionsTab: parseQuestionsTab(questionsTabRaw),
     bannersTab: parseBannersTab(stored.tabs?.banners),
     resultsSubQuizId:
       typeof stored.tabs?.resultsSubQuizId === "string" ? stored.tabs.resultsSubQuizId : "",

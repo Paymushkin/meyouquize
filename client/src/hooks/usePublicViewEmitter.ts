@@ -93,6 +93,7 @@ type UsePublicViewEmitterParams = {
   programTileTextColor: string;
   programTileLinkUrl: string;
   programTileVisible: boolean;
+  photoWallTileVisible: boolean;
   playerQuizResultsTileVisible: boolean;
   playerQuizResultsTileText: string;
   playerQuizResultsTileBackgroundColor: string;
@@ -119,6 +120,12 @@ type UsePublicViewEmitterParams = {
   randomizerAnimationPool: string[];
   randomizerHistory: RandomizerHistoryEntry[];
   randomizerRunId: number;
+  photoWallBaseUrl: string;
+  photoWallImageCount: number;
+  photoWallImageExt: import("@meyouquize/shared").PhotoWallImageExt;
+  photoWallGridColumns: number;
+  photoWallAnimate: boolean;
+  photoWallKenBurns: boolean;
   reportTitle: string;
   reportModules: ReportModuleId[];
   reportVoteQuestionIds: string[];
@@ -189,6 +196,7 @@ export function usePublicViewEmitter(params: UsePublicViewEmitterParams) {
     programTileTextColor,
     programTileLinkUrl,
     programTileVisible,
+    photoWallTileVisible,
     playerQuizResultsTileVisible,
     playerQuizResultsTileText,
     playerQuizResultsTileBackgroundColor,
@@ -215,6 +223,12 @@ export function usePublicViewEmitter(params: UsePublicViewEmitterParams) {
     randomizerAnimationPool,
     randomizerHistory,
     randomizerRunId,
+    photoWallBaseUrl,
+    photoWallImageCount,
+    photoWallImageExt,
+    photoWallGridColumns,
+    photoWallAnimate,
+    photoWallKenBurns,
     reportTitle,
     reportModules,
     reportVoteQuestionIds,
@@ -324,6 +338,7 @@ export function usePublicViewEmitter(params: UsePublicViewEmitterParams) {
         programTileTextColor: patch.programTileTextColor ?? programTileTextColor,
         programTileLinkUrl: sanitizeExternalHttpUrl(patch.programTileLinkUrl ?? programTileLinkUrl),
         programTileVisible: patch.programTileVisible ?? programTileVisible,
+        photoWallTileVisible: patch.photoWallTileVisible ?? photoWallTileVisible,
         playerQuizResultsTileVisible:
           patch.playerQuizResultsTileVisible ?? playerQuizResultsTileVisible,
         playerQuizResultsTileText: patch.playerQuizResultsTileText ?? playerQuizResultsTileText,
@@ -359,6 +374,12 @@ export function usePublicViewEmitter(params: UsePublicViewEmitterParams) {
         randomizerAnimationPool: patch.randomizerAnimationPool ?? randomizerAnimationPool,
         randomizerHistory: patch.randomizerHistory ?? randomizerHistory,
         randomizerRunId: patch.randomizerRunId ?? randomizerRunId,
+        photoWallBaseUrl: patch.photoWallBaseUrl ?? photoWallBaseUrl,
+        photoWallImageCount: patch.photoWallImageCount ?? photoWallImageCount,
+        photoWallImageExt: patch.photoWallImageExt ?? photoWallImageExt,
+        photoWallGridColumns: patch.photoWallGridColumns ?? photoWallGridColumns,
+        photoWallAnimate: patch.photoWallAnimate ?? photoWallAnimate,
+        photoWallKenBurns: patch.photoWallKenBurns ?? photoWallKenBurns,
         reportTitle: patch.reportTitle ?? reportTitle,
         reportModules: patch.reportModules ?? reportModules,
         reportVoteQuestionIds: patch.reportVoteQuestionIds ?? reportVoteQuestionIds,
@@ -446,6 +467,7 @@ export function usePublicViewEmitter(params: UsePublicViewEmitterParams) {
       programTileTextColor,
       programTileLinkUrl,
       programTileVisible,
+      photoWallTileVisible,
       playerQuizResultsTileVisible,
       playerQuizResultsTileText,
       playerQuizResultsTileBackgroundColor,
@@ -471,6 +493,12 @@ export function usePublicViewEmitter(params: UsePublicViewEmitterParams) {
       randomizerAnimationPool,
       randomizerHistory,
       randomizerRunId,
+      photoWallBaseUrl,
+      photoWallImageCount,
+      photoWallImageExt,
+      photoWallGridColumns,
+      photoWallAnimate,
+      photoWallKenBurns,
       reportTitle,
       reportModules,
       reportVoteQuestionIds,

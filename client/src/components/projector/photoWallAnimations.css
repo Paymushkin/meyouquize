@@ -1,0 +1,145 @@
+.photo-wall-waterfall {
+  display: flex;
+  gap: 0;
+  width: 100%;
+  overflow: hidden;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+.photo-wall-waterfall-column {
+  flex: 1 1 0;
+  min-width: 0;
+  overflow: hidden;
+  position: relative;
+}
+
+.photo-wall-waterfall-column__track {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  will-change: transform;
+}
+
+.photo-wall-waterfall-column__track--scroll {
+  animation: photo-wall-waterfall-scroll-up var(--photo-wall-scroll-duration, 240s) linear infinite;
+}
+
+@keyframes photo-wall-waterfall-scroll-up {
+  from {
+    transform: translateY(0);
+  }
+  to {
+    transform: translateY(-50%);
+  }
+}
+
+.photo-wall-waterfall-tile {
+  position: relative;
+  width: 100%;
+  flex-shrink: 0;
+  line-height: 0;
+  background: transparent;
+}
+
+.photo-wall-waterfall-tile__frame {
+  position: relative;
+  width: 100%;
+  line-height: 0;
+  background: transparent;
+}
+
+.photo-wall-waterfall-tile__frame--clip {
+  overflow: hidden;
+}
+
+.photo-wall-waterfall-tile__layer {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-width: 100%;
+  transform-origin: center center;
+  will-change: transform;
+  opacity: 0;
+  transition: opacity 0.35s ease;
+}
+
+.photo-wall-waterfall-tile__layer--loaded {
+  opacity: 1;
+  transition: none;
+}
+
+.photo-wall-waterfall-tile__frame--clip .photo-wall-waterfall-tile__layer--loaded {
+  opacity: 1;
+  transition: none;
+}
+
+.photo-wall-waterfall-tile__layer--ken-burns-1 {
+  animation: photo-wall-ken-burns-1 22s ease-in-out infinite alternate;
+}
+
+.photo-wall-waterfall-tile__layer--ken-burns-2 {
+  animation: photo-wall-ken-burns-2 26s ease-in-out infinite alternate;
+}
+
+.photo-wall-waterfall-tile__layer--ken-burns-3 {
+  animation: photo-wall-ken-burns-3 24s ease-in-out infinite alternate;
+}
+
+.photo-wall-waterfall-tile__layer--ken-burns-4 {
+  animation: photo-wall-ken-burns-4 20s ease-in-out infinite alternate;
+}
+
+@keyframes photo-wall-ken-burns-1 {
+  from {
+    transform: scale(1.05) translate(0%, 0%);
+  }
+  to {
+    transform: scale(1.14) translate(-2%, -1.5%);
+  }
+}
+
+@keyframes photo-wall-ken-burns-2 {
+  from {
+    transform: scale(1.06) translate(-1%, 0%);
+  }
+  to {
+    transform: scale(1.15) translate(2%, -2%);
+  }
+}
+
+@keyframes photo-wall-ken-burns-3 {
+  from {
+    transform: scale(1.05) translate(0%, 1%);
+  }
+  to {
+    transform: scale(1.13) translate(-1.5%, -2.5%);
+  }
+}
+
+@keyframes photo-wall-ken-burns-4 {
+  from {
+    transform: scale(1.07) translate(1.5%, -1%);
+  }
+  to {
+    transform: scale(1.16) translate(-2%, 1%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .photo-wall-waterfall-column__track--scroll {
+    animation: none;
+  }
+
+  .photo-wall-waterfall-tile__frame--clip {
+    transition: none !important;
+  }
+
+  .photo-wall-waterfall-tile__layer--ken-burns-1,
+  .photo-wall-waterfall-tile__layer--ken-burns-2,
+  .photo-wall-waterfall-tile__layer--ken-burns-3,
+  .photo-wall-waterfall-tile__layer--ken-burns-4 {
+    animation: none;
+    transform: scale(1.06);
+  }
+}

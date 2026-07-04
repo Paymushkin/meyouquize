@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { PROGRAM_TILE_ID, SPEAKER_TILE_ID } from "../../publicViewContract";
+import { PHOTO_WALL_TILE_ID, PROGRAM_TILE_ID, SPEAKER_TILE_ID } from "../../publicViewContract";
 import { buildPlayerTilesOrder, getVisiblePlayerBanners } from "./tiles";
 
 describe("getVisiblePlayerBanners", () => {
@@ -30,6 +30,7 @@ describe("buildPlayerTilesOrder", () => {
     expect(buildPlayerTilesOrder(["speaker_tile", "speaker_tile"], [])).toEqual([
       SPEAKER_TILE_ID,
       PROGRAM_TILE_ID,
+      PHOTO_WALL_TILE_ID,
     ]);
   });
 
@@ -47,6 +48,12 @@ describe("buildPlayerTilesOrder", () => {
           },
         ],
       ),
-    ).toEqual([SPEAKER_TILE_ID, "banner-1", PROGRAM_TILE_ID, "quiz_results_tile:sq-1"]);
+    ).toEqual([
+      SPEAKER_TILE_ID,
+      "banner-1",
+      PROGRAM_TILE_ID,
+      PHOTO_WALL_TILE_ID,
+      "quiz_results_tile:sq-1",
+    ]);
   });
 });

@@ -4,6 +4,7 @@ import type { AdminSection } from "../../features/admin/adminUiPersistence";
 import { AdminEventBannersTab, type AdminEventBannersTabProps } from "./AdminEventBannersTab";
 import { AdminEventDangerTab, type AdminEventDangerTabProps } from "./AdminEventDangerTab";
 import { AdminEventGeneralTab, type AdminEventGeneralTabProps } from "./AdminEventGeneralTab";
+import { AdminEventPhotoWallTab, type AdminEventPhotoWallTabProps } from "./AdminEventPhotoWallTab";
 import { AdminEventQuestionsTab, type AdminEventQuestionsTabProps } from "./AdminEventQuestionsTab";
 import { AdminEventReportTab } from "./AdminEventReportTab";
 import { AdminEventResultsTab, type AdminEventResultsTabProps } from "./AdminEventResultsTab";
@@ -15,6 +16,7 @@ export type AdminEventSectionRouterProps = {
   questions: AdminEventQuestionsTabProps;
   speakers: AdminEventSpeakersTabProps;
   banners: AdminEventBannersTabProps;
+  photoWall: AdminEventPhotoWallTabProps;
   branding: ComponentProps<typeof AdminBrandingSection>;
   results: AdminEventResultsTabProps;
   report: ComponentProps<typeof AdminEventReportTab>;
@@ -27,6 +29,7 @@ export function AdminEventSectionRouter({
   questions,
   speakers,
   banners,
+  photoWall,
   branding,
   results,
   report,
@@ -41,6 +44,8 @@ export function AdminEventSectionRouter({
       return <AdminEventSpeakersTab {...speakers} />;
     case "banners":
       return <AdminEventBannersTab {...banners} />;
+    case "photo_wall":
+      return <AdminEventPhotoWallTab {...photoWall} />;
     case "branding":
       return <AdminBrandingSection {...branding} />;
     case "results":

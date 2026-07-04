@@ -23,6 +23,7 @@ type Params = {
   subQuizzesForReport: Array<{ id: string; title: string }>;
   brandPrimaryColor: string;
   playerVoteOptionTextColor: string;
+  photoWallCollageSrcs: string[];
   onCreate: (linkUrl: string, backgroundUrl: string, size: "2x1" | "1x1" | "full") => void;
   onUpdate: (
     id: string,
@@ -57,6 +58,7 @@ export function useAdminBannersSectionState(params: Params) {
     subQuizzesForReport,
     brandPrimaryColor,
     playerVoteOptionTextColor,
+    photoWallCollageSrcs,
     onCreate,
     onUpdate,
     onUploadMedia,
@@ -131,6 +133,7 @@ export function useAdminBannersSectionState(params: Params) {
         subQuizzesForReport,
         brandPrimaryColor,
         playerVoteOptionTextColor,
+        photoWallCollageSrcs,
       ),
     [
       tilesOrder,
@@ -147,6 +150,7 @@ export function useAdminBannersSectionState(params: Params) {
       subQuizzesForReport,
       brandPrimaryColor,
       playerVoteOptionTextColor,
+      photoWallCollageSrcs,
     ],
   );
 

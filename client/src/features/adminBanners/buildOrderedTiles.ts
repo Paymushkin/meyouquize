@@ -1,6 +1,7 @@
 import {
   isQuizResultsTileId,
   parseQuizResultsSubQuizIdFromTileId,
+  PHOTO_WALL_TILE_ID,
   PROGRAM_TILE_ID,
   QUIZ_RESULTS_TILE_ID,
   SPEAKER_TILE_ID,
@@ -24,6 +25,7 @@ export function buildOrderedTiles(
   subQuizzesForReport: Array<{ id: string; title: string }>,
   brandPrimaryColor: string,
   playerVoteOptionTextColor: string,
+  photoWallCollageSrcs: string[],
 ): OrderedTile[] {
   const legacyEffectiveId =
     playerQuizResultsSubQuizIds[0]?.trim() || subQuizzesForReport[0]?.id || "";
@@ -49,6 +51,14 @@ export function buildOrderedTiles(
           backgroundColor: programTileBackgroundColor,
           textColor: programTileTextColor,
           linkUrl: programTileLinkUrl,
+        };
+      }
+      if (id === PHOTO_WALL_TILE_ID) {
+        return {
+          id,
+          kind: "photo_wall" as const,
+          label: "Плитка «Фотостена» (1×1)",
+          photoSrcs: photoWallCollageSrcs,
         };
       }
       if (isQuizResultsTileId(id)) {

@@ -114,6 +114,10 @@ export type QuizState = {
   programTileTextColor?: string;
   programTileLinkUrl?: string;
   programTileVisible?: boolean;
+  photoWallBaseUrl?: string;
+  photoWallImageCount?: number;
+  photoWallImageExt?: "jpeg" | "jpg" | "png" | "webp";
+  photoWallTileVisible?: boolean;
   playerQuizResultsTileVisible?: boolean;
   playerQuizResultsTileText?: string;
   playerQuizResultsTileBackgroundColor?: string;
