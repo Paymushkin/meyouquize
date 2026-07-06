@@ -41,4 +41,9 @@ DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:5432/meyouquize_test npm r
 
 ## CI
 
-GitHub Actions: `quality` (lint + coverage + build), `integration`, `e2e`.
+GitHub Actions: `quality` (lint + coverage + build), `integration`, `e2e`.  
+Ветки: `main`, `develop`, `release/*`, `hotfix/*`.
+
+## Git Flow
+
+Ветки, релизы и деплой: [GITFLOW.md](./GITFLOW.md).
