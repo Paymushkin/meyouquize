@@ -278,6 +278,8 @@ export function registerSpeakerQuestionsHandlers(socket: EnrichedSocket, io: Ser
       }
       const payload = createSpeakerQuestionSchema.parse(raw);
       if (!socket.data.participantId) throw new Error("Not joined");
+      if (!socket.data.quizId || socket.data.quizId !== payload.quizId)
+        throw new Error("Not joined");
       const view = await getStoredPublicView(payload.quizId);
       if (!view.speakerQuestionsEnabled && !view.speakerTileVisible) {
         throw new Error("Функция выключена администратором");
@@ -328,6 +330,8 @@ export function registerSpeakerQuestionsHandlers(socket: EnrichedSocket, io: Ser
       }
       const payload = speakerQuestionReactSchema.parse(raw);
       if (!socket.data.participantId) throw new Error("Not joined");
+      if (!socket.data.quizId || socket.data.quizId !== payload.quizId)
+        throw new Error("Not joined");
       const view = await getStoredPublicView(payload.quizId);
       const allowedReactions =
         Array.isArray(view.speakerQuestionsReactions) && view.speakerQuestionsReactions.length > 0
@@ -381,6 +385,8 @@ export function registerSpeakerQuestionsHandlers(socket: EnrichedSocket, io: Ser
       }
       const payload = speakerQuestionDeleteSchema.parse(raw);
       if (!socket.data.participantId) throw new Error("Not joined");
+      if (!socket.data.quizId || socket.data.quizId !== payload.quizId)
+        throw new Error("Not joined");
       const question = await prisma.speakerQuestion.findUnique({
         where: { id: payload.speakerQuestionId },
         select: { id: true, quizId: true, participantId: true },

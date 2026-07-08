@@ -207,6 +207,8 @@ export function registerQuizPlayHandlers(socket: EnrichedSocket, io: Server) {
       }
       const payload = resetAnswersSchema.parse(raw);
       if (!socket.data.participantId) throw new Error("Not joined");
+      if (!socket.data.quizId || socket.data.quizId !== payload.quizId)
+        throw new Error("Not joined");
       await resetParticipantAnswers(payload.quizId, socket.data.participantId);
       socket.emit("answers:reset:done", { ok: true });
       socket.emit("player:quiz-score", { myTotalScore: 0, mySubQuizScores: {} });
@@ -250,6 +252,8 @@ export function registerQuizPlayHandlers(socket: EnrichedSocket, io: Server) {
     try {
       const payload = toggleReactionSchema.parse(raw);
       if (!socket.data.participantId) throw new Error("Not joined");
+      if (!socket.data.quizId || socket.data.quizId !== payload.quizId)
+        throw new Error("Not joined");
       if (!allowReactionBurst(socket.id)) return;
       const reactionSession = addReaction(
         payload.quizId,

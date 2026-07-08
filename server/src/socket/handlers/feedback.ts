@@ -79,6 +79,8 @@ export function registerFeedbackHandlers(socket: EnrichedSocket, io: Server) {
       }
       const payload = submitFeedbackSchema.parse(raw);
       if (!socket.data.participantId) throw new Error("Not joined");
+      if (!socket.data.quizId || socket.data.quizId !== payload.quizId)
+        throw new Error("Not joined");
       const formId = await submitFeedbackResponse({
         quizId: payload.quizId,
         participantId: socket.data.participantId,
