@@ -2,8 +2,10 @@ import {
   DEFAULT_PROJECTOR_JOIN_QR_TEXT,
   DEFAULT_PROJECTOR_JOIN_QR_TEXT_COLOR,
   DEFAULT_PROJECTOR_JOIN_QR_VISIBLE,
+  DEFAULT_PROJECTOR_JOIN_QR_OVERLAY_VISIBLE,
   DEFAULT_PROJECTOR_JOIN_QR_OVERLAY_SIZE_PX,
-  DEFAULT_PROJECTOR_JOIN_QR_OVERLAY_INSET_PX,
+  DEFAULT_PROJECTOR_JOIN_QR_OVERLAY_INSET_HORIZONTAL_PX,
+  DEFAULT_PROJECTOR_JOIN_QR_OVERLAY_INSET_VERTICAL_PX,
   DEFAULT_PROJECTOR_JOIN_QR_OVERLAY_CORNER,
   PROJECTOR_JOIN_QR_TEXT_MAX_LENGTH,
   PROJECTOR_JOIN_QR_OVERLAY_CORNERS,
@@ -56,9 +58,12 @@ type BrandingKeys =
   | "brandProjectorBackgroundImageUrl"
   | "brandBodyBackgroundColor"
   | "projectorJoinQrVisible"
+  | "projectorJoinQrOverlayVisible"
   | "projectorJoinQrText"
   | "projectorJoinQrTextColor"
   | "projectorJoinQrOverlaySizePx"
+  | "projectorJoinQrOverlayInsetVerticalPx"
+  | "projectorJoinQrOverlayInsetHorizontalPx"
   | "projectorJoinQrOverlayInsetPx"
   | "projectorJoinQrOverlayCorner";
 type PlayerUiResultKeys =
@@ -124,8 +129,10 @@ export {
   DEFAULT_PROJECTOR_JOIN_QR_TEXT,
   DEFAULT_PROJECTOR_JOIN_QR_TEXT_COLOR,
   DEFAULT_PROJECTOR_JOIN_QR_VISIBLE,
+  DEFAULT_PROJECTOR_JOIN_QR_OVERLAY_VISIBLE,
   DEFAULT_PROJECTOR_JOIN_QR_OVERLAY_SIZE_PX,
-  DEFAULT_PROJECTOR_JOIN_QR_OVERLAY_INSET_PX,
+  DEFAULT_PROJECTOR_JOIN_QR_OVERLAY_INSET_HORIZONTAL_PX,
+  DEFAULT_PROJECTOR_JOIN_QR_OVERLAY_INSET_VERTICAL_PX,
   DEFAULT_PROJECTOR_JOIN_QR_OVERLAY_CORNER,
   PROJECTOR_JOIN_QR_TEXT_MAX_LENGTH,
   PROJECTOR_JOIN_QR_OVERLAY_CORNERS,
@@ -170,9 +177,12 @@ export function toBrandingState(payload: Partial<PublicViewPayload>): BrandingSt
     brandBodyBackgroundColor: view.brandBodyBackgroundColor,
     brandTheme: sanitizeBrandThemeId(view.brandTheme),
     projectorJoinQrVisible: view.projectorJoinQrVisible,
+    projectorJoinQrOverlayVisible: view.projectorJoinQrOverlayVisible,
     projectorJoinQrText: view.projectorJoinQrText,
     projectorJoinQrTextColor: view.projectorJoinQrTextColor,
     projectorJoinQrOverlaySizePx: view.projectorJoinQrOverlaySizePx,
+    projectorJoinQrOverlayInsetVerticalPx: view.projectorJoinQrOverlayInsetVerticalPx,
+    projectorJoinQrOverlayInsetHorizontalPx: view.projectorJoinQrOverlayInsetHorizontalPx,
     projectorJoinQrOverlayInsetPx: view.projectorJoinQrOverlayInsetPx,
     projectorJoinQrOverlayCorner: view.projectorJoinQrOverlayCorner,
     playerVoteOptionTextColor: view.playerVoteOptionTextColor,

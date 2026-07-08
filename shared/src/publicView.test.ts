@@ -287,10 +287,34 @@ describe("resolveProjectorLeaderboardRows", () => {
   });
 });
 
+describe("projectorJoinQr visibility", () => {
+  it("inherits legacy single flag for overlay when overlay field is missing", () => {
+    const state = normalizePublicViewState({ projectorJoinQrVisible: true });
+    expect(state.projectorJoinQrVisible).toBe(true);
+    expect(state.projectorJoinQrOverlayVisible).toBe(true);
+  });
+
+  it("allows independent block and overlay flags", () => {
+    const state = normalizePublicViewState({
+      projectorJoinQrVisible: true,
+      projectorJoinQrOverlayVisible: false,
+    });
+    expect(state.projectorJoinQrVisible).toBe(true);
+    expect(state.projectorJoinQrOverlayVisible).toBe(false);
+  });
+
+  it("inherits legacy single inset for both axes when axis fields are missing", () => {
+    const state = normalizePublicViewState({ projectorJoinQrOverlayInsetPx: 42 });
+    expect(state.projectorJoinQrOverlayInsetVerticalPx).toBe(42);
+    expect(state.projectorJoinQrOverlayInsetHorizontalPx).toBe(42);
+  });
+});
+
 describe("DEFAULT_PUBLIC_VIEW_STATE", () => {
   it("has stable defaults", () => {
     expect(DEFAULT_PUBLIC_VIEW_STATE.mode).toBe("title");
     expect(DEFAULT_PUBLIC_VIEW_STATE.projectorJoinQrVisible).toBe(false);
+    expect(DEFAULT_PUBLIC_VIEW_STATE.projectorJoinQrOverlayVisible).toBe(false);
     expect(DEFAULT_PUBLIC_VIEW_STATE.speakerTileVisible).toBe(false);
   });
 });

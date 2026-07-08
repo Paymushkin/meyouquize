@@ -10,8 +10,6 @@ type Props = {
   colorGridSx: SxProps<Theme>;
   projectorBackground: string;
   setProjectorBackground: (value: string) => void;
-  brandBodyBackgroundColor: string;
-  setBrandBodyBackgroundColor: (value: string) => void;
   voteQuestionTextColor: string;
   setVoteQuestionTextColor: (value: string) => void;
   voteOptionTextColor: string;
@@ -30,8 +28,6 @@ export function BrandScreenColorsSection(props: Props) {
     colorGridSx,
     projectorBackground,
     setProjectorBackground,
-    brandBodyBackgroundColor,
-    setBrandBodyBackgroundColor,
     voteQuestionTextColor,
     setVoteQuestionTextColor,
     voteOptionTextColor,
@@ -48,7 +44,7 @@ export function BrandScreenColorsSection(props: Props) {
   return (
     <Accordion defaultExpanded>
       <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-        <Typography variant="subtitle2">Экран и голосование</Typography>
+        <Typography variant="subtitle2">Проектор</Typography>
       </AccordionSummary>
       <AccordionDetails>
         <Box sx={colorGridSx}>
@@ -57,12 +53,6 @@ export function BrandScreenColorsSection(props: Props) {
             value={projectorBackground}
             onChange={setProjectorBackground}
             onBlur={() => emitPatch({ projectorBackground })}
-          />
-          <CompactColorField
-            label="Фон body (player)"
-            value={brandBodyBackgroundColor}
-            onChange={setBrandBodyBackgroundColor}
-            onBlur={() => emitPatch({ brandBodyBackgroundColor })}
           />
           <VoteQuestionTextStyleField
             label="Текст вопроса (голосование)"

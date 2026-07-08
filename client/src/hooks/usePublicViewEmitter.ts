@@ -151,10 +151,12 @@ type UsePublicViewEmitterParams = {
   brandBodyBackgroundColor: string;
   brandTheme: BrandThemeId;
   projectorJoinQrVisible: boolean;
+  projectorJoinQrOverlayVisible: boolean;
   projectorJoinQrText: string;
   projectorJoinQrTextColor: string;
   projectorJoinQrOverlaySizePx: number;
-  projectorJoinQrOverlayInsetPx: number;
+  projectorJoinQrOverlayInsetVerticalPx: number;
+  projectorJoinQrOverlayInsetHorizontalPx: number;
   projectorJoinQrOverlayCorner: import("@meyouquize/shared").ProjectorJoinQrOverlayCorner;
 };
 
@@ -254,10 +256,12 @@ export function usePublicViewEmitter(params: UsePublicViewEmitterParams) {
     brandBodyBackgroundColor,
     brandTheme,
     projectorJoinQrVisible,
+    projectorJoinQrOverlayVisible,
     projectorJoinQrText,
     projectorJoinQrTextColor,
     projectorJoinQrOverlaySizePx,
-    projectorJoinQrOverlayInsetPx,
+    projectorJoinQrOverlayInsetVerticalPx,
+    projectorJoinQrOverlayInsetHorizontalPx,
     projectorJoinQrOverlayCorner,
   } = params;
 
@@ -419,12 +423,16 @@ export function usePublicViewEmitter(params: UsePublicViewEmitterParams) {
         brandTheme:
           patch.brandTheme !== undefined ? sanitizeBrandThemeId(patch.brandTheme) : brandTheme,
         projectorJoinQrVisible: patch.projectorJoinQrVisible ?? projectorJoinQrVisible,
+        projectorJoinQrOverlayVisible:
+          patch.projectorJoinQrOverlayVisible ?? projectorJoinQrOverlayVisible,
         projectorJoinQrText: patch.projectorJoinQrText ?? projectorJoinQrText,
         projectorJoinQrTextColor: patch.projectorJoinQrTextColor ?? projectorJoinQrTextColor,
         projectorJoinQrOverlaySizePx:
           patch.projectorJoinQrOverlaySizePx ?? projectorJoinQrOverlaySizePx,
-        projectorJoinQrOverlayInsetPx:
-          patch.projectorJoinQrOverlayInsetPx ?? projectorJoinQrOverlayInsetPx,
+        projectorJoinQrOverlayInsetVerticalPx:
+          patch.projectorJoinQrOverlayInsetVerticalPx ?? projectorJoinQrOverlayInsetVerticalPx,
+        projectorJoinQrOverlayInsetHorizontalPx:
+          patch.projectorJoinQrOverlayInsetHorizontalPx ?? projectorJoinQrOverlayInsetHorizontalPx,
         projectorJoinQrOverlayCorner:
           patch.projectorJoinQrOverlayCorner ?? projectorJoinQrOverlayCorner,
       };
@@ -523,10 +531,12 @@ export function usePublicViewEmitter(params: UsePublicViewEmitterParams) {
       brandBodyBackgroundColor,
       brandTheme,
       projectorJoinQrVisible,
+      projectorJoinQrOverlayVisible,
       projectorJoinQrText,
       projectorJoinQrTextColor,
       projectorJoinQrOverlaySizePx,
-      projectorJoinQrOverlayInsetPx,
+      projectorJoinQrOverlayInsetVerticalPx,
+      projectorJoinQrOverlayInsetHorizontalPx,
       projectorJoinQrOverlayCorner,
     ],
   );

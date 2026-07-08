@@ -38,16 +38,14 @@ type Props = {
   playerVoteProgressBarColor: string;
   setPlayerVoteProgressBarColor: (value: string) => void;
   qrSettingsProps: {
-    projectorJoinQrVisible: boolean;
-    setProjectorJoinQrVisible: (value: boolean) => void;
-    projectorJoinQrText: string;
-    setProjectorJoinQrText: (value: string) => void;
-    projectorJoinQrTextColor: string;
-    setProjectorJoinQrTextColor: (value: string) => void;
+    projectorJoinQrOverlayVisible: boolean;
+    setProjectorJoinQrOverlayVisible: (value: boolean) => void;
     projectorJoinQrOverlaySizePx: number;
     setProjectorJoinQrOverlaySizePx: (value: number) => void;
-    projectorJoinQrOverlayInsetPx: number;
-    setProjectorJoinQrOverlayInsetPx: (value: number) => void;
+    projectorJoinQrOverlayInsetVerticalPx: number;
+    setProjectorJoinQrOverlayInsetVerticalPx: (value: number) => void;
+    projectorJoinQrOverlayInsetHorizontalPx: number;
+    setProjectorJoinQrOverlayInsetHorizontalPx: (value: number) => void;
     projectorJoinQrOverlayCorner: ProjectorJoinQrOverlayCorner;
     setProjectorJoinQrOverlayCorner: (value: ProjectorJoinQrOverlayCorner) => void;
   };
@@ -198,8 +196,6 @@ export function AdminBrandingSection(props: Props) {
             colorGridSx={colorGridSx}
             projectorBackground={projectorBackground}
             setProjectorBackground={setProjectorBackground}
-            brandBodyBackgroundColor={brandBodyBackgroundColor}
-            setBrandBodyBackgroundColor={setBrandBodyBackgroundColor}
             voteQuestionTextColor={voteQuestionTextColor}
             setVoteQuestionTextColor={setVoteQuestionTextColor}
             voteOptionTextColor={voteOptionTextColor}
@@ -234,6 +230,8 @@ export function AdminBrandingSection(props: Props) {
           />
           <BrandPlayerUiResultsSection
             colorGridSx={colorGridSx}
+            brandBodyBackgroundColor={brandBodyBackgroundColor}
+            setBrandBodyBackgroundColor={setBrandBodyBackgroundColor}
             playerVoteOptionTextColor={playerVoteOptionTextColor}
             setPlayerVoteOptionTextColor={setPlayerVoteOptionTextColor}
             playerVoteProgressBarColor={playerVoteProgressBarColor}

@@ -68,9 +68,12 @@ const PROJECTOR_BRANDING_KEYS = [
   "brandProjectorBackgroundImageUrl",
   "brandTheme",
   "projectorJoinQrVisible",
+  "projectorJoinQrOverlayVisible",
   "projectorJoinQrText",
   "projectorJoinQrTextColor",
   "projectorJoinQrOverlaySizePx",
+  "projectorJoinQrOverlayInsetVerticalPx",
+  "projectorJoinQrOverlayInsetHorizontalPx",
   "projectorJoinQrOverlayInsetPx",
   "projectorJoinQrOverlayCorner",
 ] as const satisfies ReadonlyArray<keyof PublicViewState>;

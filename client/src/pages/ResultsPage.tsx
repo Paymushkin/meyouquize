@@ -174,7 +174,8 @@ export function ResultsPage() {
     useProjectorJoinQr({
       slug,
       showEventTitleScreen,
-      projectorJoinQrVisible: view.projectorJoinQrVisible,
+      projectorJoinQrBlockVisible: view.projectorJoinQrVisible,
+      projectorJoinQrOverlayVisible: view.projectorJoinQrOverlayVisible,
       overlaySizePx: view.projectorJoinQrOverlaySizePx,
     });
 
@@ -202,7 +203,8 @@ export function ResultsPage() {
         <ProjectorJoinQrOverlay
           qrDataUrl={joinQrOverlayDataUrl}
           sizePx={view.projectorJoinQrOverlaySizePx}
-          insetPx={view.projectorJoinQrOverlayInsetPx}
+          insetVerticalPx={view.projectorJoinQrOverlayInsetVerticalPx}
+          insetHorizontalPx={view.projectorJoinQrOverlayInsetHorizontalPx}
           corner={view.projectorJoinQrOverlayCorner}
         />
       ) : null}

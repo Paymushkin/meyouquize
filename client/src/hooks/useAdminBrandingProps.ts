@@ -5,32 +5,28 @@ import type { ProjectorJoinQrOverlayCorner } from "../publicViewContract";
 type BrandingProps = ComponentProps<typeof AdminBrandingSection>;
 
 type Params = Omit<BrandingProps, "qrSettingsProps"> & {
-  projectorJoinQrVisible: boolean;
-  setProjectorJoinQrVisible: (value: boolean) => void;
-  projectorJoinQrText: string;
-  setProjectorJoinQrText: (value: string) => void;
-  projectorJoinQrTextColor: string;
-  setProjectorJoinQrTextColor: (value: string) => void;
+  projectorJoinQrOverlayVisible: boolean;
+  setProjectorJoinQrOverlayVisible: (value: boolean) => void;
   projectorJoinQrOverlaySizePx: number;
   setProjectorJoinQrOverlaySizePx: (value: number) => void;
-  projectorJoinQrOverlayInsetPx: number;
-  setProjectorJoinQrOverlayInsetPx: (value: number) => void;
+  projectorJoinQrOverlayInsetVerticalPx: number;
+  setProjectorJoinQrOverlayInsetVerticalPx: (value: number) => void;
+  projectorJoinQrOverlayInsetHorizontalPx: number;
+  setProjectorJoinQrOverlayInsetHorizontalPx: (value: number) => void;
   projectorJoinQrOverlayCorner: ProjectorJoinQrOverlayCorner;
   setProjectorJoinQrOverlayCorner: (value: ProjectorJoinQrOverlayCorner) => void;
 };
 
 export function useAdminBrandingProps(params: Params): BrandingProps {
   const {
-    projectorJoinQrVisible,
-    setProjectorJoinQrVisible,
-    projectorJoinQrText,
-    setProjectorJoinQrText,
-    projectorJoinQrTextColor,
-    setProjectorJoinQrTextColor,
+    projectorJoinQrOverlayVisible,
+    setProjectorJoinQrOverlayVisible,
     projectorJoinQrOverlaySizePx,
     setProjectorJoinQrOverlaySizePx,
-    projectorJoinQrOverlayInsetPx,
-    setProjectorJoinQrOverlayInsetPx,
+    projectorJoinQrOverlayInsetVerticalPx,
+    setProjectorJoinQrOverlayInsetVerticalPx,
+    projectorJoinQrOverlayInsetHorizontalPx,
+    setProjectorJoinQrOverlayInsetHorizontalPx,
     projectorJoinQrOverlayCorner,
     setProjectorJoinQrOverlayCorner,
     ...rest
@@ -38,30 +34,26 @@ export function useAdminBrandingProps(params: Params): BrandingProps {
 
   const qrSettingsProps = useMemo(
     () => ({
-      projectorJoinQrVisible,
-      setProjectorJoinQrVisible,
-      projectorJoinQrText,
-      setProjectorJoinQrText,
-      projectorJoinQrTextColor,
-      setProjectorJoinQrTextColor,
+      projectorJoinQrOverlayVisible,
+      setProjectorJoinQrOverlayVisible,
       projectorJoinQrOverlaySizePx,
       setProjectorJoinQrOverlaySizePx,
-      projectorJoinQrOverlayInsetPx,
-      setProjectorJoinQrOverlayInsetPx,
+      projectorJoinQrOverlayInsetVerticalPx,
+      setProjectorJoinQrOverlayInsetVerticalPx,
+      projectorJoinQrOverlayInsetHorizontalPx,
+      setProjectorJoinQrOverlayInsetHorizontalPx,
       projectorJoinQrOverlayCorner,
       setProjectorJoinQrOverlayCorner,
     }),
     [
-      projectorJoinQrVisible,
-      setProjectorJoinQrVisible,
-      projectorJoinQrText,
-      setProjectorJoinQrText,
-      projectorJoinQrTextColor,
-      setProjectorJoinQrTextColor,
+      projectorJoinQrOverlayVisible,
+      setProjectorJoinQrOverlayVisible,
       projectorJoinQrOverlaySizePx,
       setProjectorJoinQrOverlaySizePx,
-      projectorJoinQrOverlayInsetPx,
-      setProjectorJoinQrOverlayInsetPx,
+      projectorJoinQrOverlayInsetVerticalPx,
+      setProjectorJoinQrOverlayInsetVerticalPx,
+      projectorJoinQrOverlayInsetHorizontalPx,
+      setProjectorJoinQrOverlayInsetHorizontalPx,
       projectorJoinQrOverlayCorner,
       setProjectorJoinQrOverlayCorner,
     ],

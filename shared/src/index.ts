@@ -325,14 +325,20 @@ export interface PublicViewState {
   playerVoteProgressTrackColor: string;
   /** Интерфейс пользователя: цвет заполнения прогресс-бара в карточках результатов */
   playerVoteProgressBarColor: string;
-  /** Проектор: показывать QR-код входа в ивент */
+  /** Проектор: крупный QR на экране ивента (title) */
   projectorJoinQrVisible: boolean;
+  /** Проектор: компактный QR в углу на голосованиях и других экранах */
+  projectorJoinQrOverlayVisible: boolean;
   /** Проектор: подпись рядом с QR-кодом входа */
   projectorJoinQrText: string;
   projectorJoinQrTextColor: string;
   /** Проектор: размер компактного QR на экранах контента (px) */
   projectorJoinQrOverlaySizePx: number;
-  /** Проектор: отступ компактного QR от края экрана (px) */
+  /** Проектор: отступ компактного QR от верхнего/нижнего края (px) */
+  projectorJoinQrOverlayInsetVerticalPx: number;
+  /** Проектор: отступ компактного QR от левого/правого края (px) */
+  projectorJoinQrOverlayInsetHorizontalPx: number;
+  /** @deprecated используйте vertical/horizontal; оставлено для миграции */
   projectorJoinQrOverlayInsetPx: number;
   /** Проектор: угол размещения компактного QR */
   projectorJoinQrOverlayCorner: ProjectorJoinQrOverlayCorner;
@@ -444,6 +450,7 @@ export type PublicViewPatch = Partial<PublicViewState> & {
 };
 
 export const DEFAULT_PROJECTOR_JOIN_QR_VISIBLE = false;
+export const DEFAULT_PROJECTOR_JOIN_QR_OVERLAY_VISIBLE = false;
 export const PROJECTOR_JOIN_QR_TEXT_MAX_LENGTH = 200;
 export const DEFAULT_PROJECTOR_JOIN_QR_TEXT = "Сканируйте QR-код, чтобы войти в ивент";
 export const DEFAULT_PROJECTOR_JOIN_QR_TEXT_COLOR = "#ffffff";
@@ -455,6 +462,9 @@ export type ProjectorJoinQrOverlayCorner =
   | "bottom_left";
 
 export const DEFAULT_PROJECTOR_JOIN_QR_OVERLAY_SIZE_PX = 150;
+export const DEFAULT_PROJECTOR_JOIN_QR_OVERLAY_INSET_VERTICAL_PX = 30;
+export const DEFAULT_PROJECTOR_JOIN_QR_OVERLAY_INSET_HORIZONTAL_PX = 30;
+/** @deprecated */
 export const DEFAULT_PROJECTOR_JOIN_QR_OVERLAY_INSET_PX = 30;
 export const DEFAULT_PROJECTOR_JOIN_QR_OVERLAY_CORNER: ProjectorJoinQrOverlayCorner = "top_right";
 
@@ -546,9 +556,12 @@ export const DEFAULT_PUBLIC_VIEW_STATE: PublicViewState = {
   playerVoteProgressTrackColor: "#6a5600",
   playerVoteProgressBarColor: "#F3F722",
   projectorJoinQrVisible: DEFAULT_PROJECTOR_JOIN_QR_VISIBLE,
+  projectorJoinQrOverlayVisible: DEFAULT_PROJECTOR_JOIN_QR_OVERLAY_VISIBLE,
   projectorJoinQrText: DEFAULT_PROJECTOR_JOIN_QR_TEXT,
   projectorJoinQrTextColor: DEFAULT_PROJECTOR_JOIN_QR_TEXT_COLOR,
   projectorJoinQrOverlaySizePx: DEFAULT_PROJECTOR_JOIN_QR_OVERLAY_SIZE_PX,
+  projectorJoinQrOverlayInsetVerticalPx: DEFAULT_PROJECTOR_JOIN_QR_OVERLAY_INSET_VERTICAL_PX,
+  projectorJoinQrOverlayInsetHorizontalPx: DEFAULT_PROJECTOR_JOIN_QR_OVERLAY_INSET_HORIZONTAL_PX,
   projectorJoinQrOverlayInsetPx: DEFAULT_PROJECTOR_JOIN_QR_OVERLAY_INSET_PX,
   projectorJoinQrOverlayCorner: DEFAULT_PROJECTOR_JOIN_QR_OVERLAY_CORNER,
   randomizerMode: "names",
@@ -1427,6 +1440,12 @@ export function normalizePublicViewState(
       typeof value?.projectorJoinQrVisible === "boolean"
         ? value.projectorJoinQrVisible
         : base.projectorJoinQrVisible,
+    projectorJoinQrOverlayVisible:
+      typeof value?.projectorJoinQrOverlayVisible === "boolean"
+        ? value.projectorJoinQrOverlayVisible
+        : typeof value?.projectorJoinQrVisible === "boolean"
+          ? value.projectorJoinQrVisible
+          : base.projectorJoinQrOverlayVisible,
     projectorJoinQrText:
       typeof value?.projectorJoinQrText === "string"
         ? value.projectorJoinQrText.trim().slice(0, PROJECTOR_JOIN_QR_TEXT_MAX_LENGTH)
@@ -1439,6 +1458,20 @@ export function normalizePublicViewState(
       value?.projectorJoinQrOverlaySizePx ?? base.projectorJoinQrOverlaySizePx,
       48,
       480,
+    ),
+    projectorJoinQrOverlayInsetVerticalPx: clampInt(
+      value?.projectorJoinQrOverlayInsetVerticalPx ??
+        value?.projectorJoinQrOverlayInsetPx ??
+        base.projectorJoinQrOverlayInsetVerticalPx,
+      0,
+      200,
+    ),
+    projectorJoinQrOverlayInsetHorizontalPx: clampInt(
+      value?.projectorJoinQrOverlayInsetHorizontalPx ??
+        value?.projectorJoinQrOverlayInsetPx ??
+        base.projectorJoinQrOverlayInsetHorizontalPx,
+      0,
+      200,
     ),
     projectorJoinQrOverlayInsetPx: clampInt(
       value?.projectorJoinQrOverlayInsetPx ?? base.projectorJoinQrOverlayInsetPx,

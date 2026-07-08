@@ -63,10 +63,12 @@ export function brandingEditorStateToEventThemeBranding(state: {
   brandBodyBackgroundColor: string;
   brandTheme: EventThemeBranding["brandTheme"];
   projectorJoinQrVisible: boolean;
+  projectorJoinQrOverlayVisible: boolean;
   projectorJoinQrText: string;
   projectorJoinQrTextColor: string;
   projectorJoinQrOverlaySizePx: number;
-  projectorJoinQrOverlayInsetPx: number;
+  projectorJoinQrOverlayInsetVerticalPx: number;
+  projectorJoinQrOverlayInsetHorizontalPx: number;
   projectorJoinQrOverlayCorner: EventThemeBranding["projectorJoinQrOverlayCorner"];
   speakerTileBackgroundColor: string;
   speakerTileTextColor: string;

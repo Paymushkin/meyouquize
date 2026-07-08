@@ -1,8 +1,10 @@
 import type { BrandThemeId } from "@meyouquize/shared";
 import {
   DEFAULT_PROJECTOR_JOIN_QR_OVERLAY_CORNER,
-  DEFAULT_PROJECTOR_JOIN_QR_OVERLAY_INSET_PX,
+  DEFAULT_PROJECTOR_JOIN_QR_OVERLAY_INSET_VERTICAL_PX,
+  DEFAULT_PROJECTOR_JOIN_QR_OVERLAY_INSET_HORIZONTAL_PX,
   DEFAULT_PROJECTOR_JOIN_QR_OVERLAY_SIZE_PX,
+  DEFAULT_PROJECTOR_JOIN_QR_OVERLAY_VISIBLE,
   DEFAULT_PROJECTOR_JOIN_QR_TEXT,
   DEFAULT_PROJECTOR_JOIN_QR_TEXT_COLOR,
   DEFAULT_PROJECTOR_JOIN_QR_VISIBLE,
@@ -68,6 +70,9 @@ export function useBrandingEditorState() {
   const [projectorJoinQrVisible, setProjectorJoinQrVisible] = useState(
     DEFAULT_PROJECTOR_JOIN_QR_VISIBLE,
   );
+  const [projectorJoinQrOverlayVisible, setProjectorJoinQrOverlayVisible] = useState(
+    DEFAULT_PROJECTOR_JOIN_QR_OVERLAY_VISIBLE,
+  );
   const [projectorJoinQrText, setProjectorJoinQrText] = useState(DEFAULT_PROJECTOR_JOIN_QR_TEXT);
   const [projectorJoinQrTextColor, setProjectorJoinQrTextColor] = useState(
     DEFAULT_PROJECTOR_JOIN_QR_TEXT_COLOR,
@@ -75,9 +80,10 @@ export function useBrandingEditorState() {
   const [projectorJoinQrOverlaySizePx, setProjectorJoinQrOverlaySizePx] = useState(
     DEFAULT_PROJECTOR_JOIN_QR_OVERLAY_SIZE_PX,
   );
-  const [projectorJoinQrOverlayInsetPx, setProjectorJoinQrOverlayInsetPx] = useState(
-    DEFAULT_PROJECTOR_JOIN_QR_OVERLAY_INSET_PX,
-  );
+  const [projectorJoinQrOverlayInsetVerticalPx, setProjectorJoinQrOverlayInsetVerticalPx] =
+    useState(DEFAULT_PROJECTOR_JOIN_QR_OVERLAY_INSET_VERTICAL_PX);
+  const [projectorJoinQrOverlayInsetHorizontalPx, setProjectorJoinQrOverlayInsetHorizontalPx] =
+    useState(DEFAULT_PROJECTOR_JOIN_QR_OVERLAY_INSET_HORIZONTAL_PX);
   const [projectorJoinQrOverlayCorner, setProjectorJoinQrOverlayCorner] =
     useState<ProjectorJoinQrOverlayCorner>(DEFAULT_PROJECTOR_JOIN_QR_OVERLAY_CORNER);
   const [speakerTileBackgroundColor, setSpeakerTileBackgroundColor] = useState("#1976d2");
@@ -152,18 +158,22 @@ export function useBrandingEditorState() {
 
   const qrSettersRef = useRef<AdminBrandingQrSetters>({
     setProjectorJoinQrVisible,
+    setProjectorJoinQrOverlayVisible,
     setProjectorJoinQrText,
     setProjectorJoinQrTextColor,
     setProjectorJoinQrOverlaySizePx,
-    setProjectorJoinQrOverlayInsetPx,
+    setProjectorJoinQrOverlayInsetVerticalPx,
+    setProjectorJoinQrOverlayInsetHorizontalPx,
     setProjectorJoinQrOverlayCorner,
   });
   qrSettersRef.current = {
     setProjectorJoinQrVisible,
+    setProjectorJoinQrOverlayVisible,
     setProjectorJoinQrText,
     setProjectorJoinQrTextColor,
     setProjectorJoinQrOverlaySizePx,
-    setProjectorJoinQrOverlayInsetPx,
+    setProjectorJoinQrOverlayInsetVerticalPx,
+    setProjectorJoinQrOverlayInsetHorizontalPx,
     setProjectorJoinQrOverlayCorner,
   };
 
@@ -294,10 +304,12 @@ export function useBrandingEditorState() {
       brandBodyBackgroundColor,
       brandTheme,
       projectorJoinQrVisible,
+      projectorJoinQrOverlayVisible,
       projectorJoinQrText,
       projectorJoinQrTextColor,
       projectorJoinQrOverlaySizePx,
-      projectorJoinQrOverlayInsetPx,
+      projectorJoinQrOverlayInsetVerticalPx,
+      projectorJoinQrOverlayInsetHorizontalPx,
       projectorJoinQrOverlayCorner,
       speakerTileBackgroundColor,
       speakerTileTextColor,
@@ -336,10 +348,12 @@ export function useBrandingEditorState() {
     brandBodyBackgroundColor,
     brandTheme,
     projectorJoinQrVisible,
+    projectorJoinQrOverlayVisible,
     projectorJoinQrText,
     projectorJoinQrTextColor,
     projectorJoinQrOverlaySizePx,
-    projectorJoinQrOverlayInsetPx,
+    projectorJoinQrOverlayInsetVerticalPx,
+    projectorJoinQrOverlayInsetHorizontalPx,
     projectorJoinQrOverlayCorner,
     speakerTileBackgroundColor,
     speakerTileTextColor,
@@ -410,14 +424,18 @@ export function useBrandingEditorState() {
     setBrandTheme,
     projectorJoinQrVisible,
     setProjectorJoinQrVisible,
+    projectorJoinQrOverlayVisible,
+    setProjectorJoinQrOverlayVisible,
     projectorJoinQrText,
     setProjectorJoinQrText,
     projectorJoinQrTextColor,
     setProjectorJoinQrTextColor,
     projectorJoinQrOverlaySizePx,
     setProjectorJoinQrOverlaySizePx,
-    projectorJoinQrOverlayInsetPx,
-    setProjectorJoinQrOverlayInsetPx,
+    projectorJoinQrOverlayInsetVerticalPx,
+    setProjectorJoinQrOverlayInsetVerticalPx,
+    projectorJoinQrOverlayInsetHorizontalPx,
+    setProjectorJoinQrOverlayInsetHorizontalPx,
     projectorJoinQrOverlayCorner,
     setProjectorJoinQrOverlayCorner,
     speakerTileBackgroundColor,

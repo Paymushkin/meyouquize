@@ -5,25 +5,30 @@ import type { ProjectorJoinQrOverlayCorner } from "@meyouquize/shared";
 type Props = {
   qrDataUrl: string;
   sizePx: number;
-  insetPx: number;
+  insetVerticalPx: number;
+  insetHorizontalPx: number;
   corner: ProjectorJoinQrOverlayCorner;
 };
 
-function cornerPositionSx(corner: ProjectorJoinQrOverlayCorner, insetPx: number): SxProps<Theme> {
+function cornerPositionSx(
+  corner: ProjectorJoinQrOverlayCorner,
+  insetVerticalPx: number,
+  insetHorizontalPx: number,
+): SxProps<Theme> {
   switch (corner) {
     case "top_left":
-      return { top: insetPx, left: insetPx };
+      return { top: insetVerticalPx, left: insetHorizontalPx };
     case "bottom_right":
-      return { bottom: insetPx, right: insetPx };
+      return { bottom: insetVerticalPx, right: insetHorizontalPx };
     case "bottom_left":
-      return { bottom: insetPx, left: insetPx };
+      return { bottom: insetVerticalPx, left: insetHorizontalPx };
     default:
-      return { top: insetPx, right: insetPx };
+      return { top: insetVerticalPx, right: insetHorizontalPx };
   }
 }
 
 export function ProjectorJoinQrOverlay(props: Props) {
-  const { qrDataUrl, sizePx, insetPx, corner } = props;
+  const { qrDataUrl, sizePx, insetVerticalPx, insetHorizontalPx, corner } = props;
   return (
     <Box
       sx={{
@@ -40,7 +45,7 @@ export function ProjectorJoinQrOverlay(props: Props) {
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        ...cornerPositionSx(corner, insetPx),
+        ...cornerPositionSx(corner, insetVerticalPx, insetHorizontalPx),
       }}
     >
       <Box

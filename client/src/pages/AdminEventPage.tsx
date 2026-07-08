@@ -665,10 +665,12 @@ export function AdminEventPage() {
     setPlayerVoteProgressTrackColor: branding.setPlayerVoteProgressTrackColor,
     setPlayerVoteProgressBarColor: branding.setPlayerVoteProgressBarColor,
     setProjectorJoinQrVisible: branding.setProjectorJoinQrVisible,
+    setProjectorJoinQrOverlayVisible: branding.setProjectorJoinQrOverlayVisible,
     setProjectorJoinQrText: branding.setProjectorJoinQrText,
     setProjectorJoinQrTextColor: branding.setProjectorJoinQrTextColor,
     setProjectorJoinQrOverlaySizePx: branding.setProjectorJoinQrOverlaySizePx,
-    setProjectorJoinQrOverlayInsetPx: branding.setProjectorJoinQrOverlayInsetPx,
+    setProjectorJoinQrOverlayInsetVerticalPx: branding.setProjectorJoinQrOverlayInsetVerticalPx,
+    setProjectorJoinQrOverlayInsetHorizontalPx: branding.setProjectorJoinQrOverlayInsetHorizontalPx,
     setProjectorJoinQrOverlayCorner: branding.setProjectorJoinQrOverlayCorner,
     setBrandPrimaryColor: branding.setBrandPrimaryColor,
     setBrandAccentColor: branding.setBrandAccentColor,
@@ -721,10 +723,12 @@ export function AdminEventPage() {
     playerVoteProgressTrackColor: branding.playerVoteProgressTrackColor,
     playerVoteProgressBarColor: branding.playerVoteProgressBarColor,
     projectorJoinQrVisible: branding.projectorJoinQrVisible,
+    projectorJoinQrOverlayVisible: branding.projectorJoinQrOverlayVisible,
     projectorJoinQrText: branding.projectorJoinQrText,
     projectorJoinQrTextColor: branding.projectorJoinQrTextColor,
     projectorJoinQrOverlaySizePx: branding.projectorJoinQrOverlaySizePx,
-    projectorJoinQrOverlayInsetPx: branding.projectorJoinQrOverlayInsetPx,
+    projectorJoinQrOverlayInsetVerticalPx: branding.projectorJoinQrOverlayInsetVerticalPx,
+    projectorJoinQrOverlayInsetHorizontalPx: branding.projectorJoinQrOverlayInsetHorizontalPx,
     projectorJoinQrOverlayCorner: branding.projectorJoinQrOverlayCorner,
     showFirstCorrectAnswerer,
     firstCorrectWinnersCount,
@@ -1076,16 +1080,14 @@ export function AdminEventPage() {
     setPlayerVoteOptionTextColor: branding.setPlayerVoteOptionTextColor,
     playerVoteProgressBarColor: branding.playerVoteProgressBarColor,
     setPlayerVoteProgressBarColor: branding.setPlayerVoteProgressBarColor,
-    projectorJoinQrVisible: branding.projectorJoinQrVisible,
-    setProjectorJoinQrVisible: branding.setProjectorJoinQrVisible,
-    projectorJoinQrText: branding.projectorJoinQrText,
-    setProjectorJoinQrText: branding.setProjectorJoinQrText,
-    projectorJoinQrTextColor: branding.projectorJoinQrTextColor,
-    setProjectorJoinQrTextColor: branding.setProjectorJoinQrTextColor,
+    projectorJoinQrOverlayVisible: branding.projectorJoinQrOverlayVisible,
+    setProjectorJoinQrOverlayVisible: branding.setProjectorJoinQrOverlayVisible,
     projectorJoinQrOverlaySizePx: branding.projectorJoinQrOverlaySizePx,
     setProjectorJoinQrOverlaySizePx: branding.setProjectorJoinQrOverlaySizePx,
-    projectorJoinQrOverlayInsetPx: branding.projectorJoinQrOverlayInsetPx,
-    setProjectorJoinQrOverlayInsetPx: branding.setProjectorJoinQrOverlayInsetPx,
+    projectorJoinQrOverlayInsetVerticalPx: branding.projectorJoinQrOverlayInsetVerticalPx,
+    projectorJoinQrOverlayInsetHorizontalPx: branding.projectorJoinQrOverlayInsetHorizontalPx,
+    setProjectorJoinQrOverlayInsetVerticalPx: branding.setProjectorJoinQrOverlayInsetVerticalPx,
+    setProjectorJoinQrOverlayInsetHorizontalPx: branding.setProjectorJoinQrOverlayInsetHorizontalPx,
     projectorJoinQrOverlayCorner: branding.projectorJoinQrOverlayCorner,
     setProjectorJoinQrOverlayCorner: branding.setProjectorJoinQrOverlayCorner,
     cloudQuestionColor: branding.cloudQuestionColor,
@@ -1503,7 +1505,6 @@ export function AdminEventPage() {
               <AdminEventSectionRouter
                 activeSection={activeSection}
                 general={{
-                  eventName,
                   editableTitle,
                   setEditableTitle,
                   saveQuizTitle,
@@ -1513,7 +1514,13 @@ export function AdminEventPage() {
                   playerAutoJoinRandomNickname: playerTiles.playerAutoJoinRandomNickname,
                   onTogglePlayerAutoJoinRandomNickname:
                     playerTiles.updatePlayerAutoJoinRandomNickname,
-                  onRequestResetDemo: () => setConfirmResetDemoOpen(true),
+                  projectorJoinQrVisible: branding.projectorJoinQrVisible,
+                  setProjectorJoinQrVisible: branding.setProjectorJoinQrVisible,
+                  projectorJoinQrText: branding.projectorJoinQrText,
+                  setProjectorJoinQrText: branding.setProjectorJoinQrText,
+                  projectorJoinQrTextColor: branding.projectorJoinQrTextColor,
+                  setProjectorJoinQrTextColor: branding.setProjectorJoinQrTextColor,
+                  emitBrandingPatch,
                 }}
                 questions={{
                   roomQuestionsTab,
@@ -1612,7 +1619,11 @@ export function AdminEventPage() {
                   emitPublicViewPatch,
                   setMessage,
                 }}
-                danger={{ onResetAllAnswers: resetAllAnswers }}
+                danger={{
+                  eventName,
+                  onResetAllAnswers: resetAllAnswers,
+                  onRequestResetDemo: () => setConfirmResetDemoOpen(true),
+                }}
               />
             </Stack>
           </Box>

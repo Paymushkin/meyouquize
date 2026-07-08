@@ -80,10 +80,12 @@ type Params = {
   setPlayerVoteProgressTrackColor: (value: string) => void;
   setPlayerVoteProgressBarColor: (value: string) => void;
   setProjectorJoinQrVisible: (value: boolean) => void;
+  setProjectorJoinQrOverlayVisible: (value: boolean) => void;
   setProjectorJoinQrText: (value: string) => void;
   setProjectorJoinQrTextColor: (value: string) => void;
   setProjectorJoinQrOverlaySizePx: (value: number) => void;
-  setProjectorJoinQrOverlayInsetPx: (value: number) => void;
+  setProjectorJoinQrOverlayInsetVerticalPx: (value: number) => void;
+  setProjectorJoinQrOverlayInsetHorizontalPx: (value: number) => void;
   setProjectorJoinQrOverlayCorner: (
     value: import("@meyouquize/shared").ProjectorJoinQrOverlayCorner,
   ) => void;
@@ -149,10 +151,12 @@ export function useAdminEventSocket<TQuestion extends QuestionFormPatchable>(
     setPlayerVoteProgressTrackColor,
     setPlayerVoteProgressBarColor,
     setProjectorJoinQrVisible,
+    setProjectorJoinQrOverlayVisible,
     setProjectorJoinQrText,
     setProjectorJoinQrTextColor,
     setProjectorJoinQrOverlaySizePx,
-    setProjectorJoinQrOverlayInsetPx,
+    setProjectorJoinQrOverlayInsetVerticalPx,
+    setProjectorJoinQrOverlayInsetHorizontalPx,
     setProjectorJoinQrOverlayCorner,
     setShowFirstCorrectAnswerer,
     setFirstCorrectWinnersCount,
@@ -213,10 +217,14 @@ export function useAdminEventSocket<TQuestion extends QuestionFormPatchable>(
       setPlayerVoteProgressTrackColor(nextBranding.playerVoteProgressTrackColor);
       setPlayerVoteProgressBarColor(nextBranding.playerVoteProgressBarColor);
       setProjectorJoinQrVisible(nextBranding.projectorJoinQrVisible);
+      setProjectorJoinQrOverlayVisible(nextBranding.projectorJoinQrOverlayVisible);
       setProjectorJoinQrText(nextBranding.projectorJoinQrText);
       setProjectorJoinQrTextColor(nextBranding.projectorJoinQrTextColor);
       setProjectorJoinQrOverlaySizePx(nextBranding.projectorJoinQrOverlaySizePx);
-      setProjectorJoinQrOverlayInsetPx(nextBranding.projectorJoinQrOverlayInsetPx);
+      setProjectorJoinQrOverlayInsetVerticalPx(nextBranding.projectorJoinQrOverlayInsetVerticalPx);
+      setProjectorJoinQrOverlayInsetHorizontalPx(
+        nextBranding.projectorJoinQrOverlayInsetHorizontalPx,
+      );
       setProjectorJoinQrOverlayCorner(nextBranding.projectorJoinQrOverlayCorner);
     },
     [
@@ -257,7 +265,8 @@ export function useAdminEventSocket<TQuestion extends QuestionFormPatchable>(
       setProjectorJoinQrText,
       setProjectorJoinQrTextColor,
       setProjectorJoinQrOverlaySizePx,
-      setProjectorJoinQrOverlayInsetPx,
+      setProjectorJoinQrOverlayInsetVerticalPx,
+      setProjectorJoinQrOverlayInsetHorizontalPx,
       setProjectorJoinQrOverlayCorner,
     ],
   );

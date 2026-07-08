@@ -1,8 +1,9 @@
-import { Button, Card, CardContent, Stack } from "@mui/material";
+import { Stack } from "@mui/material";
 import { AdminGeneralSection } from "../../components/admin/AdminGeneralSection";
 
+import type { PublicViewSetPatch } from "../../publicViewContract";
+
 export type AdminEventGeneralTabProps = {
-  eventName: string;
   editableTitle: string;
   setEditableTitle: (value: string) => void;
   saveQuizTitle: () => void | Promise<void>;
@@ -11,11 +12,16 @@ export type AdminEventGeneralTabProps = {
   onToggleShowEventTitleOnPlayer: (next: boolean) => void;
   playerAutoJoinRandomNickname: boolean;
   onTogglePlayerAutoJoinRandomNickname: (next: boolean) => void;
-  onRequestResetDemo: () => void;
+  projectorJoinQrVisible: boolean;
+  setProjectorJoinQrVisible: (value: boolean) => void;
+  projectorJoinQrText: string;
+  setProjectorJoinQrText: (value: string) => void;
+  projectorJoinQrTextColor: string;
+  setProjectorJoinQrTextColor: (value: string) => void;
+  emitBrandingPatch: (patch: PublicViewSetPatch) => void;
 };
 
 export function AdminEventGeneralTab({
-  eventName,
   editableTitle,
   setEditableTitle,
   saveQuizTitle,
@@ -24,7 +30,13 @@ export function AdminEventGeneralTab({
   onToggleShowEventTitleOnPlayer,
   playerAutoJoinRandomNickname,
   onTogglePlayerAutoJoinRandomNickname,
-  onRequestResetDemo,
+  projectorJoinQrVisible,
+  setProjectorJoinQrVisible,
+  projectorJoinQrText,
+  setProjectorJoinQrText,
+  projectorJoinQrTextColor,
+  setProjectorJoinQrTextColor,
+  emitBrandingPatch,
 }: AdminEventGeneralTabProps) {
   return (
     <Stack spacing={2}>
@@ -37,21 +49,14 @@ export function AdminEventGeneralTab({
         onToggleShowEventTitleOnPlayer={onToggleShowEventTitleOnPlayer}
         playerAutoJoinRandomNickname={playerAutoJoinRandomNickname}
         onTogglePlayerAutoJoinRandomNickname={onTogglePlayerAutoJoinRandomNickname}
+        projectorJoinQrVisible={projectorJoinQrVisible}
+        setProjectorJoinQrVisible={setProjectorJoinQrVisible}
+        projectorJoinQrText={projectorJoinQrText}
+        setProjectorJoinQrText={setProjectorJoinQrText}
+        projectorJoinQrTextColor={projectorJoinQrTextColor}
+        setProjectorJoinQrTextColor={setProjectorJoinQrTextColor}
+        emitBrandingPatch={emitBrandingPatch}
       />
-      {eventName === "demo" && (
-        <Card variant="outlined" sx={{ borderColor: "warning.main" }}>
-          <CardContent>
-            <Button
-              variant="outlined"
-              color="warning"
-              onClick={onRequestResetDemo}
-              sx={{ textTransform: "none", alignSelf: "flex-start" }}
-            >
-              Вернуть тестовые данные
-            </Button>
-          </CardContent>
-        </Card>
-      )}
     </Stack>
   );
 }

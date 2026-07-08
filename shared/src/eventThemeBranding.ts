@@ -39,9 +39,12 @@ export type EventThemeBranding = {
   brandBodyBackgroundColor: string;
   brandTheme: BrandThemeId;
   projectorJoinQrVisible: boolean;
+  projectorJoinQrOverlayVisible: boolean;
   projectorJoinQrText: string;
   projectorJoinQrTextColor: string;
   projectorJoinQrOverlaySizePx: number;
+  projectorJoinQrOverlayInsetVerticalPx: number;
+  projectorJoinQrOverlayInsetHorizontalPx: number;
   projectorJoinQrOverlayInsetPx: number;
   projectorJoinQrOverlayCorner: ProjectorJoinQrOverlayCorner;
   speakerTileBackgroundColor: string;
@@ -96,9 +99,19 @@ export function pickEventThemeBrandingFromPublicView(view: unknown): EventThemeB
     brandBodyBackgroundColor: String(value.brandBodyBackgroundColor ?? ""),
     brandTheme: value.brandTheme === "meyou" ? "meyou" : "default",
     projectorJoinQrVisible: Boolean(value.projectorJoinQrVisible),
+    projectorJoinQrOverlayVisible:
+      typeof value.projectorJoinQrOverlayVisible === "boolean"
+        ? value.projectorJoinQrOverlayVisible
+        : Boolean(value.projectorJoinQrVisible),
     projectorJoinQrText: String(value.projectorJoinQrText ?? ""),
     projectorJoinQrTextColor: String(value.projectorJoinQrTextColor ?? ""),
     projectorJoinQrOverlaySizePx: Number(value.projectorJoinQrOverlaySizePx ?? 0),
+    projectorJoinQrOverlayInsetVerticalPx: Number(
+      value.projectorJoinQrOverlayInsetVerticalPx ?? value.projectorJoinQrOverlayInsetPx ?? 0,
+    ),
+    projectorJoinQrOverlayInsetHorizontalPx: Number(
+      value.projectorJoinQrOverlayInsetHorizontalPx ?? value.projectorJoinQrOverlayInsetPx ?? 0,
+    ),
     projectorJoinQrOverlayInsetPx: Number(value.projectorJoinQrOverlayInsetPx ?? 0),
     projectorJoinQrOverlayCorner:
       value.projectorJoinQrOverlayCorner === "top_left" ||

@@ -41,10 +41,12 @@ export type AdminBrandingVisualSetters = {
 
 export type AdminBrandingQrSetters = {
   setProjectorJoinQrVisible: (value: boolean) => void;
+  setProjectorJoinQrOverlayVisible: (value: boolean) => void;
   setProjectorJoinQrText: (value: string) => void;
   setProjectorJoinQrTextColor: (value: string) => void;
   setProjectorJoinQrOverlaySizePx: (value: number) => void;
-  setProjectorJoinQrOverlayInsetPx: (value: number) => void;
+  setProjectorJoinQrOverlayInsetVerticalPx: (value: number) => void;
+  setProjectorJoinQrOverlayInsetHorizontalPx: (value: number) => void;
   setProjectorJoinQrOverlayCorner: (value: ProjectorJoinQrOverlayCorner) => void;
 };
 
@@ -102,10 +104,16 @@ export function applyAdminBrandingVisualFromPublicView(
     const normalized = normalizePublicViewState(pv);
     if (options.qrSetters) {
       options.qrSetters.setProjectorJoinQrVisible(normalized.projectorJoinQrVisible);
+      options.qrSetters.setProjectorJoinQrOverlayVisible(normalized.projectorJoinQrOverlayVisible);
       options.qrSetters.setProjectorJoinQrText(normalized.projectorJoinQrText);
       options.qrSetters.setProjectorJoinQrTextColor(normalized.projectorJoinQrTextColor);
       options.qrSetters.setProjectorJoinQrOverlaySizePx(normalized.projectorJoinQrOverlaySizePx);
-      options.qrSetters.setProjectorJoinQrOverlayInsetPx(normalized.projectorJoinQrOverlayInsetPx);
+      options.qrSetters.setProjectorJoinQrOverlayInsetVerticalPx(
+        normalized.projectorJoinQrOverlayInsetVerticalPx,
+      );
+      options.qrSetters.setProjectorJoinQrOverlayInsetHorizontalPx(
+        normalized.projectorJoinQrOverlayInsetHorizontalPx,
+      );
       options.qrSetters.setProjectorJoinQrOverlayCorner(normalized.projectorJoinQrOverlayCorner);
     }
     if (options.tileSetters) {

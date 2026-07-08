@@ -5,6 +5,7 @@ import {
   Dialog,
   DialogContent,
   DialogTitle,
+  Divider,
   FormControlLabel,
   IconButton,
   Stack,
@@ -17,6 +18,12 @@ import ContentCopyIcon from "@mui/icons-material/ContentCopy";
 import QrCode2Icon from "@mui/icons-material/QrCode2";
 import QRCode from "qrcode";
 import { buildPlayerJoinUrl, buildProjectorScreenUrl } from "../../publicAppOrigin";
+import {
+  DEFAULT_PROJECTOR_JOIN_QR_TEXT,
+  PROJECTOR_JOIN_QR_TEXT_MAX_LENGTH,
+  type PublicViewSetPatch,
+} from "../../publicViewContract";
+import { CompactColorField } from "./branding/CompactColorField";
 
 type Props = {
   editableTitle: string;
@@ -27,6 +34,13 @@ type Props = {
   onToggleShowEventTitleOnPlayer: (next: boolean) => void;
   playerAutoJoinRandomNickname: boolean;
   onTogglePlayerAutoJoinRandomNickname: (next: boolean) => void;
+  projectorJoinQrVisible: boolean;
+  setProjectorJoinQrVisible: (value: boolean) => void;
+  projectorJoinQrText: string;
+  setProjectorJoinQrText: (value: string) => void;
+  projectorJoinQrTextColor: string;
+  setProjectorJoinQrTextColor: (value: string) => void;
+  emitBrandingPatch: (patch: PublicViewSetPatch) => void;
 };
 
 export function AdminGeneralSection(props: Props) {
@@ -39,6 +53,13 @@ export function AdminGeneralSection(props: Props) {
     onToggleShowEventTitleOnPlayer,
     playerAutoJoinRandomNickname,
     onTogglePlayerAutoJoinRandomNickname,
+    projectorJoinQrVisible,
+    setProjectorJoinQrVisible,
+    projectorJoinQrText,
+    setProjectorJoinQrText,
+    projectorJoinQrTextColor,
+    setProjectorJoinQrTextColor,
+    emitBrandingPatch,
   } = props;
   const joinUrl = buildPlayerJoinUrl(eventSlug);
   const screenUrl = buildProjectorScreenUrl(eventSlug);
@@ -172,6 +193,44 @@ export function AdminGeneralSection(props: Props) {
             }
             label="Вход без формы: сразу случайное имя"
           />
+          <Divider sx={{ my: 2 }} />
+          <Stack spacing={1.25}>
+            <FormControlLabel
+              sx={{ m: 0 }}
+              control={
+                <Switch
+                  checked={projectorJoinQrVisible}
+                  onChange={(_, next) => {
+                    setProjectorJoinQrVisible(next);
+                    emitBrandingPatch({ projectorJoinQrVisible: next });
+                  }}
+                />
+              }
+              label="Показывать QR-код на экране ивента"
+            />
+            <Typography variant="caption" color="text.secondary">
+              На экране ивента — крупный QR с текстом вместо названия.
+            </Typography>
+            <TextField
+              label="Текст рядом с QR"
+              placeholder={DEFAULT_PROJECTOR_JOIN_QR_TEXT}
+              value={projectorJoinQrText}
+              onChange={(e) => setProjectorJoinQrText(e.target.value)}
+              onBlur={() => emitBrandingPatch({ projectorJoinQrText })}
+              fullWidth
+              size="small"
+              multiline
+              minRows={2}
+              maxRows={5}
+              inputProps={{ maxLength: PROJECTOR_JOIN_QR_TEXT_MAX_LENGTH }}
+            />
+            <CompactColorField
+              label="Text"
+              value={projectorJoinQrTextColor}
+              onChange={setProjectorJoinQrTextColor}
+              onBlur={() => emitBrandingPatch({ projectorJoinQrTextColor })}
+            />
+          </Stack>
         </CardContent>
       </Card>
       <Dialog open={qrOpen} onClose={() => setQrOpen(false)}>

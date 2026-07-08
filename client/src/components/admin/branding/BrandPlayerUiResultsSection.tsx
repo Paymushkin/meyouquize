@@ -6,6 +6,8 @@ import { CompactColorField } from "./CompactColorField";
 
 type Props = {
   colorGridSx: SxProps<Theme>;
+  brandBodyBackgroundColor: string;
+  setBrandBodyBackgroundColor: (value: string) => void;
   playerVoteOptionTextColor: string;
   setPlayerVoteOptionTextColor: (value: string) => void;
   playerVoteProgressBarColor: string;
@@ -16,6 +18,8 @@ type Props = {
 export function BrandPlayerUiResultsSection(props: Props) {
   const {
     colorGridSx,
+    brandBodyBackgroundColor,
+    setBrandBodyBackgroundColor,
     playerVoteOptionTextColor,
     setPlayerVoteOptionTextColor,
     playerVoteProgressBarColor,
@@ -26,10 +30,16 @@ export function BrandPlayerUiResultsSection(props: Props) {
   return (
     <Accordion defaultExpanded>
       <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-        <Typography variant="subtitle2">Интерфейс пользователя</Typography>
+        <Typography variant="subtitle2">Фоновый цвет</Typography>
       </AccordionSummary>
       <AccordionDetails>
         <Box sx={colorGridSx}>
+          <CompactColorField
+            label="Фоновый цвет"
+            value={brandBodyBackgroundColor}
+            onChange={setBrandBodyBackgroundColor}
+            onBlur={() => emitPatch({ brandBodyBackgroundColor })}
+          />
           <CompactColorField
             label="Результаты: текст ответов"
             value={playerVoteOptionTextColor}

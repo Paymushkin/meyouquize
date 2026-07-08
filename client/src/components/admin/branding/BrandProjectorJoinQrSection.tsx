@@ -11,16 +11,10 @@ import {
 } from "@mui/material";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import {
-  DEFAULT_PROJECTOR_JOIN_QR_OVERLAY_CORNER,
-  DEFAULT_PROJECTOR_JOIN_QR_OVERLAY_INSET_PX,
-  DEFAULT_PROJECTOR_JOIN_QR_OVERLAY_SIZE_PX,
-  DEFAULT_PROJECTOR_JOIN_QR_TEXT,
   PROJECTOR_JOIN_QR_OVERLAY_CORNERS,
-  PROJECTOR_JOIN_QR_TEXT_MAX_LENGTH,
   type ProjectorJoinQrOverlayCorner,
   type PublicViewSetPatch,
 } from "../../../publicViewContract";
-import { CompactColorField } from "./CompactColorField";
 
 const CORNER_LABELS: Record<ProjectorJoinQrOverlayCorner, string> = {
   top_right: "Верхний правый",
@@ -30,16 +24,14 @@ const CORNER_LABELS: Record<ProjectorJoinQrOverlayCorner, string> = {
 };
 
 type Props = {
-  projectorJoinQrVisible: boolean;
-  setProjectorJoinQrVisible: (value: boolean) => void;
-  projectorJoinQrText: string;
-  setProjectorJoinQrText: (value: string) => void;
-  projectorJoinQrTextColor: string;
-  setProjectorJoinQrTextColor: (value: string) => void;
+  projectorJoinQrOverlayVisible: boolean;
+  setProjectorJoinQrOverlayVisible: (value: boolean) => void;
   projectorJoinQrOverlaySizePx: number;
   setProjectorJoinQrOverlaySizePx: (value: number) => void;
-  projectorJoinQrOverlayInsetPx: number;
-  setProjectorJoinQrOverlayInsetPx: (value: number) => void;
+  projectorJoinQrOverlayInsetVerticalPx: number;
+  setProjectorJoinQrOverlayInsetVerticalPx: (value: number) => void;
+  projectorJoinQrOverlayInsetHorizontalPx: number;
+  setProjectorJoinQrOverlayInsetHorizontalPx: (value: number) => void;
   projectorJoinQrOverlayCorner: ProjectorJoinQrOverlayCorner;
   setProjectorJoinQrOverlayCorner: (value: ProjectorJoinQrOverlayCorner) => void;
   emitPatch: (patch: PublicViewSetPatch) => void;
@@ -47,16 +39,14 @@ type Props = {
 
 export function BrandProjectorJoinQrSection(props: Props) {
   const {
-    projectorJoinQrVisible,
-    setProjectorJoinQrVisible,
-    projectorJoinQrText,
-    setProjectorJoinQrText,
-    projectorJoinQrTextColor,
-    setProjectorJoinQrTextColor,
+    projectorJoinQrOverlayVisible,
+    setProjectorJoinQrOverlayVisible,
     projectorJoinQrOverlaySizePx,
     setProjectorJoinQrOverlaySizePx,
-    projectorJoinQrOverlayInsetPx,
-    setProjectorJoinQrOverlayInsetPx,
+    projectorJoinQrOverlayInsetVerticalPx,
+    setProjectorJoinQrOverlayInsetVerticalPx,
+    projectorJoinQrOverlayInsetHorizontalPx,
+    setProjectorJoinQrOverlayInsetHorizontalPx,
     projectorJoinQrOverlayCorner,
     setProjectorJoinQrOverlayCorner,
     emitPatch,
@@ -65,7 +55,7 @@ export function BrandProjectorJoinQrSection(props: Props) {
   return (
     <Accordion defaultExpanded>
       <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-        <Typography variant="subtitle2">Проектор: QR входа</Typography>
+        <Typography variant="subtitle2">Проектор: компактный QR</Typography>
       </AccordionSummary>
       <AccordionDetails>
         <Stack spacing={1.25}>
@@ -73,40 +63,17 @@ export function BrandProjectorJoinQrSection(props: Props) {
             sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 1 }}
           >
             <Typography variant="caption" color="text.secondary">
-              Показывать QR-код на экране ивента
+              Показывать QR в углу экрана
             </Typography>
             <Switch
-              checked={projectorJoinQrVisible}
+              checked={projectorJoinQrOverlayVisible}
               onChange={(_, next) => {
-                setProjectorJoinQrVisible(next);
-                emitPatch({ projectorJoinQrVisible: next });
+                setProjectorJoinQrOverlayVisible(next);
+                emitPatch({ projectorJoinQrOverlayVisible: next });
               }}
             />
           </Box>
-          <Typography variant="caption" color="text.secondary">
-            На экране ивента — крупный QR с текстом. На голосованиях и других экранах — компактный
-            QR в углу (ведёт на вход в ивент).
-          </Typography>
-          <TextField
-            label="Текст рядом с QR"
-            placeholder={DEFAULT_PROJECTOR_JOIN_QR_TEXT}
-            value={projectorJoinQrText}
-            onChange={(e) => setProjectorJoinQrText(e.target.value)}
-            onBlur={() => emitPatch({ projectorJoinQrText })}
-            fullWidth
-            size="small"
-            multiline
-            minRows={2}
-            maxRows={5}
-            inputProps={{ maxLength: PROJECTOR_JOIN_QR_TEXT_MAX_LENGTH }}
-          />
-          <CompactColorField
-            label="Text"
-            value={projectorJoinQrTextColor}
-            onChange={setProjectorJoinQrTextColor}
-            onBlur={() => emitPatch({ projectorJoinQrTextColor })}
-          />
-          <Stack direction={{ xs: "column", sm: "row" }} spacing={1.25}>
+          <Stack direction="row" spacing={1.25} flexWrap="wrap" useFlexGap>
             <TextField
               type="number"
               label="Размер QR, px"
@@ -119,41 +86,55 @@ export function BrandProjectorJoinQrSection(props: Props) {
               }
               onBlur={() => emitPatch({ projectorJoinQrOverlaySizePx })}
               inputProps={{ min: 48, max: 480 }}
-              sx={{ flex: 1 }}
+              sx={{ flex: "1 1 110px", minWidth: 110 }}
             />
             <TextField
-              type="number"
-              label="Отступ от края, px"
+              select
+              label="Угол экрана"
               size="small"
-              value={projectorJoinQrOverlayInsetPx}
+              value={projectorJoinQrOverlayCorner}
+              onChange={(e) => {
+                const next = e.target.value as ProjectorJoinQrOverlayCorner;
+                setProjectorJoinQrOverlayCorner(next);
+                emitPatch({ projectorJoinQrOverlayCorner: next });
+              }}
+              sx={{ flex: "2 1 160px", minWidth: 160 }}
+            >
+              {PROJECTOR_JOIN_QR_OVERLAY_CORNERS.map((corner) => (
+                <MenuItem key={corner} value={corner}>
+                  {CORNER_LABELS[corner]}
+                </MenuItem>
+              ))}
+            </TextField>
+            <TextField
+              type="number"
+              label="Сверху/снизу, px"
+              size="small"
+              value={projectorJoinQrOverlayInsetVerticalPx}
               onChange={(e) =>
-                setProjectorJoinQrOverlayInsetPx(
+                setProjectorJoinQrOverlayInsetVerticalPx(
                   Math.max(0, Math.trunc(Number(e.target.value) || 0)),
                 )
               }
-              onBlur={() => emitPatch({ projectorJoinQrOverlayInsetPx })}
+              onBlur={() => emitPatch({ projectorJoinQrOverlayInsetVerticalPx })}
               inputProps={{ min: 0, max: 200 }}
-              sx={{ flex: 1 }}
+              sx={{ flex: "1 1 110px", minWidth: 110 }}
+            />
+            <TextField
+              type="number"
+              label="Слева/справа, px"
+              size="small"
+              value={projectorJoinQrOverlayInsetHorizontalPx}
+              onChange={(e) =>
+                setProjectorJoinQrOverlayInsetHorizontalPx(
+                  Math.max(0, Math.trunc(Number(e.target.value) || 0)),
+                )
+              }
+              onBlur={() => emitPatch({ projectorJoinQrOverlayInsetHorizontalPx })}
+              inputProps={{ min: 0, max: 200 }}
+              sx={{ flex: "1 1 110px", minWidth: 110 }}
             />
           </Stack>
-          <TextField
-            select
-            label="Угол экрана"
-            size="small"
-            value={projectorJoinQrOverlayCorner}
-            onChange={(e) => {
-              const next = e.target.value as ProjectorJoinQrOverlayCorner;
-              setProjectorJoinQrOverlayCorner(next);
-              emitPatch({ projectorJoinQrOverlayCorner: next });
-            }}
-            helperText={`По умолчанию: ${DEFAULT_PROJECTOR_JOIN_QR_OVERLAY_SIZE_PX}px, отступ ${DEFAULT_PROJECTOR_JOIN_QR_OVERLAY_INSET_PX}px, верхний правый`}
-          >
-            {PROJECTOR_JOIN_QR_OVERLAY_CORNERS.map((corner) => (
-              <MenuItem key={corner} value={corner}>
-                {CORNER_LABELS[corner]}
-              </MenuItem>
-            ))}
-          </TextField>
         </Stack>
       </AccordionDetails>
     </Accordion>

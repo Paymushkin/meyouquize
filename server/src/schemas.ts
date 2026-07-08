@@ -522,12 +522,15 @@ export const setPublicViewSchema = z.object({
     .regex(/^#([0-9a-fA-F]{6})$/)
     .optional(),
   projectorJoinQrVisible: z.boolean().optional(),
+  projectorJoinQrOverlayVisible: z.boolean().optional(),
   projectorJoinQrText: z.string().trim().max(PROJECTOR_JOIN_QR_TEXT_MAX_LENGTH).optional(),
   projectorJoinQrTextColor: z
     .string()
     .regex(/^#([0-9a-fA-F]{6})$/)
     .optional(),
   projectorJoinQrOverlaySizePx: z.number().int().min(48).max(480).optional(),
+  projectorJoinQrOverlayInsetVerticalPx: z.number().int().min(0).max(200).optional(),
+  projectorJoinQrOverlayInsetHorizontalPx: z.number().int().min(0).max(200).optional(),
   projectorJoinQrOverlayInsetPx: z.number().int().min(0).max(200).optional(),
   projectorJoinQrOverlayCorner: z
     .enum(["top_right", "top_left", "bottom_right", "bottom_left"])
