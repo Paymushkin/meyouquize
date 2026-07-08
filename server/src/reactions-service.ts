@@ -42,6 +42,22 @@ type ReactionSessionInternal = {
 const sessionsByQuiz = new Map<string, ReactionSessionInternal>();
 const historyByQuiz = new Map<string, ReactionSessionHistoryItem[]>();
 
+// Реакционная сессия держится в памяти пока активно/недавно завершалась.
+// Это ограничивает рост Map/histories на long-running сервере.
+const REACTION_SESSION_INACTIVE_TTL_MS = 24 * 60 * 60 * 1000; // 24 часа
+
+function cleanupExpiredReactionsForQuiz(quizId: string, nowMs: number): void {
+  const session = sessionsByQuiz.get(quizId);
+  if (!session) return;
+  if (session.isActive) return;
+
+  const endsAtMs = session.endsAt.getTime();
+  if (endsAtMs + REACTION_SESSION_INACTIVE_TTL_MS >= nowMs) return;
+
+  sessionsByQuiz.delete(quizId);
+  historyByQuiz.delete(quizId);
+}
+
 function normalizeReactionList(reactions?: string[]): string[] {
   const source =
     Array.isArray(reactions) && reactions.length > 0 ? reactions : [...DEFAULT_REACTIONS];
@@ -108,6 +124,7 @@ function pushHistorySnapshot(session: ReactionSessionInternal) {
 }
 
 export function getReactionSessionPublic(quizId: string): ReactionSessionPublic | null {
+  cleanupExpiredReactionsForQuiz(quizId, Date.now());
   const session = sessionsByQuiz.get(quizId);
   if (!session) return null;
   const totals = computeTotals(session);
@@ -131,6 +148,7 @@ export function startReactionSession(
   durationSec: number,
   reactions?: string[],
 ): ReactionSessionPublic {
+  cleanupExpiredReactionsForQuiz(quizId, Date.now());
   const prev = sessionsByQuiz.get(quizId);
   if (prev) {
     prev.isActive = false;
@@ -159,6 +177,9 @@ export function stopReactionSession(quizId: string): ReactionSessionPublic | nul
   if (!session) return null;
   session.isActive = false;
   pushHistorySnapshot(session);
+  // Если админ остановил сессию спустя "TTL" (или очень короткую duration),
+  // сразу освободим память.
+  cleanupExpiredReactionsForQuiz(quizId, Date.now());
   return getReactionSessionPublic(quizId);
 }
 
@@ -167,6 +188,7 @@ export function addReaction(
   participantId: string,
   reactionType: ReactionType,
 ): ReactionSessionPublic | null {
+  cleanupExpiredReactionsForQuiz(quizId, Date.now());
   const session = sessionsByQuiz.get(quizId);
   if (!session || !session.isActive) return null;
   if (!session.reactions.includes(reactionType)) return null;
