@@ -1,9 +1,14 @@
 type Bucket = { windowStart: number; count: number };
 
-const buckets = new Map<string, Bucket>();
+// Структура по socketId, чтобы cleanup на `disconnect` был O(1) и не сканировал весь Map.
+const bucketsBySocket = new Map<string, Map<string, Bucket>>();
 
-function key(socketId: string, action: string): string {
-  return `${socketId}:${action}`;
+function getActionBuckets(socketId: string): Map<string, Bucket> {
+  const existing = bucketsBySocket.get(socketId);
+  if (existing) return existing;
+  const created = new Map<string, Bucket>();
+  bucketsBySocket.set(socketId, created);
+  return created;
 }
 
 export function allowSocketAction(options: {
@@ -14,11 +19,11 @@ export function allowSocketAction(options: {
 }): boolean {
   const { socketId, action, windowMs, maxPerWindow } = options;
   const now = Date.now();
-  const k = key(socketId, action);
-  let b = buckets.get(k);
+  const actionBuckets = getActionBuckets(socketId);
+  let b = actionBuckets.get(action);
   if (!b || now - b.windowStart >= windowMs) {
     b = { windowStart: now, count: 0 };
-    buckets.set(k, b);
+    actionBuckets.set(action, b);
   }
   if (b.count >= maxPerWindow) return false;
   b.count += 1;
@@ -26,8 +31,5 @@ export function allowSocketAction(options: {
 }
 
 export function clearSocketActionRateLimits(socketId: string): void {
-  const prefix = `${socketId}:`;
-  for (const k of buckets.keys()) {
-    if (k.startsWith(prefix)) buckets.delete(k);
-  }
+  bucketsBySocket.delete(socketId);
 }
