@@ -1,10 +1,11 @@
 import type { Server, Socket } from "socket.io";
 import { env } from "../env.js";
+import { clearSocketActionRateLimits } from "./action-rate-limit.js";
 import { clearSubmitRateLimit } from "./submit-rate-limit.js";
 import type { EnrichedSocket } from "./handler-common.js";
 import { registerAdminAnswerHandlers } from "./handlers/admin-answers.js";
 import { registerQuizAdminHandlers } from "./handlers/quiz-admin.js";
-import { registerQuizPlayHandlers } from "./handlers/quiz-play.js";
+import { cleanupQuizPlaySocketState, registerQuizPlayHandlers } from "./handlers/quiz-play.js";
 import { registerResultsDashboardHandlers } from "./handlers/results-dashboard.js";
 import { registerSpeakerQuestionsHandlers } from "./handlers/speaker-questions.js";
 import { registerFeedbackHandlers } from "./handlers/feedback.js";
@@ -29,6 +30,8 @@ export function registerSocketHandlers(io: Server) {
 
     enrichedSocket.on("disconnect", (reason) => {
       clearSubmitRateLimit(enrichedSocket.id);
+      clearSocketActionRateLimits(enrichedSocket.id);
+      cleanupQuizPlaySocketState(enrichedSocket.id);
       if (
         typeof enrichedSocket.data.quizId === "string" &&
         enrichedSocket.data.quizId.trim().length > 0

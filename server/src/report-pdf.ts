@@ -182,25 +182,29 @@ export function resolveReportPdfPageOrigin(
   req: Pick<Request, "get" | "secure">,
   clientOrigins: string[],
 ): string {
+  const normalizedClientOrigins = clientOrigins
+    .map((o) => o.trim().replace(/\/+$/, ""))
+    .filter(Boolean);
+
   const forwardedProto = req.get("x-forwarded-proto")?.split(",")[0]?.trim();
   const forwardedHost = req.get("x-forwarded-host")?.split(",")[0]?.trim();
   if (forwardedHost) {
     const proto = forwardedProto || "https";
-    return `${proto}://${forwardedHost}`.replace(/\/+$/, "");
-  }
-
-  const host = req.get("host")?.trim();
-  if (host && !/^127\.0\.0\.1:\d+$/.test(host) && !/^localhost:\d+$/i.test(host)) {
-    const proto = forwardedProto || (req.secure ? "https" : "http");
-    return `${proto}://${host}`.replace(/\/+$/, "");
+    const origin = `${proto}://${forwardedHost}`.replace(/\/+$/, "");
+    if (normalizedClientOrigins.includes(origin)) return origin;
   }
 
   const originHeader = req.get("origin")?.trim().replace(/\/+$/, "");
-  if (originHeader && clientOrigins.includes(originHeader)) {
-    return originHeader;
+  if (originHeader && normalizedClientOrigins.includes(originHeader)) return originHeader;
+
+  const host = req.get("host")?.trim();
+  if (host) {
+    const proto = req.secure ? "https" : "http";
+    const origin = `${proto}://${host}`.replace(/\/+$/, "");
+    if (normalizedClientOrigins.includes(origin)) return origin;
   }
 
-  return clientOrigins[0]?.replace(/\/+$/, "") || "http://localhost:5173";
+  return normalizedClientOrigins[0] || "http://localhost:5173";
 }
 
 function resolveSystemChromiumPaths(): string[] {
@@ -324,6 +328,15 @@ export async function renderPublicReportPdf(
 
   if (options?.pageUrl) {
     try {
+      // Защита от SSRF: допускаем только ожидаемую страницу отчёта и (если задан) ожидаемый origin.
+      const assetOrigin = options.assetOrigin?.trim().replace(/\/+$/, "");
+      const page = new URL(options.pageUrl);
+      if (!page.pathname.startsWith("/report/")) {
+        throw new Error("Unexpected report page path");
+      }
+      if (assetOrigin && page.origin !== assetOrigin) {
+        throw new Error("Unexpected report page origin");
+      }
       return await renderPdfFromPage(options.pageUrl);
     } catch (pageError) {
       const message = pageError instanceof Error ? pageError.message : String(pageError);

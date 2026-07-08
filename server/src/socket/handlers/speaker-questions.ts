@@ -19,6 +19,7 @@ import { getQuizBySlug, getQuizPublicState } from "../../quiz-service.js";
 import { isKnownSpeakerTargetValue, SPEAKER_ALL_TARGET } from "@meyouquize/shared";
 import type { EnrichedSocket } from "../handler-common.js";
 import { assertAdmin, fail } from "../handler-common.js";
+import { allowSocketAction } from "../action-rate-limit.js";
 import { getStoredPublicView } from "../public-view-store.js";
 import { saveStoredPublicView } from "../public-view-store.js";
 import { toPublicViewPayload } from "../public-view-helpers.js";
@@ -45,6 +46,9 @@ type SpeakerQuestionWire = {
 };
 
 type ViewerMode = "player" | "projector" | "admin";
+
+const SPEAKER_QUESTIONS_SUBSCRIBE_RATE_WINDOW_MS = 60_000;
+const SPEAKER_QUESTIONS_SUBSCRIBE_RATE_MAX_PER_WINDOW = 5;
 
 async function buildSpeakerQuestionsPayload(
   quizId: string,
@@ -184,6 +188,17 @@ async function ensureQuestionInQuiz(questionId: string, quizId: string) {
 export function registerSpeakerQuestionsHandlers(socket: EnrichedSocket, io: Server) {
   socket.on("speaker:questions:subscribe", async (raw: unknown) => {
     try {
+      if (
+        !allowSocketAction({
+          socketId: socket.id,
+          action: "speaker:questions:subscribe",
+          windowMs: SPEAKER_QUESTIONS_SUBSCRIBE_RATE_WINDOW_MS,
+          maxPerWindow: SPEAKER_QUESTIONS_SUBSCRIBE_RATE_MAX_PER_WINDOW,
+        })
+      ) {
+        fail(socket, "Слишком частые запросы подписки на вопросы. Подождите немного.");
+        return;
+      }
       const payload = subscribeSpeakerQuestionsSchema.parse(raw);
       const quiz = await getQuizBySlug(payload.slug);
       if (!quiz) throw new Error("Quiz not found");

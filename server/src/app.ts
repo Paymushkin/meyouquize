@@ -161,7 +161,15 @@ export function buildApp() {
     }),
     limits: { fileSize: 10 * 1024 * 1024 },
     fileFilter: (_req, file, cb) => {
-      if (file.mimetype.startsWith("image/")) cb(null, true);
+      const ext = path.extname(file.originalname || "").toLowerCase();
+      const mime = (file.mimetype || "").toLowerCase();
+      // SVG часто используется для stored-XSS (через `<img src>`/`<object>` в зависимости от браузера).
+      // Поэтому запрещаем SVG полностью.
+      if (mime === "image/svg+xml" || ext === ".svg") {
+        cb(new Error("SVG images are not allowed"));
+        return;
+      }
+      if (mime.startsWith("image/")) cb(null, true);
       else cb(new Error("Only image files are allowed"));
     },
   });
@@ -198,7 +206,16 @@ export function buildApp() {
   );
   app.use(express.json());
   app.use(cookieParser());
-  app.use("/media", express.static(env.mediaDir));
+  app.use(
+    "/media",
+    express.static(env.mediaDir, {
+      setHeaders: (res) => {
+        // Важно для защиты от контент-спуфинга (например, когда файл с неправильным mimetype
+        // может быть интерпретирован браузером как скрипт/HTML).
+        res.setHeader("X-Content-Type-Options", "nosniff");
+      },
+    }),
+  );
 
   app.get("/", (_req, res) => {
     return res.json({ service: "meyouquize-backend", status: "ok" });

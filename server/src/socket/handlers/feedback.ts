@@ -12,6 +12,7 @@ import { getQuizPublicState } from "../../quiz-service.js";
 import { broadcastQuizPublicState, emitToQuizDashboard, quizDashboardRoom } from "../quiz-rooms.js";
 import type { EnrichedSocket } from "../handler-common.js";
 import { assertAdmin, fail } from "../handler-common.js";
+import { allowSocketAction } from "../action-rate-limit.js";
 import {
   activateFeedbackForm,
   addInjectedFeedbackResponse,
@@ -65,6 +66,17 @@ export function registerFeedbackHandlers(socket: EnrichedSocket, io: Server) {
 
   socket.on("feedback:submit", async (raw: unknown) => {
     try {
+      if (
+        !allowSocketAction({
+          socketId: socket.id,
+          action: "feedback:submit",
+          windowMs: 60_000,
+          maxPerWindow: 10,
+        })
+      ) {
+        fail(socket, "Слишком частая отправка формы обратной связи. Подождите немного.");
+        return;
+      }
       const payload = submitFeedbackSchema.parse(raw);
       if (!socket.data.participantId) throw new Error("Not joined");
       const formId = await submitFeedbackResponse({

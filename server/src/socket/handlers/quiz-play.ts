@@ -27,6 +27,7 @@ import {
 } from "../dashboard-results.js";
 import { broadcastQuizPublicState, emitQuizOnlineCount, quizPlayerRoom } from "../quiz-rooms.js";
 import { allowAnswerSubmit } from "../submit-rate-limit.js";
+import { allowSocketAction } from "../action-rate-limit.js";
 import type { EnrichedSocket } from "../handler-common.js";
 import { fail } from "../handler-common.js";
 import { addReaction } from "../../reactions-service.js";
@@ -45,11 +46,26 @@ import {
 const REACTION_WINDOW_MS = 1000;
 const REACTION_MAX_PER_WINDOW = 10;
 const JOIN_DEBOUNCE_MS = 2500;
+const JOIN_RATE_WINDOW_MS = 60_000;
+const JOIN_RATE_MAX_PER_WINDOW = 5;
+const ANSWERS_RESET_RATE_WINDOW_MS = 60_000;
+const ANSWERS_RESET_RATE_MAX_PER_WINDOW = 3;
+const NICKNAME_UPDATE_RATE_WINDOW_MS = 60_000;
+const NICKNAME_UPDATE_RATE_MAX_PER_WINDOW = 10;
+const BANNER_CLICK_RATE_WINDOW_MS = 60_000;
+const BANNER_CLICK_RATE_MAX_PER_WINDOW = 20;
+const SUB_QUIZ_REPORT_RATE_WINDOW_MS = 60_000;
+const SUB_QUIZ_REPORT_RATE_MAX_PER_WINDOW = 5;
 const reactionRateBySocket = new Map<string, number[]>();
 const lastJoinAckBySocket = new Map<
   string,
   { at: number; quizId: string; participantId: string; nickname: string }
 >();
+
+export function cleanupQuizPlaySocketState(socketId: string) {
+  reactionRateBySocket.delete(socketId);
+  lastJoinAckBySocket.delete(socketId);
+}
 
 function allowReactionBurst(socketId: string): boolean {
   const now = Date.now();
@@ -67,6 +83,17 @@ function allowReactionBurst(socketId: string): boolean {
 export function registerQuizPlayHandlers(socket: EnrichedSocket, io: Server) {
   socket.on("quiz:join", async (raw: unknown) => {
     try {
+      if (
+        !allowSocketAction({
+          socketId: socket.id,
+          action: "quiz:join",
+          windowMs: JOIN_RATE_WINDOW_MS,
+          maxPerWindow: JOIN_RATE_MAX_PER_WINDOW,
+        })
+      ) {
+        fail(socket, "Слишком много попыток подключения. Подождите немного и попробуйте снова.");
+        return;
+      }
       const payload = joinQuizSchema.parse(raw);
       const recent = lastJoinAckBySocket.get(socket.id);
       const now = Date.now();
@@ -168,6 +195,16 @@ export function registerQuizPlayHandlers(socket: EnrichedSocket, io: Server) {
 
   socket.on("answers:reset", async (raw: unknown) => {
     try {
+      if (
+        !allowSocketAction({
+          socketId: socket.id,
+          action: "answers:reset",
+          windowMs: ANSWERS_RESET_RATE_WINDOW_MS,
+          maxPerWindow: ANSWERS_RESET_RATE_MAX_PER_WINDOW,
+        })
+      ) {
+        return;
+      }
       const payload = resetAnswersSchema.parse(raw);
       if (!socket.data.participantId) throw new Error("Not joined");
       await resetParticipantAnswers(payload.quizId, socket.data.participantId);
@@ -181,6 +218,16 @@ export function registerQuizPlayHandlers(socket: EnrichedSocket, io: Server) {
 
   socket.on("quiz:nickname:update", async (raw: unknown) => {
     try {
+      if (
+        !allowSocketAction({
+          socketId: socket.id,
+          action: "quiz:nickname:update",
+          windowMs: NICKNAME_UPDATE_RATE_WINDOW_MS,
+          maxPerWindow: NICKNAME_UPDATE_RATE_MAX_PER_WINDOW,
+        })
+      ) {
+        return;
+      }
       const payload = updateNicknameSchema.parse(raw);
       if (!socket.data.participantId) throw new Error("Not joined");
       if (socket.data.quizId !== payload.quizId) throw new Error("Not joined");
@@ -226,6 +273,16 @@ export function registerQuizPlayHandlers(socket: EnrichedSocket, io: Server) {
 
   socket.on("banner:click", async (raw: unknown) => {
     try {
+      if (
+        !allowSocketAction({
+          socketId: socket.id,
+          action: "banner:click",
+          windowMs: BANNER_CLICK_RATE_WINDOW_MS,
+          maxPerWindow: BANNER_CLICK_RATE_MAX_PER_WINDOW,
+        })
+      ) {
+        return;
+      }
       const payload = bannerClickSchema.parse(raw);
       if (!socket.data.participantId) throw new Error("Not joined");
       if (socket.data.quizId !== payload.quizId) throw new Error("Not joined");
@@ -244,6 +301,16 @@ export function registerQuizPlayHandlers(socket: EnrichedSocket, io: Server) {
 
   socket.on("player:sub-quiz-report:request", async (raw: unknown) => {
     try {
+      if (
+        !allowSocketAction({
+          socketId: socket.id,
+          action: "player:sub-quiz-report:request",
+          windowMs: SUB_QUIZ_REPORT_RATE_WINDOW_MS,
+          maxPerWindow: SUB_QUIZ_REPORT_RATE_MAX_PER_WINDOW,
+        })
+      ) {
+        return;
+      }
       const payload = playerSubQuizReportRequestSchema.parse(raw);
       if (!socket.data.participantId) throw new Error("Not joined");
       if (socket.data.quizId !== payload.quizId) throw new Error("Not joined");

@@ -19,6 +19,7 @@ import type { EnrichedSocket } from "../handler-common.js";
 import { assertAdmin, fail } from "../handler-common.js";
 import { toPublicViewPayload } from "../public-view-helpers.js";
 import { broadcastSpeakerQuestions } from "./speaker-questions.js";
+import { allowSocketAction } from "../action-rate-limit.js";
 
 import {
   adminViewSetDedupeKey,
@@ -29,6 +30,17 @@ import {
 export function registerResultsDashboardHandlers(socket: EnrichedSocket, io: Server) {
   socket.on("results:subscribe", async (raw: unknown) => {
     try {
+      if (
+        !allowSocketAction({
+          socketId: socket.id,
+          action: "results:subscribe",
+          windowMs: 60_000,
+          maxPerWindow: 10,
+        })
+      ) {
+        fail(socket, "Слишком частые запросы подписки. Подождите немного.");
+        return;
+      }
       const payload = subscribeResultsSchema.parse(raw);
       const viewer = payload.viewer ?? "projector";
       if (viewer === "admin") {

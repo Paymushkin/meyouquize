@@ -16,7 +16,7 @@ describe("report contracts", () => {
         },
         secure: true,
       } as Pick<Request, "get" | "secure">,
-      ["http://localhost:5173"],
+      ["https://meyou.site", "http://localhost:5173"],
     );
     expect(origin).toBe("https://meyou.site");
   });
