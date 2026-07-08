@@ -270,6 +270,16 @@ export function buildApp() {
     message: { error: "Too many PDF requests. Please try again later." },
   });
 
+  // JSON публичного отчёта тоже может быть дорогим по БД.
+  // Делаем более мягкое ограничение, чем для PDF.
+  const publicReportJsonLimiter = rateLimit({
+    windowMs: 60_000,
+    limit: env.networkMode === "internet" ? 30 : 120,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { error: "Too many report requests. Please try again later." },
+  });
+
   app.post("/api/admin/auth", authLimiter, async (req, res) => {
     if (isAdminAuthBypassed()) {
       return res.json({ ok: true, bypass: true });
@@ -903,7 +913,7 @@ export function buildApp() {
     });
   });
 
-  app.get("/api/quiz/by-slug/:slug/public-report", async (req, res) => {
+  app.get("/api/quiz/by-slug/:slug/public-report", publicReportJsonLimiter, async (req, res) => {
     const slug = Array.isArray(req.params.slug) ? req.params.slug[0] : req.params.slug;
     const quiz = await getQuizBySlug(slug);
     if (!quiz) {
