@@ -9,6 +9,36 @@ import { buildReportPdfHtml } from "./report-pdf-html.js";
 const require = createRequire(import.meta.url);
 const PDF_FONT_NAME = "DejaVuSans";
 
+// Генерация PDF — очень дорогая операция (Playwright + layout/fonts).
+// Rate-limit помогает, но не защищает от распределённого спама — поэтому добавляем
+// глобальное ограничение параллельности на уровне процесса.
+const MAX_CONCURRENT_PDF_RENDERS = 2;
+const MAX_PDF_RENDER_QUEUE = 10;
+let currentPdfRenders = 0;
+const pdfRenderQueue: Array<() => void> = [];
+
+async function acquirePdfRenderSlot(): Promise<void> {
+  if (currentPdfRenders < MAX_CONCURRENT_PDF_RENDERS) {
+    currentPdfRenders += 1;
+    return;
+  }
+  if (pdfRenderQueue.length >= MAX_PDF_RENDER_QUEUE) {
+    throw new Error("PDF render queue is full");
+  }
+  await new Promise<void>((resolve) => {
+    pdfRenderQueue.push(() => {
+      currentPdfRenders += 1;
+      resolve();
+    });
+  });
+}
+
+function releasePdfRenderSlot(): void {
+  currentPdfRenders = Math.max(0, currentPdfRenders - 1);
+  const next = pdfRenderQueue.shift();
+  if (next) next();
+}
+
 function resolvePdfKitFontPath(): string {
   const pkgPath = require.resolve("dejavu-fonts-ttf/package.json");
   const fontPath = path.join(path.dirname(pkgPath), "ttf", "DejaVuSans.ttf");
@@ -315,46 +345,50 @@ export async function renderPublicReportPdf(
   options?: { pageUrl?: string; assetOrigin?: string },
 ): Promise<Buffer> {
   const failures: string[] = [];
-
+  await acquirePdfRenderSlot();
   try {
-    return await renderPdfFromHtml(
-      buildReportPdfHtml(report, { assetOrigin: options?.assetOrigin }),
-    );
-  } catch (htmlError) {
-    const message = htmlError instanceof Error ? htmlError.message : String(htmlError);
-    failures.push(`html: ${message}`);
-    console.error("[report-pdf] HTML render failed", { error: message });
-  }
-
-  if (options?.pageUrl) {
     try {
-      // Защита от SSRF: допускаем только ожидаемую страницу отчёта и (если задан) ожидаемый origin.
-      const assetOrigin = options.assetOrigin?.trim().replace(/\/+$/, "");
-      const page = new URL(options.pageUrl);
-      if (!page.pathname.startsWith("/report/")) {
-        throw new Error("Unexpected report page path");
-      }
-      if (assetOrigin && page.origin !== assetOrigin) {
-        throw new Error("Unexpected report page origin");
-      }
-      return await renderPdfFromPage(options.pageUrl);
-    } catch (pageError) {
-      const message = pageError instanceof Error ? pageError.message : String(pageError);
-      failures.push(`page: ${message}`);
-      console.error("[report-pdf] page URL render failed", {
-        pageUrl: options.pageUrl,
-        error: message,
-      });
+      return await renderPdfFromHtml(
+        buildReportPdfHtml(report, { assetOrigin: options?.assetOrigin }),
+      );
+    } catch (htmlError) {
+      const message = htmlError instanceof Error ? htmlError.message : String(htmlError);
+      failures.push(`html: ${message}`);
+      console.error("[report-pdf] HTML render failed", { error: message });
     }
-  }
 
-  try {
-    return await renderSimplePdf(report);
-  } catch (simpleError) {
-    const message = simpleError instanceof Error ? simpleError.message : String(simpleError);
-    failures.push(`simple: ${message}`);
-    throw new Error(
-      `All PDF render paths failed (${failures.join(" | ")}). Run: npm run install:pdf`,
-    );
+    if (options?.pageUrl) {
+      try {
+        // Защита от SSRF: допускаем только ожидаемую страницу отчёта и (если задан) ожидаемый origin.
+        const assetOrigin = options.assetOrigin?.trim().replace(/\/+$/, "");
+        const page = new URL(options.pageUrl);
+        if (!page.pathname.startsWith("/report/")) {
+          throw new Error("Unexpected report page path");
+        }
+        if (assetOrigin && page.origin !== assetOrigin) {
+          throw new Error("Unexpected report page origin");
+        }
+        return await renderPdfFromPage(options.pageUrl);
+      } catch (pageError) {
+        const message = pageError instanceof Error ? pageError.message : String(pageError);
+        failures.push(`page: ${message}`);
+        console.error("[report-pdf] page URL render failed", {
+          pageUrl: options.pageUrl,
+          error: message,
+        });
+      }
+    }
+
+    try {
+      return await renderSimplePdf(report);
+    } catch (simpleError) {
+      const message = simpleError instanceof Error ? simpleError.message : String(simpleError);
+      failures.push(`simple: ${message}`);
+      throw new Error(
+        `All PDF render paths failed (${failures.join(" | ")}). Run: npm run install:pdf`,
+      );
+    }
+  } finally {
+    releasePdfRenderSlot();
   }
 }

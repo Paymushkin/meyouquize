@@ -956,7 +956,9 @@ export function buildApp() {
         pageUrl,
         error: error instanceof Error ? error.message : String(error),
       });
-      return res.status(500).json({
+      const message = error instanceof Error ? error.message : String(error);
+      const status = message.includes("queue is full") ? 429 : 500;
+      return res.status(status).json({
         error:
           "Не удалось сформировать PDF отчёта. На сервере выполните: npm run install:pdf (или bash deploy/scripts/install-pdf-chromium.sh)",
       });
