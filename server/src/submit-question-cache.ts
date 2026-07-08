@@ -5,20 +5,26 @@ export type SubmitQuestionRow = Prisma.QuestionGetPayload<{
 }>;
 
 const TTL_MS = 60_000;
-const cache = new Map<string, { at: number; question: SubmitQuestionRow }>();
+const cacheByQuiz = new Map<string, Map<string, { at: number; question: SubmitQuestionRow }>>();
 
-function cacheKey(quizId: string, questionId: string) {
-  return `${quizId}:${questionId}`;
+function getQuizCache(quizId: string): Map<string, { at: number; question: SubmitQuestionRow }> {
+  const existing = cacheByQuiz.get(quizId);
+  if (existing) return existing;
+  const created = new Map<string, { at: number; question: SubmitQuestionRow }>();
+  cacheByQuiz.set(quizId, created);
+  return created;
 }
 
 export function getCachedSubmitQuestion(
   quizId: string,
   questionId: string,
 ): SubmitQuestionRow | null {
-  const hit = cache.get(cacheKey(quizId, questionId));
+  const quizCache = cacheByQuiz.get(quizId);
+  const hit = quizCache?.get(questionId);
   if (!hit) return null;
   if (Date.now() - hit.at > TTL_MS) {
-    cache.delete(cacheKey(quizId, questionId));
+    quizCache?.delete(questionId);
+    if (quizCache && quizCache.size === 0) cacheByQuiz.delete(quizId);
     return null;
   }
   return hit.question;
@@ -29,12 +35,9 @@ export function setCachedSubmitQuestion(
   questionId: string,
   question: SubmitQuestionRow,
 ) {
-  cache.set(cacheKey(quizId, questionId), { at: Date.now(), question });
+  getQuizCache(quizId).set(questionId, { at: Date.now(), question });
 }
 
 export function invalidateSubmitQuestionCacheForQuiz(quizId: string) {
-  const prefix = `${quizId}:`;
-  for (const key of cache.keys()) {
-    if (key.startsWith(prefix)) cache.delete(key);
-  }
+  cacheByQuiz.delete(quizId);
 }
