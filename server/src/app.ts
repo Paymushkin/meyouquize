@@ -280,6 +280,32 @@ export function buildApp() {
     message: { error: "Too many report requests. Please try again later." },
   });
 
+  // Остальные публичные GET по quiz/state/results могут быть тяжёлыми по БД.
+  // Делает их более устойчивыми к спаму без авторизации.
+  const playerQuizStateLimiter = rateLimit({
+    windowMs: 60_000,
+    limit: env.networkMode === "internet" ? 120 : 300,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { error: "Too many state requests. Please try again later." },
+  });
+
+  const playerQuizResultsLimiter = rateLimit({
+    windowMs: 60_000,
+    limit: env.networkMode === "internet" ? 60 : 180,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { error: "Too many results requests. Please try again later." },
+  });
+
+  const playerQuizMetaLimiter = rateLimit({
+    windowMs: 60_000,
+    limit: env.networkMode === "internet" ? 120 : 300,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { error: "Too many meta requests. Please try again later." },
+  });
+
   app.post("/api/admin/auth", authLimiter, async (req, res) => {
     if (isAdminAuthBypassed()) {
       return res.json({ ok: true, bypass: true });
@@ -866,20 +892,20 @@ export function buildApp() {
     return res.json(results);
   });
 
-  app.get("/api/quiz/:quizId/state", async (req, res) => {
+  app.get("/api/quiz/:quizId/state", playerQuizStateLimiter, async (req, res) => {
     const quizId = Array.isArray(req.params.quizId) ? req.params.quizId[0] : req.params.quizId;
     const state = await getQuizPublicState(quizId);
     if (!state) return res.status(404).json({ error: "Not found" });
     return res.json(state);
   });
 
-  app.get("/api/quiz/:quizId/results", async (req, res) => {
+  app.get("/api/quiz/:quizId/results", playerQuizResultsLimiter, async (req, res) => {
     const quizId = Array.isArray(req.params.quizId) ? req.params.quizId[0] : req.params.quizId;
     const results = await getResults(quizId);
     return res.json(results);
   });
 
-  app.get("/api/quiz/by-slug/:slug/results", async (req, res) => {
+  app.get("/api/quiz/by-slug/:slug/results", playerQuizResultsLimiter, async (req, res) => {
     const slug = Array.isArray(req.params.slug) ? req.params.slug[0] : req.params.slug;
     const quiz = await getQuizBySlug(slug);
     if (!quiz) return res.status(404).json({ error: "Not found" });
@@ -887,7 +913,7 @@ export function buildApp() {
     return res.json(results);
   });
 
-  app.get("/api/quiz/by-slug/:slug/meta", async (req, res) => {
+  app.get("/api/quiz/by-slug/:slug/meta", playerQuizMetaLimiter, async (req, res) => {
     const slug = Array.isArray(req.params.slug) ? req.params.slug[0] : req.params.slug;
     const quiz = await getQuizBySlug(slug);
     if (!quiz) return res.status(404).json({ error: "Not found" });
