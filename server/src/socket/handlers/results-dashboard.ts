@@ -62,10 +62,25 @@ export function registerResultsDashboardHandlers(socket: EnrichedSocket, io: Ser
     }
   });
 
+  const QUIZ_ONLINE_REQUEST_RATE_WINDOW_MS = 60_000;
+  const QUIZ_ONLINE_REQUEST_RATE_MAX_PER_WINDOW = 10;
+
   socket.on("quiz:online:request", () => {
     const quizId = socket.data.quizId;
     if (typeof quizId !== "string" || !quizId.trim()) return;
     if (!socket.rooms.has(quizDashboardRoom(quizId))) return;
+
+    if (
+      !allowSocketAction({
+        socketId: socket.id,
+        action: "quiz:online:request",
+        windowMs: QUIZ_ONLINE_REQUEST_RATE_WINDOW_MS,
+        maxPerWindow: QUIZ_ONLINE_REQUEST_RATE_MAX_PER_WINDOW,
+      })
+    ) {
+      return;
+    }
+
     emitQuizOnlineCount(io, quizId, { immediate: true });
   });
 
