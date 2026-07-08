@@ -50,6 +50,13 @@ type ViewerMode = "player" | "projector" | "admin";
 const SPEAKER_QUESTIONS_SUBSCRIBE_RATE_WINDOW_MS = 60_000;
 const SPEAKER_QUESTIONS_SUBSCRIBE_RATE_MAX_PER_WINDOW = 5;
 
+const SPEAKER_QUESTION_CREATE_RATE_WINDOW_MS = 60_000;
+const SPEAKER_QUESTION_CREATE_RATE_MAX_PER_WINDOW = 5;
+const SPEAKER_QUESTION_REACT_RATE_WINDOW_MS = 60_000;
+const SPEAKER_QUESTION_REACT_RATE_MAX_PER_WINDOW = 20;
+const SPEAKER_QUESTION_DELETE_RATE_WINDOW_MS = 60_000;
+const SPEAKER_QUESTION_DELETE_RATE_MAX_PER_WINDOW = 5;
+
 async function buildSpeakerQuestionsPayload(
   quizId: string,
   participantId?: string | null,
@@ -259,6 +266,16 @@ export function registerSpeakerQuestionsHandlers(socket: EnrichedSocket, io: Ser
 
   socket.on("speaker:question:create", async (raw: unknown) => {
     try {
+      if (
+        !allowSocketAction({
+          socketId: socket.id,
+          action: "speaker:question:create",
+          windowMs: SPEAKER_QUESTION_CREATE_RATE_WINDOW_MS,
+          maxPerWindow: SPEAKER_QUESTION_CREATE_RATE_MAX_PER_WINDOW,
+        })
+      ) {
+        return;
+      }
       const payload = createSpeakerQuestionSchema.parse(raw);
       if (!socket.data.participantId) throw new Error("Not joined");
       const view = await getStoredPublicView(payload.quizId);
@@ -299,6 +316,16 @@ export function registerSpeakerQuestionsHandlers(socket: EnrichedSocket, io: Ser
 
   socket.on("speaker:question:react", async (raw: unknown) => {
     try {
+      if (
+        !allowSocketAction({
+          socketId: socket.id,
+          action: "speaker:question:react",
+          windowMs: SPEAKER_QUESTION_REACT_RATE_WINDOW_MS,
+          maxPerWindow: SPEAKER_QUESTION_REACT_RATE_MAX_PER_WINDOW,
+        })
+      ) {
+        return;
+      }
       const payload = speakerQuestionReactSchema.parse(raw);
       if (!socket.data.participantId) throw new Error("Not joined");
       const view = await getStoredPublicView(payload.quizId);
@@ -342,6 +369,16 @@ export function registerSpeakerQuestionsHandlers(socket: EnrichedSocket, io: Ser
 
   socket.on("speaker:question:delete", async (raw: unknown) => {
     try {
+      if (
+        !allowSocketAction({
+          socketId: socket.id,
+          action: "speaker:question:delete",
+          windowMs: SPEAKER_QUESTION_DELETE_RATE_WINDOW_MS,
+          maxPerWindow: SPEAKER_QUESTION_DELETE_RATE_MAX_PER_WINDOW,
+        })
+      ) {
+        return;
+      }
       const payload = speakerQuestionDeleteSchema.parse(raw);
       if (!socket.data.participantId) throw new Error("Not joined");
       const question = await prisma.speakerQuestion.findUnique({
