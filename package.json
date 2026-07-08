@@ -66,5 +66,9 @@
     "*.{ts,tsx,js,mjs,cjs}": [
       "eslint --fix"
     ]
+  },
+  "overrides": {
+    "engine.io": "6.6.9",
+    "ws": "^8.21.0"
   }
 }
