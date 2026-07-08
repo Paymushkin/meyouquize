@@ -260,6 +260,16 @@ export function buildApp() {
     message: { error: "Too many admin API requests. Please try again in a minute." },
   });
 
+  // Playwright-based PDF rendering очень дорого (headless browser запуск + рендер).
+  // Ограничиваем генерацию публичных PDF, чтобы не получить DoS от не доверенного игрока.
+  const publicReportPdfLimiter = rateLimit({
+    windowMs: 60_000,
+    limit: env.networkMode === "internet" ? 5 : 20,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { error: "Too many PDF requests. Please try again later." },
+  });
+
   app.post("/api/admin/auth", authLimiter, async (req, res) => {
     if (isAdminAuthBypassed()) {
       return res.json({ ok: true, bypass: true });
@@ -908,7 +918,7 @@ export function buildApp() {
     return res.json(report);
   });
 
-  app.get("/api/quiz/by-slug/:slug/public-report.pdf", async (req, res) => {
+  app.get("/api/quiz/by-slug/:slug/public-report.pdf", publicReportPdfLimiter, async (req, res) => {
     const slug = Array.isArray(req.params.slug) ? req.params.slug[0] : req.params.slug;
     const quiz = await getQuizBySlug(slug);
     if (!quiz) {
@@ -923,7 +933,10 @@ export function buildApp() {
     const clientOrigin = resolveReportPdfPageOrigin(req, env.clientOrigins);
     const pageUrl = `${clientOrigin}/report/${encodeURIComponent(slug)}?pdf=1`;
     try {
-      const pdf = await renderPublicReportPdf(report, { pageUrl, assetOrigin: clientOrigin });
+      const pdf = await renderPublicReportPdf(report, {
+        pageUrl,
+        assetOrigin: clientOrigin,
+      });
       res.setHeader("Content-Type", "application/pdf");
       res.setHeader("Content-Disposition", `attachment; filename="report-${slug}.pdf"`);
       return res.send(pdf);
