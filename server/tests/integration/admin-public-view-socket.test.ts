@@ -1,7 +1,7 @@
 import { io as ioClient, type Socket } from "socket.io-client";
 import request from "supertest";
 import { afterEach, describe, expect, it } from "vitest";
-import { getStoredPublicView } from "../../src/socket/public-view-store.js";
+import { getStoredPublicView, saveStoredPublicView } from "../../src/socket/public-view-store.js";
 import { VIEW_SET_DEDUPE_MS } from "../../src/socket/admin-view-set-dedupe.js";
 import { createTestServer, type TestServer } from "../helpers/testApp.js";
 import {
@@ -256,5 +256,40 @@ describe("admin public view socket", () => {
 
     const stored = await getStoredPublicView(quizId);
     expect(stored.reactionsOverlayText).toBe("Реакции в зале");
+  });
+
+  it("preserves branding when mode patch omits theme fields", async () => {
+    const { eventName, quizId, question } = await seedSingleChoiceQuiz(
+      uniqueSlug("view-branding-guard"),
+    );
+    server = await createTestServer();
+    const { socket: admin } = await connectAdmin(server);
+    sockets.push(admin);
+
+    await saveStoredPublicView(quizId, {
+      mode: "title",
+      brandPrimaryColor: "#112233",
+      brandTheme: "meyou",
+      appliedEventThemeName: "Meyou",
+      appliedEventThemeKey: "meyou",
+    });
+
+    admin.emit("results:subscribe", { slug: eventName, viewer: "admin" });
+    await waitForEvent(admin, "results:public:view");
+
+    admin.emit("admin:results:view:set", {
+      quizId,
+      mode: "question",
+      questionId: question.id,
+      questionRevealStage: "options",
+      showFirstCorrectAnswerer: false,
+    });
+    await new Promise((r) => setTimeout(r, 450));
+
+    const stored = await getStoredPublicView(quizId);
+    expect(stored.mode).toBe("question");
+    expect(stored.brandPrimaryColor).toBe("#112233");
+    expect(stored.brandTheme).toBe("meyou");
+    expect(stored.appliedEventThemeKey).toBe("meyou");
   });
 });

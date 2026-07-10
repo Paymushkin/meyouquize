@@ -1,4 +1,7 @@
-import { isPlayerOnlyPublicViewStateKey } from "@meyouquize/shared";
+import {
+  isBrandingEmitGuardPublicViewStateKey,
+  isPlayerOnlyPublicViewStateKey,
+} from "@meyouquize/shared";
 import type { PublicViewSetPatch } from "../../publicViewContract";
 
 function patchHasKey(patch: PublicViewSetPatch, key: string): boolean {
@@ -6,7 +9,7 @@ function patchHasKey(patch: PublicViewSetPatch, key: string): boolean {
 }
 
 /**
- * Для emitPublicViewSet: player-only поля не включаются в payload,
+ * Для emitPublicViewSet: player-only и branding-поля не включаются в payload,
  * если их нет в patch — иначе локальный state админки перезаписывает сервер при смене режима проектора.
  */
 export function filterPublicViewSetEmitPayload<T extends Record<string, unknown>>(
@@ -16,6 +19,9 @@ export function filterPublicViewSetEmitPayload<T extends Record<string, unknown>
   const out: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(payload)) {
     if (isPlayerOnlyPublicViewStateKey(key) && !patchHasKey(patch, key)) {
+      continue;
+    }
+    if (isBrandingEmitGuardPublicViewStateKey(key) && !patchHasKey(patch, key)) {
       continue;
     }
     out[key] = value;

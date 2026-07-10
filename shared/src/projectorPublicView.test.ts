@@ -6,6 +6,7 @@ import {
 } from "./index.js";
 import {
   projectorPublicViewChanged,
+  isBrandingEmitGuardPublicViewStateKey,
   isPlayerOnlyPublicViewPatch,
   isPlayerOnlyPublicViewStateKey,
   pickProjectorPublicViewState,
@@ -178,5 +179,13 @@ describe("isPlayerOnlyPublicViewStateKey", () => {
   it("recognizes player-only keys", () => {
     expect(isPlayerOnlyPublicViewStateKey("speakerTileVisible")).toBe(true);
     expect(isPlayerOnlyPublicViewStateKey("projectorBackground")).toBe(false);
+  });
+});
+
+describe("isBrandingEmitGuardPublicViewStateKey", () => {
+  it("recognizes branding keys", () => {
+    expect(isBrandingEmitGuardPublicViewStateKey("brandPrimaryColor")).toBe(true);
+    expect(isBrandingEmitGuardPublicViewStateKey("appliedEventThemeKey")).toBe(true);
+    expect(isBrandingEmitGuardPublicViewStateKey("mode")).toBe(false);
   });
 });

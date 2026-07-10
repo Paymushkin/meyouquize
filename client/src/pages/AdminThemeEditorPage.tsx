@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link as RouterLink, useNavigate, useParams } from "react-router-dom";
 import { Alert, Button, Container, Stack, TextField, Typography } from "@mui/material";
 import type { EventThemeBranding } from "@meyouquize/shared";
+import { isSystemEventThemeId } from "@meyouquize/shared";
 import { AdminBrandingSection } from "../components/admin/AdminBrandingSection";
 import { AdminGlobalNav } from "../components/admin/AdminGlobalNav";
 import { AdminLoginForm } from "../components/AdminLoginForm";
@@ -17,6 +18,7 @@ export function AdminThemeEditorPage() {
   const { themeId = "new" } = useParams();
   const navigate = useNavigate();
   const isNew = themeId === "new";
+  const isSystemTheme = isSystemEventThemeId(themeId);
   const { isAuth, authChecked, checkSession } = useAdminAuth();
   const editor = useBrandingEditorState();
   const { availableFonts, setAvailableFonts, loadFontLibrary } = useAdminFontLibrary();
@@ -36,7 +38,11 @@ export function AdminThemeEditorPage() {
       setMessage("Тема не найдена");
       return;
     }
-    const payload = (await response.json()) as { name: string; branding: EventThemeBranding };
+    const payload = (await response.json()) as {
+      name: string;
+      branding: EventThemeBranding;
+      system?: boolean;
+    };
     setName(payload.name);
     editor.applyFromEventThemeBranding(payload.branding);
   }, [editor.applyFromEventThemeBranding, isNew, themeId]);
@@ -69,7 +75,7 @@ export function AdminThemeEditorPage() {
 
   async function saveTheme() {
     const trimmedName = name.trim();
-    if (!trimmedName) {
+    if (!isSystemTheme && !trimmedName) {
       setMessage("Укажите название темы");
       return;
     }
@@ -85,7 +91,7 @@ export function AdminThemeEditorPage() {
           method: isNew ? "POST" : "PUT",
           credentials: "include",
           headers: { "content-type": "application/json" },
-          body: JSON.stringify({ name: trimmedName, branding }),
+          body: JSON.stringify(isSystemTheme ? { branding } : { name: trimmedName, branding }),
         },
       );
       const payload = await response.json().catch(() => ({}));
@@ -201,20 +207,24 @@ export function AdminThemeEditorPage() {
     <Container maxWidth="lg" sx={{ py: 4 }}>
       <AdminGlobalNav />
       <Typography variant="h4" gutterBottom>
-        {isNew ? "Новая тема" : "Редактор темы"}
+        {isNew ? "Новая тема" : isSystemTheme ? "Системная тема" : "Редактор темы"}
       </Typography>
       {!authChecked ? null : !isAuth ? (
         <AdminLoginForm onSuccess={() => checkSession()} />
       ) : (
         <Stack spacing={2}>
-          <TextField
-            label="Название темы"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            fullWidth
-            size="small"
-          />
-          <AdminBrandingSection {...brandingProps} />
+          {isSystemTheme ? (
+            <Typography color="text.secondary">{name}</Typography>
+          ) : (
+            <TextField
+              label="Название темы"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              fullWidth
+              size="small"
+            />
+          )}
+          <AdminBrandingSection {...brandingProps} hideThemePicker />
           <Stack direction="row" spacing={1}>
             <Button variant="contained" disabled={saving} onClick={() => void saveTheme()}>
               Сохранить

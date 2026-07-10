@@ -97,6 +97,8 @@ type Props = {
     brandTheme?: BrandThemeId;
     onApply: (selection: EventThemeSelection) => void | Promise<void>;
   };
+  /** Скрыть выбор пресета (редактор темы ивента в каталоге). */
+  hideThemePicker?: boolean;
   tileColorsProps?: {
     speakerTileBackgroundColor: string;
     setSpeakerTileBackgroundColor: (value: string) => void;
@@ -173,6 +175,7 @@ export function AdminBrandingSection(props: Props) {
     onUploadMedia,
     emitBrandingPatch,
     eventThemeApplyProps,
+    hideThemePicker = false,
     tileColorsProps,
   } = props;
 
@@ -189,11 +192,13 @@ export function AdminBrandingSection(props: Props) {
           Брендирование
         </Typography>
         <Stack spacing={1}>
-          {eventThemeApplyProps ? (
-            <EventThemeApplySection {...eventThemeApplyProps} />
-          ) : (
-            <BrandThemeSection brandTheme={brandTheme} onThemeChange={onBrandThemeChange} />
-          )}
+          {!hideThemePicker ? (
+            eventThemeApplyProps ? (
+              <EventThemeApplySection {...eventThemeApplyProps} />
+            ) : (
+              <BrandThemeSection brandTheme={brandTheme} onThemeChange={onBrandThemeChange} />
+            )
+          ) : null}
           <BrandScreenColorsSection
             colorGridSx={colorGridSx}
             projectorBackground={projectorBackground}

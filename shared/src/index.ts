@@ -1795,6 +1795,15 @@ export {
 } from "./brandFontFaces.js";
 
 export {
+  SYSTEM_EVENT_THEME_IDS,
+  brandThemeIdFromSystemEventThemeId,
+  isSystemEventThemeId,
+  systemEventThemeDisplayName,
+  systemEventThemeStorageName,
+  type SystemEventThemeId,
+} from "./systemEventThemes.js";
+
+export {
   prunePlayerUiRefsForRoom,
   prunePublicViewForRoomContent,
   playerUiRefsChanged,
@@ -1803,6 +1812,7 @@ export {
   type PublicViewRoomPruneSlice,
 } from "./prunePlayerUiRefs.js";
 export {
+  isBrandingEmitGuardPublicViewStateKey,
   isPlayerOnlyPublicViewPatch,
   isPlayerOnlyPublicViewStateKey,
   pickProjectorPublicViewState,

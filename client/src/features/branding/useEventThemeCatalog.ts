@@ -1,6 +1,9 @@
 import { useCallback, useRef, useState } from "react";
 import { API_BASE } from "../../config";
 import type { EventThemeListOption } from "../../components/admin/branding/EventThemeApplySection";
+import { filterCustomEventThemesForApply } from "./filterCustomEventThemesForApply";
+
+type EventThemeApiListItem = EventThemeListOption & { system?: boolean };
 
 export function useEventThemeCatalog() {
   const [customThemes, setCustomThemes] = useState<EventThemeListOption[]>([]);
@@ -15,8 +18,8 @@ export function useEventThemeCatalog() {
         credentials: "include",
       });
       if (!response.ok) return;
-      const payload = (await response.json()) as EventThemeListOption[];
-      setCustomThemes(Array.isArray(payload) ? payload : []);
+      const payload = (await response.json()) as EventThemeApiListItem[];
+      setCustomThemes(Array.isArray(payload) ? filterCustomEventThemesForApply(payload) : []);
       loadedRef.current = true;
     } finally {
       setThemesLoading(false);

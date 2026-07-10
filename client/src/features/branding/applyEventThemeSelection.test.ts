@@ -1,9 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
-import { getBrandThemeVisualPatch } from "@meyouquize/shared";
 import { applyEventThemeSelection } from "./applyEventThemeSelection";
 
 describe("applyEventThemeSelection", () => {
-  it("applies built-in preset via emitBrandingPatch snapshot", async () => {
+  it("applies built-in preset from API branding", async () => {
     const emitBrandingPatch = vi.fn();
     const applyBrandThemeLocally = vi.fn();
     const applyFromEventThemeBranding = vi.fn();
@@ -14,6 +13,22 @@ describe("applyEventThemeSelection", () => {
       setProgramTileBackgroundColor: vi.fn(),
       setProgramTileTextColor: vi.fn(),
     };
+    const branding = {
+      brandTheme: "meyou" as const,
+      brandPrimaryColor: "#F3F722",
+      speakerTileBackgroundColor: "#F3F722",
+      speakerTileTextColor: "#000000",
+      programTileBackgroundColor: "#FFFFFF",
+      programTileTextColor: "#000000",
+    };
+
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({ branding }),
+      }),
+    );
 
     await applyEventThemeSelection({
       selection: { kind: "preset", theme: "meyou" },
@@ -21,41 +36,21 @@ describe("applyEventThemeSelection", () => {
       emitBrandingPatch,
       applyFromEventThemeBranding,
       applyBrandThemeLocally,
-      brandThemeVisualSetters: {
-        setProjectorBackground: vi.fn(),
-        setVoteQuestionTextColor: vi.fn(),
-        setVoteOptionTextColor: vi.fn(),
-        setVoteProgressTrackColor: vi.fn(),
-        setVoteProgressBarColor: vi.fn(),
-        setPlayerVoteOptionTextColor: vi.fn(),
-        setPlayerVoteProgressTrackColor: vi.fn(),
-        setPlayerVoteProgressBarColor: vi.fn(),
-        setBrandPrimaryColor: vi.fn(),
-        setBrandAccentColor: vi.fn(),
-        setBrandSurfaceColor: vi.fn(),
-        setBrandTextColor: vi.fn(),
-        setBrandInputTextColor: vi.fn(),
-        setBrandFontFamily: vi.fn(),
-        setBrandFontUrl: vi.fn(),
-        setBrandLogoUrl: vi.fn(),
-        setBrandPlayerBackgroundImageUrl: vi.fn(),
-        setBrandProjectorBackgroundImageUrl: vi.fn(),
-        setBrandBodyBackgroundColor: vi.fn(),
-        ...tileBrandSetters,
-      },
       tileBrandSetters,
       onAppliedName,
     });
 
+    expect(applyFromEventThemeBranding).toHaveBeenCalledWith(branding);
     expect(applyBrandThemeLocally).toHaveBeenCalledWith("meyou");
     expect(emitBrandingPatch).toHaveBeenCalledWith(
       expect.objectContaining({
-        ...getBrandThemeVisualPatch("meyou"),
+        brandPrimaryColor: "#F3F722",
         appliedEventThemeName: "MeYOU",
         appliedEventThemeKey: "meyou",
       }),
     );
     expect(onAppliedName).toHaveBeenCalledWith("MeYOU");
-    expect(applyFromEventThemeBranding).not.toHaveBeenCalled();
+
+    vi.unstubAllGlobals();
   });
 });

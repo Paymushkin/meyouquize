@@ -78,6 +78,30 @@ const PROJECTOR_BRANDING_KEYS = [
   "projectorJoinQrOverlayCorner",
 ] as const satisfies ReadonlyArray<keyof PublicViewState>;
 
+/** Визуальный брендинг / тема — не слать при emit без явного patch (как player-only). */
+const BRANDING_EMIT_GUARD_KEYS = [
+  ...PROJECTOR_BRANDING_KEYS,
+  "brandSurfaceColor",
+  "brandInputTextColor",
+  "appliedEventThemeName",
+  "appliedEventThemeKey",
+  "cloudQuestionColor",
+  "cloudTagColors",
+  "cloudTopTagColor",
+  "cloudCorrectTagColor",
+  "cloudDensity",
+  "cloudTagPadding",
+  "cloudSpiral",
+  "cloudAnimationStrength",
+  "voteQuestionTextColor",
+  "voteOptionTextColor",
+  "voteOptionBorderColor",
+  "voteProgressTrackColor",
+  "voteProgressBarColor",
+] as const satisfies ReadonlyArray<keyof PublicViewState>;
+
+const BRANDING_EMIT_GUARD_KEY_SET = new Set<string>(BRANDING_EMIT_GUARD_KEYS);
+
 const QUESTION_MODE_KEYS = [
   "questionId",
   "questionRevealStage",
@@ -241,4 +265,8 @@ export function isPlayerOnlyPublicViewPatch(patch: Record<string, unknown>): boo
 
 export function isPlayerOnlyPublicViewStateKey(key: string): boolean {
   return PLAYER_ONLY_KEY_SET.has(key);
+}
+
+export function isBrandingEmitGuardPublicViewStateKey(key: string): boolean {
+  return BRANDING_EMIT_GUARD_KEY_SET.has(key);
 }

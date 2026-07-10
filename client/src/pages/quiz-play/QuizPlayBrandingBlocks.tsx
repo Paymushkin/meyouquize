@@ -17,7 +17,6 @@ import CloseIcon from "@mui/icons-material/Close";
 import EditOutlinedIcon from "@mui/icons-material/EditOutlined";
 import EmojiEventsIcon from "@mui/icons-material/EmojiEvents";
 import EventNoteIcon from "@mui/icons-material/EventNote";
-import PersonOutlineIcon from "@mui/icons-material/PersonOutline";
 import QuestionAnswerIcon from "@mui/icons-material/QuestionAnswer";
 import NorthEastIcon from "@mui/icons-material/NorthEast";
 import {
@@ -252,11 +251,10 @@ export function PlayerTilesGrid(props: PlayerTilesGridProps) {
       sx={{
         width: "100%",
         display: "grid",
-        /** Как у карточек результатов: 2 колонки на xs/sm и 3 на md+ */
+        /** 2 колонки до 600px, 3 колонки от sm (600px) */
         gridTemplateColumns: {
           xs: "repeat(2, minmax(0, 1fr))",
-          sm: "repeat(2, minmax(0, 1fr))",
-          md: "repeat(3, minmax(0, 1fr))",
+          sm: "repeat(3, minmax(0, 1fr))",
         },
         justifyContent: "stretch",
         gap: { xs: 1.5, sm: 2 },
@@ -663,7 +661,6 @@ export function PlayerIdentityBar(props: PlayerIdentityBarProps) {
         <Stack direction="row" spacing={0.75} alignItems="center">
           <Chip
             size="small"
-            icon={<PersonOutlineIcon sx={{ fontSize: "small" }} />}
             label={nickname.trim() || "без ника"}
             variant="outlined"
             onClick={onNicknameClick}

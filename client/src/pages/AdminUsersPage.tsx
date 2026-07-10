@@ -283,9 +283,6 @@ export function AdminUsersPage() {
   return (
     <Container maxWidth="lg" sx={{ py: 4 }}>
       <AdminGlobalNav canManageAdmins={admin?.role === "SUPER_ADMIN"} />
-      <Typography variant="h4" gutterBottom>
-        Админка: администраторы
-      </Typography>
       {!authChecked ? null : !isAuth ? (
         <AdminLoginForm onSuccess={() => checkSession().then(() => loadUsers())} />
       ) : admin?.role !== "SUPER_ADMIN" ? (

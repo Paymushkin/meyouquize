@@ -64,12 +64,17 @@ function extractBrandingPatch(view: PublicViewState): Partial<PublicViewState> {
     brandAccentColor: view.brandAccentColor,
     brandSurfaceColor: view.brandSurfaceColor,
     brandTextColor: view.brandTextColor,
+    brandInputTextColor: view.brandInputTextColor,
     brandFontFamily: view.brandFontFamily,
     brandFontUrl: view.brandFontUrl,
+    brandFontUrls: view.brandFontUrls,
     brandLogoUrl: view.brandLogoUrl,
     brandPlayerBackgroundImageUrl: view.brandPlayerBackgroundImageUrl,
     brandProjectorBackgroundImageUrl: view.brandProjectorBackgroundImageUrl,
     brandBodyBackgroundColor: view.brandBodyBackgroundColor,
+    brandTheme: view.brandTheme,
+    appliedEventThemeName: view.appliedEventThemeName,
+    appliedEventThemeKey: view.appliedEventThemeKey,
     playerVoteOptionTextColor: view.playerVoteOptionTextColor,
     playerVoteProgressTrackColor: view.playerVoteProgressTrackColor,
     playerVoteProgressBarColor: view.playerVoteProgressBarColor,
@@ -902,8 +907,5 @@ export async function ensureDemoQuizExists(): Promise<void> {
   });
   if (!existing || existing._count.questions === 0 || existing._count.participants < 15) {
     await resetDemoQuizToDefault();
-    return;
   }
-  const branded = applyDemoBranding(publicViewJsonToState(existing.publicView));
-  await saveStoredPublicView(existing.id, branded);
 }

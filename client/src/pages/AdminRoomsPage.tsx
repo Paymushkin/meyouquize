@@ -44,8 +44,22 @@ export function AdminRoomsPage() {
   const [eventNameTouched, setEventNameTouched] = useState(false);
   const [message, setMessage] = useState("");
   const [confirmDeleteRoom, setConfirmDeleteRoom] = useState<Room | null>(null);
+  const [deleteConfirmSlug, setDeleteConfirmSlug] = useState("");
   const [deletingRoom, setDeletingRoom] = useState(false);
   const isSuperAdmin = admin?.role === "SUPER_ADMIN";
+  const deleteSlugMatches =
+    confirmDeleteRoom !== null && deleteConfirmSlug.trim() === confirmDeleteRoom.slug;
+
+  function openDeleteRoomDialog(room: Room) {
+    setDeleteConfirmSlug("");
+    setConfirmDeleteRoom(room);
+  }
+
+  function closeDeleteRoomDialog() {
+    if (deletingRoom) return;
+    setConfirmDeleteRoom(null);
+    setDeleteConfirmSlug("");
+  }
 
   function buildEventNameFromTitle(value: string) {
     const normalized = value
@@ -122,13 +136,15 @@ export function AdminRoomsPage() {
       );
       if (response.status === 403) {
         setMessage("Удалять комнаты может только супер-админ");
+        closeDeleteRoomDialog();
         return;
       }
       if (!response.ok) {
         setMessage("Не удалось удалить комнату");
+        closeDeleteRoomDialog();
         return;
       }
-      setConfirmDeleteRoom(null);
+      closeDeleteRoomDialog();
       await loadRooms();
     } finally {
       setDeletingRoom(false);
@@ -138,9 +154,6 @@ export function AdminRoomsPage() {
   return (
     <Container maxWidth="lg" sx={{ py: 4 }}>
       <AdminGlobalNav canManageAdmins={isSuperAdmin} />
-      <Typography variant="h4" gutterBottom>
-        Админка: комнаты
-      </Typography>
       {!authChecked ? null : !isAuth ? (
         <AdminLoginForm onSuccess={() => checkSession().then(() => loadRooms())} />
       ) : (
@@ -160,7 +173,6 @@ export function AdminRoomsPage() {
                     }}
                     placeholder="eventName (например spring-cup)"
                     label="Код комнаты"
-                    helperText="Заполняется автоматически из названия (можно изменить вручную)"
                     fullWidth
                   />
                   <TextField
@@ -186,7 +198,7 @@ export function AdminRoomsPage() {
           <Card variant="outlined">
             <CardContent>
               <Typography variant="h6" gutterBottom>
-                Комнаты
+                Ивенты
               </Typography>
               {rooms.length === 0 && (
                 <Typography color="text.secondary">Пока комнат нет.</Typography>
@@ -221,7 +233,7 @@ export function AdminRoomsPage() {
                               size="small"
                               color="error"
                               aria-label={`Удалить комнату ${room.slug}`}
-                              onClick={() => setConfirmDeleteRoom(room)}
+                              onClick={() => openDeleteRoomDialog(room)}
                             >
                               <DeleteOutlineIcon fontSize="small" />
                             </IconButton>
@@ -236,28 +248,45 @@ export function AdminRoomsPage() {
           </Card>
           <Dialog
             open={confirmDeleteRoom !== null}
-            onClose={() => {
-              if (!deletingRoom) setConfirmDeleteRoom(null);
-            }}
+            onClose={closeDeleteRoomDialog}
             maxWidth="xs"
             fullWidth
+            disableEscapeKeyDown={deletingRoom}
           >
             <DialogTitle>Удалить комнату?</DialogTitle>
             <DialogContent>
-              <Typography>
-                Будут удалены комната «{confirmDeleteRoom?.slug}» ({confirmDeleteRoom?.title}), все
-                вопросы, ответы ({confirmDeleteRoom?._count.participants ?? 0} участников) и
-                связанные медиафайлы. Действие нельзя отменить.
-              </Typography>
+              <Stack spacing={2} sx={{ pt: 0.5 }}>
+                <Typography>
+                  Будут удалены комната «{confirmDeleteRoom?.slug}» ({confirmDeleteRoom?.title}),
+                  все вопросы, ответы ({confirmDeleteRoom?._count.participants ?? 0} участников) и
+                  связанные медиафайлы. Действие нельзя отменить.
+                </Typography>
+                <TextField
+                  autoFocus
+                  fullWidth
+                  size="small"
+                  label="Код комнаты для подтверждения"
+                  placeholder={confirmDeleteRoom?.slug ?? ""}
+                  value={deleteConfirmSlug}
+                  onChange={(e) => setDeleteConfirmSlug(e.target.value)}
+                  disabled={deletingRoom}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && deleteSlugMatches && !deletingRoom) {
+                      e.preventDefault();
+                      void confirmDeleteRoomAction();
+                    }
+                  }}
+                />
+              </Stack>
             </DialogContent>
             <DialogActions>
-              <Button onClick={() => setConfirmDeleteRoom(null)} disabled={deletingRoom}>
+              <Button onClick={closeDeleteRoomDialog} disabled={deletingRoom}>
                 Отмена
               </Button>
               <Button
                 color="error"
                 variant="contained"
-                disabled={deletingRoom}
+                disabled={deletingRoom || !deleteSlugMatches}
                 onClick={() => void confirmDeleteRoomAction()}
               >
                 {deletingRoom ? "Удаление…" : "Удалить"}

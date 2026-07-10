@@ -15,7 +15,7 @@ export function AdminGlobalNav({ canManageAdmins = false }: { canManageAdmins?: 
   return (
     <Stack sx={{ mb: 2 }}>
       <Tabs value={tab}>
-        <Tab label="Комнаты" value="rooms" component={Link} to="/admin" />
+        <Tab label="Ивенты" value="rooms" component={Link} to="/admin" />
         <Tab label="Темы" value="themes" component={Link} to="/admin/themes" />
         <Tab label="Шрифты" value="fonts" component={Link} to="/admin/fonts" />
         {canManageAdmins ? (

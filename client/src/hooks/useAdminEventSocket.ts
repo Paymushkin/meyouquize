@@ -72,6 +72,8 @@ type Params = {
   setBrandProjectorBackgroundImageUrl: (value: string) => void;
   setBrandBodyBackgroundColor: (value: string) => void;
   setBrandTheme: (value: import("@meyouquize/shared").BrandThemeId) => void;
+  setAppliedEventThemeName?: (value: string | undefined) => void;
+  setAppliedEventThemeKey?: (value: string | undefined) => void;
   setSpeakerTileBackgroundColor: (value: string) => void;
   setSpeakerTileTextColor: (value: string) => void;
   setProgramTileBackgroundColor: (value: string) => void;
@@ -143,6 +145,8 @@ export function useAdminEventSocket<TQuestion extends QuestionFormPatchable>(
     setBrandProjectorBackgroundImageUrl,
     setBrandBodyBackgroundColor,
     setBrandTheme,
+    setAppliedEventThemeName,
+    setAppliedEventThemeKey,
     setSpeakerTileBackgroundColor,
     setSpeakerTileTextColor,
     setProgramTileBackgroundColor,
@@ -209,6 +213,20 @@ export function useAdminEventSocket<TQuestion extends QuestionFormPatchable>(
       setBrandProjectorBackgroundImageUrl(nextBranding.brandProjectorBackgroundImageUrl);
       setBrandBodyBackgroundColor(nextBranding.brandBodyBackgroundColor);
       setBrandTheme(nextBranding.brandTheme);
+      if (setAppliedEventThemeName) {
+        if (typeof view.appliedEventThemeName === "string" && view.appliedEventThemeName.trim()) {
+          setAppliedEventThemeName(view.appliedEventThemeName.trim());
+        } else {
+          setAppliedEventThemeName(undefined);
+        }
+      }
+      if (setAppliedEventThemeKey) {
+        if (typeof view.appliedEventThemeKey === "string" && view.appliedEventThemeKey.trim()) {
+          setAppliedEventThemeKey(view.appliedEventThemeKey.trim());
+        } else {
+          setAppliedEventThemeKey(undefined);
+        }
+      }
       setSpeakerTileBackgroundColor(view.speakerTileBackgroundColor);
       setSpeakerTileTextColor(view.speakerTileTextColor);
       setProgramTileBackgroundColor(view.programTileBackgroundColor);
@@ -254,6 +272,8 @@ export function useAdminEventSocket<TQuestion extends QuestionFormPatchable>(
       setBrandProjectorBackgroundImageUrl,
       setBrandBodyBackgroundColor,
       setBrandTheme,
+      setAppliedEventThemeName,
+      setAppliedEventThemeKey,
       setSpeakerTileBackgroundColor,
       setSpeakerTileTextColor,
       setProgramTileBackgroundColor,

@@ -1,4 +1,4 @@
-import { FormControl, InputLabel, MenuItem, Select, Stack, Typography } from "@mui/material";
+import { FormControl, InputLabel, MenuItem, Select, Stack } from "@mui/material";
 import type { BrandThemeId } from "@meyouquize/shared";
 
 type Props = {
@@ -9,7 +9,6 @@ type Props = {
 export function BrandThemeSection({ brandTheme, onThemeChange }: Props) {
   return (
     <Stack spacing={0.5}>
-      <Typography variant="subtitle2">Тема оформления</Typography>
       <FormControl size="small" fullWidth>
         <InputLabel id="brand-theme-label">Тема</InputLabel>
         <Select
@@ -17,15 +16,12 @@ export function BrandThemeSection({ brandTheme, onThemeChange }: Props) {
           label="Тема"
           value={brandTheme}
           onChange={(e) => onThemeChange(e.target.value as BrandThemeId)}
+          MenuProps={{ hideBackdrop: true }}
         >
           <MenuItem value="default">По умолчанию</MenuItem>
           <MenuItem value="meyou">MeYOU</MenuItem>
         </Select>
       </FormControl>
-      <Typography variant="caption" color="text.secondary">
-        Меняет цвета, шрифты и фоновые изображения. Баннеры, вопросы и контент плиток не
-        затрагиваются.
-      </Typography>
     </Stack>
   );
 }

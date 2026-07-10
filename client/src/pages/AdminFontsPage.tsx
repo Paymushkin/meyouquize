@@ -1,5 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
+  Accordion,
+  AccordionDetails,
+  AccordionSummary,
   Alert,
   Card,
   CardContent,
@@ -14,6 +17,7 @@ import {
   Typography,
 } from "@mui/material";
 import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
+import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import { AdminFontUploadForm } from "../components/admin/AdminFontUploadForm";
 import { AdminGlobalNav } from "../components/admin/AdminGlobalNav";
 import { AdminLoginForm } from "../components/AdminLoginForm";
@@ -33,9 +37,6 @@ export function AdminFontsPage() {
       .sort(([a], [b]) => a.localeCompare(b, "ru"))
       .map(([family, faces]) => ({
         family,
-        kind: faces.some((face) => face.kind === "variable")
-          ? ("variable" as const)
-          : ("static" as const),
         faces: [...faces].sort((a, b) => a.fileName?.localeCompare(b.fileName ?? "", "ru") ?? 0),
       }));
   }, [availableFonts]);
@@ -71,9 +72,6 @@ export function AdminFontsPage() {
   return (
     <Container maxWidth="lg" sx={{ py: 4 }}>
       <AdminGlobalNav canManageAdmins={admin?.role === "SUPER_ADMIN"} />
-      <Typography variant="h4" gutterBottom>
-        Админка: шрифты
-      </Typography>
       {!authChecked ? null : !isAuth ? (
         <AdminLoginForm onSuccess={() => checkSession().then(() => reloadFonts())} />
       ) : (
@@ -104,68 +102,49 @@ export function AdminFontsPage() {
               {fontFamilyGroups.length === 0 ? (
                 <Typography color="text.secondary">Пока нет загруженных шрифтов.</Typography>
               ) : (
-                <Table size="small">
-                  <TableHead>
-                    <TableRow>
-                      <TableCell>Семейство</TableCell>
-                      <TableCell>Режим</TableCell>
-                      <TableCell>Файл</TableCell>
-                      <TableCell align="right">Действия</TableCell>
-                    </TableRow>
-                  </TableHead>
-                  <TableBody>
-                    {fontFamilyGroups.map((group) =>
-                      group.faces.map((font, faceIndex) => {
-                        const isLastInGroup = faceIndex === group.faces.length - 1;
-                        return (
-                          <TableRow
-                            key={font.id}
-                            hover
-                            sx={
-                              isLastInGroup && fontFamilyGroups.length > 1
-                                ? { "& td": { borderBottomWidth: 2, borderBottomColor: "divider" } }
-                                : undefined
-                            }
-                          >
-                            {faceIndex === 0 ? (
-                              <TableCell
-                                rowSpan={group.faces.length}
-                                sx={{ verticalAlign: "top", fontWeight: 600 }}
-                              >
-                                {group.family}
-                                {group.faces.length > 1 ? (
-                                  <Typography
-                                    component="span"
-                                    variant="caption"
-                                    color="text.secondary"
-                                    sx={{ display: "block", mt: 0.25, fontWeight: 400 }}
+                <Stack spacing={1}>
+                  {fontFamilyGroups.map((group) => (
+                    <Accordion
+                      key={group.family}
+                      disableGutters
+                      variant="outlined"
+                      sx={{ "&:before": { display: "none" } }}
+                    >
+                      <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+                        <Typography fontWeight={600} sx={{ minWidth: 0, pr: 1 }}>
+                          {group.family}
+                        </Typography>
+                      </AccordionSummary>
+                      <AccordionDetails sx={{ px: 0, pt: 0, pb: 1 }}>
+                        <Table size="small">
+                          <TableHead>
+                            <TableRow>
+                              <TableCell>Файл</TableCell>
+                              <TableCell align="right">Действия</TableCell>
+                            </TableRow>
+                          </TableHead>
+                          <TableBody>
+                            {group.faces.map((font) => (
+                              <TableRow key={font.id} hover>
+                                <TableCell>{font.fileName || "—"}</TableCell>
+                                <TableCell align="right">
+                                  <IconButton
+                                    size="small"
+                                    color="error"
+                                    aria-label={`Удалить ${font.fileName || font.family}`}
+                                    onClick={() => void deleteFont(font)}
                                   >
-                                    {group.faces.length} начерт.
-                                  </Typography>
-                                ) : null}
-                              </TableCell>
-                            ) : null}
-                            {faceIndex === 0 ? (
-                              <TableCell rowSpan={group.faces.length} sx={{ verticalAlign: "top" }}>
-                                {group.kind === "variable" ? "вариативный" : "static"}
-                              </TableCell>
-                            ) : null}
-                            <TableCell>{font.fileName || "—"}</TableCell>
-                            <TableCell align="right">
-                              <IconButton
-                                size="small"
-                                aria-label={`Удалить ${font.fileName || font.family}`}
-                                onClick={() => void deleteFont(font)}
-                              >
-                                <DeleteOutlineIcon fontSize="small" />
-                              </IconButton>
-                            </TableCell>
-                          </TableRow>
-                        );
-                      }),
-                    )}
-                  </TableBody>
-                </Table>
+                                    <DeleteOutlineIcon fontSize="small" />
+                                  </IconButton>
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      </AccordionDetails>
+                    </Accordion>
+                  ))}
+                </Stack>
               )}
             </CardContent>
           </Card>

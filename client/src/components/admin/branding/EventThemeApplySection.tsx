@@ -115,7 +115,6 @@ export function EventThemeApplySection({
 
   return (
     <Stack spacing={0.5}>
-      <Typography variant="subtitle2">Тема оформления</Typography>
       <FormControl size="small" fullWidth>
         <InputLabel id="event-theme-apply-label">Тема</InputLabel>
         <Select
@@ -124,6 +123,7 @@ export function EventThemeApplySection({
           value={selectedValue}
           onChange={(e) => void handleSelectChange(e.target.value)}
           disabled={themesLoading || applying}
+          MenuProps={{ hideBackdrop: true }}
         >
           <MenuItem value="default">По умолчанию (встроенная)</MenuItem>
           <MenuItem value="meyou">MeYOU (встроенная)</MenuItem>

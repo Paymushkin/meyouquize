@@ -16,7 +16,6 @@ describe("filterPublicViewSetEmitPayload", () => {
         quizId: "q1",
         mode: "question",
         questionId: "q1",
-        projectorBackground: "#000",
       },
     );
   });
@@ -30,6 +29,18 @@ describe("filterPublicViewSetEmitPayload", () => {
     expect(filterPublicViewSetEmitPayload({ speakerTileVisible: true }, payload)).toEqual({
       mode: "title",
       speakerTileVisible: true,
+    });
+  });
+
+  it("includes patched branding fields", () => {
+    const payload = {
+      mode: "title" as const,
+      brandPrimaryColor: "#112233",
+      appliedEventThemeKey: "meyou",
+    };
+    expect(filterPublicViewSetEmitPayload({ brandPrimaryColor: "#112233" }, payload)).toEqual({
+      mode: "title",
+      brandPrimaryColor: "#112233",
     });
   });
 });

@@ -768,8 +768,11 @@ export function buildApp() {
 
   app.delete("/api/admin/event-themes/:id", adminAuthMiddleware, async (req, res) => {
     const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
-    const ok = await deleteEventTheme(id);
-    if (!ok) return res.status(404).json({ error: "Not found" });
+    const result = await deleteEventTheme(id);
+    if (result === "forbidden") {
+      return res.status(403).json(apiError("FORBIDDEN", "System themes cannot be deleted"));
+    }
+    if (result === "not_found") return res.status(404).json({ error: "Not found" });
     return res.status(204).send();
   });
 
