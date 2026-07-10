@@ -94,6 +94,18 @@ export async function collectQuestionMediaUrlsForQuiz(quizId: string): Promise<s
   return urls;
 }
 
+export async function collectQuizMediaUrls(quizId: string): Promise<string[]> {
+  const [questionUrls, quiz] = await Promise.all([
+    collectQuestionMediaUrlsForQuiz(quizId),
+    prisma.quiz.findUnique({ where: { id: quizId }, select: { publicView: true } }),
+  ]);
+  const urls = [...questionUrls];
+  walkJsonStrings(quiz?.publicView as Prisma.JsonValue, (value) => {
+    if (value.includes("/media/")) urls.push(value);
+  });
+  return urls;
+}
+
 /** Удаляет локальные файлы из `/media`, если они больше нигде не используются. */
 export async function cleanupUnusedQuestionMedia(previousUrls: Iterable<string>) {
   const candidates = new Set<string>();

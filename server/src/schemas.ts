@@ -215,6 +215,31 @@ export const adminAuthSchema = z.object({
   password: z.string().min(1),
 });
 
+export const createAdminUserSchema = z.object({
+  login: z.string().trim().min(3).max(80),
+  password: z.string().trim().min(8).max(200),
+});
+
+export const updateAdminUserSchema = z
+  .object({
+    login: z.string().trim().min(3).max(80).optional(),
+    password: z.string().trim().min(8).max(200).optional(),
+  })
+  .superRefine((val, ctx) => {
+    if (val.login === undefined && val.password === undefined) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "At least one field is required",
+        path: [],
+      });
+    }
+  });
+
+export const adminChangePasswordSchema = z.object({
+  currentPassword: z.string().trim().min(1),
+  newPassword: z.string().trim().min(8).max(200),
+});
+
 export const createRoomSchema = z.object({
   eventName: z
     .string()
@@ -627,6 +652,12 @@ export const setPublicViewSchema = z.object({
     .optional(),
   brandTheme: z.enum(["default", "meyou"]).optional(),
   appliedEventThemeName: z.string().trim().max(120).optional(),
+  appliedEventThemeKey: z
+    .string()
+    .trim()
+    .max(140)
+    .regex(/^(default|meyou|custom:[A-Za-z0-9_-]+)$/)
+    .optional(),
   /** @deprecated */
   brandBackgroundImageUrl: optionalClientAssetUrlSchema,
 });

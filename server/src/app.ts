@@ -1,4 +1,4 @@
-import { Prisma } from "@prisma/client";
+import { AdminRole, Prisma } from "@prisma/client";
 import cookieParser from "cookie-parser";
 import cors from "cors";
 import express from "express";
@@ -15,18 +15,21 @@ import { env } from "./env.js";
 import { logError } from "./logging.js";
 import {
   adminAuthSchema,
+  adminChangePasswordSchema,
+  createAdminUserSchema,
   createRoomSchema,
   patchQuestionAdminDoneSchema,
   patchQuestionProjectorSchema,
   patchSubQuizTitleSchema,
   patchTagCloudManualSchema,
   replaceRoomContentSchema,
+  updateAdminUserSchema,
   updateRoomSchema,
   upsertFeedbackFormSchema,
   createEventThemeSchema,
   updateEventThemeSchema,
 } from "./schemas.js";
-import { isAdminTokenValid } from "./admin-session-cache.js";
+import { getAdminSessionWithUser, isAdminTokenValid } from "./admin-session-cache.js";
 import { registerSocketHandlers } from "./socket/register-handlers.js";
 import {
   broadcastDashboardResultsNow,
@@ -38,6 +41,13 @@ import { isPrivateNetworkViteDevPort } from "./cors-allow.js";
 import { prisma } from "./prisma.js";
 import { randomToken } from "./utils.js";
 import {
+  authenticateAdminUser,
+  hashAdminPassword,
+  markAdminLastLogin,
+  verifyAdminPassword,
+  toSuperAdminManagedAdminUser,
+} from "./admin-users.js";
+import {
   readFontLibrary,
   registerFont,
   deleteFont,
@@ -48,6 +58,7 @@ import {
 import { publicViewJsonToState } from "./socket/public-view-store.js";
 import {
   createRoom,
+  deleteRoomByEventName,
   getQuizBySlug,
   getPublicReportBySlug,
   getQuizPublicState,
@@ -84,6 +95,14 @@ import { resetDemoQuizToDefault } from "./demo-seed.js";
 
 const ADMIN_COOKIE = "mq_admin";
 
+type AuthAdmin = {
+  id: string;
+  login: string;
+  role: AdminRole;
+};
+
+type AdminAuthedRequest = express.Request & { admin?: AuthAdmin };
+
 type ApiErrorBody = {
   error: string;
   code: string;
@@ -111,18 +130,41 @@ function isCorsOriginAllowed(origin: string | undefined): boolean {
 }
 
 async function adminAuthMiddleware(
-  req: express.Request,
+  req: AdminAuthedRequest,
   res: express.Response,
   next: express.NextFunction,
 ) {
   if (isAdminAuthBypassed()) return next();
   const token = req.cookies[ADMIN_COOKIE];
   if (!token) return res.status(401).json(apiError("UNAUTHORIZED", "Unauthorized"));
-  const session = await prisma.adminSession.findUnique({ where: { token } });
-  if (!session || session.expiresAt <= new Date()) {
+  const session = await getAdminSessionWithUser(token);
+  if (!session) {
     return res.status(401).json(apiError("UNAUTHORIZED", "Unauthorized"));
   }
+  if (session.adminUser) {
+    req.admin = {
+      id: session.adminUser.id,
+      login: session.adminUser.login,
+      role: session.adminUser.role,
+    };
+  } else {
+    req.admin = {
+      id: "env-super-admin",
+      login: session.login?.trim() || "admin",
+      role: AdminRole.SUPER_ADMIN,
+    };
+  }
   return next();
+}
+
+function requireSuperAdmin(
+  req: AdminAuthedRequest,
+  res: express.Response,
+  next: express.NextFunction,
+) {
+  if (isAdminAuthBypassed()) return next();
+  if (req.admin?.role === AdminRole.SUPER_ADMIN) return next();
+  return res.status(403).json(apiError("FORBIDDEN", "Forbidden"));
 }
 
 export function buildApp() {
@@ -313,18 +355,30 @@ export function buildApp() {
     const parsed = adminAuthSchema.safeParse(req.body);
     if (!parsed.success)
       return res.status(400).json(apiError("INVALID_PAYLOAD", "Invalid payload"));
-    if (!adminCredentialMatch(env.adminAccounts, parsed.data.login, parsed.data.password)) {
+    const login = parsed.data.login.trim();
+    const password = parsed.data.password.trim();
+    const adminUser = await authenticateAdminUser(login, password);
+    const envCredentialMatched = adminCredentialMatch(env.adminAccounts, login, password);
+    if (!adminUser && !envCredentialMatched) {
       return res.status(401).json(apiError("WRONG_CREDENTIALS", "Wrong credentials"));
     }
     const token = randomToken();
     const expiresAt = new Date(Date.now() + env.adminSessionHours * 60 * 60 * 1000);
     try {
       await prisma.adminSession.create({
-        data: { token, expiresAt },
+        data: {
+          token,
+          expiresAt,
+          adminUserId: adminUser ? adminUser.id : null,
+          login,
+        },
       });
     } catch (err) {
       logError("[admin] session create failed", err);
       return res.status(503).json(apiError("DB_UNAVAILABLE", "Database temporarily unavailable"));
+    }
+    if (adminUser) {
+      void markAdminLastLogin(adminUser.id);
     }
     const cookieSecure = env.networkMode === "internet" ? true : isRequestHttps(req);
     res.cookie(ADMIN_COOKIE, token, {
@@ -338,8 +392,132 @@ export function buildApp() {
     return res.json({ ok: true });
   });
 
-  app.get("/api/admin/me", adminAuthMiddleware, (_req, res) => {
+  app.get("/api/admin/me", adminAuthMiddleware, (req: AdminAuthedRequest, res) => {
+    if (isAdminAuthBypassed()) {
+      return res.json({
+        ok: true,
+        admin: { id: "bypass", login: "local-admin", role: AdminRole.SUPER_ADMIN },
+      });
+    }
+    if (!req.admin) return res.status(401).json(apiError("UNAUTHORIZED", "Unauthorized"));
+    return res.json({ ok: true, admin: req.admin });
+  });
+  app.post("/api/admin/logout", adminAuthMiddleware, async (req, res) => {
+    const token = req.cookies[ADMIN_COOKIE];
+    if (token) {
+      await prisma.adminSession.deleteMany({ where: { token } });
+    }
+    res.clearCookie(ADMIN_COOKIE, { path: "/" });
     return res.json({ ok: true });
+  });
+
+  app.post("/api/admin/me/password", adminAuthMiddleware, async (req: AdminAuthedRequest, res) => {
+    if (!req.admin) return res.status(401).json(apiError("UNAUTHORIZED", "Unauthorized"));
+    if (req.admin.role === AdminRole.SUPER_ADMIN) {
+      return res
+        .status(403)
+        .json(apiError("FORBIDDEN", "Super-admin password is managed via .env"));
+    }
+    const parsed = adminChangePasswordSchema.safeParse(req.body);
+    if (!parsed.success)
+      return res.status(400).json(apiError("INVALID_PAYLOAD", "Invalid payload"));
+    const user = await prisma.adminUser.findUnique({ where: { id: req.admin.id } });
+    if (!user || !user.isActive)
+      return res.status(404).json(apiError("NOT_FOUND", "Admin user not found"));
+    if (!verifyAdminPassword(parsed.data.currentPassword, user.passwordHash)) {
+      return res.status(401).json(apiError("WRONG_CREDENTIALS", "Current password is incorrect"));
+    }
+    await prisma.adminUser.update({
+      where: { id: user.id },
+      data: {
+        passwordHash: hashAdminPassword(parsed.data.newPassword),
+        passwordPlain: parsed.data.newPassword,
+      },
+    });
+    return res.json({ ok: true });
+  });
+
+  app.get("/api/admin/users", adminAuthMiddleware, requireSuperAdmin, async (_req, res) => {
+    const users = await prisma.adminUser.findMany({
+      where: { role: AdminRole.ADMIN },
+      orderBy: [{ createdAt: "asc" }],
+    });
+    return res.json({ users: users.map(toSuperAdminManagedAdminUser) });
+  });
+
+  app.post("/api/admin/users", adminAuthMiddleware, requireSuperAdmin, async (req, res) => {
+    const parsed = createAdminUserSchema.safeParse(req.body);
+    if (!parsed.success)
+      return res.status(400).json(apiError("INVALID_PAYLOAD", "Invalid payload"));
+    try {
+      const password = parsed.data.password.trim();
+      const created = await prisma.adminUser.create({
+        data: {
+          login: parsed.data.login.trim(),
+          loginKey: parsed.data.login.trim().toLowerCase(),
+          passwordHash: hashAdminPassword(password),
+          passwordPlain: password,
+          role: AdminRole.ADMIN,
+          isActive: true,
+        },
+      });
+      return res.status(201).json({ user: toSuperAdminManagedAdminUser(created) });
+    } catch (error) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
+        return res.status(409).json(apiError("LOGIN_TAKEN", "Login already exists"));
+      }
+      throw error;
+    }
+  });
+
+  app.patch("/api/admin/users/:id", adminAuthMiddleware, requireSuperAdmin, async (req, res) => {
+    const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+    const parsed = updateAdminUserSchema.safeParse(req.body);
+    if (!parsed.success)
+      return res.status(400).json(apiError("INVALID_PAYLOAD", "Invalid payload"));
+    const existing = await prisma.adminUser.findFirst({ where: { id, role: AdminRole.ADMIN } });
+    if (!existing) return res.status(404).json(apiError("NOT_FOUND", "Admin user not found"));
+    try {
+      const updated = await prisma.adminUser.update({
+        where: { id },
+        data: {
+          ...(parsed.data.login !== undefined
+            ? {
+                login: parsed.data.login.trim(),
+                loginKey: parsed.data.login.trim().toLowerCase(),
+              }
+            : {}),
+          ...(parsed.data.password !== undefined
+            ? {
+                passwordHash: hashAdminPassword(parsed.data.password.trim()),
+                passwordPlain: parsed.data.password.trim(),
+              }
+            : {}),
+        },
+      });
+      await prisma.adminSession.deleteMany({ where: { adminUserId: id } });
+      return res.json({ user: toSuperAdminManagedAdminUser(updated) });
+    } catch (error) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
+        return res.status(409).json(apiError("LOGIN_TAKEN", "Login already exists"));
+      }
+      throw error;
+    }
+  });
+
+  app.delete("/api/admin/users/:id", adminAuthMiddleware, requireSuperAdmin, async (req, res) => {
+    const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+    const currentAdminId = (req as AdminAuthedRequest).admin?.id;
+    if (currentAdminId && currentAdminId === id) {
+      return res
+        .status(400)
+        .json(apiError("INVALID_OPERATION", "Super-admin cannot delete own account"));
+    }
+    const deleted = await prisma.adminUser.deleteMany({ where: { id, role: AdminRole.ADMIN } });
+    if (deleted.count === 0)
+      return res.status(404).json(apiError("NOT_FOUND", "Admin user not found"));
+    await prisma.adminSession.deleteMany({ where: { adminUserId: id } });
+    return res.status(204).send();
   });
   app.use("/api/admin", adminApiLimiter);
 
@@ -612,6 +790,20 @@ export function buildApp() {
         .json({ error: error instanceof Error ? error.message : "Room already exists" });
     }
   });
+
+  app.delete(
+    "/api/admin/rooms/:eventName",
+    adminAuthMiddleware,
+    requireSuperAdmin,
+    async (req, res) => {
+      const eventName = Array.isArray(req.params.eventName)
+        ? req.params.eventName[0]
+        : req.params.eventName;
+      const ok = await deleteRoomByEventName(eventName);
+      if (!ok) return res.status(404).json(apiError("NOT_FOUND", "Not found"));
+      return res.status(204).send();
+    },
+  );
 
   app.get("/api/admin/rooms/:eventName", adminAuthMiddleware, async (req, res) => {
     const eventName = Array.isArray(req.params.eventName)

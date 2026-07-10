@@ -340,6 +340,10 @@ async function renderPdfFromPage(pageUrl: string): Promise<Buffer> {
   }
 }
 
+function shouldUsePlaywrightPdfRenderer(): boolean {
+  return process.env.VITEST !== "true" || process.env.VITEST_PROJECT_NAME === "integration";
+}
+
 export async function renderPublicReportPdf(
   report: PublicEventReport,
   options?: { pageUrl?: string; assetOrigin?: string },
@@ -347,35 +351,37 @@ export async function renderPublicReportPdf(
   const failures: string[] = [];
   await acquirePdfRenderSlot();
   try {
-    try {
-      return await renderPdfFromHtml(
-        buildReportPdfHtml(report, { assetOrigin: options?.assetOrigin }),
-      );
-    } catch (htmlError) {
-      const message = htmlError instanceof Error ? htmlError.message : String(htmlError);
-      failures.push(`html: ${message}`);
-      console.error("[report-pdf] HTML render failed", { error: message });
-    }
-
-    if (options?.pageUrl) {
+    if (shouldUsePlaywrightPdfRenderer()) {
       try {
-        // Защита от SSRF: допускаем только ожидаемую страницу отчёта и (если задан) ожидаемый origin.
-        const assetOrigin = options.assetOrigin?.trim().replace(/\/+$/, "");
-        const page = new URL(options.pageUrl);
-        if (!page.pathname.startsWith("/report/")) {
-          throw new Error("Unexpected report page path");
+        return await renderPdfFromHtml(
+          buildReportPdfHtml(report, { assetOrigin: options?.assetOrigin }),
+        );
+      } catch (htmlError) {
+        const message = htmlError instanceof Error ? htmlError.message : String(htmlError);
+        failures.push(`html: ${message}`);
+        console.error("[report-pdf] HTML render failed", { error: message });
+      }
+
+      if (options?.pageUrl) {
+        try {
+          // Защита от SSRF: допускаем только ожидаемую страницу отчёта и (если задан) ожидаемый origin.
+          const assetOrigin = options.assetOrigin?.trim().replace(/\/+$/, "");
+          const page = new URL(options.pageUrl);
+          if (!page.pathname.startsWith("/report/")) {
+            throw new Error("Unexpected report page path");
+          }
+          if (assetOrigin && page.origin !== assetOrigin) {
+            throw new Error("Unexpected report page origin");
+          }
+          return await renderPdfFromPage(options.pageUrl);
+        } catch (pageError) {
+          const message = pageError instanceof Error ? pageError.message : String(pageError);
+          failures.push(`page: ${message}`);
+          console.error("[report-pdf] page URL render failed", {
+            pageUrl: options.pageUrl,
+            error: message,
+          });
         }
-        if (assetOrigin && page.origin !== assetOrigin) {
-          throw new Error("Unexpected report page origin");
-        }
-        return await renderPdfFromPage(options.pageUrl);
-      } catch (pageError) {
-        const message = pageError instanceof Error ? pageError.message : String(pageError);
-        failures.push(`page: ${message}`);
-        console.error("[report-pdf] page URL render failed", {
-          pageUrl: options.pageUrl,
-          error: message,
-        });
       }
     }
 

@@ -10,6 +10,7 @@ import {
   type BrandThemeVisualSetters,
 } from "./applyBrandThemeVisual";
 import type { EventThemeSelection } from "../../components/admin/branding/EventThemeApplySection";
+import { eventThemeSelectionToKey } from "../../components/admin/branding/EventThemeApplySection";
 import type { AdminBrandingTileSetters } from "../admin/applyAdminBrandingVisualFromPublicView";
 
 function presetThemeLabel(theme: BrandThemeId): string {
@@ -25,6 +26,7 @@ export async function applyEventThemeSelection(params: {
   brandThemeVisualSetters: BrandThemeVisualSetters;
   tileBrandSetters: AdminBrandingTileSetters;
   onAppliedName: (name: string | undefined) => void;
+  onAppliedKey?: (key: string | undefined) => void;
 }): Promise<void> {
   if (params.selection.kind === "preset") {
     const theme = params.selection.theme;
@@ -36,11 +38,14 @@ export async function applyEventThemeSelection(params: {
     params.tileBrandSetters.setSpeakerTileTextColor(patch.speakerTileTextColor);
     params.tileBrandSetters.setProgramTileBackgroundColor(patch.programTileBackgroundColor);
     params.tileBrandSetters.setProgramTileTextColor(patch.programTileTextColor);
+    const key = eventThemeSelectionToKey(params.selection);
     params.emitBrandingPatch({
       ...patch,
       appliedEventThemeName: label,
+      appliedEventThemeKey: key,
     });
     params.onAppliedName(label);
+    params.onAppliedKey?.(key);
     return;
   }
 
@@ -59,7 +64,12 @@ export async function applyEventThemeSelection(params: {
   params.tileBrandSetters.setProgramTileBackgroundColor(branding.programTileBackgroundColor);
   params.tileBrandSetters.setProgramTileTextColor(branding.programTileTextColor);
   params.emitBrandingPatch(
-    eventThemeBrandingToPublicViewPatch(branding, params.selection.themeName),
+    eventThemeBrandingToPublicViewPatch(
+      branding,
+      params.selection.themeName,
+      eventThemeSelectionToKey(params.selection),
+    ),
   );
   params.onAppliedName(params.selection.themeName);
+  params.onAppliedKey?.(eventThemeSelectionToKey(params.selection));
 }

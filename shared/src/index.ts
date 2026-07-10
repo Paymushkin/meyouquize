@@ -9,6 +9,7 @@ import type { BrandThemeId } from "./brandThemes.js";
 import type { EventThemeBranding } from "./eventThemeBranding.js";
 import {
   eventThemeBrandingToPublicViewPatch,
+  sanitizeAppliedEventThemeKey,
   pickEventThemeBrandingFromPublicView,
 } from "./eventThemeBranding.js";
 import { sanitizeBrandThemeId } from "./brandThemes.js";
@@ -436,6 +437,8 @@ export interface PublicViewState {
   brandTheme?: BrandThemeId;
   /** Метка последней применённой темы (только для UI, без синхронизации). */
   appliedEventThemeName?: string;
+  /** Ключ выбора темы в админке: default | meyou | custom:{id}. */
+  appliedEventThemeKey?: string;
   /** @deprecated legacy поле, используйте раздельные player/projector */
   brandBackgroundImageUrl?: string;
 }
@@ -1655,6 +1658,9 @@ export function normalizePublicViewState(
       typeof value?.appliedEventThemeName === "string"
         ? value.appliedEventThemeName.trim().slice(0, 120)
         : undefined,
+    appliedEventThemeKey: sanitizeAppliedEventThemeKey(
+      value?.appliedEventThemeKey ?? base.appliedEventThemeKey,
+    ),
   };
 }
 
@@ -1737,6 +1743,7 @@ export {
 export type { EventThemeBranding, EventThemeBrandingPatch } from "./eventThemeBranding.js";
 export {
   eventThemeBrandingToPublicViewPatch,
+  sanitizeAppliedEventThemeKey,
   pickEventThemeBrandingFromPublicView,
 } from "./eventThemeBranding.js";
 

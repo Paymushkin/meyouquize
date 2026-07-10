@@ -1,4 +1,5 @@
 import { prisma } from "./prisma.js";
+import { Prisma } from "@prisma/client";
 
 const CACHE_TTL_MS = 60_000;
 const MAX_ENTRIES = 256;
@@ -26,4 +27,33 @@ export async function isAdminTokenValid(token: string): Promise<boolean> {
   cache.set(token, { valid, cachedAt: now });
   pruneIfNeeded();
   return valid;
+}
+
+export async function getAdminSessionWithUser(token: string) {
+  try {
+    const session = await prisma.adminSession.findUnique({
+      where: { token },
+      include: {
+        adminUser: {
+          select: {
+            id: true,
+            login: true,
+            role: true,
+            isActive: true,
+          },
+        },
+      },
+    });
+    if (!session || session.expiresAt <= new Date()) return null;
+    if (session.adminUser && !session.adminUser.isActive) return null;
+    return session;
+  } catch (error) {
+    // Во время постепенного rollout миграций поле/таблица admin users может отсутствовать.
+    if (error instanceof Prisma.PrismaClientKnownRequestError) {
+      const fallback = await prisma.adminSession.findUnique({ where: { token } });
+      if (!fallback || fallback.expiresAt <= new Date()) return null;
+      return { ...fallback, adminUser: null };
+    }
+    throw error;
+  }
 }

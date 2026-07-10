@@ -52,15 +52,15 @@ describe("HTTP routes integration", () => {
       ...DEFAULT_PUBLIC_VIEW_STATE,
       brandPrimaryColor: "#112233",
       brandAccentColor: "#445566",
-      brandFontFamily: "Montserrat, Arial, sans-serif",
-      brandFontUrl: "/media/fonts/montserrat.woff2",
+      brandFontFamily: "Custom Display, Arial, sans-serif",
+      brandFontUrl: "/media/fonts/custom-display.woff2",
     });
     const app = buildApp();
     const response = await request(app).get(`/api/quiz/by-slug/${eventName}/meta`);
     expect(response.status).toBe(200);
     expect(response.body.brandPrimaryColor).toBe("#112233");
-    expect(response.body.brandFontFamily).toBe("Montserrat, Arial, sans-serif");
-    expect(response.body.brandFontUrl).toBe("/media/fonts/montserrat.woff2");
+    expect(response.body.brandFontFamily).toBe("Custom Display, Arial, sans-serif");
+    expect(response.body.brandFontUrl).toBe("/media/fonts/custom-display.woff2");
     expect(response.body.slug).toBe(eventName);
   });
 

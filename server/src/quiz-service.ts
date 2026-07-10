@@ -39,7 +39,11 @@ import {
   type SubmitQuestionRow,
 } from "./submit-question-cache.js";
 import { getActiveFeedbackFormPublic, getFeedbackResultsForReport } from "./feedback-service.js";
-import { cleanupUnusedQuestionMedia, collectQuestionMediaUrlsForQuiz } from "./media-cleanup.js";
+import {
+  cleanupUnusedQuestionMedia,
+  collectQuestionMediaUrlsForQuiz,
+  collectQuizMediaUrls,
+} from "./media-cleanup.js";
 import {
   getStoredPublicView,
   publicViewJsonToState,
@@ -496,6 +500,20 @@ export async function listRooms() {
     },
     orderBy: { createdAt: "desc" },
   });
+}
+
+export async function deleteRoomByEventName(eventName: string): Promise<boolean> {
+  const room = await prisma.quiz.findUnique({
+    where: { slug: eventName },
+    select: { id: true },
+  });
+  if (!room) return false;
+  const mediaUrls = await collectQuizMediaUrls(room.id);
+  await prisma.quiz.delete({ where: { id: room.id } });
+  await cleanupUnusedQuestionMedia(mediaUrls);
+  invalidateSubmitQuestionCacheForQuiz(room.id);
+  await invalidateDashboardResultsCache(room.id);
+  return true;
 }
 
 const roomInclude = {

@@ -93,6 +93,8 @@ type Props = {
     customThemes: EventThemeListOption[];
     themesLoading?: boolean;
     appliedEventThemeName?: string;
+    appliedEventThemeKey?: string;
+    brandTheme?: BrandThemeId;
     onApply: (selection: EventThemeSelection) => void | Promise<void>;
   };
   tileColorsProps?: {
@@ -229,7 +231,6 @@ export function AdminBrandingSection(props: Props) {
             emitPatch={emitBrandingPatch}
           />
           <BrandPlayerUiResultsSection
-            colorGridSx={colorGridSx}
             brandBodyBackgroundColor={brandBodyBackgroundColor}
             setBrandBodyBackgroundColor={setBrandBodyBackgroundColor}
             playerVoteOptionTextColor={playerVoteOptionTextColor}

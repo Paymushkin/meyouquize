@@ -180,8 +180,35 @@ model Answer {
 model AdminSession {
   id        String   @id @default(cuid())
   token     String   @unique
+  adminUserId String?
+  adminUser AdminUser? @relation(fields: [adminUserId], references: [id], onDelete: SetNull)
+  /** Логин при входе — для env-супер-админа без записи AdminUser. */
+  login     String?
   expiresAt DateTime
   createdAt DateTime @default(now())
+
+  @@index([adminUserId])
+  @@index([expiresAt])
+}
+
+model AdminUser {
+  id           String       @id @default(cuid())
+  login        String
+  loginKey     String       @unique
+  passwordHash String
+  /** Пароль в открытом виде — только для ADMIN, чтобы супер-админ мог просматривать/редактировать. */
+  passwordPlain String?
+  role         AdminRole    @default(ADMIN)
+  isActive     Boolean      @default(true)
+  lastLoginAt  DateTime?
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+  sessions     AdminSession[]
+}
+
+enum AdminRole {
+  SUPER_ADMIN
+  ADMIN
 }
 
 enum ScoringMode {

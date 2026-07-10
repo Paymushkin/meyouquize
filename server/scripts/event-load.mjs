@@ -122,6 +122,10 @@ async function fetchHttpBootstrap() {
         if (!res.ok) bumpReason(httpFailReasons, `asset_http_${res.status}`);
       }),
     );
+    if (forcedQuizId) {
+      httpBootstrapLatencies.push(Date.now() - t0);
+      return { ok: true, meta: { id: forcedQuizId } };
+    }
     const metaUrl = new URL(`/api/quiz/by-slug/${slug}/meta`, base).toString();
     const metaRes = await fetch(metaUrl);
     if (!metaRes.ok) {

@@ -1,12 +1,11 @@
 import { useState } from "react";
 import {
+  Box,
   Card,
   CardContent,
   Dialog,
   DialogContent,
   DialogTitle,
-  Divider,
-  FormControlLabel,
   IconButton,
   Stack,
   Switch,
@@ -15,6 +14,7 @@ import {
   Typography,
 } from "@mui/material";
 import ContentCopyIcon from "@mui/icons-material/ContentCopy";
+import OpenInNewIcon from "@mui/icons-material/OpenInNew";
 import QrCode2Icon from "@mui/icons-material/QrCode2";
 import QRCode from "qrcode";
 import { buildPlayerJoinUrl, buildProjectorScreenUrl } from "../../publicAppOrigin";
@@ -61,6 +61,13 @@ export function AdminGeneralSection(props: Props) {
     setProjectorJoinQrTextColor,
     emitBrandingPatch,
   } = props;
+  const switchRowSx = {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 1,
+  } as const;
+  const rowLabelSx = { flex: 1, minWidth: 0 } as const;
   const joinUrl = buildPlayerJoinUrl(eventSlug);
   const screenUrl = buildProjectorScreenUrl(eventSlug);
   const [qrOpen, setQrOpen] = useState(false);
@@ -90,127 +97,18 @@ export function AdminGeneralSection(props: Props) {
     <>
       <Card variant="outlined">
         <CardContent>
-          <TextField
-            label="Название квиза"
-            value={editableTitle}
-            onChange={(e) => setEditableTitle(e.target.value)}
-            onBlur={saveQuizTitle}
-            fullWidth
-            size="small"
-            multiline
-            minRows={2}
-            maxRows={4}
-            sx={{ mb: 2 }}
-          />
-          <Stack spacing={0.5} sx={{ mb: 2 }}>
-            <Stack direction="row" alignItems="center" spacing={0.5}>
-              <Typography
-                color="text.secondary"
-                sx={{ flex: 1, minWidth: 0 }}
-                title={joinUrl || undefined}
-              >
-                {joinUrl ? `Ивент: ${joinUrl}` : "Ссылка на ивент"}
-              </Typography>
-              <Tooltip title="Скопировать ссылку">
-                <span>
-                  <IconButton
-                    size="small"
-                    onClick={() => void copyToClipboard(joinUrl)}
-                    disabled={!joinUrl}
-                  >
-                    <ContentCopyIcon fontSize="small" />
-                  </IconButton>
-                </span>
-              </Tooltip>
-              <Tooltip title="Показать QR">
-                <span>
-                  <IconButton
-                    size="small"
-                    onClick={() => void openQr("Ссылка на ивент", buildPlayerJoinUrl(eventSlug))}
-                    disabled={!eventSlug}
-                  >
-                    <QrCode2Icon fontSize="small" />
-                  </IconButton>
-                </span>
-              </Tooltip>
-            </Stack>
-            <Stack direction="row" alignItems="center" spacing={0.5}>
-              <Stack sx={{ flex: 1, minWidth: 0 }}>
-                <Typography color="text.secondary">Ссылка на проектор</Typography>
-                {screenUrl ? (
-                  <Typography
-                    variant="caption"
-                    color="text.secondary"
-                    sx={{ wordBreak: "break-all" }}
-                  >
-                    {screenUrl}
-                  </Typography>
-                ) : null}
-              </Stack>
-              <Tooltip title="Скопировать ссылку">
-                <span>
-                  <IconButton
-                    size="small"
-                    onClick={() => void copyToClipboard(screenUrl)}
-                    disabled={!screenUrl}
-                  >
-                    <ContentCopyIcon fontSize="small" />
-                  </IconButton>
-                </span>
-              </Tooltip>
-              <Tooltip title="Показать QR">
-                <span>
-                  <IconButton
-                    size="small"
-                    onClick={() =>
-                      void openQr("Ссылка на проектор", buildProjectorScreenUrl(eventSlug))
-                    }
-                    disabled={!eventSlug}
-                  >
-                    <QrCode2Icon fontSize="small" />
-                  </IconButton>
-                </span>
-              </Tooltip>
-            </Stack>
-          </Stack>
-          <FormControlLabel
-            sx={{ m: 0 }}
-            control={
-              <Switch
-                checked={showEventTitleOnPlayer}
-                onChange={(_, next) => onToggleShowEventTitleOnPlayer(next)}
-              />
-            }
-            label="Показывать название ивента у пользователя"
-          />
-          <FormControlLabel
-            sx={{ m: 0, mt: 1 }}
-            control={
-              <Switch
-                checked={playerAutoJoinRandomNickname}
-                onChange={(_, next) => onTogglePlayerAutoJoinRandomNickname(next)}
-              />
-            }
-            label="Вход без формы: сразу случайное имя"
-          />
-          <Divider sx={{ my: 2 }} />
-          <Stack spacing={1.25}>
-            <FormControlLabel
-              sx={{ m: 0 }}
-              control={
-                <Switch
-                  checked={projectorJoinQrVisible}
-                  onChange={(_, next) => {
-                    setProjectorJoinQrVisible(next);
-                    emitBrandingPatch({ projectorJoinQrVisible: next });
-                  }}
-                />
-              }
-              label="Показывать QR-код на экране ивента"
+          <Stack spacing={2}>
+            <TextField
+              label="Название квиза"
+              value={editableTitle}
+              onChange={(e) => setEditableTitle(e.target.value)}
+              onBlur={saveQuizTitle}
+              fullWidth
+              size="small"
+              multiline
+              minRows={2}
+              maxRows={4}
             />
-            <Typography variant="caption" color="text.secondary">
-              На экране ивента — крупный QR с текстом вместо названия.
-            </Typography>
             <TextField
               label="Текст рядом с QR"
               placeholder={DEFAULT_PROJECTOR_JOIN_QR_TEXT}
@@ -225,11 +123,121 @@ export function AdminGeneralSection(props: Props) {
               inputProps={{ maxLength: PROJECTOR_JOIN_QR_TEXT_MAX_LENGTH }}
             />
             <CompactColorField
-              label="Text"
+              label="Цвет текста"
               value={projectorJoinQrTextColor}
               onChange={setProjectorJoinQrTextColor}
               onBlur={() => emitBrandingPatch({ projectorJoinQrTextColor })}
             />
+            <Stack spacing={0.5}>
+              <Stack direction="row" alignItems="center" spacing={0.5}>
+                <Typography variant="body2" sx={rowLabelSx}>
+                  Ивент
+                </Typography>
+                <Tooltip title="Скопировать ссылку">
+                  <span>
+                    <IconButton
+                      size="small"
+                      onClick={() => void copyToClipboard(joinUrl)}
+                      disabled={!joinUrl}
+                    >
+                      <ContentCopyIcon fontSize="small" />
+                    </IconButton>
+                  </span>
+                </Tooltip>
+                <Tooltip title="Показать QR">
+                  <span>
+                    <IconButton
+                      size="small"
+                      onClick={() => void openQr("Ссылка на ивент", buildPlayerJoinUrl(eventSlug))}
+                      disabled={!eventSlug}
+                    >
+                      <QrCode2Icon fontSize="small" />
+                    </IconButton>
+                  </span>
+                </Tooltip>
+                <Tooltip title="Открыть в новой вкладке">
+                  <span>
+                    <IconButton
+                      size="small"
+                      onClick={() => {
+                        if (joinUrl) window.open(joinUrl, "_blank", "noopener,noreferrer");
+                      }}
+                      disabled={!joinUrl}
+                    >
+                      <OpenInNewIcon fontSize="small" />
+                    </IconButton>
+                  </span>
+                </Tooltip>
+              </Stack>
+              <Stack direction="row" alignItems="center" spacing={0.5}>
+                <Typography variant="body2" sx={rowLabelSx}>
+                  Проектор
+                </Typography>
+                <Tooltip title="Скопировать ссылку">
+                  <span>
+                    <IconButton
+                      size="small"
+                      onClick={() => void copyToClipboard(screenUrl)}
+                      disabled={!screenUrl}
+                    >
+                      <ContentCopyIcon fontSize="small" />
+                    </IconButton>
+                  </span>
+                </Tooltip>
+                <Tooltip title="Показать QR">
+                  <span>
+                    <IconButton
+                      size="small"
+                      onClick={() =>
+                        void openQr("Ссылка на проектор", buildProjectorScreenUrl(eventSlug))
+                      }
+                      disabled={!eventSlug}
+                    >
+                      <QrCode2Icon fontSize="small" />
+                    </IconButton>
+                  </span>
+                </Tooltip>
+                <Tooltip title="Открыть в новой вкладке">
+                  <span>
+                    <IconButton
+                      size="small"
+                      onClick={() => {
+                        if (screenUrl) window.open(screenUrl, "_blank", "noopener,noreferrer");
+                      }}
+                      disabled={!screenUrl}
+                    >
+                      <OpenInNewIcon fontSize="small" />
+                    </IconButton>
+                  </span>
+                </Tooltip>
+              </Stack>
+            </Stack>
+            <Stack spacing={1}>
+              <Box sx={switchRowSx}>
+                <Typography variant="body2">Показывать название ивента у пользователя</Typography>
+                <Switch
+                  checked={showEventTitleOnPlayer}
+                  onChange={(_, next) => onToggleShowEventTitleOnPlayer(next)}
+                />
+              </Box>
+              <Box sx={switchRowSx}>
+                <Typography variant="body2">Вход без формы: сразу случайное имя</Typography>
+                <Switch
+                  checked={playerAutoJoinRandomNickname}
+                  onChange={(_, next) => onTogglePlayerAutoJoinRandomNickname(next)}
+                />
+              </Box>
+              <Box sx={switchRowSx}>
+                <Typography variant="body2">Показывать QR-код на экране ивента</Typography>
+                <Switch
+                  checked={projectorJoinQrVisible}
+                  onChange={(_, next) => {
+                    setProjectorJoinQrVisible(next);
+                    emitBrandingPatch({ projectorJoinQrVisible: next });
+                  }}
+                />
+              </Box>
+            </Stack>
           </Stack>
         </CardContent>
       </Card>

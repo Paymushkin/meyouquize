@@ -222,6 +222,7 @@ export function AdminEventPage() {
   const [showFirstCorrectAnswerer, setShowFirstCorrectAnswerer] = useState(false);
   const [firstCorrectWinnersCount, setFirstCorrectWinnersCount] = useState(1);
   const [appliedEventThemeName, setAppliedEventThemeName] = useState<string | undefined>();
+  const [appliedEventThemeKey, setAppliedEventThemeKey] = useState<string | undefined>();
   const branding = useAdminBrandingVisual({
     emitBrandingPatchRef,
     tileBrandSettersRef: playerTileBrandSettersRef,
@@ -265,6 +266,7 @@ export function AdminEventPage() {
 
   const {
     authChecked,
+    adminLogin,
     checkSession,
     loadRoom,
     persistQuestions,
@@ -799,6 +801,8 @@ export function AdminEventPage() {
     brandProjectorBackgroundImageUrl: branding.brandProjectorBackgroundImageUrl,
     brandBodyBackgroundColor: branding.brandBodyBackgroundColor,
     brandTheme: branding.brandTheme,
+    appliedEventThemeName,
+    appliedEventThemeKey,
   });
 
   const emitPublicViewSetRef = useRef(emitPublicViewSet);
@@ -991,6 +995,11 @@ export function AdminEventPage() {
     } else {
       setAppliedEventThemeName(undefined);
     }
+    if (typeof pv.appliedEventThemeKey === "string" && pv.appliedEventThemeKey.trim()) {
+      setAppliedEventThemeKey(pv.appliedEventThemeKey.trim());
+    } else {
+      setAppliedEventThemeKey(undefined);
+    }
     if (typeof pv.showFirstCorrectAnswerer === "boolean") {
       setShowFirstCorrectAnswerer(pv.showFirstCorrectAnswerer);
     }
@@ -1051,6 +1060,7 @@ export function AdminEventPage() {
           brandThemeVisualSetters: branding.brandThemeVisualSetters,
           tileBrandSetters: playerTileBrandSettersRef.current,
           onAppliedName: setAppliedEventThemeName,
+          onAppliedKey: setAppliedEventThemeKey,
         });
         setMessage("Тема применена");
       } catch (error) {
@@ -1134,6 +1144,8 @@ export function AdminEventPage() {
       customThemes,
       themesLoading,
       appliedEventThemeName,
+      appliedEventThemeKey,
+      brandTheme: branding.brandTheme,
       onApply: handleApplyEventTheme,
     },
   });
@@ -1474,6 +1486,7 @@ export function AdminEventPage() {
           currentPublicScreenText={currentPublicScreenText}
           adminSocketStatus={adminSocketStatus}
           onlineUsersCount={onlineUsersCount}
+          adminLogin={adminLogin}
         />
       ) : null}
       {!authChecked ? null : !isAuth ? (

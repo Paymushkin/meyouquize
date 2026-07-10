@@ -55,6 +55,7 @@ export type EventThemeBranding = {
 
 export type EventThemeBrandingPatch = EventThemeBranding & {
   appliedEventThemeName?: string;
+  appliedEventThemeKey?: string;
 };
 
 type PublicViewLike = Record<string, unknown>;
@@ -126,14 +127,26 @@ export function pickEventThemeBrandingFromPublicView(view: unknown): EventThemeB
   };
 }
 
+export function sanitizeAppliedEventThemeKey(raw: unknown): string | undefined {
+  if (typeof raw !== "string") return undefined;
+  const trimmed = raw.trim();
+  if (trimmed === "default" || trimmed === "meyou") return trimmed;
+  if (/^custom:[A-Za-z0-9_-]+$/.test(trimmed)) return trimmed.slice(0, 140);
+  return undefined;
+}
+
 export function eventThemeBrandingToPublicViewPatch(
   branding: EventThemeBranding,
   appliedEventThemeName?: string,
+  appliedEventThemeKey?: string,
 ): EventThemeBrandingPatch {
   return {
     ...branding,
     ...(appliedEventThemeName?.trim()
       ? { appliedEventThemeName: appliedEventThemeName.trim().slice(0, 120) }
+      : {}),
+    ...(sanitizeAppliedEventThemeKey(appliedEventThemeKey)
+      ? { appliedEventThemeKey: sanitizeAppliedEventThemeKey(appliedEventThemeKey) }
       : {}),
   };
 }

@@ -55,6 +55,16 @@ function patchStringField(
   return typeof value === "string" ? value : current;
 }
 
+function patchOptionalStringField(
+  patch: PublicViewSetPatch,
+  key: "appliedEventThemeName" | "appliedEventThemeKey",
+  current: string | undefined,
+): string | undefined {
+  if (!Object.prototype.hasOwnProperty.call(patch, key)) return current;
+  const value = patch[key];
+  return typeof value === "string" ? value : undefined;
+}
+
 type UsePublicViewEmitterParams = {
   quizId: string;
   publicViewMode: PublicViewMode;
@@ -150,6 +160,8 @@ type UsePublicViewEmitterParams = {
   brandProjectorBackgroundImageUrl: string;
   brandBodyBackgroundColor: string;
   brandTheme: BrandThemeId;
+  appliedEventThemeName?: string;
+  appliedEventThemeKey?: string;
   projectorJoinQrVisible: boolean;
   projectorJoinQrOverlayVisible: boolean;
   projectorJoinQrText: string;
@@ -255,6 +267,8 @@ export function usePublicViewEmitter(params: UsePublicViewEmitterParams) {
     brandProjectorBackgroundImageUrl,
     brandBodyBackgroundColor,
     brandTheme,
+    appliedEventThemeName,
+    appliedEventThemeKey,
     projectorJoinQrVisible,
     projectorJoinQrOverlayVisible,
     projectorJoinQrText,
@@ -295,6 +309,16 @@ export function usePublicViewEmitter(params: UsePublicViewEmitterParams) {
             : undefined;
       const leaderboardSubQuizIdForEmit =
         leaderboardSubQuizIdRaw !== undefined ? String(leaderboardSubQuizIdRaw).trim() : "";
+      const nextAppliedEventThemeName = patchOptionalStringField(
+        patch,
+        "appliedEventThemeName",
+        appliedEventThemeName,
+      );
+      const nextAppliedEventThemeKey = patchOptionalStringField(
+        patch,
+        "appliedEventThemeKey",
+        appliedEventThemeKey,
+      );
       const nextPayload = {
         quizId,
         mode: nextMode,
@@ -422,6 +446,12 @@ export function usePublicViewEmitter(params: UsePublicViewEmitterParams) {
         ),
         brandTheme:
           patch.brandTheme !== undefined ? sanitizeBrandThemeId(patch.brandTheme) : brandTheme,
+        ...(nextAppliedEventThemeName !== undefined
+          ? { appliedEventThemeName: nextAppliedEventThemeName }
+          : {}),
+        ...(nextAppliedEventThemeKey !== undefined
+          ? { appliedEventThemeKey: nextAppliedEventThemeKey }
+          : {}),
         projectorJoinQrVisible: patch.projectorJoinQrVisible ?? projectorJoinQrVisible,
         projectorJoinQrOverlayVisible:
           patch.projectorJoinQrOverlayVisible ?? projectorJoinQrOverlayVisible,
@@ -530,6 +560,8 @@ export function usePublicViewEmitter(params: UsePublicViewEmitterParams) {
       brandProjectorBackgroundImageUrl,
       brandBodyBackgroundColor,
       brandTheme,
+      appliedEventThemeName,
+      appliedEventThemeKey,
       projectorJoinQrVisible,
       projectorJoinQrOverlayVisible,
       projectorJoinQrText,

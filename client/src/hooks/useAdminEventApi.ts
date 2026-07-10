@@ -57,6 +57,7 @@ export function useAdminEventApi(params: Params) {
 
   const lastPersistQuestionsErrorRef = useRef<string | null>(null);
   const [authChecked, setAuthChecked] = useState(false);
+  const [adminLogin, setAdminLogin] = useState<string | null>(null);
 
   const readSubQuizTitleFromSnapshot = useCallback((snapshot: string, subQuizId: string) => {
     try {
@@ -73,10 +74,19 @@ export function useAdminEventApi(params: Params) {
   const checkSession = useCallback(async () => {
     try {
       const response = await fetch(`${API_BASE}/api/admin/me`, { credentials: "include" });
-      setIsAuth(response.ok);
-      return response.ok;
+      const ok = response.ok;
+      setIsAuth(ok);
+      if (ok) {
+        const payload = (await response.json()) as { admin?: { login?: string } };
+        const login = payload.admin?.login?.trim();
+        setAdminLogin(login || null);
+      } else {
+        setAdminLogin(null);
+      }
+      return ok;
     } catch {
       setIsAuth(false);
+      setAdminLogin(null);
       return false;
     } finally {
       setAuthChecked(true);
@@ -408,6 +418,7 @@ export function useAdminEventApi(params: Params) {
 
   return {
     authChecked,
+    adminLogin,
     checkSession,
     loadRoom,
     persistQuestions,

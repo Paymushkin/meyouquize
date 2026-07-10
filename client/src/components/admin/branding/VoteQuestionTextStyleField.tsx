@@ -97,28 +97,23 @@ export function VoteQuestionTextStyleField(props: Props) {
           </ToggleButtonGroup>
         </Stack>
         {mode === "solid" ? (
-          <Stack direction="row" alignItems="center" gap={0.75}>
-            <input
-              type="color"
-              value={solidFromValue(value)}
-              onChange={(e) => onChange(e.target.value)}
-              onBlur={() => commit(solidFromValue(value))}
-              aria-label={label}
-              style={{
-                width: 32,
-                height: 26,
-                padding: 0,
-                border: "1px solid rgba(0,0,0,0.23)",
-                borderRadius: 4,
-                cursor: "pointer",
-                flexShrink: 0,
-                background: "transparent",
-              }}
-            />
-            <Typography variant="caption" color="text.secondary" sx={{ fontFamily: "monospace" }}>
-              {solidFromValue(value)}
-            </Typography>
-          </Stack>
+          <input
+            type="color"
+            value={solidFromValue(value)}
+            onChange={(e) => onChange(e.target.value)}
+            onBlur={() => commit(solidFromValue(value))}
+            aria-label={label}
+            style={{
+              width: 32,
+              height: 26,
+              padding: 0,
+              border: "1px solid rgba(0,0,0,0.23)",
+              borderRadius: 4,
+              cursor: "pointer",
+              flexShrink: 0,
+              background: "transparent",
+            }}
+          />
         ) : (
           <Stack direction="row" alignItems="center" flexWrap="wrap" gap={1}>
             <input

@@ -20,8 +20,9 @@ describe("eventThemeBranding", () => {
 
   it("eventThemeBrandingToPublicViewPatch adds applied name metadata", () => {
     const branding = pickEventThemeBrandingFromPublicView(DEFAULT_PUBLIC_VIEW_STATE);
-    const patch = eventThemeBrandingToPublicViewPatch(branding, "Corporate");
+    const patch = eventThemeBrandingToPublicViewPatch(branding, "Corporate", "custom:theme-1");
     expect(patch.appliedEventThemeName).toBe("Corporate");
+    expect(patch.appliedEventThemeKey).toBe("custom:theme-1");
     expect(patch.brandPrimaryColor).toBe(branding.brandPrimaryColor);
   });
 });

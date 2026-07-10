@@ -1,11 +1,9 @@
 import { Accordion, AccordionDetails, AccordionSummary, Box, Typography } from "@mui/material";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
-import type { SxProps, Theme } from "@mui/material/styles";
 import type { PublicViewSetPatch } from "../../../publicViewContract";
 import { CompactColorField } from "./CompactColorField";
 
 type Props = {
-  colorGridSx: SxProps<Theme>;
   brandBodyBackgroundColor: string;
   setBrandBodyBackgroundColor: (value: string) => void;
   playerVoteOptionTextColor: string;
@@ -17,7 +15,6 @@ type Props = {
 
 export function BrandPlayerUiResultsSection(props: Props) {
   const {
-    colorGridSx,
     brandBodyBackgroundColor,
     setBrandBodyBackgroundColor,
     playerVoteOptionTextColor,
@@ -30,10 +27,10 @@ export function BrandPlayerUiResultsSection(props: Props) {
   return (
     <Accordion defaultExpanded>
       <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-        <Typography variant="subtitle2">Фоновый цвет</Typography>
+        <Typography variant="subtitle2">Пользователь</Typography>
       </AccordionSummary>
       <AccordionDetails>
-        <Box sx={colorGridSx}>
+        <Box sx={{ display: "flex", flexDirection: "column", gap: 1, maxWidth: 360 }}>
           <CompactColorField
             label="Фоновый цвет"
             value={brandBodyBackgroundColor}

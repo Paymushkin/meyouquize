@@ -23,7 +23,7 @@ import { useAdminFontLibrary } from "../features/admin/useAdminFontLibrary";
 import { useAdminAuth } from "../hooks/useAdminAuth";
 
 export function AdminFontsPage() {
-  const { isAuth, authChecked, checkSession } = useAdminAuth();
+  const { isAuth, authChecked, admin, checkSession } = useAdminAuth();
   const { availableFonts, setAvailableFonts, loadFontLibrary } = useAdminFontLibrary();
   const [message, setMessage] = useState("");
 
@@ -70,7 +70,7 @@ export function AdminFontsPage() {
 
   return (
     <Container maxWidth="lg" sx={{ py: 4 }}>
-      <AdminGlobalNav />
+      <AdminGlobalNav canManageAdmins={admin?.role === "SUPER_ADMIN"} />
       <Typography variant="h4" gutterBottom>
         Админка: шрифты
       </Typography>

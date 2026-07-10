@@ -30,7 +30,7 @@ type ThemeListItem = {
 
 export function AdminThemesPage() {
   const navigate = useNavigate();
-  const { isAuth, authChecked, checkSession } = useAdminAuth();
+  const { isAuth, authChecked, admin, checkSession } = useAdminAuth();
   const [themes, setThemes] = useState<ThemeListItem[]>([]);
   const [message, setMessage] = useState("");
 
@@ -65,7 +65,7 @@ export function AdminThemesPage() {
 
   return (
     <Container maxWidth="lg" sx={{ py: 4 }}>
-      <AdminGlobalNav />
+      <AdminGlobalNav canManageAdmins={admin?.role === "SUPER_ADMIN"} />
       <Typography variant="h4" gutterBottom>
         Админка: темы ивента
       </Typography>

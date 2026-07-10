@@ -63,4 +63,20 @@ describe("HTTP API integration", () => {
     const response = await agent.post("/api/admin/rooms").send({ title: "missing slug" });
     expect(response.status).toBe(400);
   });
+
+  it("DELETE /api/admin/rooms/:eventName removes room and related data", async () => {
+    const app = buildApp();
+    const agent = await createAdminAgent(app);
+    const slug = uniqueSlug("http-delete-room");
+    await agent
+      .post("/api/admin/rooms")
+      .send({ eventName: slug, title: `Delete ${slug}` })
+      .expect(201);
+
+    const deleted = await agent.delete(`/api/admin/rooms/${slug}`);
+    expect(deleted.status).toBe(204);
+
+    const missing = await request(app).get(`/api/quiz/by-slug/${slug}/meta`);
+    expect(missing.status).toBe(404);
+  });
 });

@@ -14,6 +14,7 @@ import { AdminFontsPage } from "./pages/AdminFontsPage";
 import { AdminEventRoute } from "./pages/AdminEventRoute";
 import { AdminVoteDetailPage } from "./pages/AdminVoteDetailPage";
 import { AdminSubQuizResultsPage } from "./pages/AdminSubQuizResultsPage";
+import { AdminUsersPage } from "./pages/AdminUsersPage";
 import { PublicReportPage } from "./pages/PublicReportPage";
 import { LandingPage } from "./pages/LandingPage";
 import { NotFoundPage } from "./pages/NotFoundPage";
@@ -119,6 +120,7 @@ function App() {
             <Route path="themes" element={<AdminThemesPage />} />
             <Route path="themes/:themeId" element={<AdminThemeEditorPage />} />
             <Route path="fonts" element={<AdminFontsPage />} />
+            <Route path="admins" element={<AdminUsersPage />} />
             <Route path=":eventName/votes/:questionId" element={<AdminVoteDetailPage />} />
             <Route
               path=":eventName/sub-quizzes/:subQuizId/results"

@@ -4,12 +4,14 @@ export type AdminEventStatusBarProps = {
   currentPublicScreenText: string;
   adminSocketStatus: "connected" | "connecting" | "disconnected";
   onlineUsersCount: number;
+  adminLogin?: string | null;
 };
 
 export function AdminEventStatusBar({
   currentPublicScreenText,
   adminSocketStatus,
   onlineUsersCount,
+  adminLogin,
 }: AdminEventStatusBarProps) {
   return (
     <Box sx={{ width: "100%", mb: 0 }}>
@@ -46,7 +48,10 @@ export function AdminEventStatusBar({
                 ? "подключение..."
                 : "отключено"}
           </Typography>
-          <Typography variant="caption">Онлайн: {onlineUsersCount}</Typography>
+          <Stack direction="row" spacing={2} alignItems="center">
+            <Typography variant="caption">Онлайн: {onlineUsersCount}</Typography>
+            {adminLogin ? <Typography variant="caption">Вы: {adminLogin}</Typography> : null}
+          </Stack>
         </Stack>
       </Paper>
     </Box>

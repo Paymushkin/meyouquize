@@ -1,17 +1,4 @@
-import {
-  Button,
-  Dialog,
-  DialogActions,
-  DialogContent,
-  DialogContentText,
-  DialogTitle,
-  FormControl,
-  InputLabel,
-  MenuItem,
-  Select,
-  Stack,
-  Typography,
-} from "@mui/material";
+import { FormControl, InputLabel, MenuItem, Select, Stack, Typography } from "@mui/material";
 import type { BrandThemeId } from "@meyouquize/shared";
 import { useMemo, useState } from "react";
 
@@ -28,38 +15,103 @@ type Props = {
   customThemes: EventThemeListOption[];
   themesLoading?: boolean;
   appliedEventThemeName?: string;
+  appliedEventThemeKey?: string;
+  brandTheme?: BrandThemeId;
   onApply: (selection: EventThemeSelection) => void | Promise<void>;
 };
 
-function selectionLabel(selection: EventThemeSelection | null): string {
-  if (!selection) return "";
-  if (selection.kind === "preset") {
-    return selection.theme === "meyou" ? "MeYOU" : "По умолчанию";
+export function eventThemeSelectionToKey(selection: EventThemeSelection): string {
+  return selection.kind === "preset" ? selection.theme : `custom:${selection.themeId}`;
+}
+
+export function appliedEventThemeNameToSelectValue(
+  appliedEventThemeName: string | undefined,
+  customThemes: EventThemeListOption[],
+  brandThemeFallback: BrandThemeId = "default",
+): string {
+  const name = appliedEventThemeName?.trim();
+  if (name) {
+    if (name === "MeYOU") return "meyou";
+    if (name === "По умолчанию") return "default";
+    const custom = customThemes.find((theme) => theme.name === name);
+    if (custom) return `custom:${custom.id}`;
   }
-  return selection.themeName;
+  return brandThemeFallback === "meyou" ? "meyou" : "default";
+}
+
+export function resolveEventThemeSelectValue(
+  appliedEventThemeKey: string | undefined,
+  appliedEventThemeName: string | undefined,
+  customThemes: EventThemeListOption[],
+  brandThemeFallback: BrandThemeId = "default",
+): string {
+  const key = appliedEventThemeKey?.trim();
+  if (key === "default" || key === "meyou") return key;
+  if (key?.startsWith("custom:")) return key;
+  return appliedEventThemeNameToSelectValue(
+    appliedEventThemeName,
+    customThemes,
+    brandThemeFallback,
+  );
+}
+
+function resolveSelection(
+  value: string,
+  customThemes: EventThemeListOption[],
+): EventThemeSelection | null {
+  if (value === "default" || value === "meyou") {
+    return { kind: "preset", theme: value };
+  }
+  if (value.startsWith("custom:")) {
+    const themeId = value.slice("custom:".length);
+    const theme = customThemes.find((item) => item.id === themeId);
+    if (!theme) return null;
+    return { kind: "custom", themeId, themeName: theme.name };
+  }
+  return null;
 }
 
 export function EventThemeApplySection({
   customThemes,
   themesLoading = false,
   appliedEventThemeName,
+  appliedEventThemeKey,
+  brandTheme = "default",
   onApply,
 }: Props) {
-  const [selectedValue, setSelectedValue] = useState("default");
-  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [pendingValue, setPendingValue] = useState<string | null>(null);
+  const [applying, setApplying] = useState(false);
+  const resolvedValue = useMemo(
+    () =>
+      resolveEventThemeSelectValue(
+        appliedEventThemeKey,
+        appliedEventThemeName,
+        customThemes,
+        brandTheme,
+      ),
+    [appliedEventThemeKey, appliedEventThemeName, brandTheme, customThemes],
+  );
+  const selectedValue = pendingValue ?? resolvedValue;
+  const staleCustomTheme =
+    selectedValue.startsWith("custom:") &&
+    !customThemes.some((theme) => selectedValue === `custom:${theme.id}`);
 
-  const pendingSelection = useMemo((): EventThemeSelection | null => {
-    if (selectedValue === "default" || selectedValue === "meyou") {
-      return { kind: "preset", theme: selectedValue };
+  async function handleSelectChange(nextValue: string) {
+    if (nextValue === resolvedValue) return;
+    setPendingValue(nextValue);
+    const selection = resolveSelection(nextValue, customThemes);
+    if (!selection) {
+      setPendingValue(null);
+      return;
     }
-    if (selectedValue.startsWith("custom:")) {
-      const themeId = selectedValue.slice("custom:".length);
-      const theme = customThemes.find((item) => item.id === themeId);
-      if (!theme) return null;
-      return { kind: "custom", themeId, themeName: theme.name };
+    setApplying(true);
+    try {
+      await onApply(selection);
+    } finally {
+      setPendingValue(null);
+      setApplying(false);
     }
-    return null;
-  }, [customThemes, selectedValue]);
+  }
 
   return (
     <Stack spacing={0.5}>
@@ -70,11 +122,16 @@ export function EventThemeApplySection({
           labelId="event-theme-apply-label"
           label="Тема"
           value={selectedValue}
-          onChange={(e) => setSelectedValue(e.target.value)}
-          disabled={themesLoading}
+          onChange={(e) => void handleSelectChange(e.target.value)}
+          disabled={themesLoading || applying}
         >
           <MenuItem value="default">По умолчанию (встроенная)</MenuItem>
           <MenuItem value="meyou">MeYOU (встроенная)</MenuItem>
+          {staleCustomTheme ? (
+            <MenuItem value={selectedValue}>
+              {appliedEventThemeName?.trim() || "Применённая тема"}
+            </MenuItem>
+          ) : null}
           {customThemes.map((theme) => (
             <MenuItem key={theme.id} value={`custom:${theme.id}`}>
               {theme.name}
@@ -82,47 +139,11 @@ export function EventThemeApplySection({
           ))}
         </Select>
       </FormControl>
-      <Button
-        variant="outlined"
-        size="small"
-        disabled={!pendingSelection || themesLoading}
-        onClick={() => setConfirmOpen(true)}
-        sx={{ alignSelf: "flex-start" }}
-      >
-        Применить тему
-      </Button>
       {appliedEventThemeName ? (
         <Typography variant="caption" color="text.secondary">
           Последняя применённая тема: {appliedEventThemeName}
         </Typography>
       ) : null}
-      <Typography variant="caption" color="text.secondary">
-        Применение заменит текущие настройки брендинга снимком выбранной темы. Дальнейшие правки
-        глобальной темы ивент не затронут.
-      </Typography>
-
-      <Dialog open={confirmOpen} onClose={() => setConfirmOpen(false)}>
-        <DialogTitle>Применить тему?</DialogTitle>
-        <DialogContent>
-          <DialogContentText>
-            Тема «{selectionLabel(pendingSelection)}» заменит текущие настройки брендинга в этой
-            комнате.
-          </DialogContentText>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setConfirmOpen(false)}>Отмена</Button>
-          <Button
-            variant="contained"
-            onClick={async () => {
-              if (!pendingSelection) return;
-              setConfirmOpen(false);
-              await onApply(pendingSelection);
-            }}
-          >
-            Применить
-          </Button>
-        </DialogActions>
-      </Dialog>
     </Stack>
   );
 }

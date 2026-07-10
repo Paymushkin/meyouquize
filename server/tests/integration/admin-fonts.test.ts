@@ -20,9 +20,9 @@ describe("Admin fonts API integration", () => {
     }
   });
 
-  function writeTempFont(name: string, bytes: string) {
+  function writeTempFont(name: string, payload = "") {
     const file = path.join(os.tmpdir(), `${name}-${Date.now()}.woff2`);
-    fs.writeFileSync(file, bytes);
+    fs.writeFileSync(file, `wOF2${payload}`);
     tempFiles.push(file);
     return file;
   }
@@ -37,8 +37,8 @@ describe("Admin fonts API integration", () => {
       .post("/api/admin/fonts/upload")
       .field("family", family)
       .field("kind", "static")
-      .attach("files", writeTempFont("regular", `regular-${token}`), "Family-Regular.woff2")
-      .attach("files", writeTempFont("bold", `bold-${token}`), "Family-Bold.woff2");
+      .attach("files", writeTempFont("regular", `-${token}-regular`), "Family-Regular.woff2")
+      .attach("files", writeTempFont("bold", `-${token}-bold`), "Family-Bold.woff2");
 
     expect(uploadResponse.status).toBe(201);
     expect(uploadResponse.body.fonts).toHaveLength(2);
@@ -82,14 +82,14 @@ describe("Admin fonts API integration", () => {
       .post("/api/admin/fonts/upload")
       .field("family", family)
       .field("kind", "variable")
-      .attach("files", writeTempFont("variable", `variable-${token}`), "Family-Variable.woff2");
+      .attach("files", writeTempFont("variable", `-${token}-variable`), "Family-Variable.woff2");
     expect(variableResponse.status).toBe(201);
 
     const staticResponse = await agent
       .post("/api/admin/fonts/upload")
       .field("family", family)
       .field("kind", "static")
-      .attach("files", writeTempFont("regular", `regular-${token}`), "Family-Regular.woff2");
+      .attach("files", writeTempFont("regular", `-${token}-static`), "Family-Regular.woff2");
     expect(staticResponse.status).toBe(409);
     expect(staticResponse.body.rejectedCount).toBe(1);
 

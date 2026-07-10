@@ -52,6 +52,7 @@ describe("applyEventThemeSelection", () => {
       expect.objectContaining({
         ...getBrandThemeVisualPatch("meyou"),
         appliedEventThemeName: "MeYOU",
+        appliedEventThemeKey: "meyou",
       }),
     );
     expect(onAppliedName).toHaveBeenCalledWith("MeYOU");

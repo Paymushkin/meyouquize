@@ -8,6 +8,11 @@ import {
   CardContent,
   Chip,
   Container,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
+  IconButton,
   Stack,
   Table,
   TableBody,
@@ -17,6 +22,7 @@ import {
   TextField,
   Typography,
 } from "@mui/material";
+import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
 import { AdminLoginForm } from "../components/AdminLoginForm";
 import { AdminGlobalNav } from "../components/admin/AdminGlobalNav";
 import { API_BASE } from "../config";
@@ -31,12 +37,15 @@ type Room = {
 };
 
 export function AdminRoomsPage() {
-  const { isAuth, authChecked, checkSession } = useAdminAuth();
+  const { isAuth, authChecked, admin, checkSession } = useAdminAuth();
   const [rooms, setRooms] = useState<Room[]>([]);
   const [eventName, setEventName] = useState("");
   const [title, setTitle] = useState("");
   const [eventNameTouched, setEventNameTouched] = useState(false);
   const [message, setMessage] = useState("");
+  const [confirmDeleteRoom, setConfirmDeleteRoom] = useState<Room | null>(null);
+  const [deletingRoom, setDeletingRoom] = useState(false);
+  const isSuperAdmin = admin?.role === "SUPER_ADMIN";
 
   function buildEventNameFromTitle(value: string) {
     const normalized = value
@@ -102,9 +111,33 @@ export function AdminRoomsPage() {
     setEventName(buildEventNameFromTitle(title));
   }, [title, eventNameTouched]);
 
+  async function confirmDeleteRoomAction() {
+    if (!confirmDeleteRoom) return;
+    setDeletingRoom(true);
+    setMessage("");
+    try {
+      const response = await fetch(
+        `${API_BASE}/api/admin/rooms/${encodeURIComponent(confirmDeleteRoom.slug)}`,
+        { method: "DELETE", credentials: "include" },
+      );
+      if (response.status === 403) {
+        setMessage("Удалять комнаты может только супер-админ");
+        return;
+      }
+      if (!response.ok) {
+        setMessage("Не удалось удалить комнату");
+        return;
+      }
+      setConfirmDeleteRoom(null);
+      await loadRooms();
+    } finally {
+      setDeletingRoom(false);
+    }
+  }
+
   return (
     <Container maxWidth="lg" sx={{ py: 4 }}>
-      <AdminGlobalNav />
+      <AdminGlobalNav canManageAdmins={isSuperAdmin} />
       <Typography variant="h4" gutterBottom>
         Админка: комнаты
       </Typography>
@@ -167,6 +200,7 @@ export function AdminRoomsPage() {
                       <TableCell>Статус</TableCell>
                       <TableCell>Вопросы</TableCell>
                       <TableCell>Участники</TableCell>
+                      {isSuperAdmin ? <TableCell align="right"> </TableCell> : null}
                     </TableRow>
                   </TableHead>
                   <TableBody>
@@ -181,6 +215,18 @@ export function AdminRoomsPage() {
                         </TableCell>
                         <TableCell>{room._count.questions}</TableCell>
                         <TableCell>{room._count.participants}</TableCell>
+                        {isSuperAdmin ? (
+                          <TableCell align="right">
+                            <IconButton
+                              size="small"
+                              color="error"
+                              aria-label={`Удалить комнату ${room.slug}`}
+                              onClick={() => setConfirmDeleteRoom(room)}
+                            >
+                              <DeleteOutlineIcon fontSize="small" />
+                            </IconButton>
+                          </TableCell>
+                        ) : null}
                       </TableRow>
                     ))}
                   </TableBody>
@@ -188,6 +234,36 @@ export function AdminRoomsPage() {
               )}
             </CardContent>
           </Card>
+          <Dialog
+            open={confirmDeleteRoom !== null}
+            onClose={() => {
+              if (!deletingRoom) setConfirmDeleteRoom(null);
+            }}
+            maxWidth="xs"
+            fullWidth
+          >
+            <DialogTitle>Удалить комнату?</DialogTitle>
+            <DialogContent>
+              <Typography>
+                Будут удалены комната «{confirmDeleteRoom?.slug}» ({confirmDeleteRoom?.title}), все
+                вопросы, ответы ({confirmDeleteRoom?._count.participants ?? 0} участников) и
+                связанные медиафайлы. Действие нельзя отменить.
+              </Typography>
+            </DialogContent>
+            <DialogActions>
+              <Button onClick={() => setConfirmDeleteRoom(null)} disabled={deletingRoom}>
+                Отмена
+              </Button>
+              <Button
+                color="error"
+                variant="contained"
+                disabled={deletingRoom}
+                onClick={() => void confirmDeleteRoomAction()}
+              >
+                {deletingRoom ? "Удаление…" : "Удалить"}
+              </Button>
+            </DialogActions>
+          </Dialog>
         </Stack>
       )}
     </Container>
