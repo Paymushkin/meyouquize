@@ -582,7 +582,7 @@ export const DEFAULT_PUBLIC_VIEW_STATE: PublicViewState = {
   randomizerRunId: 0,
   photoWallBaseUrl: "",
   photoWallImageCount: 0,
-  photoWallImageExt: "jpeg",
+  photoWallImageExt: "jpg",
   photoWallGridColumns: 0,
   photoWallAnimate: true,
   photoWallKenBurns: true,

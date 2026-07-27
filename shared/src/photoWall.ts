@@ -1,7 +1,7 @@
 export type PhotoWallImageExt = "jpeg" | "jpg" | "png" | "webp";
 
 export const PHOTO_WALL_MAX_IMAGE_COUNT = 200;
-export const PHOTO_WALL_DEFAULT_IMAGE_EXT: PhotoWallImageExt = "jpeg";
+export const PHOTO_WALL_DEFAULT_IMAGE_EXT: PhotoWallImageExt = "jpg";
 export const PHOTO_WALL_PHOTO_WIDTH = 1600;
 export const PHOTO_WALL_PHOTO_HEIGHT = 1200;
 

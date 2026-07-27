@@ -60,4 +60,33 @@ describe("publicViewEmitCoordination", () => {
     flushPublicViewSocketEmitForTests();
     expect(fn).toHaveBeenCalledTimes(2);
   });
+
+  it("distinguishes branding toggles in payload key", () => {
+    const on = publicViewPayloadKey({
+      quizId: "q1",
+      mode: "title",
+      projectorJoinQrVisible: true,
+    });
+    const off = publicViewPayloadKey({
+      quizId: "q1",
+      mode: "title",
+      projectorJoinQrVisible: false,
+    });
+    expect(on).not.toBe(off);
+  });
+
+  it("emits last branding toggle after rapid burst debounce", () => {
+    vi.useFakeTimers();
+    const calls: string[] = [];
+    const onKey = publicViewPayloadKey({ quizId: "q1", projectorJoinQrVisible: true });
+    const offKey = publicViewPayloadKey({ quizId: "q1", projectorJoinQrVisible: false });
+
+    schedulePublicViewSocketEmit(() => calls.push("on"), onKey);
+    expect(calls).toEqual(["on"]);
+
+    schedulePublicViewSocketEmit(() => calls.push("off"), offKey);
+    expect(calls).toEqual(["on"]);
+    vi.advanceTimersByTime(120);
+    expect(calls).toEqual(["on", "off"]);
+  });
 });

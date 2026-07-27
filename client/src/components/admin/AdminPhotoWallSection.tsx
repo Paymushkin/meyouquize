@@ -95,7 +95,7 @@ export function AdminPhotoWallSection(props: Props) {
         <CardContent>
           <Stack spacing={1.5}>
             <Typography variant="body2" color="text.secondary">
-              Загрузите фото в Yandex Object Storage: <code>1.jpeg</code>, <code>2.jpeg</code>, …
+              Загрузите фото в Yandex Object Storage: <code>1.jpg</code>, <code>2.jpg</code>, …
               Укажите HTTPS-URL папки (с <code>/</code> в конце) и количество файлов.
             </Typography>
             <TextField

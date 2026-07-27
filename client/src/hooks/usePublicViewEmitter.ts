@@ -583,9 +583,10 @@ export function usePublicViewEmitter(params: UsePublicViewEmitterParams) {
 
   const emitBrandingPatch = useCallback(
     (patch: PublicViewSetPatch) => {
-      emitPublicViewSet(patch);
+      // Только явные поля — иначе projector-dedupe схлопывает быстрые toggle’ы QR/цветов.
+      emitPublicViewPatch(patch);
     },
-    [emitPublicViewSet],
+    [emitPublicViewPatch],
   );
 
   return { emitPublicViewSet, emitPublicViewPatch, emitBrandingPatch };

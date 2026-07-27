@@ -4,7 +4,7 @@ import type {
   ProjectorQuestionResult,
 } from "../../types/projectorDashboard";
 
-/** Сравнение данных дашборда — облако тегов и голоса, без лишних перерисовок проектора. */
+/** Сравнение данных дашборда — голоса, метрики ранжирования и настройки проектора. */
 export function projectorDashboardFingerprint(
   questions: ProjectorQuestionResult[],
   leaders: ProjectorLeader[],
@@ -14,12 +14,19 @@ export function projectorDashboardFingerprint(
     q: questions.map((question) => ({
       id: question.questionId,
       type: question.type,
+      rankingProjectorMetric: question.rankingProjectorMetric,
+      rankingKind: question.rankingKind,
+      projectorShowFirstCorrect: question.projectorShowFirstCorrect,
+      projectorFirstCorrectWinnersCount: question.projectorFirstCorrectWinnersCount,
       tagCloud: question.tagCloud,
       optionStats: question.optionStats.map((row) => ({
         text: row.text,
         count: row.count,
         weight: row.weight,
         isCorrect: row.isCorrect,
+        avgRank: row.avgRank,
+        avgScore: row.avgScore,
+        totalScore: row.totalScore,
       })),
       firstCorrectNicknames: question.firstCorrectNicknames,
       temperatureValue: question.temperatureValue,

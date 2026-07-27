@@ -30,7 +30,7 @@ type Params = {
 export function useAdminPhotoWall({ emitPublicViewPatch, setPublicResultsView }: Params) {
   const [baseUrl, setBaseUrl] = useState("");
   const [imageCount, setImageCount] = useState(0);
-  const [imageExt, setImageExt] = useState<PhotoWallImageExt>("jpeg");
+  const [imageExt, setImageExt] = useState<PhotoWallImageExt>("jpg");
   const [gridColumns, setGridColumns] = useState(0);
   const [animate, setAnimate] = useState(true);
   const [kenBurns, setKenBurns] = useState(true);

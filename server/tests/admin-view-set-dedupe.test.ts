@@ -41,4 +41,13 @@ describe("admin-view-set-dedupe", () => {
     const prev = { key: keyA, at: now - 50 };
     expect(shouldSkipAdminViewSetDedupe(prev, keyB, now)).toBe(false);
   });
+
+  it("does not skip when branding toggle differs with same projector mode", () => {
+    const keyOn = adminViewSetDedupeKey({ ...payload, projectorJoinQrVisible: true });
+    const keyOff = adminViewSetDedupeKey({ ...payload, projectorJoinQrVisible: false });
+    expect(keyOn).not.toBe(keyOff);
+    const now = 4_000_000;
+    const prev = { key: keyOn, at: now - 50 };
+    expect(shouldSkipAdminViewSetDedupe(prev, keyOff, now)).toBe(false);
+  });
 });

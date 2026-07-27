@@ -16,12 +16,25 @@ const PROJECTOR_DEDUPE_KEYS = [
   "highlightedLeadersCount",
 ] as const;
 
+const PROJECTOR_DEDUPE_KEY_SET = new Set<string>(PROJECTOR_DEDUPE_KEYS);
+
+/**
+ * Ключ для dedupe/debounce.
+ * Projector-поля — как раньше; остальные поля payload тоже входят в ключ,
+ * иначе быстрые branding-переключатели (QR и т.п.) схлопываются в один emit.
+ */
 export function publicViewPayloadKey(payload: Record<string, unknown>): string {
   const subset: Record<string, unknown> = {};
   for (const key of PROJECTOR_DEDUPE_KEYS) {
     if (Object.prototype.hasOwnProperty.call(payload, key)) {
       subset[key] = payload[key];
     }
+  }
+  const extraKeys = Object.keys(payload)
+    .filter((key) => key !== "quizId" && !PROJECTOR_DEDUPE_KEY_SET.has(key))
+    .sort();
+  for (const key of extraKeys) {
+    subset[key] = payload[key];
   }
   return JSON.stringify(subset);
 }
