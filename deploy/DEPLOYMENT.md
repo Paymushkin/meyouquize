@@ -1,5 +1,7 @@
 # Deployment Runbook
 
+Полный порядок установки, нагрузка и плейбук агента: [INSTALLATION.md](./INSTALLATION.md). Ниже — детали эксплуатации и PgBouncer.
+
 ## 1) Prerequisites
 
 - Linux host with Node 20+, npm, and Caddy.

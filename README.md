@@ -2,6 +2,12 @@
 
 Интерактивные квизы и голосования для мероприятий.
 
+## Установка и production
+
+Пошаговая установка (локально, VPS, LAN), настройка под нагрузку **до ~500 игроков** и чеклист для агента: [deploy/INSTALLATION.md](./deploy/INSTALLATION.md).
+
+См. также: [deploy/DEPLOYMENT.md](./deploy/DEPLOYMENT.md), [deploy/VPS_QUICKSTART.md](./deploy/VPS_QUICKSTART.md), [load/README.md](./load/README.md).
+
 ## Тестирование
 
 | Команда                    | Что запускает                                     |
