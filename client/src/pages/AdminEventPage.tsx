@@ -50,6 +50,8 @@ import { buildBrandFontFacesForFamily, useBrandFont } from "../hooks/useBrandFon
 import { usePublicViewEmitter } from "../hooks/usePublicViewEmitter";
 import { recordServerPublicView } from "../features/publicView/publicViewEmitCoordination";
 import { useSpeakerQuestionsAdminActions } from "../hooks/useSpeakerQuestionsAdminActions";
+import { shouldFallbackProjectorToTitleAfterSpeakerOff } from "../features/speakerQuestionsAdmin/speakerOnScreenProjectorFallback";
+import { useAdminColorMode } from "../theme/AdminColorModeProvider";
 import { socket } from "../socket";
 import {
   buildQuestionIndexMapForSubQuiz,
@@ -80,7 +82,8 @@ import {
 const ADMIN_BANNER_AUTO_HIDE_MS = 2000;
 const RESULTS_UI_STORAGE_PREFIX = "mq_admin_results_ui_";
 const EXPANDED_SUBQUIZ_STORAGE_PREFIX = "mq_admin_expanded_subquiz_";
-const ADMIN_BODY_BG_FALLBACK = "#22313c";
+const ADMIN_BODY_BG_FALLBACK_DARK = "#121212";
+const ADMIN_BODY_BG_FALLBACK_LIGHT = "#f4f5f7";
 
 function clampInt(value: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, Math.trunc(value)));
@@ -125,6 +128,7 @@ function getPublicBanners(value: unknown): PublicBanner[] {
 }
 
 export function AdminEventPage() {
+  const { mode: adminColorMode } = useAdminColorMode();
   const { eventName = "" } = useParams();
   const resultsUiStorageKey = `${RESULTS_UI_STORAGE_PREFIX}${eventName}`;
   const expandedSubQuizStorageKey = `${EXPANDED_SUBQUIZ_STORAGE_PREFIX}${eventName}`;
@@ -243,7 +247,9 @@ export function AdminEventPage() {
   const isFirstExpandedPersistEffect = useRef(true);
 
   useBodyBrandBackground({
-    backgroundColor: branding.brandBodyBackgroundColor?.trim() || ADMIN_BODY_BG_FALLBACK,
+    backgroundColor:
+      branding.brandBodyBackgroundColor?.trim() ||
+      (adminColorMode === "light" ? ADMIN_BODY_BG_FALLBACK_LIGHT : ADMIN_BODY_BG_FALLBACK_DARK),
     clearRootBackground: true,
     resetOverflowX: true,
   });
@@ -1250,9 +1256,16 @@ export function AdminEventPage() {
       setSpeakerQuestionOnScreen(id, next);
       if (next) {
         setPublicResultsViewRef.current("speaker_questions");
+        return;
+      }
+      const remainingOnScreen = (speakerQuestions.payload?.items ?? []).filter(
+        (q) => q.id !== id && q.isOnScreen,
+      ).length;
+      if (shouldFallbackProjectorToTitleAfterSpeakerOff(remainingOnScreen)) {
+        setPublicResultsViewRef.current("title");
       }
     },
-    [setSpeakerQuestionOnScreen],
+    [setSpeakerQuestionOnScreen, speakerQuestions.payload?.items],
   );
 
   function updateHighlightedLeaders(nextValue: number) {

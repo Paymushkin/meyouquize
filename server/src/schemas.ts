@@ -66,6 +66,7 @@ const questionSchema = z
     rankingProjectorMetric: z.enum(["avg_rank", "avg_score", "total_score"]).optional(),
     rankingKind: z.enum(["quiz", "jury"]).optional(),
     rankingPlayerHint: z.string().trim().max(300).nullable().optional(),
+    tagCloudPlayerHint: z.string().trim().max(300).nullable().optional(),
     temperatureSubtitle: z.string().trim().max(300).nullable().optional(),
     adminDone: z.boolean().optional(),
     options: z.array(optionInputSchema),

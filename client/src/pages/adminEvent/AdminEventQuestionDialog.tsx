@@ -122,6 +122,24 @@ export function AdminEventQuestionDialog({
                   fullWidth
                 />
               )}
+              {question.type === "tag_cloud" && (
+                <TextField
+                  size="small"
+                  label="Подсказка игроку (облако тегов)"
+                  value={question.tagCloudPlayerHint ?? ""}
+                  onChange={(e) =>
+                    onUpdateQuestion({
+                      tagCloudPlayerHint: e.target.value,
+                    })
+                  }
+                  helperText="Необязательно. Если пусто — подсказка на экране игрока не показывается."
+                  placeholder="Например: До 3 тегов. Несколько слов через «;» в одном поле — один тег."
+                  multiline
+                  minRows={1}
+                  maxRows={3}
+                  fullWidth
+                />
+              )}
               {question.type === "temperature" && (
                 <TextField
                   size="small"

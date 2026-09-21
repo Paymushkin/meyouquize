@@ -75,6 +75,8 @@ model Question {
   rankingKind RankingKind @default(QUIZ)
   /** Для RANKING: пользовательская подсказка на экране игрока (если null — используется текст по умолчанию). */
   rankingPlayerHint String?
+  /** Для TAG_CLOUD: подсказка игроку над полями ввода тегов; null/пусто — не показывать. */
+  tagCloudPlayerHint String?
   /** Для TEMPERATURE: подзаголовок на проекторе над шкалой. */
   temperatureSubtitle String?
   /** Когда вопрос был выведен на экран для ответов (для подсчёта responseMs). */

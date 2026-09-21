@@ -454,7 +454,8 @@ export function AdminQuestionsSection(props: Props) {
                           >
                             {question.type === "tag_cloud" ? (
                               <CloudQueueIcon
-                                sx={{ fontSize: 16, display: "block", color: "common.white" }}
+                                sx={{ fontSize: 16, display: "block" }}
+                                color="action"
                               />
                             ) : question.type === "ranking" ? (
                               <FormatListNumberedIcon

@@ -21,7 +21,10 @@ export type ProjectorDerived = {
   barQuestionCentered: boolean;
 };
 
-export function computeProjectorDerived(state: ProjectorSessionState): ProjectorDerived {
+export function computeProjectorDerived(
+  state: ProjectorSessionState,
+  options?: { speakerOnScreenCount?: number },
+): ProjectorDerived {
   const { questions, leaders, leaderboardsBySubQuiz, view } = state;
   const {
     mode,
@@ -30,6 +33,7 @@ export function computeProjectorDerived(state: ProjectorSessionState): Projector
     firstCorrectWinnersCount,
     leaderboardSubQuizId,
   } = view;
+  const speakerOnScreenCount = Math.max(0, Math.trunc(options?.speakerOnScreenCount ?? 0));
 
   const rawSelectedQuestion =
     mode === "question" && publicQuestionId
@@ -56,7 +60,8 @@ export function computeProjectorDerived(state: ProjectorSessionState): Projector
   const showEventTitleScreen =
     mode === "title" ||
     (mode === "question" && !selectedQuestion) ||
-    (mode === "leaderboard" && leadersShown.length === 0);
+    (mode === "leaderboard" && leadersShown.length === 0) ||
+    (mode === "speaker_questions" && speakerOnScreenCount === 0);
 
   const isTagCloudQuestion =
     !!selectedQuestion &&

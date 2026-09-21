@@ -78,6 +78,33 @@ describe("QuestionPopupCard", () => {
     expect(screen.getByText("Расставьте варианты")).toBeTruthy();
   });
 
+  it("renders tag cloud question with custom hint", () => {
+    renderPopup({
+      question: makeQuestion({
+        type: "tag_cloud",
+        maxAnswers: 3,
+        options: [],
+        tagCloudPlayerHint: "До 3 тегов. Несколько слов через «;» в одном поле — один тег.",
+      }),
+      tagAnswers: [""],
+    });
+    expect(
+      screen.getByText("До 3 тегов. Несколько слов через «;» в одном поле — один тег."),
+    ).toBeTruthy();
+  });
+
+  it("hides tag cloud hint when not configured", () => {
+    renderPopup({
+      question: makeQuestion({
+        type: "tag_cloud",
+        maxAnswers: 3,
+        options: [],
+      }),
+      tagAnswers: [""],
+    });
+    expect(screen.queryByText(/До \d+ тегов/)).toBeNull();
+  });
+
   it("calls closeQuestionPopup when close button clicked", () => {
     const closeQuestionPopup = vi.fn();
     renderPopup({ closeQuestionPopup });

@@ -12,6 +12,8 @@ export type ActiveQuestion = {
   rankingPointsByRank?: number[];
   /** Кастомная подсказка игроку для ранжирования (если не задана — дефолтный текст). */
   rankingPlayerHint?: string;
+  /** Подсказка игроку для облака тегов (если пусто — не показывать). */
+  tagCloudPlayerHint?: string;
   maxAnswers?: number;
   options: Array<{ id: string; text: string; imageUrl?: string }>;
   isClosed: boolean;

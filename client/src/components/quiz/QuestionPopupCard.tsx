@@ -67,6 +67,7 @@ export function QuestionPopupCard(props: QuestionPopupCardProps) {
     ruBallLabel,
   } = props;
   const rankingHintRaw = question.rankingPlayerHint?.trim() ?? "";
+  const tagCloudHintRaw = question.tagCloudPlayerHint?.trim() ?? "";
   const rankingHint =
     rankingHintRaw ===
     "Расставьте варианты от лучшего к худшему. Баллы по позициям задаёт ведущий; зачёт в общей таблице не меняется."
@@ -146,6 +147,11 @@ export function QuestionPopupCard(props: QuestionPopupCardProps) {
                       {question.text}
                     </Typography>
                   ) : null}
+                  {question.type === "tag_cloud" && tagCloudHintRaw ? (
+                    <Typography variant="body2" sx={{ color: "rgba(255,255,255,0.75)" }}>
+                      {tagCloudHintRaw}
+                    </Typography>
+                  ) : null}
                   {question.type !== "temperature" ? (
                     <Chip
                       label={getQuestionTypeLabel(question)}
@@ -178,11 +184,6 @@ export function QuestionPopupCard(props: QuestionPopupCardProps) {
                 )}
                 {question.type === "tag_cloud" && (
                   <Stack spacing={1.5}>
-                    <Typography variant="body2" sx={{ color: "rgba(255,255,255,0.75)" }}>
-                      {tagLimit === 1
-                        ? "Один ответ. Несколько слов через «;» считаются одним тегом."
-                        : `До ${tagLimit} тегов. Несколько слов через «;» в одном поле — один тег.`}
-                    </Typography>
                     {tagCountOverLimit ? (
                       <Typography variant="body2" sx={{ color: "#ffb4ab" }}>
                         Слишком много тегов: максимум {tagLimit}

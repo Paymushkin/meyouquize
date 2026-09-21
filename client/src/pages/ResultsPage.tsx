@@ -358,7 +358,7 @@ export function ResultsPage() {
               firstCorrectWinnersShown={firstCorrectWinnersShown}
             />
           ))}
-        {view.mode === "speaker_questions" && (
+        {view.mode === "speaker_questions" && screenSpeakerQuestions.length > 0 && (
           <Stack
             spacing={0}
             sx={{

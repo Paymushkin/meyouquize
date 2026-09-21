@@ -1,4 +1,5 @@
 import { Card, CardContent, List, ListItemButton, ListItemIcon, ListItemText } from "@mui/material";
+import { AdminColorModeSwitcher } from "../../components/admin/AdminColorModeSwitcher";
 import type { AdminSection } from "../../features/admin/adminUiPersistence";
 import { ADMIN_EVENT_NAV } from "./adminEventNavConfig";
 
@@ -75,6 +76,7 @@ export function AdminEventNavSidebar({
             </ListItemButton>
           ))}
         </List>
+        <AdminColorModeSwitcher />
       </CardContent>
     </Card>
   );

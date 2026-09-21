@@ -198,6 +198,8 @@ export type QuestionReplaceInput = {
   rankingKind?: "quiz" | "jury";
   /** Для RANKING: кастомная подсказка игроку; null/undefined = текст по умолчанию. */
   rankingPlayerHint?: string | null;
+  /** Для TAG_CLOUD: подсказка игроку; null/пусто — не показывать. */
+  tagCloudPlayerHint?: string | null;
   /** Для TEMPERATURE: подзаголовок на проекторе над шкалой. */
   temperatureSubtitle?: string | null;
   /** Только UI админки: корзина «отработанные». */
@@ -398,6 +400,16 @@ function temperatureQuestionCreateData(q: QuestionReplaceInput) {
     temperatureSubtitle:
       q.temperatureSubtitle != null && q.temperatureSubtitle.trim() !== ""
         ? q.temperatureSubtitle.trim()
+        : null,
+  };
+}
+
+function tagCloudPlayerHintData(q: QuestionReplaceInput) {
+  if (q.type !== "tag_cloud") return {};
+  return {
+    tagCloudPlayerHint:
+      q.tagCloudPlayerHint != null && q.tagCloudPlayerHint.trim() !== ""
+        ? q.tagCloudPlayerHint.trim()
         : null,
   };
 }
@@ -687,6 +699,7 @@ export async function replaceRoomContent(eventName: string, content: RoomContent
         ),
         adminDone: q.adminDone ?? false,
         ...rankingQuestionCreateData(q),
+        ...tagCloudPlayerHintData(q),
         ...temperatureQuestionCreateData(q),
         ...tagCloudQuestionCreateData(q),
       };
@@ -1046,6 +1059,8 @@ export async function getQuizPublicState(quizId: string) {
       rankingKind: q.type === QuestionType.RANKING ? rankingKindToApi(q.rankingKind) : undefined,
       rankingPlayerHint:
         q.type === QuestionType.RANKING ? (q.rankingPlayerHint ?? undefined) : undefined,
+      tagCloudPlayerHint:
+        q.type === QuestionType.TAG_CLOUD ? (q.tagCloudPlayerHint ?? undefined) : undefined,
       rankingPointsByRank:
         q.type === QuestionType.RANKING
           ? (() => {
@@ -1079,6 +1094,10 @@ export async function getQuizPublicState(quizId: string) {
           rankingPlayerHint:
             activeQuestion.type === QuestionType.RANKING
               ? (activeQuestion.rankingPlayerHint ?? undefined)
+              : undefined,
+          tagCloudPlayerHint:
+            activeQuestion.type === QuestionType.TAG_CLOUD
+              ? (activeQuestion.tagCloudPlayerHint ?? undefined)
               : undefined,
           rankingPointsByRank:
             activeQuestion.type === QuestionType.RANKING

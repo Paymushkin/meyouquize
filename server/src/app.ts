@@ -322,11 +322,12 @@ export function buildApp() {
     message: { error: "Too many report requests. Please try again later." },
   });
 
-  // Остальные публичные GET по quiz/state/results могут быть тяжёлыми по БД.
-  // Делает их более устойчивыми к спаму без авторизации.
+  // Публичные GET: meta/state лёгкие, но на ивенте / load-тесте сотни join идут с одного NAT/IP.
+  // Лимит на воркер (in-memory store); keep-alive может прибить бурст к одному процессу.
+  // 600/мин хватает на load:normal (300) с запасом; PDF/results остаются жёстче.
   const playerQuizStateLimiter = rateLimit({
     windowMs: 60_000,
-    limit: env.networkMode === "internet" ? 120 : 300,
+    limit: env.networkMode === "internet" ? 600 : 1200,
     standardHeaders: true,
     legacyHeaders: false,
     message: { error: "Too many state requests. Please try again later." },
@@ -342,7 +343,7 @@ export function buildApp() {
 
   const playerQuizMetaLimiter = rateLimit({
     windowMs: 60_000,
-    limit: env.networkMode === "internet" ? 120 : 300,
+    limit: env.networkMode === "internet" ? 600 : 1200,
     standardHeaders: true,
     legacyHeaders: false,
     message: { error: "Too many meta requests. Please try again later." },

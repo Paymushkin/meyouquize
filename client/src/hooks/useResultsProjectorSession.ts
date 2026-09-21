@@ -121,7 +121,14 @@ export function useResultsProjectorSession(
     };
   }, [slug]);
 
-  const derived = useMemo(() => computeProjectorDerived(state), [state]);
+  const speakerOnScreenCount = useMemo(
+    () => (speakerQuestions?.items ?? []).filter((item) => item.isOnScreen).length,
+    [speakerQuestions?.items],
+  );
+  const derived = useMemo(
+    () => computeProjectorDerived(state, { speakerOnScreenCount }),
+    [speakerOnScreenCount, state],
+  );
   const leaderboardAnimKey = useMemo(() => buildLeaderboardAnimKey(state), [state]);
 
   useEffect(() => {

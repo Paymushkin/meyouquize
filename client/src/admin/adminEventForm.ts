@@ -57,6 +57,8 @@ export type QuestionForm = {
   rankingKind?: "quiz" | "jury";
   /** Для ranking: кастомная подсказка игроку; пусто = текст по умолчанию на экране ответа. */
   rankingPlayerHint?: string;
+  /** Для tag_cloud: подсказка игроку над полями ввода; пусто — не показывать. */
+  tagCloudPlayerHint?: string;
   /** Для temperature: подзаголовок на проекторе над шкалой. */
   temperatureSubtitle?: string;
   options: OptionForm[];
@@ -95,6 +97,7 @@ export type AdminEventRoomQuestion = {
   rankingProjectorMetric?: string;
   rankingKind?: string;
   rankingPlayerHint?: string | null;
+  tagCloudPlayerHint?: string | null;
   temperatureSubtitle?: string | null;
   options: Array<{
     id: string;
@@ -342,9 +345,14 @@ export function toQuestionReplaceInput(q: QuestionForm) {
         ? {
             temperatureSubtitle: q.temperatureSubtitle?.trim() || null,
           }
-        : q.type === "tag_cloud" && isEditorQuizMode(q)
+        : q.type === "tag_cloud"
           ? {
-              rankingPointsByRank: tagCloudRankingPointsForSave(q),
+              tagCloudPlayerHint: q.tagCloudPlayerHint?.trim() || null,
+              ...(isEditorQuizMode(q)
+                ? {
+                    rankingPointsByRank: tagCloudRankingPointsForSave(q),
+                  }
+                : {}),
             }
           : {}),
     options,
@@ -614,6 +622,7 @@ export function mapLoadedRoomQuestions(
       rankingKind: kind,
       rankingPlayerHint:
         q.type === "RANKING" ? q.rankingPlayerHint?.trim() || defaultRankingPlayerHint(kind) : "",
+      tagCloudPlayerHint: q.type === "TAG_CLOUD" ? q.tagCloudPlayerHint?.trim() || "" : "",
       temperatureSubtitle: q.type === "TEMPERATURE" ? q.temperatureSubtitle?.trim() || "" : "",
       options,
     };
@@ -669,6 +678,9 @@ export function mergeServerQuestionsIntoForms(
       rankingKind: kind,
       rankingPlayerHint:
         q.type === "RANKING" ? q.rankingPlayerHint?.trim() || defaultRankingPlayerHint(kind) : "",
+      tagCloudPlayerHint:
+        prev?.tagCloudPlayerHint ??
+        (q.type === "TAG_CLOUD" ? q.tagCloudPlayerHint?.trim() || "" : ""),
       temperatureSubtitle:
         prev?.temperatureSubtitle ??
         (q.type === "TEMPERATURE" ? q.temperatureSubtitle?.trim() || "" : ""),

@@ -66,6 +66,34 @@ describe("computeProjectorDerived", () => {
     expect(derived.selectedQuestion).toBeUndefined();
   });
 
+  it("shows title screen when speaker_questions mode has nothing on screen", () => {
+    const derived = computeProjectorDerived(
+      {
+        ...initialProjectorSessionState,
+        view: {
+          ...DEFAULT_PUBLIC_VIEW_STATE,
+          mode: "speaker_questions",
+        },
+      },
+      { speakerOnScreenCount: 0 },
+    );
+    expect(derived.showEventTitleScreen).toBe(true);
+  });
+
+  it("keeps speaker screen when questions are on screen", () => {
+    const derived = computeProjectorDerived(
+      {
+        ...initialProjectorSessionState,
+        view: {
+          ...DEFAULT_PUBLIC_VIEW_STATE,
+          mode: "speaker_questions",
+        },
+      },
+      { speakerOnScreenCount: 1 },
+    );
+    expect(derived.showEventTitleScreen).toBe(false);
+  });
+
   it("applies option vote count overrides from tagCloudManualByQuestionId", () => {
     const derived = computeProjectorDerived({
       ...initialProjectorSessionState,

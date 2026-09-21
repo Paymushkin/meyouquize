@@ -441,6 +441,48 @@ export function registerSpeakerQuestionsHandlers(socket: EnrichedSocket, io: Ser
         where: { id: payload.speakerQuestionId },
         data: { isOnScreen: payload.isOnScreen },
       });
+      if (payload.isOnScreen) {
+        const prevView = await getStoredPublicView(payload.quizId);
+        if (prevView.mode !== "speaker_questions") {
+          const nextView = mergePublicViewState(prevView, {
+            mode: "speaker_questions",
+            questionId: undefined,
+          });
+          await saveStoredPublicView(payload.quizId, nextView);
+          const quiz = await getQuizPublicState(payload.quizId);
+          if (quiz) {
+            emitToQuizDashboard(
+              io,
+              payload.quizId,
+              "results:public:view",
+              toPublicViewPayload(nextView, quiz.title),
+            );
+          }
+        }
+      } else {
+        const stillOnScreen = await prisma.speakerQuestion.count({
+          where: { quizId: payload.quizId, isOnScreen: true },
+        });
+        if (stillOnScreen === 0) {
+          const prevView = await getStoredPublicView(payload.quizId);
+          if (prevView.mode === "speaker_questions") {
+            const nextView = mergePublicViewState(prevView, {
+              mode: "title",
+              questionId: undefined,
+            });
+            await saveStoredPublicView(payload.quizId, nextView);
+            const quiz = await getQuizPublicState(payload.quizId);
+            if (quiz) {
+              emitToQuizDashboard(
+                io,
+                payload.quizId,
+                "results:public:view",
+                toPublicViewPayload(nextView, quiz.title),
+              );
+            }
+          }
+        }
+      }
       await broadcastSpeakerQuestions(io, payload.quizId);
     } catch (error) {
       fail(
