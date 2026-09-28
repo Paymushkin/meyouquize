@@ -64,20 +64,27 @@ if [[ "${MODE}" == "journal" && -z "${SINCE}" ]]; then
 fi
 
 fetch_logs() {
-  local journal_cmd=(journalctl -u "${UNIT}" --no-pager)
-  if [[ -n "${SINCE}" ]]; then
-    journal_cmd+=(--since "${SINCE}")
-  fi
-  if [[ -n "${UNTIL}" ]]; then
-    journal_cmd+=(--until "${UNTIL}")
-  fi
   if [[ -n "${SSH_TARGET}" ]]; then
-    ssh -o ConnectTimeout=20 "${SSH_TARGET}" "${journal_cmd[*]}"
+    # Одна remote-команда с экранированием дат (пробелы в --since/--until).
+    local remote="journalctl -u $(printf '%q' "${UNIT}") --no-pager"
+    if [[ -n "${SINCE}" ]]; then
+      remote+=" --since $(printf '%q' "${SINCE}")"
+    fi
+    if [[ -n "${UNTIL}" ]]; then
+      remote+=" --until $(printf '%q' "${UNTIL}")"
+    fi
+    ssh -o ConnectTimeout=20 "${SSH_TARGET}" "$remote"
   else
+    local journal_cmd=(journalctl -u "${UNIT}" --no-pager)
+    if [[ -n "${SINCE}" ]]; then
+      journal_cmd+=(--since "${SINCE}")
+    fi
+    if [[ -n "${UNTIL}" ]]; then
+      journal_cmd+=(--until "${UNTIL}")
+    fi
     "${journal_cmd[@]}"
   fi
 }
-
 if [[ "${MODE}" == "stdin" ]]; then
   node "${ROOT}/deploy/scripts/post-event-log-summary.mjs"
 else
