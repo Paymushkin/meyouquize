@@ -631,7 +631,7 @@ function DebateSeriesBlockShell(props: {
     onDrop,
     children,
   } = props;
-  const [expanded, setExpanded] = useState(true);
+  const [expanded, setExpanded] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
   const roundsCount = formIndices.filter((i) => questionForms[i]).length;
   const adminDoneDisabled = formIndices.some((i) => !questionForms[i]?.id);
