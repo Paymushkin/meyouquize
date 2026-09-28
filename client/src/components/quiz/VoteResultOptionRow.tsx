@@ -82,7 +82,7 @@ export function VoteResultOptionRow(props: Props) {
               position: "relative",
               color: playerVoteOptionTextColor,
               fontWeight: 400,
-              fontSize: { xs: "1.05rem", sm: "1.12rem" },
+              fontSize: { "@": "1.05rem", "@sm": "1.12rem" },
               pointerEvents: "none",
               px: 1,
               py: 0.55,

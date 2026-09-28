@@ -72,11 +72,15 @@ function useEditorHarness(options: HarnessOptions = {}) {
   const [selectedQuestionIndex, setSelectedQuestionIndex] = useState(0);
   const [publicViewMode, setPublicViewMode] = useState<PublicViewMode>("title");
   const [publicViewQuestionId, setPublicViewQuestionId] = useState<string | undefined>();
+  const [publicDebateCompareQuestionId, setPublicDebateCompareQuestionId] = useState<
+    string | undefined
+  >();
   const [questionRevealStage, setQuestionRevealStage] = useState<"options" | "results">("options");
   const [resultsSubQuizId, setResultsSubQuizId] = useState("sq-1");
   const [playerVisibleResultQuestionIds, setPlayerVisibleResultQuestionIds] = useState<string[]>(
     [],
   );
+  const [playerVisibleDebateSeriesIds, setPlayerVisibleDebateSeriesIds] = useState<string[]>([]);
   const [showFirstCorrectAnswerer, setShowFirstCorrectAnswerer] = useState(false);
   const syncedSubQuizIdsKeyRef = useRef("");
   const lastPersistQuestionsErrorRef = useRef<string | null>(null);
@@ -105,6 +109,7 @@ function useEditorHarness(options: HarnessOptions = {}) {
     publicViewQuestionId,
     setPublicViewMode,
     setPublicViewQuestionId,
+    setPublicDebateCompareQuestionId,
     setQuestionRevealStage,
     emitPublicViewSet: editorSpies.emitPublicViewSet,
     emitPublicViewPatch: editorSpies.emitPublicViewPatch,
@@ -112,6 +117,8 @@ function useEditorHarness(options: HarnessOptions = {}) {
     setResultsSubQuizId,
     playerVisibleResultQuestionIds,
     setPlayerVisibleResultQuestionIds,
+    playerVisibleDebateSeriesIds,
+    setPlayerVisibleDebateSeriesIds,
     playerTiles: {
       playerQuizResultsSubQuizIds: [],
       playerQuizResultsSubQuizId: "",

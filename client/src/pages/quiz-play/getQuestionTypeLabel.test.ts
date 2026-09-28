@@ -13,4 +13,16 @@ describe("getQuestionTypeLabel", () => {
     } satisfies ActiveQuestion;
     expect(getQuestionTypeLabel(question)).toBe("Измерение температуры");
   });
+
+  it("labels geo poll questions", () => {
+    const question = {
+      id: "q-geo",
+      text: "Откуда вы?",
+      type: "single",
+      options: [],
+      isClosed: false,
+      geoPollDictionary: "world_cities",
+    } satisfies ActiveQuestion;
+    expect(getQuestionTypeLabel(question)).toBe("Геоопрос");
+  });
 });

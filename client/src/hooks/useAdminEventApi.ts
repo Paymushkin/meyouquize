@@ -58,6 +58,8 @@ export function useAdminEventApi(params: Params) {
   const lastPersistQuestionsErrorRef = useRef<string | null>(null);
   const [authChecked, setAuthChecked] = useState(false);
   const [adminLogin, setAdminLogin] = useState<string | null>(null);
+  const [roomLoading, setRoomLoading] = useState(false);
+  const [roomLoadError, setRoomLoadError] = useState<string | null>(null);
 
   const readSubQuizTitleFromSnapshot = useCallback((snapshot: string, subQuizId: string) => {
     try {
@@ -100,12 +102,21 @@ export function useAdminEventApi(params: Params) {
       return loadRoomInFlightRef.current;
     }
     const promise = (async () => {
+      if (isReservedAdminEventName(eventName)) return;
+      setRoomLoading(true);
+      setRoomLoadError(null);
       try {
-        if (isReservedAdminEventName(eventName)) return;
         const response = await fetch(`${API_BASE}/api/admin/rooms/${eventName}`, {
           credentials: "include",
         });
-        if (!response.ok) return;
+        if (!response.ok) {
+          setRoomLoadError(
+            response.status === 404
+              ? `Комната «${eventName}» не найдена`
+              : `Не удалось загрузить комнату (${response.status})`,
+          );
+          return;
+        }
         const data = (await response.json()) as AdminEventRoom;
         const cloudManual = readCloudManualFromPublicView(data.publicView);
         const sheets: SubQuizSheet[] = data.subQuizzes.map((s) => ({
@@ -121,7 +132,13 @@ export function useAdminEventApi(params: Params) {
         setQuestionForms(flat);
         lastSavedSnapshotRef.current = serializeRoomContent(sheets, flat);
         setSelectedQuestionIndex(0);
+        setRoomLoadError(null);
+      } catch {
+        setRoomLoadError(
+          `Не удалось подключиться к серверу (${API_BASE}). Проверьте, что backend запущен.`,
+        );
       } finally {
+        setRoomLoading(false);
         loadRoomInFlightRef.current = null;
       }
     })();
@@ -419,6 +436,8 @@ export function useAdminEventApi(params: Params) {
   return {
     authChecked,
     adminLogin,
+    roomLoading,
+    roomLoadError,
     checkSession,
     loadRoom,
     persistQuestions,

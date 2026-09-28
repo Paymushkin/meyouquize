@@ -1,5 +1,6 @@
 import { expandTagCloudSubmitLines } from "@meyouquize/shared";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import type { GeoPollOption } from "../components/quiz/PlayerGeoPollAutocomplete";
 import { socket } from "../socket";
 import {
   isRoomMultiActiveFlow,
@@ -40,6 +41,7 @@ export function useQuizPlayQuestionFlow(params: Params) {
   const [selected, setSelected] = useState<string[]>([]);
   const [rankOrder, setRankOrder] = useState<string[]>([]);
   const [tagAnswers, setTagAnswers] = useState<string[]>([""]);
+  const [geoAnswer, setGeoAnswer] = useState<GeoPollOption | null>(null);
   const [dismissedQuestionId, setDismissedQuestionId] = useState<string | null>(null);
   const activeQuestionIdRef = useRef<string | null>(null);
   const activeQuestionTypeRef = useRef<
@@ -48,6 +50,7 @@ export function useQuizPlayQuestionFlow(params: Params) {
   const selectedRef = useRef<string[]>([]);
   const rankOrderRef = useRef<string[]>([]);
   const tagAnswersRef = useRef<string[]>([""]);
+  const geoAnswerRef = useRef<GeoPollOption | null>(null);
   const pendingSubmitPayloadRef = useRef<SubmitPayload | null>(null);
 
   const nonQuizActiveQuestion = useMemo(() => {
@@ -78,10 +81,12 @@ export function useQuizPlayQuestionFlow(params: Params) {
       setSelected([]);
       setRankOrder([]);
       setTagAnswers([""]);
+      setGeoAnswer(null);
       return;
     }
     setSelected([]);
     setTagAnswers([""]);
+    setGeoAnswer(null);
     if (nonQuizActiveQuestion.type === "ranking") {
       setRankOrder(nonQuizActiveQuestion.options.map((o) => o.id));
       return;
@@ -102,6 +107,10 @@ export function useQuizPlayQuestionFlow(params: Params) {
   }, [tagAnswers]);
 
   useEffect(() => {
+    geoAnswerRef.current = geoAnswer;
+  }, [geoAnswer]);
+
+  useEffect(() => {
     const q = nonQuizActiveQuestion;
     if (!q || q.type !== "ranking") {
       setRankOrder([]);
@@ -113,6 +122,9 @@ export function useQuizPlayQuestionFlow(params: Params) {
   const canSubmit = useMemo(() => {
     if (!quiz || !nonQuizActiveQuestion || !quizSessionReady) return false;
     const alreadySubmitted = submittedQuestionIds.includes(nonQuizActiveQuestion.id);
+    if (nonQuizActiveQuestion.geoPollDictionary) {
+      return Boolean(geoAnswer?.key) && !nonQuizActiveQuestion.isClosed && !alreadySubmitted;
+    }
     if (nonQuizActiveQuestion.type === "tag_cloud") {
       const filled = tagAnswers.map((value) => value.trim()).filter(Boolean);
       const maxAnswers = Math.max(1, nonQuizActiveQuestion.maxAnswers ?? 1);
@@ -144,11 +156,23 @@ export function useQuizPlayQuestionFlow(params: Params) {
     rankOrder,
     submittedQuestionIds,
     tagAnswers,
+    geoAnswer,
     quizSessionReady,
   ]);
 
   const submit = useCallback(() => {
     if (!quiz || !nonQuizActiveQuestion || !canSubmit || !quizSessionReady) return;
+    if (nonQuizActiveQuestion.geoPollDictionary) {
+      if (!geoAnswer?.key) return;
+      const payload = {
+        quizId: quiz.id,
+        questionId: nonQuizActiveQuestion.id,
+        tagAnswers: [geoAnswer.key],
+      };
+      pendingSubmitPayloadRef.current = payload;
+      socket.emit("answer:submit", payload);
+      return;
+    }
     if (nonQuizActiveQuestion.type === "tag_cloud") {
       const expanded = expandTagCloudSubmitLines(
         tagAnswers.map((value) => value.trim()).filter(Boolean),
@@ -181,7 +205,16 @@ export function useQuizPlayQuestionFlow(params: Params) {
     };
     pendingSubmitPayloadRef.current = payload;
     socket.emit("answer:submit", payload);
-  }, [quiz, nonQuizActiveQuestion, canSubmit, tagAnswers, rankOrder, selected, quizSessionReady]);
+  }, [
+    quiz,
+    nonQuizActiveQuestion,
+    canSubmit,
+    tagAnswers,
+    geoAnswer,
+    rankOrder,
+    selected,
+    quizSessionReady,
+  ]);
 
   const onQuestionSubmitted = useCallback((questionId: string) => {
     setDismissedQuestionId(questionId);
@@ -243,6 +276,7 @@ export function useQuizPlayQuestionFlow(params: Params) {
     setSelected([]);
     setRankOrder([]);
     setTagAnswers([""]);
+    setGeoAnswer(null);
     setDismissedQuestionId(null);
     pendingSubmitPayloadRef.current = null;
   }, []);
@@ -279,6 +313,8 @@ export function useQuizPlayQuestionFlow(params: Params) {
     setRankOrder,
     tagAnswers,
     setTagAnswers,
+    geoAnswer,
+    setGeoAnswer,
     activeQuestionIdRef,
     activeQuestionTypeRef,
     selectedRef,

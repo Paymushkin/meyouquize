@@ -26,7 +26,7 @@ function ResultPreviewOptionRow(props: {
   const hasText = Boolean(row.text.trim());
 
   return (
-    <Box sx={{ p: 0 }}>
+    <Box sx={{ p: 0, minWidth: 0 }}>
       <Box
         sx={{
           position: "relative",
@@ -56,8 +56,8 @@ function ResultPreviewOptionRow(props: {
           sx={{
             position: "relative",
             pointerEvents: "none",
-            px: { xs: 1, sm: 1.25 },
-            py: { xs: 0.75, sm: 0.85 },
+            px: 1,
+            py: 0.75,
             width: "100%",
             minWidth: 0,
           }}
@@ -82,7 +82,7 @@ function ResultPreviewOptionRow(props: {
               sx={{
                 color: optionTextColor,
                 fontWeight: 400,
-                fontSize: { xs: "0.9rem", sm: "0.98rem" },
+                fontSize: "clamp(0.8rem, 3.2cqw, 0.95rem)",
                 flex: 1,
                 minWidth: 0,
               }}
@@ -130,17 +130,20 @@ export function PlayerVisibleResultTileCard(props: Props) {
         borderColor: "divider",
         bgcolor: "rgba(0,0,0,0.22)",
         backdropFilter: "blur(3px)",
-        p: { xs: 1.75, sm: 2 },
+        p: 1.75,
         cursor: "pointer",
         overflow: "hidden",
         position: "relative",
+        display: "flex",
+        flexDirection: "column",
+        minWidth: 0,
         "&::after": {
           content: '""',
           position: "absolute",
           left: 0,
           right: 0,
           bottom: 0,
-          height: { xs: 42, sm: 50 },
+          height: 42,
           background:
             "linear-gradient(to bottom, rgba(8,12,24,0) 0%, rgba(8,12,24,0.85) 62%, rgba(8,12,24,0.98) 100%)",
           pointerEvents: "none",
@@ -154,14 +157,20 @@ export function PlayerVisibleResultTileCard(props: Props) {
           "&:last-child": { pb: 0 },
           position: "relative",
           zIndex: 1,
+          flex: 1,
+          minHeight: 0,
+          minWidth: 0,
+          display: "flex",
+          flexDirection: "column",
+          width: "100%",
         }}
       >
-        <Stack spacing={{ xs: 1.5, sm: 1.75 }} sx={{ height: "100%" }}>
+        <Stack spacing={1.5} sx={{ height: "100%", minWidth: 0, overflow: "hidden" }}>
           {optionHasImage(tile.imageUrl) ? (
             <QuestionAssetImage
               url={tile.imageUrl}
               alt={optionAltText(tile.text, "Вопрос")}
-              sx={{ width: "100%", maxHeight: { xs: 72, sm: 88 }, borderRadius: 1 }}
+              sx={{ width: "100%", maxHeight: 72, borderRadius: 1, flexShrink: 0 }}
               objectFit="cover"
             />
           ) : null}
@@ -170,17 +179,18 @@ export function PlayerVisibleResultTileCard(props: Props) {
             sx={{
               fontWeight: 700,
               lineHeight: 1.2,
-              fontSize: { xs: "1rem", sm: "1.1rem" },
+              fontSize: "clamp(0.85rem, 3.6cqw, 1.05rem)",
               display: "-webkit-box",
               WebkitLineClamp: 2,
               WebkitBoxOrient: "vertical",
               overflow: "hidden",
+              flexShrink: 0,
             }}
             title={tile.text}
           >
             {tile.text}
           </Typography>
-          <Stack spacing={{ xs: 1.15, sm: 1.35 }}>
+          <Stack spacing={1.15} sx={{ minWidth: 0, flex: 1, overflow: "hidden" }}>
             {tile.optionStats.slice(0, 3).map((row) => {
               const pct = total > 0 ? Math.round((row.count / total) * 100) : 0;
               return (

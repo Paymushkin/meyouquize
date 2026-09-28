@@ -26,12 +26,29 @@ describe("getVisiblePlayerBanners", () => {
 });
 
 describe("buildPlayerTilesOrder", () => {
-  it("deduplicates and appends missing system tiles", () => {
+  it("deduplicates and appends missing system tiles in default order", () => {
     expect(buildPlayerTilesOrder(["speaker_tile", "speaker_tile"], [])).toEqual([
       SPEAKER_TILE_ID,
       PROGRAM_TILE_ID,
       PHOTO_WALL_TILE_ID,
     ]);
+  });
+
+  it("appends new banners without moving existing system tiles", () => {
+    expect(
+      buildPlayerTilesOrder(
+        [PROGRAM_TILE_ID, SPEAKER_TILE_ID, PHOTO_WALL_TILE_ID],
+        [
+          {
+            id: "banner-1",
+            isVisible: false,
+            linkUrl: "https://x.com",
+            backgroundUrl: "/b.png",
+            size: "1x1",
+          },
+        ],
+      ),
+    ).toEqual([PROGRAM_TILE_ID, SPEAKER_TILE_ID, PHOTO_WALL_TILE_ID, "banner-1"]);
   });
 
   it("moves quiz result tiles to the end", () => {

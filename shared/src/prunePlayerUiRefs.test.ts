@@ -12,6 +12,7 @@ const emptyRefs = {
   playerQuizResultsTileVisible: false,
   playerTilesOrder: [] as string[],
   playerVisibleResultQuestionIds: [] as string[],
+  playerVisibleDebateSeriesIds: [] as string[],
   leaderboardSubQuizId: "",
   reportVoteQuestionIds: [] as string[],
   reportQuizQuestionIds: [] as string[],

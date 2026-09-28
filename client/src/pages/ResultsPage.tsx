@@ -6,6 +6,7 @@ import { ProjectorLeaderboardTable } from "../components/projector/ProjectorLead
 import { ProjectorJoinQrBlock } from "../components/projector/ProjectorJoinQrBlock";
 import { ProjectorJoinQrOverlay } from "../components/projector/ProjectorJoinQrOverlay";
 import { ProjectorQuestionSection } from "../components/projector/ProjectorQuestionSection";
+import { ProjectorDebateCompareSection } from "../components/projector/ProjectorDebateCompareSection";
 import { ProjectorRandomizerSection } from "../components/projector/ProjectorRandomizerSection";
 import { ProjectorPhotoWallSection } from "../components/projector/ProjectorPhotoWallSection";
 import { useResultsProjectorSession } from "../hooks/useResultsProjectorSession";
@@ -53,15 +54,21 @@ export function ResultsPage() {
     winnersRowsCount,
     showEventTitleScreen,
     selectedQuestion,
+    debateCompareBaselineQuestion,
+    debateCompareFinalQuestion,
+    debateSeriesRounds,
     fullScreenCloud,
     fullScreenContainer,
     barQuestionCentered,
     showProjectorWinnersHero,
     isTagCloudQuestion,
+    isGeoPollQuestion,
     firstCorrectWinnersShown,
     speakerQuestions,
     reactionSession,
   } = p;
+  const geoPollFullBleed =
+    view.mode === "question" && isGeoPollQuestion && !showProjectorWinnersHero;
   const reactionList = useMemo(
     () => (reactionSession?.reactions?.length ? reactionSession.reactions : [...DEFAULT_REACTIONS]),
     [reactionSession?.reactions],
@@ -196,8 +203,8 @@ export function ResultsPage() {
   return (
     <>
       <ProjectorViewportBackground
-        backgroundColor={view.projectorBackground}
-        backgroundImageUrl={brandProjectorBackgroundImageUrl}
+        backgroundColor={geoPollFullBleed ? "#111111" : view.projectorBackground}
+        backgroundImageUrl={geoPollFullBleed ? undefined : brandProjectorBackgroundImageUrl}
       />
       {showJoinQrOverlay && joinQrOverlayDataUrl ? (
         <ProjectorJoinQrOverlay
@@ -325,7 +332,32 @@ export function ResultsPage() {
             )}
           </Stack>
         )}
-        {view.mode === "question" &&
+        {view.mode === "debate_compare" &&
+          debateCompareBaselineQuestion &&
+          debateCompareFinalQuestion && (
+            <Box
+              sx={{
+                width: "100%",
+                px: PROJECTOR_QUESTION_CONTENT_PX,
+                boxSizing: "border-box",
+                flex: 1,
+                display: "flex",
+                alignItems: "center",
+              }}
+            >
+              <ProjectorDebateCompareSection
+                baselineQuestion={debateCompareBaselineQuestion}
+                finalQuestion={debateCompareFinalQuestion}
+                showVoteCount={view.showVoteCount}
+                voteQuestionTextColor={view.voteQuestionTextColor}
+                voteOptionTextColor={view.voteOptionTextColor}
+                voteProgressTrackColor={view.voteProgressTrackColor}
+                voteProgressBarColor={view.voteProgressBarColor}
+                brandFontFamily={view.brandFontFamily}
+              />
+            </Box>
+          )}
+        {(view.mode === "question" || view.mode === "debate_series") &&
           selectedQuestion &&
           (fullScreenCloud && isTagCloudQuestion ? (
             <Box
@@ -341,21 +373,27 @@ export function ResultsPage() {
             >
               <ProjectorQuestionSection
                 selectedQuestion={selectedQuestion}
-                view={view}
+                view={
+                  view.mode === "debate_series" ? { ...view, questionRevealStage: "results" } : view
+                }
                 showProjectorWinnersHero={showProjectorWinnersHero}
                 fullScreenCloud={fullScreenCloud}
                 isTagCloudQuestion={isTagCloudQuestion}
                 firstCorrectWinnersShown={firstCorrectWinnersShown}
+                debateSeriesRounds={debateSeriesRounds}
               />
             </Box>
           ) : (
             <ProjectorQuestionSection
               selectedQuestion={selectedQuestion}
-              view={view}
+              view={
+                view.mode === "debate_series" ? { ...view, questionRevealStage: "results" } : view
+              }
               showProjectorWinnersHero={showProjectorWinnersHero}
               fullScreenCloud={fullScreenCloud}
               isTagCloudQuestion={isTagCloudQuestion}
               firstCorrectWinnersShown={firstCorrectWinnersShown}
+              debateSeriesRounds={debateSeriesRounds}
             />
           ))}
         {view.mode === "speaker_questions" && screenSpeakerQuestions.length > 0 && (

@@ -111,9 +111,12 @@ type UsePublicViewEmitterParams = {
   playerQuizResultsSubQuizId: string;
   playerQuizResultsSubQuizIds: string[];
   playerTilesOrder: string[];
+  playerTilesGridColumns: 2 | 3;
   reactionsOverlayText: string;
   reactionsWidgets: ReactionWidget[];
   playerVisibleResultQuestionIds: string[];
+  playerVisibleDebateSeriesIds: string[];
+  debateSeriesShowRounds: boolean;
   playerVoteOptionTextColor: string;
   playerVoteProgressTrackColor: string;
   playerVoteProgressBarColor: string;
@@ -218,9 +221,12 @@ export function usePublicViewEmitter(params: UsePublicViewEmitterParams) {
     playerQuizResultsSubQuizId,
     playerQuizResultsSubQuizIds,
     playerTilesOrder,
+    playerTilesGridColumns,
     reactionsOverlayText,
     reactionsWidgets,
     playerVisibleResultQuestionIds,
+    playerVisibleDebateSeriesIds,
+    debateSeriesShowRounds,
     playerVoteOptionTextColor,
     playerVoteProgressTrackColor,
     playerVoteProgressBarColor,
@@ -299,7 +305,23 @@ export function usePublicViewEmitter(params: UsePublicViewEmitterParams) {
       if (!quizId) return;
       const nextMode = patch.mode ?? publicViewMode;
       const nextQuestionId =
-        nextMode === "question" ? (patch.questionId ?? publicViewQuestionId) : undefined;
+        nextMode === "question" || nextMode === "debate_series"
+          ? (patch.questionId ?? publicViewQuestionId)
+          : undefined;
+      const nextDebateCompareQuestionId =
+        nextMode === "debate_compare" ? (patch.debateCompareQuestionId ?? undefined) : undefined;
+      const nextDebateSeriesId =
+        nextMode === "debate_series" ? (patch.debateSeriesId ?? undefined) : undefined;
+      const nextDebateSeriesView =
+        nextMode === "debate_series"
+          ? patch.debateSeriesView === "round"
+            ? "round"
+            : "cumulative"
+          : undefined;
+      const nextDebateSeriesQuestionIds =
+        nextMode === "debate_series" && Array.isArray(patch.debateSeriesQuestionIds)
+          ? patch.debateSeriesQuestionIds
+          : undefined;
       const questionState = getQuestionViewState(nextQuestionId);
       const leaderboardSubQuizIdRaw =
         patch.leaderboardSubQuizId !== undefined
@@ -323,6 +345,14 @@ export function usePublicViewEmitter(params: UsePublicViewEmitterParams) {
         quizId,
         mode: nextMode,
         questionId: nextQuestionId,
+        ...(nextDebateCompareQuestionId
+          ? { debateCompareQuestionId: nextDebateCompareQuestionId }
+          : {}),
+        ...(nextDebateSeriesId ? { debateSeriesId: nextDebateSeriesId } : {}),
+        ...(nextDebateSeriesView ? { debateSeriesView: nextDebateSeriesView } : {}),
+        ...(nextDebateSeriesQuestionIds && nextDebateSeriesQuestionIds.length > 0
+          ? { debateSeriesQuestionIds: nextDebateSeriesQuestionIds }
+          : {}),
         questionRevealStage: patch.questionRevealStage ?? questionRevealStage,
         highlightedLeadersCount: patch.highlightedLeadersCount ?? highlightedLeadersCount,
         ...(nextMode === "leaderboard" && leaderboardSubQuizIdForEmit
@@ -378,10 +408,14 @@ export function usePublicViewEmitter(params: UsePublicViewEmitterParams) {
         playerQuizResultsSubQuizIds:
           patch.playerQuizResultsSubQuizIds ?? playerQuizResultsSubQuizIds,
         playerTilesOrder: patch.playerTilesOrder ?? playerTilesOrder,
+        playerTilesGridColumns: patch.playerTilesGridColumns ?? playerTilesGridColumns,
         reactionsOverlayText: patch.reactionsOverlayText ?? reactionsOverlayText,
         reactionsWidgets: patch.reactionsWidgets ?? reactionsWidgets,
         playerVisibleResultQuestionIds:
           patch.playerVisibleResultQuestionIds ?? playerVisibleResultQuestionIds,
+        playerVisibleDebateSeriesIds:
+          patch.playerVisibleDebateSeriesIds ?? playerVisibleDebateSeriesIds,
+        debateSeriesShowRounds: patch.debateSeriesShowRounds ?? debateSeriesShowRounds,
         playerVoteOptionTextColor: patch.playerVoteOptionTextColor ?? playerVoteOptionTextColor,
         playerVoteProgressTrackColor:
           patch.playerVoteProgressTrackColor ?? playerVoteProgressTrackColor,
@@ -512,9 +546,12 @@ export function usePublicViewEmitter(params: UsePublicViewEmitterParams) {
       playerQuizResultsTileTextColor,
       playerQuizResultsSubQuizId,
       playerTilesOrder,
+      playerTilesGridColumns,
       reactionsOverlayText,
       reactionsWidgets,
       playerVisibleResultQuestionIds,
+      playerVisibleDebateSeriesIds,
+      debateSeriesShowRounds,
       playerVoteOptionTextColor,
       playerVoteProgressTrackColor,
       playerVoteProgressBarColor,

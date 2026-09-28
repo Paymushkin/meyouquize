@@ -1,14 +1,15 @@
 import { Box, Button, MenuItem, Stack, TextField, Typography } from "@mui/material";
-import type { BannerSize } from "./types";
+
+export type PlayerTilesGridColumns = 2 | 3;
 
 type Props = {
   linkUrl: string;
   backgroundUrl: string;
-  size: BannerSize;
+  gridColumns: PlayerTilesGridColumns;
   uploading: boolean;
   onChangeLinkUrl: (value: string) => void;
   onChangeBackgroundUrl: (value: string) => void;
-  onChangeSize: (value: BannerSize) => void;
+  onChangeGridColumns: (value: PlayerTilesGridColumns) => void;
   onUpload: (file: File) => Promise<void>;
   onCreate: () => void;
 };
@@ -16,11 +17,11 @@ type Props = {
 export function BannerCreateTab({
   linkUrl,
   backgroundUrl,
-  size,
+  gridColumns,
   uploading,
   onChangeLinkUrl,
   onChangeBackgroundUrl,
-  onChangeSize,
+  onChangeGridColumns,
   onUpload,
   onCreate,
 }: Props) {
@@ -46,15 +47,15 @@ export function BannerCreateTab({
       />
       <TextField
         select
-        label="Размер плитки"
+        label="Формат сетки"
         size="small"
-        value={size}
-        onChange={(e) => onChangeSize(e.target.value as BannerSize)}
+        value={gridColumns}
+        onChange={(e) => onChangeGridColumns(Number(e.target.value) as PlayerTilesGridColumns)}
         fullWidth
+        helperText="Сколько колонок плиток показывать игроку"
       >
-        <MenuItem value="2x1">2x1</MenuItem>
-        <MenuItem value="1x1">1x1</MenuItem>
-        <MenuItem value="full">Во всю ширину</MenuItem>
+        <MenuItem value={2}>2 колонки</MenuItem>
+        <MenuItem value={3}>3 колонки</MenuItem>
       </TextField>
       <Stack direction={{ xs: "column", sm: "row" }} spacing={1} sx={{ alignItems: "stretch" }}>
         <Button
@@ -89,9 +90,9 @@ export function BannerCreateTab({
       {backgroundUrl.trim() ? (
         <Box
           sx={{
-            width: size === "1x1" ? "100px" : size === "full" ? "320px" : "200px",
+            width: 100,
+            height: 100,
             maxWidth: "100%",
-            aspectRatio: size === "1x1" ? "1 / 1" : size === "full" ? "4 / 1" : "2 / 1",
             borderRadius: 1,
             border: "1px solid",
             borderColor: "divider",

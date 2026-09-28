@@ -94,6 +94,207 @@ describe("computeProjectorDerived", () => {
     expect(derived.showEventTitleScreen).toBe(false);
   });
 
+  it("resolves debate compare baseline and final questions", () => {
+    const derived = computeProjectorDerived({
+      ...initialProjectorSessionState,
+      questions: [
+        {
+          questionId: "baseline",
+          text: "До",
+          debateBaselineQuestionId: undefined,
+          optionStats: [
+            { optionId: "a1", text: "A", count: 60, isCorrect: false },
+            { optionId: "b1", text: "B", count: 40, isCorrect: false },
+          ],
+        },
+        {
+          questionId: "final",
+          text: "После",
+          debateBaselineQuestionId: "baseline",
+          optionStats: [
+            { optionId: "a2", text: "A", count: 35, isCorrect: false },
+            { optionId: "b2", text: "B", count: 65, isCorrect: false },
+          ],
+        },
+      ],
+      view: {
+        ...DEFAULT_PUBLIC_VIEW_STATE,
+        mode: "debate_compare",
+        debateCompareQuestionId: "final",
+      },
+    });
+    expect(derived.debateCompareFinalQuestion?.questionId).toBe("final");
+    expect(derived.debateCompareBaselineQuestion?.questionId).toBe("baseline");
+    expect(derived.barQuestionCentered).toBe(true);
+  });
+
+  it("sums debate series rounds for cumulative projector view", () => {
+    const derived = computeProjectorDerived({
+      ...initialProjectorSessionState,
+      questions: [
+        {
+          questionId: "r0",
+          text: "Раунд 1",
+          type: "single",
+          projectorDebateLayout: true,
+          debateSeriesId: "ser1",
+          debateRoundIndex: 0,
+          optionStats: [
+            { optionId: "a0", text: "A", count: 10, isCorrect: false, color: "#111111" },
+            { optionId: "b0", text: "B", count: 5, isCorrect: false, color: "#222222" },
+          ],
+        },
+        {
+          questionId: "r1",
+          text: "Раунд 2",
+          type: "single",
+          projectorDebateLayout: true,
+          debateSeriesId: "ser1",
+          debateRoundIndex: 1,
+          optionStats: [
+            { optionId: "a1", text: "A", count: 20, isCorrect: false, color: "#111111" },
+            { optionId: "b1", text: "B", count: 15, isCorrect: false, color: "#222222" },
+          ],
+        },
+      ],
+      view: {
+        ...DEFAULT_PUBLIC_VIEW_STATE,
+        mode: "debate_series",
+        debateSeriesId: "ser1",
+        debateSeriesView: "cumulative",
+        questionId: "r1",
+        questionRevealStage: "results",
+      },
+    });
+    expect(derived.selectedQuestion?.text).toBe("Накопительный итог");
+    expect(derived.selectedQuestion?.optionStats.map((r) => r.count)).toEqual([30, 20]);
+    expect(derived.barQuestionCentered).toBe(true);
+    expect(derived.showEventTitleScreen).toBe(false);
+    expect(derived.debateSeriesRounds).toEqual([]);
+  });
+
+  it("exposes ordered round bars when debateSeriesShowRounds is on", () => {
+    const derived = computeProjectorDerived({
+      ...initialProjectorSessionState,
+      questions: [
+        {
+          questionId: "r1",
+          text: "Раунд 2",
+          type: "single",
+          projectorDebateLayout: true,
+          debateSeriesId: "ser1",
+          debateRoundIndex: 1,
+          optionStats: [
+            { optionId: "a1", text: "A", count: 20, isCorrect: false, color: "#111111" },
+            { optionId: "b1", text: "B", count: 15, isCorrect: false, color: "#222222" },
+          ],
+        },
+        {
+          questionId: "r0",
+          text: "Раунд 1",
+          type: "single",
+          projectorDebateLayout: true,
+          debateSeriesId: "ser1",
+          debateRoundIndex: 0,
+          optionStats: [
+            { optionId: "a0", text: "A", count: 10, isCorrect: false, color: "#111111" },
+            { optionId: "b0", text: "B", count: 5, isCorrect: false, color: "#222222" },
+          ],
+        },
+      ],
+      view: {
+        ...DEFAULT_PUBLIC_VIEW_STATE,
+        mode: "debate_series",
+        debateSeriesId: "ser1",
+        debateSeriesView: "cumulative",
+        debateSeriesShowRounds: true,
+        questionId: "r1",
+        questionRevealStage: "results",
+      },
+    });
+    expect(derived.debateSeriesRounds.map((r) => r.questionId)).toEqual(["r0", "r1"]);
+    expect(derived.debateSeriesRounds.map((r) => r.debateRoundIndex)).toEqual([0, 1]);
+  });
+
+  it("sums only selected past rounds when debateSeriesQuestionIds is set", () => {
+    const derived = computeProjectorDerived({
+      ...initialProjectorSessionState,
+      questions: [
+        {
+          questionId: "r0",
+          text: "Раунд 1",
+          type: "single",
+          projectorDebateLayout: true,
+          debateSeriesId: "ser1",
+          debateRoundIndex: 0,
+          optionStats: [
+            { optionId: "a0", text: "A", count: 10, isCorrect: false },
+            { optionId: "b0", text: "B", count: 5, isCorrect: false },
+          ],
+        },
+        {
+          questionId: "r1",
+          text: "Раунд 2",
+          type: "single",
+          projectorDebateLayout: true,
+          debateSeriesId: "ser1",
+          debateRoundIndex: 1,
+          optionStats: [
+            { optionId: "a1", text: "A", count: 20, isCorrect: false },
+            { optionId: "b1", text: "B", count: 15, isCorrect: false },
+          ],
+        },
+        {
+          questionId: "r2",
+          text: "Раунд 3",
+          type: "single",
+          projectorDebateLayout: true,
+          debateSeriesId: "ser1",
+          debateRoundIndex: 2,
+          optionStats: [
+            { optionId: "a2", text: "A", count: 100, isCorrect: false },
+            { optionId: "b2", text: "B", count: 100, isCorrect: false },
+          ],
+        },
+      ],
+      view: {
+        ...DEFAULT_PUBLIC_VIEW_STATE,
+        mode: "debate_series",
+        debateSeriesId: "ser1",
+        debateSeriesView: "cumulative",
+        debateSeriesQuestionIds: ["r0", "r1"],
+        questionId: "r1",
+        questionRevealStage: "results",
+      },
+    });
+    expect(derived.selectedQuestion?.text).toBe("Накопительный итог");
+    expect(derived.selectedQuestion?.optionStats.map((r) => r.count)).toEqual([30, 20]);
+  });
+
+  it("treats geo poll with empty stats as map question, not tag cloud", () => {
+    const derived = computeProjectorDerived({
+      ...initialProjectorSessionState,
+      questions: [
+        {
+          questionId: "geo-1",
+          text: "Откуда вы?",
+          type: "single",
+          geoPollDictionary: "world_cities",
+          optionStats: [],
+        },
+      ],
+      view: {
+        ...DEFAULT_PUBLIC_VIEW_STATE,
+        mode: "question",
+        questionId: "geo-1",
+      },
+    });
+    expect(derived.isGeoPollQuestion).toBe(true);
+    expect(derived.isTagCloudQuestion).toBe(false);
+    expect(derived.fullScreenCloud).toBe(false);
+    expect(derived.barQuestionCentered).toBe(true);
+  });
+
   it("applies option vote count overrides from tagCloudManualByQuestionId", () => {
     const derived = computeProjectorDerived({
       ...initialProjectorSessionState,

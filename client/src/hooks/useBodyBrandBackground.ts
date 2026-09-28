@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useLayoutEffect } from "react";
 
 export const BODY_NO_DECOR_CLASS = "mq-no-body-decor";
 
@@ -80,7 +80,7 @@ function restoreBodyBrandBackground(
 export function useBodyBrandBackground(options: BodyBrandBackgroundOptions): void {
   const { backgroundColor, clearRootBackground = false, resetOverflowX = false } = options;
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const snapshot = captureBodyBrandSnapshot();
     applyBodyBrandBackground({ backgroundColor, clearRootBackground, resetOverflowX });
 

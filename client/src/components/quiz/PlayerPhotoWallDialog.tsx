@@ -4,6 +4,7 @@ import DownloadIcon from "@mui/icons-material/Download";
 import { Box, Dialog, DialogContent, IconButton, Typography } from "@mui/material";
 import type { PhotoWallAlbumPhoto } from "@meyouquize/shared";
 import { photoWallDownloadFilename } from "../../features/quizPlay/downloadPhotoWallImage";
+import { photoWallAlbumMosaicGridSx } from "../../features/quizPlay/photoWallAlbumMosaicGrid";
 import { PLAYER_DIALOG_SECONDARY_TEXT, buildPlayerDialogPaperSx } from "./playerDialogStyles";
 
 const PlayerPhotoWallLightbox = lazy(() =>
@@ -101,9 +102,9 @@ export function PlayerPhotoWallDialog({ open, photos, brandFontFamily, onClose }
         <DialogContent
           sx={{
             flex: 1,
-            px: { xs: 1.5, sm: 2 },
+            px: { "@": 1.5, "@sm": 2 },
             pt: 0,
-            pb: { xs: 2, sm: 2.5 },
+            pb: { "@": 2, "@sm": 2.5 },
             color: "#fff",
             overflow: "auto",
           }}
@@ -113,26 +114,19 @@ export function PlayerPhotoWallDialog({ open, photos, brandFontFamily, onClose }
               Фотографии недоступны
             </Typography>
           ) : (
-            <Box
-              sx={{
-                display: "grid",
-                gridTemplateColumns: {
-                  xs: "repeat(3, minmax(0, 1fr))",
-                  sm: "repeat(4, minmax(0, 1fr))",
-                  md: "repeat(5, minmax(0, 1fr))",
-                },
-                gap: { xs: 0.75, sm: 1 },
-              }}
-            >
+            <Box sx={photoWallAlbumMosaicGridSx}>
               {photos.map((photo, index) => (
                 <Box
                   key={photo.key}
+                  className="pw-mosaic-cell"
                   sx={{
                     position: "relative",
-                    aspectRatio: "1 / 1",
+                    minWidth: 0,
+                    minHeight: 0,
                     overflow: "hidden",
-                    borderRadius: 1,
+                    borderRadius: 0,
                     cursor: "pointer",
+                    bgcolor: "rgba(255, 255, 255, 0.06)",
                   }}
                   onClick={() => setLightboxIndex(index)}
                 >

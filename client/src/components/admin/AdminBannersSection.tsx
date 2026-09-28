@@ -48,11 +48,15 @@ type Props = {
   brandPrimaryColor: string;
   playerVoteOptionTextColor: string;
   photoWallCollageSrcs: string[];
+  playerTilesGridColumns: 2 | 3;
+  onChangePlayerTilesGridColumns: (value: 2 | 3) => void;
   bannerClickCounts: Record<string, number>;
   tilesOrder: string[];
   onMoveTileUp: (id: string) => void;
   onMoveTileDown: (id: string) => void;
   onToggleVisible: (bannerId: string, next: boolean) => void;
+  photoWallTileVisible: boolean;
+  onTogglePhotoWallTileVisible: (next: boolean) => void;
   onDelete: (bannerId: string) => void;
 };
 
@@ -81,11 +85,15 @@ export function AdminBannersSection({
   brandPrimaryColor,
   playerVoteOptionTextColor,
   photoWallCollageSrcs,
+  playerTilesGridColumns,
+  onChangePlayerTilesGridColumns,
   bannerClickCounts,
   tilesOrder,
   onMoveTileUp,
   onMoveTileDown,
   onToggleVisible,
+  photoWallTileVisible,
+  onTogglePhotoWallTileVisible,
   onDelete,
 }: Props) {
   const state = useAdminBannersSectionState({
@@ -105,6 +113,8 @@ export function AdminBannersSection({
     brandPrimaryColor,
     playerVoteOptionTextColor,
     photoWallCollageSrcs,
+    playerTilesGridColumns,
+    onChangePlayerTilesGridColumns,
     onCreate,
     onUpdate,
     onUploadMedia,
@@ -130,11 +140,11 @@ export function AdminBannersSection({
               <BannerCreateTab
                 linkUrl={state.linkUrl}
                 backgroundUrl={state.backgroundUrl}
-                size={state.size}
+                gridColumns={state.playerTilesGridColumns}
                 uploading={state.uploading}
                 onChangeLinkUrl={state.setLinkUrl}
                 onChangeBackgroundUrl={state.setBackgroundUrl}
-                onChangeSize={state.setSize}
+                onChangeGridColumns={state.onChangePlayerTilesGridColumns}
                 onUpload={state.handleUploadBannerImage}
                 onCreate={state.handleCreateBanner}
               />
@@ -181,13 +191,14 @@ export function AdminBannersSection({
         onMoveUp={onMoveTileUp}
         onMoveDown={onMoveTileDown}
         onToggleBannerVisible={onToggleVisible}
+        photoWallTileVisible={photoWallTileVisible}
+        onTogglePhotoWallTileVisible={onTogglePhotoWallTileVisible}
         onDeleteBanner={onDelete}
         onStartEdit={(tile) => state.startEdit(tile.banner)}
         onCancelEdit={state.cancelEdit}
         onSaveEdit={state.saveEdit}
         onChangeEditLinkUrl={state.setEditLinkUrl}
         onChangeEditBackgroundUrl={state.setEditBackgroundUrl}
-        onChangeEditSize={state.setEditSize}
       />
     </Stack>
   );

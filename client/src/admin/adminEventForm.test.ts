@@ -1,7 +1,12 @@
 import { describe, expect, it } from "vitest";
+import { buildDebatePollQuestionPatch, buildGeoPollQuestionPatch } from "@meyouquize/shared";
 import {
+  applyVotesDisplayBlocksReorder,
+  buildVotesDisplayBlocks,
   cloneQuestionForm,
   editorQuizModeFromLoadedQuestion,
+  filterVotesDisplayBlocks,
+  getQuestionTypeSelectValue,
   mapLoadedRoomQuestions,
   toQuestionReplaceInput,
   validateQuestionFormEntry,
@@ -52,6 +57,57 @@ describe("editorQuizModeFromLoadedQuestion", () => {
         "sq-1",
       ),
     ).toBe(false);
+  });
+});
+
+describe("getQuestionTypeSelectValue", () => {
+  it("returns geo_poll and debate_poll for presets", () => {
+    expect(
+      getQuestionTypeSelectValue({
+        subQuizId: null,
+        text: "",
+        useImages: false,
+        ...buildGeoPollQuestionPatch(),
+        points: 1,
+        maxAnswers: 1,
+        adminDone: false,
+        isActive: false,
+        showVoteCount: true,
+      }),
+    ).toBe("geo_poll");
+    expect(
+      getQuestionTypeSelectValue({
+        subQuizId: null,
+        text: "",
+        useImages: false,
+        ...buildDebatePollQuestionPatch(),
+        points: 1,
+        maxAnswers: 1,
+        adminDone: false,
+        isActive: false,
+        showVoteCount: true,
+      }),
+    ).toBe("debate_poll");
+    expect(
+      getQuestionTypeSelectValue({
+        subQuizId: null,
+        text: "Тезис",
+        useImages: false,
+        type: "single",
+        editorQuizMode: false,
+        projectorDebateLayout: true,
+        points: 1,
+        maxAnswers: 1,
+        adminDone: false,
+        isActive: false,
+        showVoteCount: true,
+        options: [
+          { text: "Своя позиция A", isCorrect: false },
+          { text: "Своя позиция B", isCorrect: false },
+          { text: "Свой третий", isCorrect: false },
+        ],
+      }),
+    ).toBe("debate_poll");
   });
 });
 
@@ -160,6 +216,22 @@ describe("validateQuestionFormEntry", () => {
     ).toBeNull();
   });
 
+  it("rejects temperature inside quizzes", () => {
+    expect(
+      validateQuestionFormEntry(
+        baseQuestionForm({
+          subQuizId: "sq-1",
+          type: "temperature",
+          options: [
+            { text: "Cold", isCorrect: false, weight: 25 },
+            { text: "Hot", isCorrect: false, weight: 75 },
+          ],
+        }),
+        0,
+      ),
+    ).toMatch(/недоступно в квизах/);
+  });
+
   it("validates ranking minimum options", () => {
     expect(
       validateQuestionFormEntry(
@@ -173,6 +245,21 @@ describe("validateQuestionFormEntry", () => {
         0,
       ),
     ).toMatch(/не меньше трёх/);
+  });
+
+  it("allows geo poll without manual options", () => {
+    expect(
+      validateQuestionFormEntry(
+        baseQuestionForm({
+          subQuizId: null,
+          text: "Откуда вы?",
+          type: "single",
+          editorQuizMode: false,
+          ...buildGeoPollQuestionPatch("Откуда вы?"),
+        }),
+        0,
+      ),
+    ).toBeNull();
   });
 
   it("validates tag cloud max answers", () => {
@@ -205,5 +292,116 @@ describe("toQuestionReplaceInput", () => {
     if (payload.type !== "temperature") throw new Error("expected temperature question");
     expect(payload.temperatureSubtitle).toBe("Уровень тревоги");
     expect(payload.scoringMode).toBe("poll");
+  });
+
+  it("maps geo poll to empty options and dictionary", () => {
+    const payload = toQuestionReplaceInput(
+      baseQuestionForm({
+        text: "Откуда вы?",
+        ...buildGeoPollQuestionPatch("Откуда вы?"),
+        options: [{ text: "should-be-cleared", isCorrect: false }],
+      }),
+    );
+    expect(payload.type).toBe("single");
+    expect(payload.options).toEqual([]);
+    expect(payload.geoPollDictionary).toBe("world_cities");
+    expect(payload.projectorDebateLayout).toBe(false);
+    expect(payload.debateBaselineQuestionId).toBeNull();
+  });
+
+  it("persists debate option colors on save", () => {
+    const payload = toQuestionReplaceInput(
+      baseQuestionForm({
+        text: "Тезис",
+        ...buildDebatePollQuestionPatch("Тезис"),
+        options: [
+          { text: "A", isCorrect: false },
+          { text: "B", isCorrect: false, color: "#112233" },
+          { text: "C", isCorrect: false },
+        ],
+      }),
+    );
+    expect(payload.options.map((o) => o.color)).toEqual(["#1976d2", "#112233", "#90a4ae"]);
+  });
+});
+
+describe("votes display blocks order", () => {
+  it("keeps debate series interleaved with singles by form order", () => {
+    const forms: QuestionForm[] = [
+      baseQuestionForm({ subQuizId: null, text: "Vote A", id: "a" }),
+      baseQuestionForm({
+        subQuizId: null,
+        text: "Debate R1",
+        id: "d1",
+        ...buildDebatePollQuestionPatch("Debate"),
+        debateSeriesId: "ser1",
+        debateRoundIndex: 0,
+      }),
+      baseQuestionForm({
+        subQuizId: null,
+        text: "Debate R2",
+        id: "d2",
+        ...buildDebatePollQuestionPatch("Debate"),
+        debateSeriesId: "ser1",
+        debateRoundIndex: 1,
+      }),
+      baseQuestionForm({ subQuizId: null, text: "Vote B", id: "b" }),
+    ];
+    const blocks = buildVotesDisplayBlocks(forms);
+    expect(blocks.map((block) => block.kind)).toEqual(["single", "debate_series", "single"]);
+    expect(blocks[1]).toMatchObject({ kind: "debate_series", seriesId: "ser1" });
+    if (blocks[1]?.kind === "debate_series") {
+      expect(blocks[1].formIndices).toEqual([1, 2]);
+    }
+  });
+
+  it("moves a debate series block among singles", () => {
+    const forms: QuestionForm[] = [
+      baseQuestionForm({ subQuizId: null, text: "Vote A", id: "a" }),
+      baseQuestionForm({
+        subQuizId: null,
+        text: "Debate R1",
+        id: "d1",
+        ...buildDebatePollQuestionPatch("Debate"),
+        debateSeriesId: "ser1",
+        debateRoundIndex: 0,
+      }),
+      baseQuestionForm({
+        subQuizId: null,
+        text: "Debate R2",
+        id: "d2",
+        ...buildDebatePollQuestionPatch("Debate"),
+        debateSeriesId: "ser1",
+        debateRoundIndex: 1,
+      }),
+      baseQuestionForm({ subQuizId: null, text: "Vote B", id: "b" }),
+    ];
+    const blocks = buildVotesDisplayBlocks(forms);
+    const next = applyVotesDisplayBlocksReorder(forms, blocks, 1, 0);
+    expect(next).not.toBeNull();
+    expect(next!.map((q) => q.id)).toEqual(["d1", "d2", "a", "b"]);
+    expect(buildVotesDisplayBlocks(next!).map((block) => block.kind)).toEqual([
+      "debate_series",
+      "single",
+      "single",
+    ]);
+  });
+
+  it("reorders only within a filtered active scope", () => {
+    const forms: QuestionForm[] = [
+      baseQuestionForm({ subQuizId: null, text: "Vote A", id: "a" }),
+      baseQuestionForm({
+        subQuizId: null,
+        text: "Debate",
+        id: "d1",
+        ...buildDebatePollQuestionPatch("Debate"),
+        debateSeriesId: "ser1",
+        debateRoundIndex: 0,
+      }),
+      baseQuestionForm({ subQuizId: null, text: "Vote B", id: "b" }),
+    ];
+    const blocks = filterVotesDisplayBlocks(buildVotesDisplayBlocks(forms), new Set([0, 1, 2]));
+    const next = applyVotesDisplayBlocksReorder(forms, blocks, 2, 0);
+    expect(next!.map((q) => q.id)).toEqual(["b", "a", "d1"]);
   });
 });

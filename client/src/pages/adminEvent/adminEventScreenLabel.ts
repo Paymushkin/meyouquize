@@ -7,6 +7,8 @@ function publicScreenModeLabel(mode: PublicViewMode): string {
   if (mode === "randomizer") return "рандомайзер";
   if (mode === "photo_wall") return "фотостена";
   if (mode === "report") return "отчет";
+  if (mode === "debate_compare") return "дебаты: сравнение";
+  if (mode === "debate_series") return "дебаты: итог серии";
   if (mode === "question") return "вопрос";
   return "название";
 }

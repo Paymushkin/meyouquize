@@ -87,12 +87,16 @@ export function useQuizPlayJoin({
   useEffect(() => {
     if (!slug || restoreJoinAttemptedRef.current) return;
     if (!shouldRestoreJoin(slug, getNickname())) return;
-    restoreJoinAttemptedRef.current = true;
     const roomNickname = localStorage.getItem(getRoomNickKey(slug)) || "";
     const persistedNick = roomNickname || getNickname() || "";
     setJoinPending(true);
     setBootLoading(true);
-    emitQuizJoin(slug, "restore", persistedNick.trim());
+    /** После всех useEffect на странице — иначе quiz:joined приходит до socket.on в useQuizPlaySocket. */
+    const timer = window.setTimeout(() => {
+      restoreJoinAttemptedRef.current = true;
+      emitQuizJoin(slug, "restore", persistedNick.trim());
+    }, 0);
+    return () => window.clearTimeout(timer);
   }, [setBootLoading, setJoinPending, slug]);
 
   useEffect(() => {

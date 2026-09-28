@@ -15,6 +15,8 @@ export function isPrivateNetworkViteDevPort(origin: string): boolean {
     if (a === 10) return true;
     if (a === 172 && b >= 16 && b <= 31) return true;
     if (a === 192 && b === 168) return true;
+    /** Tailscale / CGNAT 100.64.0.0/10 — часто LAN_HOST в event:init. */
+    if (a === 100 && b >= 64 && b <= 127) return true;
     return false;
   } catch {
     return false;

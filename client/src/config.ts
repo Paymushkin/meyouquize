@@ -6,8 +6,13 @@ const protocol = window.location.protocol || "http:";
 /** Origin для публичных ссылок и QR (см. `resolvePlayerFacingOrigin`). */
 export const APP_ORIGIN = resolvePlayerFacingOrigin();
 
-/** В прод-сборке backend за тем же доменом (Caddy → /api, /socket.io). В `vite dev` — отдельный порт API. */
-const defaultApiBase = import.meta.env.DEV ? `${protocol}//${host}:4000` : window.location.origin;
+/**
+ * В prod backend за тем же доменом (Caddy → /api, /socket.io).
+ * В `vite dev` — отдельный порт API. Не используем `import.meta.env.DEV`: корневой `.env`
+ * с `NODE_ENV=production` (event:init) сбрасывает DEV в false при `npm run dev`.
+ */
+const isViteDevServer = import.meta.env.MODE === "development";
+const defaultApiBase = isViteDevServer ? `${protocol}//${host}:4000` : window.location.origin;
 
 export const API_BASE = (import.meta.env.VITE_API_URL as string | undefined) ?? defaultApiBase;
 

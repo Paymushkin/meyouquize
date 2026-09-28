@@ -1,8 +1,11 @@
 import {
+  isGeoPollDictionary,
+  resolveDebateSeriesResultTitle,
   resolveProjectorLeaderboardRows,
   applyOptionVoteCountOverrides,
   computeTemperatureWeightedAverage,
   resolveTagCloudManualForQuestion,
+  sumDebateSeriesOptionStats,
   type PublicViewState,
 } from "@meyouquize/shared";
 import type { ProjectorLeader, ProjectorQuestionResult } from "../../types/projectorDashboard";
@@ -10,10 +13,15 @@ import type { ProjectorSessionState } from "./projectorSessionReducer";
 
 export type ProjectorDerived = {
   selectedQuestion: ProjectorQuestionResult | undefined;
+  debateCompareBaselineQuestion: ProjectorQuestionResult | undefined;
+  debateCompareFinalQuestion: ProjectorQuestionResult | undefined;
+  /** Раунды серии под накопительным итогом (если включено в админке). */
+  debateSeriesRounds: ProjectorQuestionResult[];
   leadersShown: ProjectorLeader[];
   winnersRowsCount: number;
   showEventTitleScreen: boolean;
   isTagCloudQuestion: boolean;
+  isGeoPollQuestion: boolean;
   firstCorrectWinnersShown: string[];
   showProjectorWinnersHero: boolean;
   fullScreenCloud: boolean;
@@ -38,9 +46,33 @@ export function computeProjectorDerived(
   const rawSelectedQuestion =
     mode === "question" && publicQuestionId
       ? questions.find((q) => q.questionId === publicQuestionId)
-      : undefined;
+      : mode === "debate_series"
+        ? resolveDebateSeriesProjectorQuestion(questions, view)
+        : undefined;
 
-  const selectedQuestion = applyProjectorOptionVoteOverrides(rawSelectedQuestion, view);
+  // Накопительный итог серии не смешиваем с ручными override одного раунда.
+  const selectedQuestion =
+    mode === "debate_series" && view.debateSeriesView !== "round"
+      ? rawSelectedQuestion
+      : applyProjectorOptionVoteOverrides(rawSelectedQuestion, view);
+
+  const rawDebateFinalQuestion =
+    mode === "debate_compare" && view.debateCompareQuestionId
+      ? questions.find((q) => q.questionId === view.debateCompareQuestionId)
+      : undefined;
+  const debateCompareFinalQuestion = applyProjectorOptionVoteOverrides(
+    rawDebateFinalQuestion,
+    view,
+  );
+  const debateBaselineId = debateCompareFinalQuestion?.debateBaselineQuestionId?.trim();
+  const rawDebateBaselineQuestion =
+    mode === "debate_compare" && debateBaselineId
+      ? questions.find((q) => q.questionId === debateBaselineId)
+      : undefined;
+  const debateCompareBaselineQuestion = applyProjectorOptionVoteOverrides(
+    rawDebateBaselineQuestion,
+    view,
+  );
 
   const leaderboardRows = resolveProjectorLeaderboardRows(
     leaderboardsBySubQuiz,
@@ -60,11 +92,16 @@ export function computeProjectorDerived(
   const showEventTitleScreen =
     mode === "title" ||
     (mode === "question" && !selectedQuestion) ||
+    (mode === "debate_series" && !selectedQuestion) ||
+    (mode === "debate_compare" &&
+      (!debateCompareFinalQuestion || !debateCompareBaselineQuestion)) ||
     (mode === "leaderboard" && leadersShown.length === 0) ||
     (mode === "speaker_questions" && speakerOnScreenCount === 0);
 
+  const isGeoPollQuestion = isGeoPollDictionary(selectedQuestion?.geoPollDictionary);
   const isTagCloudQuestion =
     !!selectedQuestion &&
+    !isGeoPollQuestion &&
     (selectedQuestion.type === "tag_cloud" || selectedQuestion.optionStats.length === 0);
 
   const raw = selectedQuestion?.firstCorrectNicknames ?? [];
@@ -95,19 +132,128 @@ export function computeProjectorDerived(
 
   const fullScreenCloud = mode === "question" && isTagCloudQuestion && !showProjectorWinnersHero;
   const fullScreenContainer = showEventTitleScreen;
-  const barQuestionCentered = mode === "question" && !!selectedQuestion && !fullScreenCloud;
+  const barQuestionCentered =
+    (mode === "question" && !!selectedQuestion && (!fullScreenCloud || isGeoPollQuestion)) ||
+    (mode === "debate_series" && !!selectedQuestion) ||
+    (mode === "debate_compare" && !!debateCompareFinalQuestion && !!debateCompareBaselineQuestion);
+
+  const debateSeriesRounds =
+    mode === "debate_series" && view.debateSeriesView !== "round" && view.debateSeriesShowRounds
+      ? resolveDebateSeriesProjectorRounds(questions, view).map(
+          (round) => applyProjectorOptionVoteOverrides(round, view) ?? round,
+        )
+      : [];
 
   return {
     selectedQuestion,
+    debateCompareBaselineQuestion,
+    debateCompareFinalQuestion,
+    debateSeriesRounds,
     leadersShown,
     winnersRowsCount,
     showEventTitleScreen,
     isTagCloudQuestion,
+    isGeoPollQuestion,
     firstCorrectWinnersShown,
     showProjectorWinnersHero,
     fullScreenCloud,
     fullScreenContainer,
     barQuestionCentered,
+  };
+}
+
+/** Раунды серии для компактных шкал под накопительным итогом. */
+export function resolveDebateSeriesProjectorRounds(
+  questions: ProjectorQuestionResult[],
+  view: Pick<PublicViewState, "debateSeriesId" | "debateSeriesQuestionIds">,
+): ProjectorQuestionResult[] {
+  const seriesId = view.debateSeriesId?.trim();
+  if (!seriesId) return [];
+
+  const rounds = questions
+    .filter((q) => q.debateSeriesId?.trim() === seriesId)
+    .sort(
+      (a, b) =>
+        (a.debateRoundIndex ?? 0) - (b.debateRoundIndex ?? 0) ||
+        a.questionId.localeCompare(b.questionId),
+    );
+  if (rounds.length === 0) return [];
+
+  const includeIds = new Set(
+    (view.debateSeriesQuestionIds ?? []).map((id) => id.trim()).filter((id) => id.length > 0),
+  );
+  const filtered =
+    includeIds.size > 0 ? rounds.filter((q) => includeIds.has(q.questionId)) : rounds;
+  return filtered.length > 0 ? filtered : rounds;
+}
+
+/** Собирает вопрос серии для проектора: сумма голосов или один раунд. */
+export function resolveDebateSeriesProjectorQuestion(
+  questions: ProjectorQuestionResult[],
+  view: Pick<
+    PublicViewState,
+    "debateSeriesId" | "debateSeriesView" | "debateSeriesQuestionIds" | "questionId"
+  >,
+): ProjectorQuestionResult | undefined {
+  const seriesId = view.debateSeriesId?.trim();
+  if (!seriesId) return undefined;
+
+  const rounds = questions
+    .filter((q) => q.debateSeriesId?.trim() === seriesId)
+    .sort(
+      (a, b) =>
+        (a.debateRoundIndex ?? 0) - (b.debateRoundIndex ?? 0) ||
+        a.questionId.localeCompare(b.questionId),
+    );
+  if (rounds.length === 0) return undefined;
+
+  if (view.debateSeriesView === "round") {
+    const byId = view.questionId ? rounds.find((q) => q.questionId === view.questionId) : undefined;
+    return byId ?? rounds[rounds.length - 1];
+  }
+
+  const includeIds = new Set(
+    (view.debateSeriesQuestionIds ?? []).map((id) => id.trim()).filter((id) => id.length > 0),
+  );
+  const roundsToSum =
+    includeIds.size > 0 ? rounds.filter((q) => includeIds.has(q.questionId)) : rounds;
+  const effectiveRounds = roundsToSum.length > 0 ? roundsToSum : rounds;
+
+  const last = effectiveRounds[effectiveRounds.length - 1]!;
+  const summed = sumDebateSeriesOptionStats(
+    effectiveRounds.map((q) =>
+      q.optionStats.map((row) => ({
+        optionId: row.optionId,
+        text: row.text,
+        count: row.count,
+        imageUrl: row.imageUrl,
+        color: row.color,
+        isCorrect: row.isCorrect,
+      })),
+    ),
+  );
+
+  const seriesTitle = resolveDebateSeriesResultTitle(
+    effectiveRounds.map((q) => q.debateSeriesResultTitle).find((t) => t?.trim()) ??
+      last.debateSeriesResultTitle,
+  );
+
+  return {
+    ...last,
+    questionId: last.questionId,
+    text: seriesTitle,
+    projectorDebateLayout: true,
+    debateSeriesId: seriesId,
+    debateRoundIndex: last.debateRoundIndex,
+    debateSeriesResultTitle: seriesTitle,
+    optionStats: summed.map((row) => ({
+      optionId: row.optionId,
+      text: row.text,
+      count: row.count,
+      imageUrl: row.imageUrl,
+      color: row.color,
+      isCorrect: Boolean(row.isCorrect),
+    })),
   };
 }
 

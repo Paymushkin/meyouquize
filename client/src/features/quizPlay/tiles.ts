@@ -36,8 +36,8 @@ export function buildPlayerTilesOrder(
   for (const b of banners) {
     if (!deduped.includes(b.id)) deduped.push(b.id);
   }
-  if (!deduped.includes(SPEAKER_TILE_ID)) deduped.push(SPEAKER_TILE_ID);
   if (!deduped.includes(PROGRAM_TILE_ID)) deduped.push(PROGRAM_TILE_ID);
+  if (!deduped.includes(SPEAKER_TILE_ID)) deduped.push(SPEAKER_TILE_ID);
   if (!deduped.includes(PHOTO_WALL_TILE_ID)) deduped.push(PHOTO_WALL_TILE_ID);
   return withQuizResultsTileLast([...deduped, ...quizTiles]);
 }

@@ -37,6 +37,8 @@ import { Link as RouterLink } from "react-router-dom";
 import { BrandPageLayout } from "./brand/BrandPageLayout";
 import { BrandHeader } from "./brand/BrandHeader";
 import { BrandFooter } from "./brand/BrandFooter";
+import { LandingHeroSection } from "./landing/LandingHeroSection";
+import { LandingInteractiveSection } from "./landing/LandingInteractiveSection";
 import type { DemoTitrePair } from "./landingDemo/DemoScenarioCaptions";
 import {
   DEMO_TAB_QUIZ,
@@ -55,7 +57,7 @@ import type {
   ProjectorQuestionResult,
   ProjectorTagCloudWord,
 } from "../types/projectorDashboard";
-import { BRAND_ACCENT, BRAND_BORDER, BRAND_SURFACE, BRAND_TEXT } from "../theme/brandTheme";
+import { BRAND_ACCENT, BRAND_BORDER, BRAND_TEXT } from "../theme/brandTheme";
 
 /** Три вопроса демо-квиза по 3 сцены: голосование → выбор + результаты → принято + обновление на проекторе */
 const DEMO_QUIZ_POLLS = [
@@ -1474,12 +1476,17 @@ function DemoQuizPhoneColumn(props: { sceneIndex: number; screenOverlay?: ReactN
   );
 }
 
+const SHOW_LANDING_DEMO_SECTION = false;
+
 export function LandingPage() {
   return (
     <BrandPageLayout documentTitle="Meyouquize — интерактивные квизы и голосования для мероприятий">
-      <BrandHeader />
-      <DemoSceneSection />
-      <CtaSection />
+      <Box sx={{ position: "relative" }}>
+        <BrandHeader overHero />
+        <LandingHeroSection />
+      </Box>
+      {SHOW_LANDING_DEMO_SECTION ? <DemoSceneSection /> : null}
+      <LandingInteractiveSection />
       <BrandFooter />
     </BrandPageLayout>
   );
@@ -1955,69 +1962,6 @@ function DemoSceneSection() {
         </Box>
         <Box sx={{ display: demoTab === 4 ? "block" : "none" }}>
           <LandingDemoRandomizerTab sectionRef={sectionRef} demoTabRef={demoTabRef} />
-        </Box>
-      </Container>
-    </Box>
-  );
-}
-
-function CtaSection() {
-  return (
-    <Box id="request" component="section" sx={{ py: { xs: 8, md: 12 } }}>
-      <Container maxWidth="md">
-        <Box
-          sx={{
-            position: "relative",
-            overflow: "hidden",
-            borderRadius: 4,
-            border: `1px solid ${BRAND_BORDER}`,
-            background: BRAND_SURFACE,
-            p: { xs: 4, md: 6 },
-            textAlign: "center",
-          }}
-        >
-          <Box
-            aria-hidden
-            sx={{
-              position: "absolute",
-              inset: 0,
-              background: `radial-gradient(circle at 50% 0%, rgba(243,247,34,0.16), rgba(243,247,34,0) 60%)`,
-              pointerEvents: "none",
-            }}
-          />
-          <Stack alignItems="center" spacing={3} sx={{ position: "relative" }}>
-            <Typography variant="h3" sx={{ fontSize: { xs: "1.7rem", md: "2.2rem" } }}>
-              Понравился сценарий?
-            </Typography>
-            <Typography variant="body1" sx={{ color: "text.secondary", maxWidth: 520 }}>
-              Оставьте заявку, и мы подготовим для вас рабочий ивент с брендингом, вопросами
-              спикеру, голосованием и квизом под формат вашей аудитории.
-            </Typography>
-            <Stack
-              direction={{ xs: "column", sm: "row" }}
-              spacing={2}
-              sx={{ pt: 1, width: { xs: "100%", sm: "auto" } }}
-            >
-              <Button
-                component="a"
-                href="mailto:hello@meyouquize.ru?subject=Заявка%20на%20демо%20ивент"
-                variant="contained"
-                color="primary"
-                size="large"
-              >
-                Оставить заявку
-              </Button>
-              <Button
-                component={RouterLink}
-                to="/admin"
-                variant="outlined"
-                color="primary"
-                size="large"
-              >
-                В админку
-              </Button>
-            </Stack>
-          </Stack>
         </Box>
       </Container>
     </Box>

@@ -42,6 +42,7 @@ type Params = {
   setLeaderboardsBySubQuiz: (rows: SubQuizLeaderboardPayload[]) => void;
   setPublicViewMode: (mode: PublicViewMode) => void;
   setPublicViewQuestionId: (id: string | undefined) => void;
+  setPublicDebateCompareQuestionId?: (id: string | undefined) => void;
   setQuestionRevealStage: (value: "options" | "results") => void;
   setHighlightedLeadersCount: (value: number) => void;
   setQuestionForms: Dispatch<SetStateAction<QuestionFormPatchable[]>>;
@@ -115,6 +116,7 @@ export function useAdminEventSocket<TQuestion extends QuestionFormPatchable>(
     setLeaderboardsBySubQuiz,
     setPublicViewMode,
     setPublicViewQuestionId,
+    setPublicDebateCompareQuestionId,
     setQuestionRevealStage,
     setHighlightedLeadersCount,
     setQuestionForms,
@@ -354,6 +356,9 @@ export function useAdminEventSocket<TQuestion extends QuestionFormPatchable>(
       const view = normalizePublicViewState(payload);
       setPublicViewMode(view.mode);
       setPublicViewQuestionId(view.questionId);
+      if (setPublicDebateCompareQuestionId) {
+        setPublicDebateCompareQuestionId(view.debateCompareQuestionId);
+      }
       setQuestionRevealStage(view.questionRevealStage);
       setShowFirstCorrectAnswerer(view.showFirstCorrectAnswerer);
       setFirstCorrectWinnersCount(view.firstCorrectWinnersCount);

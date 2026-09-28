@@ -34,7 +34,7 @@ describe("resolveFeedbackScaleTitleFontPx", () => {
 
 describe("playerQuestionTitleFontSizeSx", () => {
   it("returns rem strings for breakpoints", () => {
-    expect(playerQuestionTitleFontSizeSx(30)).toEqual({ xs: "1.9rem", sm: "2.25rem" });
+    expect(playerQuestionTitleFontSizeSx(30)).toEqual({ "@": "1.9rem", "@sm": "2.25rem" });
   });
 });
 
@@ -43,7 +43,7 @@ describe("playerFullWidthTileLabelSx", () => {
     expect(playerFullWidthTileLabelSx).toEqual({
       fontWeight: 700,
       fontStyle: "normal",
-      fontSize: "clamp(1.3rem, 4.2vw, 2.5rem)",
+      fontSize: "clamp(1.3rem, 4.2cqw, 2.5rem)",
       lineHeight: 1.35,
     });
   });

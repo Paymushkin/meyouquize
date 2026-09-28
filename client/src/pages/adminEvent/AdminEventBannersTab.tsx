@@ -1,9 +1,11 @@
 import { AdminBannersSection } from "../../components/admin/AdminBannersSection";
 import type { useAdminPlayerTiles } from "../../features/admin/useAdminPlayerTiles";
+import type { useAdminPhotoWall } from "../../features/admin/useAdminPhotoWall";
 
 export type AdminEventBannersTabProps = {
   eventName: string;
   playerTiles: ReturnType<typeof useAdminPlayerTiles>;
+  photoWall: ReturnType<typeof useAdminPhotoWall>;
   subQuizzesForReport: Array<{ id: string; title: string }>;
   brandPrimaryColor: string;
   playerVoteOptionTextColor: string;
@@ -15,6 +17,7 @@ export type AdminEventBannersTabProps = {
 export function AdminEventBannersTab({
   eventName,
   playerTiles,
+  photoWall,
   subQuizzesForReport,
   brandPrimaryColor,
   playerVoteOptionTextColor,
@@ -47,6 +50,8 @@ export function AdminEventBannersTab({
       brandPrimaryColor={brandPrimaryColor}
       playerVoteOptionTextColor={playerVoteOptionTextColor}
       photoWallCollageSrcs={photoWallCollageSrcs}
+      playerTilesGridColumns={playerTiles.playerTilesGridColumns}
+      onChangePlayerTilesGridColumns={playerTiles.setPlayerTilesGridColumns}
       bannerClickCounts={playerTiles.bannerClickCounts}
       tilesOrder={playerTiles.playerTilesOrder}
       onMoveTileUp={(id) => playerTiles.moveTile(id, -1)}
@@ -60,6 +65,11 @@ export function AdminEventBannersTab({
         }
       }}
       onToggleVisible={playerTiles.togglePlayerBannerVisible}
+      photoWallTileVisible={photoWall.tileVisible}
+      onTogglePhotoWallTileVisible={(next) => {
+        photoWall.setTileVisible(next);
+        photoWall.emitSnapshot({ photoWallTileVisible: next });
+      }}
       onDelete={playerTiles.deletePlayerBanner}
     />
   );

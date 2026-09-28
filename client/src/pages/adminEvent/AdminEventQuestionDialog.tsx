@@ -17,10 +17,23 @@ import {
   MenuItem,
   Stack,
   TextField,
+  ToggleButton,
+  ToggleButtonGroup,
   Tooltip,
   Typography,
 } from "@mui/material";
 import type { Dispatch, SetStateAction } from "react";
+import {
+  buildDebatePollQuestionPatch,
+  buildGeoPollQuestionPatch,
+  debateDefaultOptionColor,
+  GEO_POLL_DICTIONARY_WORLD_CITIES,
+  GEO_POLL_DICTIONARY_WORLD_COUNTRIES,
+  geoPollDictionaryLabel,
+  isDebatePollPreset,
+  sanitizeOptionColor,
+} from "@meyouquize/shared";
+import { CompactColorField } from "../../components/admin/branding/CompactColorField";
 import {
   getQuestionTypeSelectValue,
   isEditorQuizMode,
@@ -29,6 +42,7 @@ import {
   type OptionForm,
   type QuestionForm,
   type QuestionType,
+  type QuestionTypeSelectValue,
 } from "../../admin/adminEventForm";
 import { BrandImageUploadTile } from "../../components/admin/branding/BrandImageUploadTile";
 import { ImagePreview } from "../../components/admin/branding/ImagePreview";
@@ -204,232 +218,259 @@ export function AdminEventQuestionDialog({
             </Stack>
             <Divider />
 
-            {(question.type !== "tag_cloud" || isEditorQuizMode(question)) && (
-              <>
-                <Typography variant="subtitle2" sx={{ mt: 0.5 }}>
-                  {question.type === "tag_cloud"
-                    ? "Эталонные теги"
-                    : question.type === "ranking"
-                      ? question.rankingKind === "quiz"
-                        ? "Варианты (для квиза эталон задаётся в колонке «Эталон (место)»)"
-                        : "Варианты (для жюри эталон не используется)"
-                      : "Варианты ответов"}
-                </Typography>
-                {question.type === "tag_cloud" && isEditorQuizMode(question) ? (
-                  <Typography variant="body2" color="text.secondary" sx={{ mt: -0.5 }}>
-                    Синонимы в одном теге — через «;» или «,», например: «Синий; Голубой».
+            {getQuestionTypeSelectValue(question) === "geo_poll" ? (
+              <Alert severity="info" icon={<InfoOutlinedIcon fontSize="inherit" />}>
+                Участник вводит{" "}
+                {question.geoPollDictionary === GEO_POLL_DICTIONARY_WORLD_COUNTRIES
+                  ? "страну"
+                  : "город"}{" "}
+                с автодополнением по словарю «
+                {geoPollDictionaryLabel(
+                  question.geoPollDictionary ?? GEO_POLL_DICTIONARY_WORLD_CITIES,
+                )}
+                ». На проекторе — карта с ответами.
+              </Alert>
+            ) : null}
+
+            {(question.type !== "tag_cloud" || isEditorQuizMode(question)) &&
+              getQuestionTypeSelectValue(question) !== "geo_poll" && (
+                <>
+                  <Typography variant="subtitle2" sx={{ mt: 0.5 }}>
+                    {question.type === "tag_cloud"
+                      ? "Эталонные теги"
+                      : question.type === "ranking"
+                        ? question.rankingKind === "quiz"
+                          ? "Варианты (для квиза эталон задаётся в колонке «Эталон (место)»)"
+                          : "Варианты (для жюри эталон не используется)"
+                        : "Варианты ответов"}
                   </Typography>
-                ) : null}
-                <Stack spacing={1.25}>
-                  {question.options.map((option, oIndex) => (
-                    <Stack
-                      key={`q-o-${oIndex}`}
-                      direction="row"
-                      spacing={1.5}
-                      alignItems="flex-start"
-                      sx={{ width: "100%", minWidth: 0 }}
-                    >
-                      <TextField
-                        label={
-                          question.type === "tag_cloud"
-                            ? `Тег ${oIndex + 1}`
-                            : `Вариант ${oIndex + 1}`
-                        }
-                        value={option.text}
-                        onChange={(e) => onUpdateOption(oIndex, { text: e.target.value })}
-                        placeholder={question.type === "tag_cloud" ? "Синий; Голубой" : undefined}
-                        size="small"
-                        multiline
-                        minRows={1}
-                        maxRows={8}
-                        sx={{ flex: 1, minWidth: 0 }}
-                      />
-                      {questionAllowsOptionImages(question) ? (
-                        <Stack spacing={0.5} sx={{ width: 72, flexShrink: 0 }}>
-                          <Button
-                            component="label"
-                            variant="outlined"
-                            size="small"
-                            sx={{ p: 0, minWidth: 0, width: 72, height: 56, overflow: "hidden" }}
-                          >
-                            <input
-                              hidden
-                              type="file"
-                              accept="image/*"
-                              onChange={async (e) => {
-                                const file = e.currentTarget.files?.[0];
-                                e.currentTarget.value = "";
-                                if (!file) return;
-                                try {
-                                  const url = await uploadBannerMedia(file);
-                                  onUpdateOption(oIndex, { imageUrl: url });
-                                } catch (error) {
-                                  onDialogError(
-                                    error instanceof Error
-                                      ? error.message
-                                      : "Не удалось загрузить картинку",
-                                  );
-                                }
-                              }}
-                            />
-                            <ImagePreview
-                              label={`Вариант ${oIndex + 1}`}
-                              url={option.imageUrl ?? ""}
-                              height={56}
-                            />
-                          </Button>
-                          {option.imageUrl?.trim() ? (
-                            <Button
-                              size="small"
-                              color="inherit"
-                              sx={{ minWidth: 0, px: 0.5 }}
-                              onClick={() =>
-                                onUpdateOption(oIndex, {
-                                  imageUrl: undefined,
-                                })
-                              }
-                            >
-                              ×
-                            </Button>
-                          ) : null}
-                        </Stack>
-                      ) : null}
-                      {question.type === "tag_cloud" && isEditorQuizMode(question) && (
-                        <TextField
-                          type="number"
-                          size="small"
-                          label="Баллы"
-                          inputProps={{
-                            min: 0,
-                            max: 10_000,
-                            "aria-label": `Баллы за тег ${oIndex + 1}`,
-                          }}
-                          value={question.rankingPointsByRank?.[oIndex] ?? 1}
-                          onChange={(e) => onSetTagCloudTagPointsAt(oIndex, e.target.value)}
-                          sx={{ width: 88, flexShrink: 0 }}
-                          slotProps={{ inputLabel: { shrink: true } }}
-                        />
-                      )}
-                      {question.type === "ranking" && (
-                        <TextField
-                          type="number"
-                          size="small"
-                          label={
-                            question.rankingKind === "jury"
-                              ? `${oIndex + 1}-е место`
-                              : "Эталон (место)"
-                          }
-                          inputProps={{
-                            min: question.rankingKind === "jury" ? 0 : 1,
-                            max: question.rankingKind === "jury" ? 10000 : question.options.length,
-                            "aria-label":
-                              question.rankingKind === "jury"
-                                ? `Балл за ${oIndex + 1}-е место`
-                                : `Место варианта ${oIndex + 1} в скрытом эталоне`,
-                          }}
-                          value={question.rankingPointsByRank?.[oIndex] ?? ""}
-                          onChange={(e) => onSetRankingTierAt(oIndex, e.target.value)}
-                          sx={{ width: 118, flexShrink: 0 }}
-                        />
-                      )}
-                      {question.type === "temperature" && (
-                        <TextField
-                          type="number"
-                          size="small"
-                          label="Вес 0–100"
-                          inputProps={{
-                            min: 0,
-                            max: 100,
-                            "aria-label": `Вес варианта ${oIndex + 1}`,
-                          }}
-                          value={option.weight ?? ""}
-                          onChange={(e) => {
-                            const raw = Number(e.target.value);
-                            const weight = Number.isFinite(raw)
-                              ? Math.max(0, Math.min(100, Math.trunc(raw)))
-                              : undefined;
-                            onUpdateOption(oIndex, { weight });
-                          }}
-                          sx={{ width: 108, flexShrink: 0 }}
-                          slotProps={{ inputLabel: { shrink: true } }}
-                        />
-                      )}
-                      {isEditorQuizMode(question) &&
-                        question.type !== "tag_cloud" &&
-                        question.type !== "ranking" &&
-                        question.type !== "temperature" && (
-                          <Stack
-                            direction="row"
-                            spacing={0}
-                            sx={{ flexShrink: 0, pt: 0.5 }}
-                            aria-label="Правильность ответа"
-                          >
-                            <Tooltip title="Правильный">
-                              <IconButton
-                                size="small"
-                                color={option.isCorrect ? "success" : "default"}
-                                onClick={() => {
-                                  onUpdateOption(oIndex, {
-                                    isCorrect: true,
-                                  });
-                                }}
-                                aria-pressed={option.isCorrect}
-                                aria-label="Отметить как правильный"
-                              >
-                                <CheckCircleOutlineIcon fontSize="small" />
-                              </IconButton>
-                            </Tooltip>
-                            <Tooltip title="Неверный">
-                              <IconButton
-                                size="small"
-                                color={!option.isCorrect ? "error" : "default"}
-                                onClick={() => {
-                                  onUpdateOption(oIndex, {
-                                    isCorrect: false,
-                                  });
-                                }}
-                                aria-pressed={!option.isCorrect}
-                                aria-label="Отметить как неверный"
-                              >
-                                <HighlightOffOutlinedIcon fontSize="small" />
-                              </IconButton>
-                            </Tooltip>
-                          </Stack>
-                        )}
-                      <IconButton
-                        onClick={() => onRemoveOption(oIndex)}
-                        disabled={
-                          question.type === "tag_cloud" && isEditorQuizMode(question)
-                            ? question.options.length <= 1
-                            : question.type === "ranking"
-                              ? question.options.length <= 3
-                              : question.options.length <= 2
-                        }
-                        sx={{ flexShrink: 0, mt: 0.5 }}
-                        aria-label="Удалить вариант"
+                  {question.type === "tag_cloud" && isEditorQuizMode(question) ? (
+                    <Typography variant="body2" color="text.secondary" sx={{ mt: -0.5 }}>
+                      Синонимы в одном теге — через «;» или «,», например: «Синий; Голубой».
+                    </Typography>
+                  ) : null}
+                  <Stack spacing={1.25}>
+                    {question.options.map((option, oIndex) => (
+                      <Stack
+                        key={`q-o-${oIndex}`}
+                        direction="row"
+                        spacing={1.5}
+                        alignItems="flex-start"
+                        sx={{ width: "100%", minWidth: 0 }}
                       >
-                        <DeleteOutlineIcon />
-                      </IconButton>
-                    </Stack>
-                  ))}
-                </Stack>
-                <TextField
-                  label="Новый вариант (введите и нажмите Enter)"
-                  placeholder="Текст нового варианта"
-                  value={newOptionText}
-                  onChange={(e) => setNewOptionText(e.target.value)}
-                  onBlur={onCommitNewOption}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") {
-                      e.preventDefault();
-                      onCommitNewOption();
-                    }
-                  }}
-                  size="small"
-                  fullWidth
-                />
-              </>
-            )}
+                        <TextField
+                          label={
+                            question.type === "tag_cloud"
+                              ? `Тег ${oIndex + 1}`
+                              : `Вариант ${oIndex + 1}`
+                          }
+                          value={option.text}
+                          onChange={(e) => onUpdateOption(oIndex, { text: e.target.value })}
+                          placeholder={question.type === "tag_cloud" ? "Синий; Голубой" : undefined}
+                          size="small"
+                          multiline
+                          minRows={1}
+                          maxRows={8}
+                          sx={{ flex: 1, minWidth: 0 }}
+                        />
+                        {isDebatePollPreset(question) ? (
+                          <CompactColorField
+                            label="Цвет"
+                            value={
+                              sanitizeOptionColor(option.color, debateDefaultOptionColor(oIndex)) ??
+                              debateDefaultOptionColor(oIndex)
+                            }
+                            onChange={(next) => onUpdateOption(oIndex, { color: next })}
+                            onBlur={() => undefined}
+                          />
+                        ) : null}
+                        {questionAllowsOptionImages(question) ? (
+                          <Stack spacing={0.5} sx={{ width: 72, flexShrink: 0 }}>
+                            <Button
+                              component="label"
+                              variant="outlined"
+                              size="small"
+                              sx={{ p: 0, minWidth: 0, width: 72, height: 56, overflow: "hidden" }}
+                            >
+                              <input
+                                hidden
+                                type="file"
+                                accept="image/*"
+                                onChange={async (e) => {
+                                  const file = e.currentTarget.files?.[0];
+                                  e.currentTarget.value = "";
+                                  if (!file) return;
+                                  try {
+                                    const url = await uploadBannerMedia(file);
+                                    onUpdateOption(oIndex, { imageUrl: url });
+                                  } catch (error) {
+                                    onDialogError(
+                                      error instanceof Error
+                                        ? error.message
+                                        : "Не удалось загрузить картинку",
+                                    );
+                                  }
+                                }}
+                              />
+                              <ImagePreview
+                                label={`Вариант ${oIndex + 1}`}
+                                url={option.imageUrl ?? ""}
+                                height={56}
+                              />
+                            </Button>
+                            {option.imageUrl?.trim() ? (
+                              <Button
+                                size="small"
+                                color="inherit"
+                                sx={{ minWidth: 0, px: 0.5 }}
+                                onClick={() =>
+                                  onUpdateOption(oIndex, {
+                                    imageUrl: undefined,
+                                  })
+                                }
+                              >
+                                ×
+                              </Button>
+                            ) : null}
+                          </Stack>
+                        ) : null}
+                        {question.type === "tag_cloud" && isEditorQuizMode(question) && (
+                          <TextField
+                            type="number"
+                            size="small"
+                            label="Баллы"
+                            inputProps={{
+                              min: 0,
+                              max: 10_000,
+                              "aria-label": `Баллы за тег ${oIndex + 1}`,
+                            }}
+                            value={question.rankingPointsByRank?.[oIndex] ?? 1}
+                            onChange={(e) => onSetTagCloudTagPointsAt(oIndex, e.target.value)}
+                            sx={{ width: 88, flexShrink: 0 }}
+                            slotProps={{ inputLabel: { shrink: true } }}
+                          />
+                        )}
+                        {question.type === "ranking" && (
+                          <TextField
+                            type="number"
+                            size="small"
+                            label={
+                              question.rankingKind === "jury"
+                                ? `${oIndex + 1}-е место`
+                                : "Эталон (место)"
+                            }
+                            inputProps={{
+                              min: question.rankingKind === "jury" ? 0 : 1,
+                              max:
+                                question.rankingKind === "jury" ? 10000 : question.options.length,
+                              "aria-label":
+                                question.rankingKind === "jury"
+                                  ? `Балл за ${oIndex + 1}-е место`
+                                  : `Место варианта ${oIndex + 1} в скрытом эталоне`,
+                            }}
+                            value={question.rankingPointsByRank?.[oIndex] ?? ""}
+                            onChange={(e) => onSetRankingTierAt(oIndex, e.target.value)}
+                            sx={{ width: 118, flexShrink: 0 }}
+                          />
+                        )}
+                        {question.type === "temperature" && (
+                          <TextField
+                            type="number"
+                            size="small"
+                            label="Вес 0–100"
+                            inputProps={{
+                              min: 0,
+                              max: 100,
+                              "aria-label": `Вес варианта ${oIndex + 1}`,
+                            }}
+                            value={option.weight ?? ""}
+                            onChange={(e) => {
+                              const raw = Number(e.target.value);
+                              const weight = Number.isFinite(raw)
+                                ? Math.max(0, Math.min(100, Math.trunc(raw)))
+                                : undefined;
+                              onUpdateOption(oIndex, { weight });
+                            }}
+                            sx={{ width: 108, flexShrink: 0 }}
+                            slotProps={{ inputLabel: { shrink: true } }}
+                          />
+                        )}
+                        {isEditorQuizMode(question) &&
+                          question.type !== "tag_cloud" &&
+                          question.type !== "ranking" &&
+                          question.type !== "temperature" && (
+                            <Stack
+                              direction="row"
+                              spacing={0}
+                              sx={{ flexShrink: 0, pt: 0.5 }}
+                              aria-label="Правильность ответа"
+                            >
+                              <Tooltip title="Правильный">
+                                <IconButton
+                                  size="small"
+                                  color={option.isCorrect ? "success" : "default"}
+                                  onClick={() => {
+                                    onUpdateOption(oIndex, {
+                                      isCorrect: true,
+                                    });
+                                  }}
+                                  aria-pressed={option.isCorrect}
+                                  aria-label="Отметить как правильный"
+                                >
+                                  <CheckCircleOutlineIcon fontSize="small" />
+                                </IconButton>
+                              </Tooltip>
+                              <Tooltip title="Неверный">
+                                <IconButton
+                                  size="small"
+                                  color={!option.isCorrect ? "error" : "default"}
+                                  onClick={() => {
+                                    onUpdateOption(oIndex, {
+                                      isCorrect: false,
+                                    });
+                                  }}
+                                  aria-pressed={!option.isCorrect}
+                                  aria-label="Отметить как неверный"
+                                >
+                                  <HighlightOffOutlinedIcon fontSize="small" />
+                                </IconButton>
+                              </Tooltip>
+                            </Stack>
+                          )}
+                        <IconButton
+                          onClick={() => onRemoveOption(oIndex)}
+                          disabled={
+                            question.type === "tag_cloud" && isEditorQuizMode(question)
+                              ? question.options.length <= 1
+                              : question.type === "ranking"
+                                ? question.options.length <= 3
+                                : question.options.length <= 2
+                          }
+                          sx={{ flexShrink: 0, mt: 0.5 }}
+                          aria-label="Удалить вариант"
+                        >
+                          <DeleteOutlineIcon />
+                        </IconButton>
+                      </Stack>
+                    ))}
+                  </Stack>
+                  <TextField
+                    label="Новый вариант (введите и нажмите Enter)"
+                    placeholder="Текст нового варианта"
+                    value={newOptionText}
+                    onChange={(e) => setNewOptionText(e.target.value)}
+                    onBlur={onCommitNewOption}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        onCommitNewOption();
+                      }
+                    }}
+                    size="small"
+                    fullWidth
+                  />
+                </>
+              )}
             <Divider />
             <Stack
               direction="row"
@@ -443,25 +484,40 @@ export function AdminEventQuestionDialog({
                 label="Тип ответа"
                 value={getQuestionTypeSelectValue(question)}
                 onChange={(e) => {
-                  const value = e.target.value as
-                    | "single"
-                    | "multi"
-                    | "ranking"
-                    | "tag_cloud"
-                    | "poll"
-                    | "temperature";
+                  const value = e.target.value as QuestionTypeSelectValue;
+                  const inQuiz = question.subQuizId != null;
                   if (value === "poll") {
                     onUpdateQuestion({
                       type: "single",
                       editorQuizMode: false,
-                      options: question.options.map((opt) => ({
-                        ...opt,
-                        isCorrect: false,
-                      })),
+                      projectorDebateLayout: false,
+                      debateBaselineQuestionId: null,
+                      geoPollDictionary: null,
+                      options:
+                        question.options.length >= 2
+                          ? question.options.map((opt) => ({
+                              ...opt,
+                              isCorrect: false,
+                            }))
+                          : [
+                              { text: "", isCorrect: false },
+                              { text: "", isCorrect: false },
+                            ],
                     });
                     return;
                   }
+                  if (value === "geo_poll") {
+                    if (inQuiz) return;
+                    onUpdateQuestion(buildGeoPollQuestionPatch(question.text));
+                    return;
+                  }
+                  if (value === "debate_poll") {
+                    if (inQuiz) return;
+                    onUpdateQuestion(buildDebatePollQuestionPatch(question.text));
+                    return;
+                  }
                   if (value === "temperature") {
+                    if (inQuiz) return;
                     onUpdateQuestion({
                       type: "temperature",
                       editorQuizMode: false,
@@ -471,6 +527,9 @@ export function AdminEventQuestionDialog({
                   onUpdateQuestion({
                     type: value as QuestionType,
                     editorQuizMode: true,
+                    projectorDebateLayout: false,
+                    debateBaselineQuestionId: null,
+                    geoPollDictionary: null,
                   });
                 }}
                 size="small"
@@ -481,13 +540,51 @@ export function AdminEventQuestionDialog({
                   maxWidth: "100%",
                 }}
               >
-                <MenuItem value="poll">Обычное голосование</MenuItem>
+                {question.subQuizId == null ? (
+                  <MenuItem value="poll">Обычное голосование</MenuItem>
+                ) : null}
+                {question.subQuizId == null ? (
+                  <MenuItem value="debate_poll">Дебаты</MenuItem>
+                ) : null}
+                {question.subQuizId == null ? <MenuItem value="geo_poll">Геоопрос</MenuItem> : null}
                 <MenuItem value="single">Один правильный</MenuItem>
                 <MenuItem value="multi">Несколько правильных</MenuItem>
                 <MenuItem value="ranking">Ранжирование</MenuItem>
                 <MenuItem value="tag_cloud">Облако тегов</MenuItem>
-                <MenuItem value="temperature">Измерение температуры</MenuItem>
+                {question.subQuizId == null ? (
+                  <MenuItem value="temperature">Измерение температуры</MenuItem>
+                ) : null}
               </TextField>
+              {getQuestionTypeSelectValue(question) === "geo_poll" ? (
+                <Stack spacing={0.5} sx={{ flex: "0 1 auto", minWidth: { xs: "100%", sm: 200 } }}>
+                  <Typography variant="caption" color="text.secondary">
+                    Словарь
+                  </Typography>
+                  <ToggleButtonGroup
+                    exclusive
+                    size="small"
+                    value={question.geoPollDictionary ?? GEO_POLL_DICTIONARY_WORLD_CITIES}
+                    onChange={(_event, nextDictionary) => {
+                      if (!nextDictionary) return;
+                      onUpdateQuestion({ geoPollDictionary: nextDictionary });
+                    }}
+                    sx={{ width: { xs: "100%", sm: "auto" } }}
+                  >
+                    <ToggleButton
+                      value={GEO_POLL_DICTIONARY_WORLD_CITIES}
+                      sx={{ flex: { xs: 1, sm: "none" }, px: 2 }}
+                    >
+                      Города
+                    </ToggleButton>
+                    <ToggleButton
+                      value={GEO_POLL_DICTIONARY_WORLD_COUNTRIES}
+                      sx={{ flex: { xs: 1, sm: "none" }, px: 2 }}
+                    >
+                      Страны
+                    </ToggleButton>
+                  </ToggleButtonGroup>
+                </Stack>
+              ) : null}
               {question.type === "tag_cloud" ? (
                 <TextField
                   type="number"

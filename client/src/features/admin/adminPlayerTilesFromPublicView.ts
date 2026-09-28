@@ -21,6 +21,7 @@ type TileSetters = {
   setPlayerQuizResultsSubQuizIds: (value: string[]) => void;
   setPlayerQuizResultsTileVisible: (value: boolean) => void;
   setPlayerTilesOrder: (value: string[]) => void;
+  setPlayerTilesGridColumns: (value: 2 | 3) => void;
 };
 
 function getStringArrayOrNull(value: unknown): string[] | null {
@@ -94,4 +95,7 @@ export function applyAdminPlayerTilesFromPublicView(
   }
   const nextTilesOrder = getStringArrayOrNull(pv.playerTilesOrder) ?? [];
   setters.setPlayerTilesOrder(buildPlayerTilesOrder(nextTilesOrder, nextBanners));
+  if (pv.playerTilesGridColumns === 2 || pv.playerTilesGridColumns === 3) {
+    setters.setPlayerTilesGridColumns(pv.playerTilesGridColumns);
+  }
 }

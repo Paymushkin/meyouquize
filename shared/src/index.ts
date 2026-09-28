@@ -124,7 +124,9 @@ export type PublicViewMode =
   | "reactions"
   | "randomizer"
   | "photo_wall"
-  | "report";
+  | "report"
+  | "debate_compare"
+  | "debate_series";
 export type QuestionRevealStage = "options" | "results";
 export type RandomizerMode = "names" | "numbers";
 export type RandomizerListMode = "participants_only" | "free_list";
@@ -158,6 +160,54 @@ export {
   applyQuestionResultManualDisplay,
 } from "./tagCloudManual.js";
 export { buildCloudWordsForDisplay, aggregateTagCloudWordCounts } from "./tagCloudMerge.js";
+export type {
+  DebateCompareRow,
+  DebateOptionStat,
+  DebateSeriesOptionStat,
+} from "./debateCompare.js";
+export {
+  buildDebateCompareRows,
+  DEFAULT_DEBATE_SERIES_RESULT_TITLE,
+  debateOptionPercents,
+  formatDebateSwingLabel,
+  groupDebateSeriesQuestionIds,
+  isDebateUndecidedOption,
+  resolveDebateSeriesResultTitle,
+  singlePollDebateSideBySideEligible,
+  sumDebateSeriesOptionStats,
+} from "./debateCompare.js";
+export type { GeoPollDictionaryId } from "./geoPollDictionaries.js";
+export {
+  GEO_POLL_DICTIONARY_WORLD_CITIES,
+  GEO_POLL_DICTIONARY_WORLD_COUNTRIES,
+  geoPollDictionaryInputLabel,
+  geoPollDictionaryLabel,
+  isGeoPollDictionary,
+} from "./geoPollDictionaries.js";
+export type { GeoPollMapKind, GeoPollMapPoint } from "./geoPollMapLayout.js";
+export {
+  buildGeoPollMapMarkers,
+  geoPollMapKind,
+  geoPollMapViewBox,
+  projectGeoLatLon,
+} from "./geoPollMapLayout.js";
+export {
+  DEBATE_POLL_DEFAULT_QUESTION_TEXT,
+  GEO_POLL_DEFAULT_QUESTION_TEXT,
+  buildDebatePollQuestionPatch,
+  buildDebateSeriesNextRoundPatch,
+  buildGeoPollQuestionPatch,
+  debatePollOptions,
+  isDebatePollPreset,
+  isGeoPollPreset,
+  withDebateOptionColors,
+} from "./interactivePresets.js";
+export {
+  DEBATE_DEFAULT_OPTION_COLORS,
+  contrastingTextOnColor,
+  debateDefaultOptionColor,
+  sanitizeOptionColor,
+} from "./optionColor.js";
 export type {
   PhotoWallImageExt,
   PhotoWallAlbumPhoto,
@@ -221,6 +271,16 @@ export type RandomizerHistoryEntry = {
 export interface PublicViewState {
   mode: PublicViewMode;
   questionId?: string;
+  /** Финальный вопрос дебатов для режима `debate_compare`. */
+  debateCompareQuestionId?: string;
+  /** Серия дебатов для накопительного итога (`debate_series`). */
+  debateSeriesId?: string;
+  /** В режиме серии: cumulative (по умолчанию) или текущий раунд. */
+  debateSeriesView?: "cumulative" | "round";
+  /** Явный набор раундов для накопительного итога (прошедшие). Пусто = все раунды серии. */
+  debateSeriesQuestionIds?: string[];
+  /** Под накопительным итогом серии показывать шкалы по каждому раунду (мельче). */
+  debateSeriesShowRounds: boolean;
   questionRevealStage: QuestionRevealStage;
   highlightedLeadersCount: number;
   /** Сабквиз для режима `leaderboard` на проекторе (пусто = первый по sortOrder). */
@@ -312,6 +372,8 @@ export interface PublicViewState {
   playerQuizResultsSubQuizIds: string[];
   /** Порядок плиток в пользовательском интерфейсе (баннеры + speaker_tile + program_tile) */
   playerTilesOrder: string[];
+  /** Число колонок сетки плиток у игрока (2 или 3). */
+  playerTilesGridColumns: 2 | 3;
   /** Крупный текст в режиме реакций на проекторе (по центру экрана) */
   reactionsOverlayText: string;
   /** Набор сохраненных виджетов реакций для админки */
@@ -320,6 +382,8 @@ export interface PublicViewState {
   reactionsWidgetStats: PublicReactionWidgetStats[];
   /** Список questionId, для которых у пользователя показываются плитки результатов */
   playerVisibleResultQuestionIds: string[];
+  /** Список debateSeriesId, для которых у пользователя показывается накопительный итог серии */
+  playerVisibleDebateSeriesIds: string[];
   /** Интерфейс пользователя: цвет текста ответов в карточках результатов */
   playerVoteOptionTextColor: string;
   /** Интерфейс пользователя: цвет трека прогресс-бара в карточках результатов */
@@ -495,6 +559,7 @@ function sanitizeProjectorJoinQrOverlayCorner(
 
 export const DEFAULT_PUBLIC_VIEW_STATE: PublicViewState = {
   mode: "title",
+  debateSeriesShowRounds: false,
   questionRevealStage: "options",
   highlightedLeadersCount: 3,
   leaderboardSubQuizId: "",
@@ -550,11 +615,13 @@ export const DEFAULT_PUBLIC_VIEW_STATE: PublicViewState = {
   playerQuizResultsTileTextColor: "#ffffff",
   playerQuizResultsSubQuizId: "",
   playerQuizResultsSubQuizIds: [],
-  playerTilesOrder: [SPEAKER_TILE_ID, PROGRAM_TILE_ID, PHOTO_WALL_TILE_ID],
+  playerTilesOrder: [PROGRAM_TILE_ID, SPEAKER_TILE_ID, PHOTO_WALL_TILE_ID],
+  playerTilesGridColumns: 3,
   reactionsOverlayText: "Реакции аудитории",
   reactionsWidgets: [],
   reactionsWidgetStats: [],
   playerVisibleResultQuestionIds: [],
+  playerVisibleDebateSeriesIds: [],
   playerVoteOptionTextColor: "#ffffff",
   playerVoteProgressTrackColor: "#6a5600",
   playerVoteProgressBarColor: "#F3F722",
@@ -1144,14 +1211,36 @@ export function normalizePublicViewState(
     value?.mode === "reactions" ||
     value?.mode === "randomizer" ||
     value?.mode === "photo_wall" ||
-    value?.mode === "report"
+    value?.mode === "report" ||
+    value?.mode === "debate_compare" ||
+    value?.mode === "debate_series"
       ? value.mode
       : base.mode;
   const rawQuestionId =
     typeof value?.questionId === "string" && value.questionId.trim()
       ? value.questionId.trim()
       : undefined;
-  const questionId = mode === "question" ? rawQuestionId : undefined;
+  const questionId = mode === "question" || mode === "debate_series" ? rawQuestionId : undefined;
+  const rawDebateCompareQuestionId =
+    typeof value?.debateCompareQuestionId === "string" && value.debateCompareQuestionId.trim()
+      ? value.debateCompareQuestionId.trim()
+      : undefined;
+  const debateCompareQuestionId =
+    mode === "debate_compare" ? rawDebateCompareQuestionId : undefined;
+  const rawDebateSeriesId =
+    typeof value?.debateSeriesId === "string" && value.debateSeriesId.trim()
+      ? value.debateSeriesId.trim().slice(0, 80)
+      : undefined;
+  const debateSeriesId = mode === "debate_series" ? rawDebateSeriesId : undefined;
+  const debateSeriesView: "cumulative" | "round" =
+    value?.debateSeriesView === "round" ? "round" : "cumulative";
+  const debateSeriesQuestionIds =
+    mode === "debate_series" && Array.isArray(value?.debateSeriesQuestionIds)
+      ? value.debateSeriesQuestionIds
+          .filter((id): id is string => typeof id === "string" && id.trim().length > 0)
+          .map((id) => id.trim().slice(0, 80))
+          .slice(0, 40)
+      : undefined;
   const questionRevealStage: QuestionRevealStage =
     value?.questionRevealStage === "results" || value?.questionRevealStage === "options"
       ? value.questionRevealStage
@@ -1195,8 +1284,8 @@ export function normalizePublicViewState(
   for (const banner of playerBanners) {
     if (!deduped.includes(banner.id)) deduped.push(banner.id);
   }
-  if (!deduped.includes(SPEAKER_TILE_ID)) deduped.push(SPEAKER_TILE_ID);
   if (!deduped.includes(PROGRAM_TILE_ID)) deduped.push(PROGRAM_TILE_ID);
+  if (!deduped.includes(SPEAKER_TILE_ID)) deduped.push(SPEAKER_TILE_ID);
   if (!deduped.includes(PHOTO_WALL_TILE_ID)) deduped.push(PHOTO_WALL_TILE_ID);
   let playerQuizResultsSubQuizIds = sanitizeSubQuizIdList(value?.playerQuizResultsSubQuizIds, 20);
   const legacyReportVisible =
@@ -1226,6 +1315,17 @@ export function normalizePublicViewState(
   return {
     mode,
     questionId,
+    debateCompareQuestionId,
+    debateSeriesId,
+    debateSeriesView: mode === "debate_series" ? debateSeriesView : undefined,
+    debateSeriesQuestionIds:
+      mode === "debate_series" && debateSeriesQuestionIds && debateSeriesQuestionIds.length > 0
+        ? debateSeriesQuestionIds
+        : undefined,
+    debateSeriesShowRounds:
+      typeof value?.debateSeriesShowRounds === "boolean"
+        ? value.debateSeriesShowRounds
+        : base.debateSeriesShowRounds,
     questionRevealStage,
     highlightedLeadersCount: clampInt(
       value?.highlightedLeadersCount ?? base.highlightedLeadersCount,
@@ -1414,6 +1514,10 @@ export function normalizePublicViewState(
         ? value.playerQuizResultsTileVisible
         : base.playerQuizResultsTileVisible),
     playerTilesOrder: dedupedTilesOrder,
+    playerTilesGridColumns:
+      value?.playerTilesGridColumns === 2 || value?.playerTilesGridColumns === 3
+        ? value.playerTilesGridColumns
+        : base.playerTilesGridColumns,
     reactionsOverlayText:
       typeof value?.reactionsOverlayText === "string"
         ? value.reactionsOverlayText.trim().slice(0, 120)
@@ -1427,6 +1531,13 @@ export function normalizePublicViewState(
           .filter((item) => item.length > 0)
           .slice(0, 200)
       : [...base.playerVisibleResultQuestionIds],
+    playerVisibleDebateSeriesIds: Array.isArray(value?.playerVisibleDebateSeriesIds)
+      ? value.playerVisibleDebateSeriesIds
+          .filter((item): item is string => typeof item === "string")
+          .map((item) => item.trim())
+          .filter((item) => item.length > 0)
+          .slice(0, 50)
+      : [...base.playerVisibleDebateSeriesIds],
     playerVoteOptionTextColor: sanitizeHex6(
       value?.playerVoteOptionTextColor,
       base.playerVoteOptionTextColor,
@@ -1761,6 +1872,17 @@ export function mergePublicViewState(
 ): PublicViewState {
   const merged = normalizePublicViewState({ ...prev, ...patch });
   const nextMode = merged.mode;
+
+  /** Накопительный итог серии держит seed `questionId`; патч вроде `debateSeriesShowRounds` не должен его сбрасывать. */
+  if (nextMode === "debate_series") {
+    if (typeof patch.questionId === "string" && patch.questionId.trim()) {
+      merged.questionId = patch.questionId.trim();
+    }
+    if (patch.questionRevealStage === undefined) {
+      merged.questionRevealStage = "results";
+    }
+    return withProjectorTagCloudFields(merged);
+  }
 
   if (nextMode !== "question") {
     merged.questionId = undefined;

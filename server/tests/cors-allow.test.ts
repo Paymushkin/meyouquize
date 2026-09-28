@@ -11,6 +11,7 @@ describe("isPrivateNetworkViteDevPort", () => {
     expect(isPrivateNetworkViteDevPort("http://192.168.1.42:5173")).toBe(true);
     expect(isPrivateNetworkViteDevPort("http://10.0.0.5:3000")).toBe(true);
     expect(isPrivateNetworkViteDevPort("http://172.16.5.1:5173")).toBe(true);
+    expect(isPrivateNetworkViteDevPort("http://100.67.147.201:5173")).toBe(true);
   });
 
   it("rejects public hosts and invalid origins", () => {

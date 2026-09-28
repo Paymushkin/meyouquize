@@ -1,4 +1,5 @@
 import { Box, Stack } from "@mui/material";
+import { pcq } from "../../features/quizPlay/playerContainerQuery";
 import {
   optionAltText,
   optionHasImage,
@@ -30,7 +31,7 @@ export function OptionAnswerContent(props: Props) {
           alt={alt}
           sx={{
             width: "100%",
-            maxHeight: compact ? { xs: 88, sm: 140 } : { xs: 120, sm: 140 },
+            maxHeight: compact ? pcq(88, 140) : pcq(120, 140),
             borderRadius: 1,
           }}
         />

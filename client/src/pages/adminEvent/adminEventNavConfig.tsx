@@ -18,7 +18,7 @@ export type AdminEventNavItem = {
 
 export const ADMIN_EVENT_NAV: AdminEventNavItem[] = [
   { id: "general", label: "Общее", icon: <SettingsSuggestIcon fontSize="small" /> },
-  { id: "questions", label: "Вопросы", icon: <QuizIcon fontSize="small" /> },
+  { id: "questions", label: "Интерактивы", icon: <QuizIcon fontSize="small" /> },
   { id: "speakers", label: "Спикеры", icon: <RecordVoiceOverIcon fontSize="small" /> },
   { id: "banners", label: "Баннеры", icon: <ViewCarouselIcon fontSize="small" /> },
   { id: "photo_wall", label: "Фотостена", icon: <PhotoLibraryIcon fontSize="small" /> },

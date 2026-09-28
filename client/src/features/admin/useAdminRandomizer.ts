@@ -22,7 +22,9 @@ type SetPublicResultsView = (
     | "speaker_questions"
     | "reactions"
     | "randomizer"
-    | "photo_wall",
+    | "photo_wall"
+    | "debate_compare"
+    | "debate_series",
   questionId?: string,
   patch?: PublicViewSetPatch,
 ) => void;

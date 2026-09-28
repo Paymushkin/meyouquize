@@ -28,8 +28,8 @@ const DEMO_DEFAULT_BANNER: PublicBanner = {
   isVisible: true,
 };
 const DEMO_DEFAULT_PLAYER_TILES_ORDER = [
-  SPEAKER_TILE_ID,
   PROGRAM_TILE_ID,
+  SPEAKER_TILE_ID,
   DEMO_DEFAULT_BANNER_ID,
 ] as const;
 

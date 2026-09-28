@@ -2,7 +2,7 @@
 
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
-import { PlayerVoteOptionsGrid } from "./PlayerVoteOptionsGrid";
+import { PlayerVoteOptionsGrid, resolvePlayerVoteOptionColors } from "./PlayerVoteOptionsGrid";
 import { ProjectorOptionLabel } from "./ProjectorOptionLabel";
 import { VoteResultOptionRow } from "./VoteResultOptionRow";
 
@@ -24,6 +24,18 @@ describe("PlayerVoteOptionsGrid", () => {
 
     expect(screen.getByText("Alpha")).toBeTruthy();
     expect(screen.getByText("Beta")).toBeTruthy();
+  });
+
+  it("uses debate option colors for accents", () => {
+    const colors = resolvePlayerVoteOptionColors(
+      [
+        { id: "a", text: "A", color: "#00ff00" },
+        { id: "b", text: "B" },
+        { id: "c", text: "C" },
+      ],
+      true,
+    );
+    expect(colors).toEqual(["#00ff00", "#c62828", "#90a4ae"]);
   });
 });
 

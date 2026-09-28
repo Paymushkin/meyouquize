@@ -68,8 +68,11 @@ export function PlayerPhotoWallCollageTile({
         ...(preview
           ? {
               width: previewWidth,
+              height: previewWidth,
               maxWidth: previewWidth,
+              maxHeight: previewWidth,
               flexShrink: 0,
+              boxSizing: "border-box",
             }
           : {
               gridColumn: "span 1",

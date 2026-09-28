@@ -206,6 +206,24 @@ describe("mergePublicViewState", () => {
     expect(next.questionRevealStage).toBe("options");
   });
 
+  it("keeps debate_series seed questionId when toggling round bars", () => {
+    const prev = normalizePublicViewState({
+      mode: "debate_series",
+      questionId: "q-seed",
+      debateSeriesId: "ser-1",
+      debateSeriesView: "cumulative",
+      debateSeriesQuestionIds: ["q-seed", "q-2"],
+      debateSeriesShowRounds: false,
+      questionRevealStage: "results",
+    });
+    const next = mergePublicViewState(prev, { debateSeriesShowRounds: true });
+    expect(next.mode).toBe("debate_series");
+    expect(next.questionId).toBe("q-seed");
+    expect(next.debateSeriesId).toBe("ser-1");
+    expect(next.debateSeriesShowRounds).toBe(true);
+    expect(next.questionRevealStage).toBe("results");
+  });
+
   it("projects manual tag cloud fields for active question", () => {
     const prev = normalizePublicViewState({
       mode: "question",
@@ -316,5 +334,22 @@ describe("DEFAULT_PUBLIC_VIEW_STATE", () => {
     expect(DEFAULT_PUBLIC_VIEW_STATE.projectorJoinQrVisible).toBe(false);
     expect(DEFAULT_PUBLIC_VIEW_STATE.projectorJoinQrOverlayVisible).toBe(false);
     expect(DEFAULT_PUBLIC_VIEW_STATE.speakerTileVisible).toBe(false);
+    expect(DEFAULT_PUBLIC_VIEW_STATE.playerTilesGridColumns).toBe(3);
+  });
+});
+
+describe("playerTilesGridColumns", () => {
+  it("accepts 2 and 3", () => {
+    expect(normalizePublicViewState({ playerTilesGridColumns: 2 }).playerTilesGridColumns).toBe(2);
+    expect(normalizePublicViewState({ playerTilesGridColumns: 3 }).playerTilesGridColumns).toBe(3);
+  });
+
+  it("falls back to default for invalid values", () => {
+    expect(
+      normalizePublicViewState({ playerTilesGridColumns: 4 as 2 | 3 }).playerTilesGridColumns,
+    ).toBe(3);
+    expect(
+      normalizePublicViewState({ playerTilesGridColumns: 1 as 2 | 3 }).playerTilesGridColumns,
+    ).toBe(3);
   });
 });

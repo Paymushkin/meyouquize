@@ -99,6 +99,10 @@ export function AdminVoteDetailPage() {
     );
   }
 
+  /** Колонки «верно» только если у вопроса заданы правильные варианты (не geo poll / опрос). */
+  const hasCorrectAnswers =
+    !!detail && (detail.question.type === "ranking" || detail.optionStats.some((o) => o.isCorrect));
+
   return (
     <Container maxWidth="md" sx={{ py: 4 }}>
       <Stack spacing={2}>
@@ -121,34 +125,37 @@ export function AdminVoteDetailPage() {
               <Typography variant="h5" gutterBottom sx={{ fontWeight: 700 }}>
                 {detail.question.text}
               </Typography>
-              {(detail.question.type === "single" || detail.question.type === "ranking") && (
-                <Box sx={{ my: 2 }}>
-                  <Typography variant="subtitle2" gutterBottom>
-                    {detail.question.type === "ranking"
-                      ? "Первый полностью верный порядок"
-                      : "Первый верный ответ"}
-                  </Typography>
-                  {detail.firstCorrect ? (
-                    <Typography>
-                      {detail.firstCorrect.nickname}
-                      <Typography
-                        component="span"
-                        variant="body2"
-                        color="text.secondary"
-                        sx={{ ml: 1 }}
-                      >
-                        {new Date(detail.firstCorrect.submittedAt).toLocaleString("ru-RU")}
-                      </Typography>
-                    </Typography>
-                  ) : (
-                    <Typography color="text.secondary">
+              {(detail.question.type === "single" || detail.question.type === "ranking") &&
+                (detail.firstCorrect != null ||
+                  detail.question.type === "ranking" ||
+                  detail.optionStats.some((o) => o.isCorrect)) && (
+                  <Box sx={{ my: 2 }}>
+                    <Typography variant="subtitle2" gutterBottom>
                       {detail.question.type === "ranking"
-                        ? "Пока никто не угадал эталонный порядок."
-                        : "Нет подходящей записи (не SINGLE с одним правильным или пока никто не угадал)."}
+                        ? "Первый полностью верный порядок"
+                        : "Первый верный ответ"}
                     </Typography>
-                  )}
-                </Box>
-              )}
+                    {detail.firstCorrect ? (
+                      <Typography>
+                        {detail.firstCorrect.nickname}
+                        <Typography
+                          component="span"
+                          variant="body2"
+                          color="text.secondary"
+                          sx={{ ml: 1 }}
+                        >
+                          {new Date(detail.firstCorrect.submittedAt).toLocaleString("ru-RU")}
+                        </Typography>
+                      </Typography>
+                    ) : (
+                      <Typography color="text.secondary">
+                        {detail.question.type === "ranking"
+                          ? "Пока никто не угадал эталонный порядок."
+                          : "Пока никто не угадал."}
+                      </Typography>
+                    )}
+                  </Box>
+                )}
               {detail.question.type !== "tag_cloud" && detail.question.type !== "ranking" && (
                 <>
                   <Typography variant="subtitle2" sx={{ mt: 2, mb: 1 }}>
@@ -159,7 +166,7 @@ export function AdminVoteDetailPage() {
                       <TableRow>
                         <TableCell>Вариант</TableCell>
                         <TableCell align="right">Голосов</TableCell>
-                        <TableCell>Правильный</TableCell>
+                        {hasCorrectAnswers ? <TableCell>Правильный</TableCell> : null}
                       </TableRow>
                     </TableHead>
                     <TableBody>
@@ -167,7 +174,9 @@ export function AdminVoteDetailPage() {
                         <TableRow key={o.optionId}>
                           <TableCell>{o.text}</TableCell>
                           <TableCell align="right">{o.count}</TableCell>
-                          <TableCell>{o.isCorrect ? "да" : "нет"}</TableCell>
+                          {hasCorrectAnswers ? (
+                            <TableCell>{o.isCorrect ? "да" : "нет"}</TableCell>
+                          ) : null}
                         </TableRow>
                       ))}
                     </TableBody>
@@ -235,7 +244,7 @@ export function AdminVoteDetailPage() {
                     <TableCell>Участник</TableCell>
                     <TableCell>Время</TableCell>
                     <TableCell>Выбор</TableCell>
-                    <TableCell>Верно</TableCell>
+                    {hasCorrectAnswers ? <TableCell>Верно</TableCell> : null}
                   </TableRow>
                 </TableHead>
                 <TableBody>
@@ -244,7 +253,9 @@ export function AdminVoteDetailPage() {
                       <TableCell>{row.nickname}</TableCell>
                       <TableCell>{new Date(row.submittedAt).toLocaleString("ru-RU")}</TableCell>
                       <TableCell>{row.labels.join(", ")}</TableCell>
-                      <TableCell>{row.isCorrect ? "да" : "нет"}</TableCell>
+                      {hasCorrectAnswers ? (
+                        <TableCell>{row.isCorrect ? "да" : "нет"}</TableCell>
+                      ) : null}
                     </TableRow>
                   ))}
                 </TableBody>

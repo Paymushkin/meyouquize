@@ -81,6 +81,21 @@ describe("projectorPublicViewChanged", () => {
     expect(projectorPublicViewChanged(prev, next)).toBe(false);
   });
 
+  it("returns true when debate series round bars toggle changes", () => {
+    const prev = normalizePublicViewState({
+      mode: "debate_series",
+      questionId: "q1",
+      debateSeriesId: "ser1",
+      debateSeriesView: "cumulative",
+      debateSeriesShowRounds: false,
+    });
+    const next = mergePublicViewState(prev, { debateSeriesShowRounds: true });
+    expect(projectorPublicViewChanged(prev, next)).toBe(true);
+    expect(pickProjectorPublicViewState(next).debateSeriesShowRounds).toBe(true);
+    expect(pickProjectorPublicViewState(next).questionId).toBe("q1");
+    expect(pickProjectorPublicViewState(next).debateSeriesId).toBe("ser1");
+  });
+
   it("returns false for identical views", () => {
     const view = normalizePublicViewState(DEFAULT_PUBLIC_VIEW_STATE);
     expect(projectorPublicViewChanged(view, view)).toBe(false);
@@ -178,6 +193,7 @@ describe("projectorPublicViewChanged", () => {
 describe("isPlayerOnlyPublicViewStateKey", () => {
   it("recognizes player-only keys", () => {
     expect(isPlayerOnlyPublicViewStateKey("speakerTileVisible")).toBe(true);
+    expect(isPlayerOnlyPublicViewStateKey("playerTilesGridColumns")).toBe(true);
     expect(isPlayerOnlyPublicViewStateKey("projectorBackground")).toBe(false);
   });
 });

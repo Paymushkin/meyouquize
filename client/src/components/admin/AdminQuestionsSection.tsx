@@ -6,6 +6,7 @@ import KeyboardArrowUpIcon from "@mui/icons-material/KeyboardArrowUp";
 import CloudQueueIcon from "@mui/icons-material/CloudQueue";
 import FormatListNumberedIcon from "@mui/icons-material/FormatListNumbered";
 import HowToVoteIcon from "@mui/icons-material/HowToVote";
+import MapIcon from "@mui/icons-material/Map";
 import LeaderboardIcon from "@mui/icons-material/Leaderboard";
 import OpenInNewIcon from "@mui/icons-material/OpenInNew";
 import SettingsIcon from "@mui/icons-material/Settings";
@@ -28,11 +29,17 @@ import {
 } from "@mui/material";
 import { Link as RouterLink } from "react-router-dom";
 import { useState } from "react";
-import { isEditorQuizMode, type QuestionForm } from "../../admin/adminEventForm";
+import {
+  getQuestionTypeDisplayLabel,
+  isEditorQuizMode,
+  type QuestionForm,
+} from "../../admin/adminEventForm";
 import type { QuestionResult } from "../../admin/adminEventTypes";
-import type { PublicViewMode } from "../../publicViewContract";
+import type { PublicViewMode, PublicViewSetPatch } from "../../publicViewContract";
 import {
   hasOptionVoteCountOverride,
+  isDebatePollPreset,
+  isGeoPollPreset,
   resolveOptionDisplayCount,
   computeTemperatureWeightedAverage,
 } from "@meyouquize/shared";
@@ -42,6 +49,7 @@ import {
 } from "../../features/admin/adminQuestionProjectorFlow";
 import { QuestionRowProjectorControls } from "./questionRow/QuestionRowProjectorControls";
 import { QuestionRowQuickActions } from "./questionRow/QuestionRowQuickActions";
+import { questionSupportsVoteAdjust } from "./questionRow/questionSupportsVoteAdjust";
 import { QuestionSettingsToolbar } from "./questionRow/QuestionSettingsToolbar";
 import { VoteCountAdjustControls } from "./VoteCountAdjustControls";
 
@@ -70,6 +78,7 @@ type Props = {
   questionResults: QuestionResult[];
   publicViewMode: PublicViewMode;
   publicViewQuestionId: string | undefined;
+  publicDebateCompareQuestionId?: string | undefined;
   setMessage: (value: string) => void;
   openQuestionDialog: (globalIndex: number) => void;
   addQuestion: () => void;
@@ -82,8 +91,16 @@ type Props = {
   /** Если задано — слева кнопка вместо заголовка (например, результаты квиза) */
   listHeaderPrimaryAction?: { label: string; to: string } | { label: string; onClick: () => void };
   setPublicResultsView: (
-    mode: "title" | "question" | "leaderboard" | "speaker_questions" | "reactions",
+    mode:
+      | "title"
+      | "question"
+      | "leaderboard"
+      | "speaker_questions"
+      | "reactions"
+      | "debate_compare"
+      | "debate_series",
     questionIdForMode?: string,
+    extraPatch?: PublicViewSetPatch,
   ) => void;
   updateQuestionShowVoteCount: (globalIndex: number, next: boolean) => void;
   updateQuestionShowCorrectOption: (globalIndex: number, next: boolean) => void;
@@ -117,6 +134,8 @@ type Props = {
   ) => void;
   playerVisibleResultQuestionIds: string[];
   togglePlayerVisibleResultQuestionId: (questionId: string) => void;
+  playerVisibleDebateSeriesIds: string[];
+  togglePlayerVisibleDebateSeriesId: (seriesId: string) => void;
   /** Перенос в «отработанные» / обратно (только голосования комнаты). */
   adminDoneToggle?: {
     mode: "markDone" | "markActive";
@@ -134,10 +153,6 @@ type Props = {
   onCloneQuestion?: (globalIndex: number) => void;
 };
 
-function questionSupportsVoteAdjust(type: QuestionForm["type"]): boolean {
-  return type !== "tag_cloud" && type !== "ranking";
-}
-
 export function AdminQuestionsSection(props: Props) {
   const {
     questionForms,
@@ -149,6 +164,7 @@ export function AdminQuestionsSection(props: Props) {
     questionResults,
     publicViewMode,
     publicViewQuestionId,
+    publicDebateCompareQuestionId,
     setMessage,
     openQuestionDialog,
     addQuestion,
@@ -197,12 +213,7 @@ export function AdminQuestionsSection(props: Props) {
     });
   }
 
-  function questionTypeLabel(type: QuestionForm["type"]) {
-    if (type === "tag_cloud") return "Облако тегов";
-    if (type === "ranking") return "Ранжирование";
-    if (type === "temperature") return "Температура";
-    return "Голосование";
-  }
+  const questionTypeLabel = getQuestionTypeDisplayLabel;
 
   const settingsExpanded = (globalIndex: number) => expandedQuestionSettingsIndex === globalIndex;
   const hasHeader =
@@ -296,9 +307,23 @@ export function AdminQuestionsSection(props: Props) {
               const revealButtonVisible = true;
               const revealResultsOnProjector =
                 isOnProjector && !showFirstCorrectAnswerer && questionRevealStage === "results";
+              const debateCompareOnProjector =
+                publicViewMode === "debate_compare" &&
+                publicDebateCompareQuestionId === question.id;
+              const showDebateCompareButton =
+                Boolean(question.debateBaselineQuestionId?.trim()) &&
+                (question.type === "single" || question.type === "multi");
               const isStandaloneVote =
                 question.subQuizId === null || question.subQuizId === undefined;
               const showStandaloneAdminBlock = isStandaloneVote && !!question.id;
+              const isDebateSeriesQuestion = isDebatePollPreset(question);
+              const debateSeriesId = question.debateSeriesId?.trim() || "";
+              const debateRoundLabel =
+                isDebateSeriesQuestion && debateSeriesId
+                  ? `Раунд ${(question.debateRoundIndex ?? 0) + 1}`
+                  : isDebateSeriesQuestion
+                    ? "Дебаты"
+                    : null;
               return (
                 <Box
                   key={question.id ?? `q-list-${g}`}
@@ -345,7 +370,7 @@ export function AdminQuestionsSection(props: Props) {
                       disableGutters
                       selected={false}
                       onClick={() => openQuestionDialog(g)}
-                      aria-label={`${questionTypeLabel(question.type)}: ${question.text.trim() || "Без текста"}`}
+                      aria-label={`${questionTypeLabel(question)}: ${question.text.trim() || "Без текста"}`}
                       aria-selected={selectedListIndex === qIndex}
                       sx={{
                         display: "flex",
@@ -438,7 +463,7 @@ export function AdminQuestionsSection(props: Props) {
                             </Box>
                           </Tooltip>
                         ) : null}
-                        <Tooltip title={questionTypeLabel(question.type)} enterTouchDelay={400}>
+                        <Tooltip title={questionTypeLabel(question)} enterTouchDelay={400}>
                           <Box
                             component="span"
                             aria-hidden
@@ -462,6 +487,8 @@ export function AdminQuestionsSection(props: Props) {
                                 sx={{ fontSize: 16, display: "block" }}
                                 color="action"
                               />
+                            ) : isGeoPollPreset(question) ? (
+                              <MapIcon sx={{ fontSize: 16, display: "block" }} color="action" />
                             ) : (
                               <HowToVoteIcon
                                 sx={{ fontSize: 16, display: "block" }}
@@ -477,6 +504,16 @@ export function AdminQuestionsSection(props: Props) {
                           title={question.text.trim() || undefined}
                           sx={{ minWidth: 0, textAlign: "left" }}
                         >
+                          {debateRoundLabel ? (
+                            <Typography
+                              component="span"
+                              variant="caption"
+                              color="text.secondary"
+                              sx={{ mr: 0.75, fontWeight: 600 }}
+                            >
+                              {debateRoundLabel}
+                            </Typography>
+                          ) : null}
                           {question.text.trim() || "Без текста"}
                         </Typography>
                       </Box>
@@ -494,7 +531,21 @@ export function AdminQuestionsSection(props: Props) {
                           !(question.type === "ranking" && question.rankingKind === "jury") &&
                           (question.projectorShowFirstCorrect ?? true),
                         )}
+                        showDebateCompareButton={showDebateCompareButton}
+                        debateCompareOnProjector={debateCompareOnProjector}
                         questionActive={Boolean(question.isActive)}
+                        onDebateCompare={(event) => {
+                          event.stopPropagation();
+                          if (!question.id) {
+                            setMessage("Сначала сохраните вопрос");
+                            return;
+                          }
+                          if (debateCompareOnProjector) {
+                            setPublicResultsView("title");
+                            return;
+                          }
+                          setPublicResultsView("debate_compare", question.id);
+                        }}
                         settingsExpanded={settingsExpanded(g)}
                         onSlideshow={(event) => {
                           event.stopPropagation();
@@ -559,7 +610,9 @@ export function AdminQuestionsSection(props: Props) {
                             openTagInputDialog={openTagInputDialog}
                             confirmResetQuestionAnswersByIndex={confirmResetQuestionAnswersByIndex}
                             playerResultsButtonVisible={
-                              Boolean(question.id) && question.type !== "tag_cloud"
+                              Boolean(question.id) &&
+                              question.type !== "tag_cloud" &&
+                              !isGeoPollPreset(question)
                             }
                             playerResultsVisible={
                               question.id
@@ -578,7 +631,7 @@ export function AdminQuestionsSection(props: Props) {
                               (question.optionVoteCountOverrides?.length ?? 0) > 0
                             }
                             onRestoreVoteResults={() => resetOptionVoteCountOverrides(g)}
-                            showVoteAdjustToggle={questionSupportsVoteAdjust(question.type)}
+                            showVoteAdjustToggle={questionSupportsVoteAdjust(question)}
                             voteAdjustEditVisible={voteAdjustEditIndices.has(g)}
                             onToggleVoteAdjustEdit={() => toggleVoteAdjustEdit(g)}
                           />
@@ -645,6 +698,42 @@ export function AdminQuestionsSection(props: Props) {
                                   >
                                     Открыть список результатов ({displayedTags.length})
                                   </Button>
+                                  <QuestionVoterTotalRow total={voterTotal} />
+                                </Stack>
+                              );
+                            }
+                            if (isGeoPollPreset(question)) {
+                              const stats = result?.optionStats ?? [];
+                              const totalAnswers =
+                                result?.answerCount ??
+                                stats.reduce((sum, row) => sum + row.count, 0);
+                              const uniqueCities = stats.length;
+                              return (
+                                <Stack spacing={0.75} sx={{ mt: 0.5 }}>
+                                  <Stack
+                                    direction="row"
+                                    justifyContent="space-between"
+                                    alignItems="center"
+                                  >
+                                    <Typography variant="body2" color="text.secondary">
+                                      Голосов
+                                    </Typography>
+                                    <Typography variant="body2" color="text.secondary">
+                                      {totalAnswers}
+                                    </Typography>
+                                  </Stack>
+                                  <Stack
+                                    direction="row"
+                                    justifyContent="space-between"
+                                    alignItems="center"
+                                  >
+                                    <Typography variant="body2" color="text.secondary">
+                                      Городов
+                                    </Typography>
+                                    <Typography variant="body2" color="text.secondary">
+                                      {uniqueCities}
+                                    </Typography>
+                                  </Stack>
                                 </Stack>
                               );
                             }
@@ -918,7 +1007,10 @@ export function AdminQuestionsSection(props: Props) {
                                 count: resolveOptionDisplayCount(optionId, liveCount, overrides),
                               };
                             });
-                            const totalVotes = bars.reduce((sum, option) => sum + option.count, 0);
+                            const totalVotes =
+                              bars.length > 0
+                                ? bars.reduce((sum, option) => sum + option.count, 0)
+                                : voterTotal;
                             return (
                               <Stack spacing={0.8}>
                                 {bars.map((option) => {
@@ -968,7 +1060,9 @@ export function AdminQuestionsSection(props: Props) {
                                             }
                                           />
                                         ) : (
-                                          <Typography variant="caption">{option.count}</Typography>
+                                          <Typography variant="caption">
+                                            {option.count} / {percent}%
+                                          </Typography>
                                         )}
                                       </Stack>
                                       <LinearProgress

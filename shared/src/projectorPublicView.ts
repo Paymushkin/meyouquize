@@ -26,7 +26,9 @@ const PLAYER_ONLY_PUBLIC_VIEW_KEYS = [
   "playerQuizResultsSubQuizId",
   "playerQuizResultsSubQuizIds",
   "playerTilesOrder",
+  "playerTilesGridColumns",
   "playerVisibleResultQuestionIds",
+  "playerVisibleDebateSeriesIds",
   "playerVoteOptionTextColor",
   "playerVoteProgressTrackColor",
   "playerVoteProgressBarColor",
@@ -182,6 +184,30 @@ const REPORT_MODE_KEYS = [
   "reportPublished",
 ] as const satisfies ReadonlyArray<keyof PublicViewState>;
 
+const DEBATE_SERIES_MODE_KEYS = [
+  "questionId",
+  "debateSeriesId",
+  "debateSeriesView",
+  "debateSeriesQuestionIds",
+  "debateSeriesShowRounds",
+  "showVoteCount",
+  "voteQuestionTextColor",
+  "voteOptionTextColor",
+  "voteOptionBorderColor",
+  "voteProgressTrackColor",
+  "voteProgressBarColor",
+] as const satisfies ReadonlyArray<keyof PublicViewState>;
+
+const DEBATE_COMPARE_MODE_KEYS = [
+  "debateCompareQuestionId",
+  "showVoteCount",
+  "voteQuestionTextColor",
+  "voteOptionTextColor",
+  "voteOptionBorderColor",
+  "voteProgressTrackColor",
+  "voteProgressBarColor",
+] as const satisfies ReadonlyArray<keyof PublicViewState>;
+
 function pickViewKeys(
   view: PublicViewState,
   keys: readonly (keyof PublicViewState)[],
@@ -244,6 +270,18 @@ export function pickProjectorPublicViewState(view: PublicViewState): PublicViewS
         mode,
         ...branding,
         ...pickViewKeys(resolved, REPORT_MODE_KEYS),
+      } as PublicViewState;
+    case "debate_series":
+      return {
+        mode,
+        ...branding,
+        ...pickViewKeys(resolved, DEBATE_SERIES_MODE_KEYS),
+      } as PublicViewState;
+    case "debate_compare":
+      return {
+        mode,
+        ...branding,
+        ...pickViewKeys(resolved, DEBATE_COMPARE_MODE_KEYS),
       } as PublicViewState;
     default:
       return { mode, ...branding } as unknown as PublicViewState;

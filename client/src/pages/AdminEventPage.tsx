@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { flushSync } from "react-dom";
 import { useParams } from "react-router-dom";
-import { Alert, Box, Container, Snackbar, Stack } from "@mui/material";
+import { Alert, Box, Button, Container, Snackbar, Stack } from "@mui/material";
 import { resolveClientAssetUrl } from "../utils/resolveClientAssetUrl";
 import { AdminLoginForm } from "../components/AdminLoginForm";
 import { API_BASE } from "../config";
@@ -45,6 +45,7 @@ import { buildPhotoWallAlbumPhotos, photoWallCollagePhotoIndices } from "@meyouq
 import { useAdminEventSocket } from "../hooks/useAdminEventSocket";
 import { useAdminEventApi } from "../hooks/useAdminEventApi";
 import { useAdminBrandingProps } from "../hooks/useAdminBrandingProps";
+import { RouteLoadingFallback } from "../components/RouteLoadingFallback";
 import { useBodyBrandBackground } from "../hooks/useBodyBrandBackground";
 import { buildBrandFontFacesForFamily, useBrandFont } from "../hooks/useBrandFont";
 import { usePublicViewEmitter } from "../hooks/usePublicViewEmitter";
@@ -98,7 +99,9 @@ function isSupportedPublicMode(mode: unknown): mode is PublicViewMode {
     mode === "reactions" ||
     mode === "randomizer" ||
     mode === "photo_wall" ||
-    mode === "report"
+    mode === "report" ||
+    mode === "debate_compare" ||
+    mode === "debate_series"
   );
 }
 
@@ -207,9 +210,14 @@ export function AdminEventPage() {
     }
   });
   const [publicViewQuestionId, setPublicViewQuestionId] = useState<string | undefined>(undefined);
+  const [publicDebateCompareQuestionId, setPublicDebateCompareQuestionId] = useState<
+    string | undefined
+  >(undefined);
   const [playerVisibleResultQuestionIds, setPlayerVisibleResultQuestionIds] = useState<string[]>(
     [],
   );
+  const [playerVisibleDebateSeriesIds, setPlayerVisibleDebateSeriesIds] = useState<string[]>([]);
+  const [debateSeriesShowRounds, setDebateSeriesShowRounds] = useState(false);
   const [questionRevealStage, setQuestionRevealStage] = useState<"options" | "results">("options");
   const [highlightedLeadersCount, setHighlightedLeadersCount] = useState(() => {
     if (typeof window === "undefined") return 3;
@@ -273,6 +281,8 @@ export function AdminEventPage() {
   const {
     authChecked,
     adminLogin,
+    roomLoading,
+    roomLoadError,
     checkSession,
     loadRoom,
     persistQuestions,
@@ -652,6 +662,7 @@ export function AdminEventPage() {
     setLeaderboardsBySubQuiz,
     setPublicViewMode,
     setPublicViewQuestionId,
+    setPublicDebateCompareQuestionId,
     setQuestionRevealStage,
     setHighlightedLeadersCount,
     setQuestionForms,
@@ -762,7 +773,10 @@ export function AdminEventPage() {
     playerQuizResultsSubQuizId: playerTiles.playerQuizResultsSubQuizId,
     playerQuizResultsSubQuizIds: playerTiles.playerQuizResultsSubQuizIds,
     playerVisibleResultQuestionIds,
+    playerVisibleDebateSeriesIds,
+    debateSeriesShowRounds,
     playerTilesOrder: playerTiles.playerTilesOrder,
+    playerTilesGridColumns: playerTiles.playerTilesGridColumns,
     reactionsOverlayText: adminReactions.overlayText,
     reactionsWidgets: adminReactions.widgets,
     randomizerMode: randomizer.mode,
@@ -878,6 +892,7 @@ export function AdminEventPage() {
     publicViewQuestionId,
     setPublicViewMode,
     setPublicViewQuestionId,
+    setPublicDebateCompareQuestionId,
     setQuestionRevealStage,
     emitPublicViewSet,
     emitPublicViewPatch,
@@ -885,6 +900,8 @@ export function AdminEventPage() {
     setResultsSubQuizId,
     playerVisibleResultQuestionIds,
     setPlayerVisibleResultQuestionIds,
+    playerVisibleDebateSeriesIds,
+    setPlayerVisibleDebateSeriesIds,
     playerTiles,
     adminReport,
     showFirstCorrectAnswerer,
@@ -986,6 +1003,9 @@ export function AdminEventPage() {
       setPublicViewMode(pv.mode);
     }
     setPublicViewQuestionId(typeof pv.questionId === "string" ? pv.questionId : undefined);
+    setPublicDebateCompareQuestionId(
+      typeof pv.debateCompareQuestionId === "string" ? pv.debateCompareQuestionId : undefined,
+    );
     setQuestionRevealStage(pv.questionRevealStage === "results" ? "results" : "options");
     if (typeof pv.highlightedLeadersCount === "number") {
       setHighlightedLeadersCount(pv.highlightedLeadersCount);
@@ -1025,6 +1045,14 @@ export function AdminEventPage() {
       setPlayerVisibleResultQuestionIds(
         pv.playerVisibleResultQuestionIds.filter((x): x is string => typeof x === "string"),
       );
+    }
+    if (Array.isArray(pv.playerVisibleDebateSeriesIds)) {
+      setPlayerVisibleDebateSeriesIds(
+        pv.playerVisibleDebateSeriesIds.filter((x): x is string => typeof x === "string"),
+      );
+    }
+    if (typeof pv.debateSeriesShowRounds === "boolean") {
+      setDebateSeriesShowRounds(pv.debateSeriesShowRounds);
     }
   };
 
@@ -1335,6 +1363,8 @@ export function AdminEventPage() {
     runConfirmedRemoveSubQuiz,
     addQuestionToSubQuiz,
     cloneQuestionAtIndex,
+    addDebateSeriesRoundAtIndex,
+    updateDebateSeriesResultTitle,
     requestRemoveQuestion,
     closeDeleteQuestionDialog,
     runConfirmedRemoveQuestion,
@@ -1354,7 +1384,9 @@ export function AdminEventPage() {
     updateQuestionShowVoteCount,
     updateQuestionShowCorrectOption,
     toggleQuestionAdminDone,
+    setQuestionsAdminDone,
     reorderVoteInList,
+    reorderVoteDisplayBlocks,
     updateQuestionProjectorShowFirstCorrect,
     updateQuestionRankingProjectorMetric,
     patchQuestionProjectorFirstCorrectWinnersCount,
@@ -1375,6 +1407,7 @@ export function AdminEventPage() {
     clearOptionVoteCountOverride,
     resetOptionVoteCountOverrides,
     togglePlayerVisibleResultQuestionId,
+    togglePlayerVisibleDebateSeriesId,
   } = questionEditor;
 
   const questionsSectionBindings = useMemo(
@@ -1386,6 +1419,7 @@ export function AdminEventPage() {
         questionResults,
         publicViewMode,
         publicViewQuestionId,
+        publicDebateCompareQuestionId,
         setMessage,
         openQuestionDialog,
         setPublicResultsView,
@@ -1408,6 +1442,8 @@ export function AdminEventPage() {
         setQuestionRevealStageForQuestion,
         playerVisibleResultQuestionIds,
         togglePlayerVisibleResultQuestionId,
+        playerVisibleDebateSeriesIds,
+        togglePlayerVisibleDebateSeriesId,
       }),
     [
       eventName,
@@ -1415,6 +1451,7 @@ export function AdminEventPage() {
       questionResults,
       publicViewMode,
       publicViewQuestionId,
+      publicDebateCompareQuestionId,
       openQuestionDialog,
       setPublicResultsView,
       updateQuestionShowVoteCount,
@@ -1435,6 +1472,8 @@ export function AdminEventPage() {
       setQuestionRevealStageForQuestion,
       playerVisibleResultQuestionIds,
       togglePlayerVisibleResultQuestionId,
+      playerVisibleDebateSeriesIds,
+      togglePlayerVisibleDebateSeriesId,
     ],
   );
 
@@ -1503,7 +1542,8 @@ export function AdminEventPage() {
           adminLogin={adminLogin}
         />
       ) : null}
-      {!authChecked ? null : !isAuth ? (
+      {!authChecked || (isAuth && roomLoading && !room) ? <RouteLoadingFallback /> : null}
+      {authChecked && !isAuth ? (
         <Box
           sx={{
             minHeight: "100dvh",
@@ -1522,6 +1562,25 @@ export function AdminEventPage() {
               })
             }
           />
+        </Box>
+      ) : null}
+      {authChecked && isAuth && !room && !roomLoading && roomLoadError ? (
+        <Box
+          sx={{
+            minHeight: "100dvh",
+            width: "100%",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            px: 2,
+          }}
+        >
+          <Stack spacing={2} sx={{ maxWidth: 520, width: "100%" }}>
+            <Alert severity="error">{roomLoadError}</Alert>
+            <Button variant="contained" onClick={() => void loadRoom()}>
+              Повторить
+            </Button>
+          </Stack>
         </Box>
       ) : null}
       {isAuth && room && (
@@ -1595,8 +1654,20 @@ export function AdminEventPage() {
                   updateHighlightedLeaders,
                   confirmResetSubQuizAnswersById,
                   toggleQuestionAdminDone,
+                  setQuestionsAdminDone,
                   reorderVoteInList,
+                  reorderVoteDisplayBlocks,
                   cloneQuestionAtIndex,
+                  addDebateSeriesRoundAtIndex,
+                  updateDebateSeriesResultTitle,
+                  debateSeriesShowRounds,
+                  onToggleDebateSeriesShowRounds: () => {
+                    setDebateSeriesShowRounds((prev) => {
+                      const next = !prev;
+                      emitPublicViewPatch({ debateSeriesShowRounds: next });
+                      return next;
+                    });
+                  },
                 }}
                 speakers={{
                   speakerQuestions,
@@ -1611,6 +1682,7 @@ export function AdminEventPage() {
                 banners={{
                   eventName,
                   playerTiles,
+                  photoWall,
                   subQuizzesForReport,
                   brandPrimaryColor: branding.brandPrimaryColor,
                   playerVoteOptionTextColor: branding.playerVoteOptionTextColor,

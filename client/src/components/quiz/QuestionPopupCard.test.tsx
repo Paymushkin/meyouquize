@@ -39,6 +39,8 @@ function renderPopup(overrides: Partial<ComponentProps<typeof QuestionPopupCard>
       closeQuestionPopup={vi.fn()}
       tagAnswers={[""]}
       setTagAnswers={vi.fn()}
+      geoAnswer={null}
+      setGeoAnswer={vi.fn()}
       canSubmit={false}
       submit={vi.fn()}
       ruBallLabel={(n) => `${n}`}
@@ -110,5 +112,19 @@ describe("QuestionPopupCard", () => {
     renderPopup({ closeQuestionPopup });
     fireEvent.click(screen.getByLabelText("Закрыть"));
     expect(closeQuestionPopup).toHaveBeenCalled();
+  });
+
+  it("renders geo poll autocomplete instead of option buttons", () => {
+    renderPopup({
+      question: makeQuestion({
+        text: "Откуда вы?",
+        options: [],
+        geoPollDictionary: "world_cities",
+      }),
+      geoAnswer: null,
+    });
+    expect(screen.getByPlaceholderText("Начните вводить город")).toBeTruthy();
+    expect(screen.queryByText("Four")).toBeNull();
+    expect(screen.getByText("Геоопрос")).toBeTruthy();
   });
 });

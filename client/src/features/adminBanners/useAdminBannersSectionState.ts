@@ -24,6 +24,8 @@ type Params = {
   brandPrimaryColor: string;
   playerVoteOptionTextColor: string;
   photoWallCollageSrcs: string[];
+  playerTilesGridColumns: 2 | 3;
+  onChangePlayerTilesGridColumns: (value: 2 | 3) => void;
   onCreate: (linkUrl: string, backgroundUrl: string, size: "2x1" | "1x1" | "full") => void;
   onUpdate: (
     id: string,
@@ -59,6 +61,8 @@ export function useAdminBannersSectionState(params: Params) {
     brandPrimaryColor,
     playerVoteOptionTextColor,
     photoWallCollageSrcs,
+    playerTilesGridColumns,
+    onChangePlayerTilesGridColumns,
     onCreate,
     onUpdate,
     onUploadMedia,
@@ -67,12 +71,11 @@ export function useAdminBannersSectionState(params: Params) {
   } = params;
   const [linkUrl, setLinkUrl] = useState("");
   const [backgroundUrl, setBackgroundUrl] = useState("");
-  const [size, setSize] = useState<"2x1" | "1x1" | "full">("2x1");
   const [uploading, setUploading] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editLinkUrl, setEditLinkUrl] = useState("");
   const [editBackgroundUrl, setEditBackgroundUrl] = useState("");
-  const [editSize, setEditSize] = useState<"2x1" | "1x1" | "full">("2x1");
+  const [editSize, setEditSize] = useState<"2x1" | "1x1" | "full">("1x1");
   const [speakerTextDraft, setSpeakerTextDraft] = useState(speakerTileText);
   const [speakerBgColorDraft, setSpeakerBgColorDraft] = useState(speakerTileBackgroundColor);
   const [speakerTextColorDraft, setSpeakerTextColorDraft] = useState(speakerTileTextColor);
@@ -168,11 +171,10 @@ export function useAdminBannersSectionState(params: Params) {
   );
 
   const handleCreateBanner = useCallback(() => {
-    onCreate(linkUrl.trim(), backgroundUrl.trim(), size);
+    onCreate(linkUrl.trim(), backgroundUrl.trim(), "1x1");
     setLinkUrl("");
     setBackgroundUrl("");
-    setSize("2x1");
-  }, [onCreate, linkUrl, backgroundUrl, size]);
+  }, [onCreate, linkUrl, backgroundUrl]);
 
   const handleSaveSpeakerTile = useCallback(() => {
     onSaveSpeakerTile(
@@ -206,20 +208,20 @@ export function useAdminBannersSectionState(params: Params) {
   const cancelEdit = useCallback(() => setEditingId(null), []);
   const saveEdit = useCallback(
     (bannerId: string) => {
-      onUpdate(bannerId, editLinkUrl.trim(), editBackgroundUrl.trim(), editSize);
+      onUpdate(bannerId, editLinkUrl.trim(), editBackgroundUrl.trim(), "1x1");
       setEditingId(null);
     },
-    [onUpdate, editLinkUrl, editBackgroundUrl, editSize],
+    [onUpdate, editLinkUrl, editBackgroundUrl],
   );
 
   return {
     linkUrl,
     backgroundUrl,
-    size,
+    playerTilesGridColumns,
+    onChangePlayerTilesGridColumns,
     uploading,
     setLinkUrl,
     setBackgroundUrl,
-    setSize,
     speakerTextDraft,
     speakerBgColorDraft,
     speakerTextColorDraft,

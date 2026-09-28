@@ -27,11 +27,11 @@ export function resolvePlayerQuestionFontRem(textLength: number): {
 }
 
 export function playerQuestionTitleFontSizeSx(textLength: number): {
-  xs: string;
-  sm: string;
+  "@": string;
+  "@sm": string;
 } {
   const { mobile, desktop } = resolvePlayerQuestionFontRem(textLength);
-  return { xs: `${mobile}rem`, sm: `${desktop}rem` };
+  return { "@": `${mobile}rem`, "@sm": `${desktop}rem` };
 }
 
 export function resolveProjectorQuestionFontRem(
@@ -91,7 +91,7 @@ export function playerFeedbackScaleTitleSx(textLength: number): SxProps<Theme> {
   return {
     fontWeight: 700,
     lineHeight: VOTE_QUESTION_TITLE_LINE_HEIGHT,
-    fontSize: { xs: `${mobile}px`, sm: `${desktop}px` },
+    fontSize: { "@": `${mobile}px`, "@sm": `${desktop}px` },
     py: 0.5,
   };
 }
@@ -112,7 +112,7 @@ export function playerEventTitleSx(brandFontFamily?: string): SxProps<Theme> {
     fontStyle: "normal",
     ...(brandFontFamily ? { fontFamily: brandFontFamily } : {}),
     letterSpacing: 0.2,
-    fontSize: "clamp(1.4rem, 4.2vw, 2.45rem)",
+    fontSize: "clamp(1.4rem, 4.2cqw, 2.45rem)",
     lineHeight: PLAYER_EVENT_TITLE_LINE_HEIGHT,
     whiteSpace: "pre-line",
     mb: 4,
@@ -123,14 +123,14 @@ export function playerEventTitleSx(brandFontFamily?: string): SxProps<Theme> {
 export const playerFullWidthTileLabelSx: SxProps<Theme> = {
   fontWeight: 700,
   fontStyle: "normal",
-  fontSize: "clamp(1.3rem, 4.2vw, 2.5rem)",
+  fontSize: "clamp(1.3rem, 4.2cqw, 2.5rem)",
   lineHeight: 1.35,
 };
 
 export function voteResultsDialogQuestionSx(): SxProps<Theme> {
   return {
     fontWeight: 700,
-    fontSize: { xs: "1.3rem", sm: "1.45rem" },
+    fontSize: { "@": "1.3rem", "@sm": "1.45rem" },
     lineHeight: 1.25,
     pb: VOTE_RESULTS_DIALOG_QUESTION_MB,
   };
@@ -139,7 +139,7 @@ export function voteResultsDialogQuestionSx(): SxProps<Theme> {
 const voteResultsStatValueSx = {
   color: "#fff",
   fontWeight: 400,
-  fontSize: { xs: "1.05rem", sm: "1.12rem" },
+  fontSize: { "@": "1.05rem", "@sm": "1.12rem" },
   flexShrink: 0,
   textAlign: "right",
   lineHeight: 1.2,

@@ -39,7 +39,9 @@ import { getSocketIo, setSocketIo } from "./socket/io-holder.js";
 import { attachSocketIoRedisAdapter } from "./socket/redis-io-adapter.js";
 import { isPrivateNetworkViteDevPort } from "./cors-allow.js";
 import { prisma } from "./prisma.js";
+import { searchGeoPollEntries } from "./geo-poll-service.js";
 import { randomToken } from "./utils.js";
+import { isGeoPollDictionary } from "@meyouquize/shared";
 import {
   authenticateAdminUser,
   hashAdminPassword,
@@ -347,6 +349,25 @@ export function buildApp() {
     standardHeaders: true,
     legacyHeaders: false,
     message: { error: "Too many meta requests. Please try again later." },
+  });
+
+  const geoPollSearchLimiter = rateLimit({
+    windowMs: 60_000,
+    limit: env.networkMode === "internet" ? 120 : 300,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { error: "Too many geo search requests. Please try again later." },
+  });
+
+  app.get("/api/geo-poll/search", geoPollSearchLimiter, (req, res) => {
+    const dictionary = typeof req.query.dictionary === "string" ? req.query.dictionary.trim() : "";
+    const q = typeof req.query.q === "string" ? req.query.q : "";
+    const limitRaw = typeof req.query.limit === "string" ? Number(req.query.limit) : 12;
+    if (!isGeoPollDictionary(dictionary)) {
+      return res.status(400).json({ error: "Invalid dictionary" });
+    }
+    const rows = searchGeoPollEntries(dictionary, q, Number.isFinite(limitRaw) ? limitRaw : 12);
+    return res.json({ items: rows });
   });
 
   app.post("/api/admin/auth", authLimiter, async (req, res) => {

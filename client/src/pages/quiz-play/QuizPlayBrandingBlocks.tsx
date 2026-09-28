@@ -38,6 +38,9 @@ import { alpha, type SxProps, type Theme } from "@mui/material/styles";
 import { useState, type RefObject } from "react";
 import type { QuizState, ReactionType } from "./types";
 import { PlayerVisibleResultTileCard } from "../../components/quiz/PlayerVisibleResultTileCard";
+import { pcq } from "../../features/quizPlay/playerContainerQuery";
+import { buildPlayerTilesGridColumnsSx } from "../../features/quizPlay/playerTilesGridColumns";
+import { buildBrandBackground } from "../../features/branding/brandVisual";
 import { resolveClientAssetUrl } from "../../utils/resolveClientAssetUrl";
 import {
   sanitizeBannerLinkUrl,
@@ -56,15 +59,37 @@ type QuizPlayContainerSxParams = {
   brandFontFamily: string;
   isJoinScreen?: boolean;
   joined?: boolean;
+  backgroundColor?: string;
+  backgroundImageUrl?: string;
 };
 
 export function buildQuizPlayContainerSx(params: QuizPlayContainerSxParams): SxProps<Theme> {
-  const { brandFontFamily, isJoinScreen = false, joined = false } = params;
+  const {
+    brandFontFamily,
+    isJoinScreen = false,
+    joined = false,
+    backgroundColor,
+    backgroundImageUrl,
+  } = params;
   const allowMainScroll = joined && !isJoinScreen;
+  const normalizedImageUrl = backgroundImageUrl?.trim() ?? "";
+  const brandBg = buildBrandBackground({
+    backgroundImageUrl: normalizedImageUrl || undefined,
+    backgroundAnchor: "bottom",
+    backgroundAttachment: "scroll",
+  });
   return {
     position: "relative",
     zIndex: 1,
-    bgcolor: "transparent",
+    width: "100%",
+    maxWidth: "576px !important",
+    mx: "auto",
+    px: 2,
+    boxSizing: "border-box",
+    containerType: "inline-size",
+    backgroundColor: backgroundColor ?? "transparent",
+    ...brandBg,
+    backgroundRepeat: "no-repeat",
     fontFamily: brandFontFamily,
     fontStyle: "normal",
     "&, & *": {
@@ -75,18 +100,13 @@ export function buildQuizPlayContainerSx(params: QuizPlayContainerSxParams): SxP
         fontFamily: brandFontFamily,
         fontStyle: "normal",
       },
-    pt: isJoinScreen ? { xs: 5, sm: 6 } : 2,
-    maxWidth: "678px !important",
+    pt: isJoinScreen ? 5 : 2,
     pb: isJoinScreen
       ? "env(safe-area-inset-bottom, 0px)"
-      : {
-          xs: "calc(env(safe-area-inset-bottom, 0px) + 96px)",
-          sm: 4,
-        },
+      : "calc(env(safe-area-inset-bottom, 0px) + 96px)",
     minHeight: "100dvh",
     height: allowMainScroll ? "auto" : "100dvh",
     overflowY: allowMainScroll ? "auto" : "hidden",
-    boxSizing: "border-box",
     display: "flex",
     flexDirection: "column",
     justifyContent: "flex-start",
@@ -140,8 +160,8 @@ export function EventTitleBlock(props: EventTitleBlockProps) {
         flexShrink: 0,
         ...(isJoinScreen
           ? {
-              px: { xs: 2, sm: 0 },
-              mt: { xs: 1, sm: 1.5 },
+              px: pcq(2, 0),
+              mt: pcq(1, 1.5),
               alignSelf: "stretch",
             }
           : {}),
@@ -163,7 +183,7 @@ export function EventTitleBlock(props: EventTitleBlockProps) {
               alignSelf: "flex-start",
               mb: isJoinScreen ? 0.5 : 1.5,
               maxHeight: 56,
-              maxWidth: isJoinScreen ? "min(56vw, 220px)" : "min(60vw, 280px)",
+              maxWidth: isJoinScreen ? "min(56cqw, 220px)" : "min(60cqw, 280px)",
               objectFit: "contain",
             }}
           />
@@ -177,7 +197,7 @@ export function EventTitleBlock(props: EventTitleBlockProps) {
               isJoinScreen
                 ? {
                     ...playerEventTitleSx(brandFontFamily),
-                    fontSize: "clamp(1.75rem, 6vw, 3rem)",
+                    fontSize: "clamp(1.75rem, 6cqw, 3rem)",
                     lineHeight: 1.08,
                     letterSpacing: 0.4,
                     mb: 0,
@@ -195,6 +215,7 @@ export function EventTitleBlock(props: EventTitleBlockProps) {
 
 type PlayerTilesGridProps = {
   tileOrder: string[];
+  gridColumns: 2 | 3;
   visibleBannerById: Map<string, BannerTile>;
   speakerTileVisible: boolean;
   onSpeakerOpen: () => void;
@@ -222,6 +243,7 @@ type PlayerTilesGridProps = {
 export function PlayerTilesGrid(props: PlayerTilesGridProps) {
   const {
     tileOrder,
+    gridColumns,
     visibleBannerById,
     speakerTileVisible,
     onSpeakerOpen,
@@ -251,13 +273,9 @@ export function PlayerTilesGrid(props: PlayerTilesGridProps) {
       sx={{
         width: "100%",
         display: "grid",
-        /** 2 колонки до 600px, 3 колонки от sm (600px) */
-        gridTemplateColumns: {
-          xs: "repeat(2, minmax(0, 1fr))",
-          sm: "repeat(3, minmax(0, 1fr))",
-        },
+        ...buildPlayerTilesGridColumnsSx(gridColumns),
         justifyContent: "stretch",
-        gap: { xs: 1.5, sm: 2 },
+        gap: pcq(1.5, 2),
         mb: 2,
         mt: 1.5,
         alignItems: "start",
@@ -529,7 +547,7 @@ const JOIN_CARD_ROOT_SX: SxProps<Theme> = {
 export const JOIN_SCREEN_STACK_SX: SxProps<Theme> = {
   width: "100%",
   maxWidth: 520,
-  px: { xs: 2, sm: 0 },
+  px: pcq(2, 0),
   display: "flex",
   flexDirection: "column",
   alignItems: "stretch",
@@ -615,8 +633,8 @@ const RANDOM_NICKNAME_BUTTON_SX: SxProps<Theme> = {
   borderColor: "rgba(255, 255, 255, 0.5)",
   minHeight: 56,
   px: 4,
-  mx: { xs: 0, sm: 1 },
-  minWidth: { sm: 180 },
+  mx: pcq(0, 1),
+  minWidth: { "@sm": 180 },
   whiteSpace: "nowrap",
   "&:hover": {
     borderColor: "rgba(255, 255, 255, 0.75)",
@@ -734,12 +752,15 @@ export function ReactionsDock(props: ReactionsDockProps) {
     <Box
       sx={{
         position: "fixed",
-        left: 0,
-        right: 0,
+        left: "50%",
+        transform: "translateX(-50%)",
+        width: "100%",
+        maxWidth: 576,
         bottom: 0,
         zIndex: 1450,
-        px: { xs: 1.25, sm: 2 },
-        pb: { xs: 1.25, sm: 2 },
+        containerType: "inline-size",
+        px: pcq(1.25, 2),
+        pb: pcq(1.25, 2),
       }}
     >
       {bursts.map((burst) => (
@@ -806,16 +827,16 @@ export function ReactionsDock(props: ReactionsDockProps) {
                 borderColor: brandPrimaryColor,
               },
               textTransform: "none",
-              width: { xs: 76, sm: 86 },
-              minWidth: { xs: 76, sm: 86 },
-              height: { xs: 76, sm: 86 },
-              minHeight: { xs: 76, sm: 86 },
+              width: pcq(76, 86),
+              minWidth: pcq(76, 86),
+              height: pcq(76, 86),
+              minHeight: pcq(76, 86),
               p: 0,
               fontWeight: 700,
               borderRadius: 1.5,
             }}
           >
-            <Box component="span" sx={{ fontSize: { xs: "1.8rem", sm: "2rem" }, lineHeight: 1 }}>
+            <Box component="span" sx={{ fontSize: pcq("1.8rem", "2rem"), lineHeight: 1 }}>
               {item.emoji}
             </Box>
           </Button>
@@ -856,7 +877,7 @@ export function JoinCard(props: JoinCardProps) {
       <CardContent sx={JOIN_CARD_CONTENT_SX}>
         <Stack spacing={2}>
           <Stack spacing={0.75}>
-            <Stack direction={{ xs: "column", sm: "row" }} spacing={1}>
+            <Stack direction={pcq<"column" | "row">("column", "row")} spacing={1}>
               <OutlinedInput
                 autoFocus
                 inputRef={nicknameInputRef}
@@ -909,11 +930,8 @@ export function RestoreJoinPendingBlock() {
   return (
     <Box
       sx={{
-        mt: { xs: 2, md: "auto" },
-        mb: {
-          xs: "calc(env(safe-area-inset-bottom, 0px) + 76px)",
-          md: 5,
-        },
+        mt: pcq(2, "auto"),
+        mb: pcq("calc(env(safe-area-inset-bottom, 0px) + 76px)", 5),
         width: "100%",
         minHeight: 220,
         display: "flex",
@@ -948,13 +966,19 @@ export function CompletionOverlay(props: CompletionOverlayProps) {
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        p: { xs: 1.5, sm: 2.5 },
+        p: pcq(1.5, 2.5),
         backgroundColor: "rgba(0, 0, 0, 0.42)",
       }}
     >
       <Card
         variant="outlined"
-        sx={{ width: "100%", maxWidth: 980, maxHeight: "92vh", overflowY: "auto" }}
+        sx={{
+          width: "100%",
+          maxWidth: 576,
+          maxHeight: "92vh",
+          overflowY: "auto",
+          containerType: "inline-size",
+        }}
       >
         <CardContent sx={{ position: "relative" }}>
           <IconButton

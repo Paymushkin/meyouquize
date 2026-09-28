@@ -97,6 +97,7 @@ export { PHOTO_WALL_TILE_ID } from "@meyouquize/shared";
 export type PublicViewPayload = SharedPublicViewPayload & {
   reactionsWidgets?: PublicReactionWidget[];
   playerVisibleResultQuestionIds?: string[];
+  playerVisibleDebateSeriesIds?: string[];
   randomizerListMode?: "participants_only" | "free_list";
   speakerTileVisible?: boolean;
   programTileText?: string;
@@ -108,6 +109,7 @@ export type PublicViewPayload = SharedPublicViewPayload & {
 export type PublicViewSetPatch = SharedPublicViewPatch & {
   reactionsWidgets?: PublicReactionWidget[];
   playerVisibleResultQuestionIds?: string[];
+  playerVisibleDebateSeriesIds?: string[];
   randomizerListMode?: "participants_only" | "free_list";
   speakerTileVisible?: boolean;
   programTileText?: string;

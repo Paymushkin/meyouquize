@@ -59,7 +59,6 @@ import { buildQuizPlayConnectionChip } from "../features/quizPlay/connectionChip
 import { getRoomNickKey, shouldRestoreJoin } from "../features/quizPlay/joinStorage";
 import { buildPlayerTilesOrder, getVisiblePlayerBanners } from "../features/quizPlay/tiles";
 import { QuestionPopupCard } from "../components/quiz/QuestionPopupCard";
-import { PlayerViewportBackground } from "../components/quiz/PlayerViewportBackground";
 import {
   buildQuizPlayContainerSx,
   CompletionOverlay,
@@ -144,6 +143,8 @@ export function QuizPlayPage() {
     setRankOrder,
     tagAnswers,
     setTagAnswers,
+    geoAnswer,
+    setGeoAnswer,
     activeQuestionIdRef,
     activeQuestionTypeRef,
     selectedRef,
@@ -604,16 +605,15 @@ export function QuizPlayPage() {
 
   return (
     <>
-      <PlayerViewportBackground
-        backgroundColor={brandBodyBackgroundColor}
-        backgroundImageUrl={brandPlayerBackgroundImageUrl}
-      />
       <Container
-        maxWidth="md"
+        maxWidth={false}
+        disableGutters
         sx={buildQuizPlayContainerSx({
           brandFontFamily,
           isJoinScreen,
           joined,
+          backgroundColor: brandBodyBackgroundColor,
+          backgroundImageUrl: brandPlayerBackgroundImageUrl,
         })}
       >
         {bootLoading ? (
@@ -662,6 +662,11 @@ export function QuizPlayPage() {
             {joined ? (
               <PlayerTilesGrid
                 tileOrder={tileOrder}
+                gridColumns={
+                  quiz?.playerTilesGridColumns === 2 || quiz?.playerTilesGridColumns === 3
+                    ? quiz.playerTilesGridColumns
+                    : 3
+                }
                 visibleBannerById={visibleBannerById}
                 speakerTileVisible={speakerTileVisible}
                 onSpeakerOpen={() => setSpeakerDialogOpen(true)}
@@ -764,6 +769,8 @@ export function QuizPlayPage() {
                 closeQuestionPopup={closeQuestionPopup}
                 tagAnswers={tagAnswers}
                 setTagAnswers={setTagAnswers}
+                geoAnswer={geoAnswer}
+                setGeoAnswer={setGeoAnswer}
                 canSubmit={canSubmit}
                 submit={submit}
                 ruBallLabel={ruBallLabel}

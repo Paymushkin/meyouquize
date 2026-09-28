@@ -49,6 +49,12 @@ const optionInputSchema = z.object({
   isCorrect: z.boolean(),
   imageUrl: optionalClientAssetUrlSchema,
   weight: z.number().int().min(0).max(100).optional(),
+  color: z
+    .string()
+    .trim()
+    .regex(/^#[0-9a-fA-F]{6}$/)
+    .nullable()
+    .optional(),
 });
 
 const questionSchema = z
@@ -68,6 +74,12 @@ const questionSchema = z
     rankingPlayerHint: z.string().trim().max(300).nullable().optional(),
     tagCloudPlayerHint: z.string().trim().max(300).nullable().optional(),
     temperatureSubtitle: z.string().trim().max(300).nullable().optional(),
+    debateBaselineQuestionId: z.string().trim().min(1).max(80).nullable().optional(),
+    projectorDebateLayout: z.boolean().optional(),
+    debateSeriesId: z.string().trim().min(1).max(80).nullable().optional(),
+    debateRoundIndex: z.number().int().min(0).max(99).nullable().optional(),
+    debateSeriesResultTitle: z.string().trim().max(200).nullable().optional(),
+    geoPollDictionary: z.string().trim().min(1).max(80).nullable().optional(),
     adminDone: z.boolean().optional(),
     options: z.array(optionInputSchema),
   })
@@ -78,6 +90,16 @@ const questionSchema = z
         message: "У вопроса должен быть текст или картинка",
         path: ["text"],
       });
+    }
+    if (value.geoPollDictionary?.trim()) {
+      if (value.type !== "single") {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "Geo poll поддерживается только для типа single",
+          path: ["type"],
+        });
+      }
+      return;
     }
     if (value.type === "tag_cloud") {
       const sm = value.scoringMode ?? "poll";
@@ -203,13 +225,39 @@ const questionSchema = z
     }
   });
 
-const subQuizBlockSchema = z.object({
-  id: z.string().min(1).optional(),
-  title: z.string().min(1).max(120),
-  questionFlowMode: z.enum(["manual", "auto"]).optional(),
-  sortOrder: z.number().int().min(0).max(1000).optional(),
-  questions: z.array(questionSchema),
-});
+const subQuizBlockSchema = z
+  .object({
+    id: z.string().min(1).optional(),
+    title: z.string().min(1).max(120),
+    questionFlowMode: z.enum(["manual", "auto"]).optional(),
+    sortOrder: z.number().int().min(0).max(1000).optional(),
+    questions: z.array(questionSchema),
+  })
+  .superRefine((block, ctx) => {
+    block.questions.forEach((question, index) => {
+      if (question.geoPollDictionary?.trim()) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "Геоопрос недоступен в квизах",
+          path: ["questions", index, "geoPollDictionary"],
+        });
+      }
+      if (question.projectorDebateLayout === true || question.debateSeriesId?.trim()) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "Дебаты недоступны в квизах",
+          path: ["questions", index, "projectorDebateLayout"],
+        });
+      }
+      if (question.type === "temperature") {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "Измерение температуры недоступно в квизах",
+          path: ["questions", index, "type"],
+        });
+      }
+    });
+  });
 
 export const adminAuthSchema = z.object({
   login: z.string().min(1),
@@ -356,9 +404,16 @@ export const setPublicViewSchema = z.object({
       "randomizer",
       "photo_wall",
       "report",
+      "debate_compare",
+      "debate_series",
     ])
     .optional(),
   questionId: z.string().min(1).optional(),
+  debateCompareQuestionId: z.string().trim().min(1).max(80).optional(),
+  debateSeriesId: z.string().trim().min(1).max(80).optional(),
+  debateSeriesView: z.enum(["cumulative", "round"]).optional(),
+  debateSeriesQuestionIds: z.array(z.string().trim().min(1).max(80)).max(40).optional(),
+  debateSeriesShowRounds: z.boolean().optional(),
   questionRevealStage: z.enum(["options", "results"]).optional(),
   highlightedLeadersCount: z.number().int().min(0).max(100).optional(),
   leaderboardSubQuizId: z.string().trim().max(80).optional(),
@@ -523,6 +578,7 @@ export const setPublicViewSchema = z.object({
   playerQuizResultsSubQuizId: z.string().trim().max(80).optional(),
   playerQuizResultsSubQuizIds: z.array(z.string().trim().min(1).max(80)).max(20).optional(),
   playerTilesOrder: z.array(z.string().trim().min(1).max(120)).max(100).optional(),
+  playerTilesGridColumns: z.union([z.literal(2), z.literal(3)]).optional(),
   reactionsOverlayText: z.string().trim().max(120).optional(),
   reactionsWidgets: z
     .array(
@@ -535,6 +591,7 @@ export const setPublicViewSchema = z.object({
     .max(100)
     .optional(),
   playerVisibleResultQuestionIds: z.array(z.string().trim().min(1).max(80)).max(200).optional(),
+  playerVisibleDebateSeriesIds: z.array(z.string().trim().min(1).max(80)).max(50).optional(),
   playerVoteOptionTextColor: z
     .string()
     .regex(/^#([0-9a-fA-F]{6})$/)

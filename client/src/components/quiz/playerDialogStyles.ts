@@ -7,6 +7,9 @@ export const PLAYER_DIALOG_PAPER_SX = {
   bgcolor: "rgba(0, 0, 0, 0.9)",
   color: "#fff",
   backdropFilter: "blur(4px)",
+  width: "100%",
+  maxWidth: "576px !important",
+  containerType: "inline-size",
 } as const;
 
 /** Фиксированный оверлей попапа голосования/обратной связи — скролл на всём слое, не на flex-ребёнке. */
@@ -16,7 +19,7 @@ export const PLAYER_POPUP_OVERLAY_SX = {
   overflowY: "auto",
   WebkitOverflowScrolling: "touch",
   overscrollBehaviorY: "contain",
-  p: { xs: 1.5, sm: 2.5 },
+  p: { "@": 1.5, "@sm": 2.5 },
   backgroundColor: "rgba(0, 0, 0, 0.85)",
 } as const;
 
@@ -29,13 +32,14 @@ export const PLAYER_POPUP_ALIGN_SX = {
 
 export const PLAYER_POPUP_CARD_SX = {
   width: "100%",
-  maxWidth: 678,
+  maxWidth: 576,
   flexShrink: 0,
   margin: "auto",
   bgcolor: "rgba(38, 38, 38, 0.84)",
   backdropFilter: "blur(4px)",
   color: "#fff",
   boxShadow: "none",
+  containerType: "inline-size",
 } as const;
 
 export const PLAYER_DIALOG_TITLE_SX = {

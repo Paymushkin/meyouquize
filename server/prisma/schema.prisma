@@ -79,6 +79,20 @@ model Question {
   tagCloudPlayerHint String?
   /** Для TEMPERATURE: подзаголовок на проекторе над шкалой. */
   temperatureSubtitle String?
+  /** Для дебатов: id baseline-опроса «до» (финальный вопрос ссылается на него). */
+  debateBaselineQuestionId String?
+  debateBaselineQuestion   Question? @relation("DebateBaseline", fields: [debateBaselineQuestionId], references: [id], onDelete: SetNull)
+  debateFinalQuestions     Question[] @relation("DebateBaseline")
+  /** SINGLE/MULTI: side-by-side layout на проекторе (2–3 варианта). */
+  projectorDebateLayout Boolean @default(false)
+  /** Серия многораундовых дебатов: общий id группы раундов. */
+  debateSeriesId String?
+  /** Порядок раунда в серии (0 = первый). */
+  debateRoundIndex Int?
+  /** Заголовок накопительного итога серии на проекторе (общий для раундов). */
+  debateSeriesResultTitle String?
+  /** Geo poll: id словаря для автодополнения (например world_countries). */
+  geoPollDictionary String?
   /** Когда вопрос был выведен на экран для ответов (для подсчёта responseMs). */
   activatedAt DateTime?
   /** Опциональная иллюстрация к тексту вопроса */
@@ -88,6 +102,7 @@ model Question {
 
   @@index([quizId])
   @@index([subQuizId])
+  @@index([debateSeriesId])
 }
 
 model Option {
@@ -102,6 +117,8 @@ model Option {
   sortOrder  Int      @default(0)
   /** Для TEMPERATURE: вес варианта на шкале 0–100. */
   weight     Int?
+  /** Hex-цвет сегмента на проекторе (дебаты / side-by-side). */
+  color      String?
 }
 
 model Participant {

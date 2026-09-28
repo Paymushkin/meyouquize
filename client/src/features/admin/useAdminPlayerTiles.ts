@@ -1,4 +1,5 @@
 import {
+  PHOTO_WALL_TILE_ID,
   PROGRAM_TILE_ID,
   SPEAKER_TILE_ID,
   quizResultsTileIdForSubQuiz,
@@ -50,9 +51,11 @@ export function useAdminPlayerTiles({
   const [playerQuizResultsSubQuizIds, setPlayerQuizResultsSubQuizIds] = useState<string[]>([]);
   const [playerQuizResultsTileVisible, setPlayerQuizResultsTileVisible] = useState(false);
   const [playerTilesOrder, setPlayerTilesOrder] = useState<string[]>([
-    SPEAKER_TILE_ID,
     PROGRAM_TILE_ID,
+    SPEAKER_TILE_ID,
+    PHOTO_WALL_TILE_ID,
   ]);
+  const [playerTilesGridColumns, setPlayerTilesGridColumns] = useState<2 | 3>(3);
   const [playerBannerClickStats, setPlayerBannerClickStats] = useState<PublicBannerClickStats[]>(
     [],
   );
@@ -93,6 +96,7 @@ export function useAdminPlayerTiles({
         setPlayerQuizResultsSubQuizIds,
         setPlayerQuizResultsTileVisible,
         setPlayerTilesOrder,
+        setPlayerTilesGridColumns,
       });
       applyBannerClickStatsFromPublicView(pv);
     },
@@ -134,13 +138,7 @@ export function useAdminPlayerTiles({
           isVisible: false,
         },
       ];
-      const baseOrder = buildPlayerTilesOrder(playerTilesOrder, playerBanners);
-      const nextOrderRaw = [
-        ...baseOrder.filter((x) => x !== SPEAKER_TILE_ID),
-        next[next.length - 1]!.id,
-        SPEAKER_TILE_ID,
-      ];
-      const nextOrder = withQuizResultsTileLast(nextOrderRaw);
+      const nextOrder = buildPlayerTilesOrder(playerTilesOrder, next);
       setPlayerBanners(next);
       setPlayerTilesOrder(nextOrder);
       emitPublicViewPatch({ playerBanners: next, playerTilesOrder: nextOrder });
@@ -371,6 +369,16 @@ export function useAdminPlayerTiles({
     [emitPublicViewPatch, playerBanners, playerTilesOrder, quizId, refreshQuizState],
   );
 
+  const setPlayerTilesGridColumnsAndEmit = useCallback(
+    (value: 2 | 3) => {
+      setPlayerTilesGridColumns(value);
+      if (!quizId) return;
+      emitPublicViewPatch({ playerTilesGridColumns: value });
+      refreshQuizState();
+    },
+    [emitPublicViewPatch, quizId, refreshQuizState],
+  );
+
   const updateShowEventTitleOnPlayer = useCallback(
     (next: boolean) => {
       setShowEventTitleOnPlayer(next);
@@ -414,7 +422,9 @@ export function useAdminPlayerTiles({
     playerQuizResultsSubQuizIds,
     playerQuizResultsTileVisible,
     playerTilesOrder,
+    playerTilesGridColumns,
     setPlayerTilesOrder,
+    setPlayerTilesGridColumns: setPlayerTilesGridColumnsAndEmit,
     setPlayerQuizResultsSubQuizIds,
     setPlayerQuizResultsSubQuizId,
     setPlayerQuizResultsTileVisible,

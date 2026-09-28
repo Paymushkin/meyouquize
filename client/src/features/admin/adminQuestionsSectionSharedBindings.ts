@@ -11,6 +11,7 @@ export type AdminQuestionsSectionSharedBindings = Pick<
   | "questionResults"
   | "publicViewMode"
   | "publicViewQuestionId"
+  | "publicDebateCompareQuestionId"
   | "setMessage"
   | "openQuestionDialog"
   | "setPublicResultsView"
@@ -33,6 +34,8 @@ export type AdminQuestionsSectionSharedBindings = Pick<
   | "setQuestionRevealStageForQuestion"
   | "playerVisibleResultQuestionIds"
   | "togglePlayerVisibleResultQuestionId"
+  | "playerVisibleDebateSeriesIds"
+  | "togglePlayerVisibleDebateSeriesId"
 >;
 
 type Source = {
@@ -42,6 +45,7 @@ type Source = {
   questionResults: QuestionResult[];
   publicViewMode: PublicViewMode;
   publicViewQuestionId: string | undefined;
+  publicDebateCompareQuestionId?: string | undefined;
   setMessage: (value: string) => void;
   openQuestionDialog: (globalIndex: number) => void;
   setPublicResultsView: AdminQuestionsSectionSharedBindings["setPublicResultsView"];
@@ -64,6 +68,8 @@ type Source = {
   setQuestionRevealStageForQuestion: AdminQuestionsSectionSharedBindings["setQuestionRevealStageForQuestion"];
   playerVisibleResultQuestionIds: string[];
   togglePlayerVisibleResultQuestionId: (questionId: string) => void;
+  playerVisibleDebateSeriesIds: string[];
+  togglePlayerVisibleDebateSeriesId: (seriesId: string) => void;
 };
 
 export function buildAdminQuestionsSectionSharedBindings(
@@ -76,6 +82,7 @@ export function buildAdminQuestionsSectionSharedBindings(
     questionResults: source.questionResults,
     publicViewMode: source.publicViewMode,
     publicViewQuestionId: source.publicViewQuestionId,
+    publicDebateCompareQuestionId: source.publicDebateCompareQuestionId,
     setMessage: source.setMessage,
     openQuestionDialog: source.openQuestionDialog,
     setPublicResultsView: source.setPublicResultsView,
@@ -100,5 +107,7 @@ export function buildAdminQuestionsSectionSharedBindings(
     setQuestionRevealStageForQuestion: source.setQuestionRevealStageForQuestion,
     playerVisibleResultQuestionIds: source.playerVisibleResultQuestionIds,
     togglePlayerVisibleResultQuestionId: source.togglePlayerVisibleResultQuestionId,
+    playerVisibleDebateSeriesIds: source.playerVisibleDebateSeriesIds,
+    togglePlayerVisibleDebateSeriesId: source.togglePlayerVisibleDebateSeriesId,
   };
 }

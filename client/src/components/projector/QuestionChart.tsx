@@ -6,7 +6,9 @@ import { animated, to, useTransition } from "@react-spring/web";
 import cloud from "d3-cloud";
 import {
   collectTagCloudQuizReferenceAliases,
+  isGeoPollDictionary,
   normalizeTagComparable,
+  singlePollDebateSideBySideEligible,
   VOTE_MIN_BAR_DISPLAY_PERCENT,
   voteFillOutlineColor,
   voteProgressBarFillStyle,
@@ -22,7 +24,12 @@ import {
 } from "../../features/quizPlay/voteOptionImages";
 import { ProjectorSideBySideContent } from "./ProjectorSideBySideContent";
 import { ProjectorOptionLabel } from "../quiz/ProjectorOptionLabel";
+import { ProjectorGeoPollMap } from "./ProjectorGeoPollMap";
 import { ProjectorTemperatureScale } from "./ProjectorTemperatureScale";
+import {
+  buildDebateSideBySideRows,
+  ProjectorDebateSideBySideChart,
+} from "./ProjectorDebateSideBySideChart";
 import type { ProjectorLayoutWord, ProjectorQuestionResult } from "../../types/projectorDashboard";
 import { resolveMuiFontFamily } from "../../utils/muiFontFamily";
 
@@ -115,6 +122,7 @@ export function QuestionChart(props: QuestionChartProps) {
   /** Последние применённые размеры — без этого ResizeObserver + пересчёт облака могут «дрожать» на 1px и зациклить layout. */
   const appliedCloudSizeRef = useRef({ width: 0, height: 0 });
 
+  const isGeoPoll = isGeoPollDictionary(question.geoPollDictionary);
   const isTagCloud = question.type === "tag_cloud";
   const sourceWords = useMemo(
     () =>
@@ -371,6 +379,15 @@ export function QuestionChart(props: QuestionChartProps) {
   const isTemperatureQuestion = question.type === "temperature";
   const isRegularVoteQuestion = question.type !== "tag_cloud";
   const isOptionsRevealStage = isRegularVoteQuestion && questionRevealStage === "options";
+  const debateSideBySide = singlePollDebateSideBySideEligible({
+    type: question.type,
+    optionCount: question.optionStats.length,
+    projectorDebateLayout: question.projectorDebateLayout,
+  });
+  const debateSideBySideRows = useMemo(
+    () => (debateSideBySide ? buildDebateSideBySideRows(question.optionStats, showVoteCount) : []),
+    [debateSideBySide, question.optionStats, showVoteCount],
+  );
 
   const rankingBlock = useMemo(() => {
     const baseStyle = () => ({
@@ -483,6 +500,18 @@ export function QuestionChart(props: QuestionChartProps) {
       return chunk;
     });
   }, [optionsRows]);
+
+  if (isGeoPoll && question.geoPollDictionary) {
+    return (
+      <ProjectorGeoPollMap
+        dictionaryId={question.geoPollDictionary}
+        optionStats={question.optionStats}
+        brandPrimaryColor={brandPrimaryColor}
+        voteOptionTextColor={voteOptionTextColor}
+        brandFontFamily={brandFontFamily}
+      />
+    );
+  }
 
   if (!hasData) {
     return null;
@@ -708,6 +737,15 @@ export function QuestionChart(props: QuestionChartProps) {
                 ))}
               </Stack>
             </>
+          ) : debateSideBySide ? (
+            <ProjectorDebateSideBySideChart
+              rows={debateSideBySideRows}
+              questionRevealStage={questionRevealStage}
+              voteOptionTextColor={voteOptionTextColor}
+              voteOptionBorderColor={voteOptionBorderColor}
+              voteProgressTrackColor={voteProgressTrackColor}
+              voteProgressBarColor={voteProgressBarColor}
+            />
           ) : isTemperatureQuestion ? (
             <ProjectorTemperatureScale
               subtitle={question.temperatureSubtitle?.trim() || undefined}

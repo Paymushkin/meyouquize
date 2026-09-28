@@ -4,6 +4,13 @@ import type {
   PublicViewPayload,
 } from "../publicViewContract";
 import {
+  GEO_POLL_DICTIONARY_WORLD_CITIES,
+  GEO_POLL_DICTIONARY_WORLD_COUNTRIES,
+  isDebatePollPreset,
+  isGeoPollPreset,
+  withDebateOptionColors,
+} from "@meyouquize/shared";
+import {
   inferQuestionUseImages,
   optionHasTextOrImage,
 } from "../features/quizPlay/voteOptionImages";
@@ -19,6 +26,8 @@ export type OptionForm = {
   imageUrl?: string;
   /** Для temperature: вес варианта 0–100. */
   weight?: number;
+  /** Hex-цвет сегмента на проекторе (дебаты). */
+  color?: string | null;
 };
 
 export type QuestionForm = {
@@ -61,6 +70,18 @@ export type QuestionForm = {
   tagCloudPlayerHint?: string;
   /** Для temperature: подзаголовок на проекторе над шкалой. */
   temperatureSubtitle?: string;
+  /** Для дебатов: id baseline-опроса «до». */
+  debateBaselineQuestionId?: string | null;
+  /** Side-by-side layout на проекторе (2–3 варианта). */
+  projectorDebateLayout?: boolean;
+  /** Серия многораундовых дебатов. */
+  debateSeriesId?: string | null;
+  /** Индекс раунда в серии (0-based). */
+  debateRoundIndex?: number | null;
+  /** Заголовок накопительного итога серии. */
+  debateSeriesResultTitle?: string | null;
+  /** Geo poll: id словаря автодополнения. */
+  geoPollDictionary?: string | null;
   options: OptionForm[];
 };
 
@@ -99,6 +120,12 @@ export type AdminEventRoomQuestion = {
   rankingPlayerHint?: string | null;
   tagCloudPlayerHint?: string | null;
   temperatureSubtitle?: string | null;
+  debateBaselineQuestionId?: string | null;
+  projectorDebateLayout?: boolean;
+  debateSeriesId?: string | null;
+  debateRoundIndex?: number | null;
+  debateSeriesResultTitle?: string | null;
+  geoPollDictionary?: string | null;
   options: Array<{
     id: string;
     text: string;
@@ -106,6 +133,7 @@ export type AdminEventRoomQuestion = {
     sortOrder?: number;
     imageUrl?: string | null;
     weight?: number | null;
+    color?: string | null;
   }>;
 };
 
@@ -231,10 +259,20 @@ export function questionAllowsOptionImages(q: QuestionForm): boolean {
   return Boolean(q.useImages) && q.type !== "tag_cloud";
 }
 
-export function getQuestionTypeSelectValue(
-  question: QuestionForm,
-): "single" | "multi" | "ranking" | "tag_cloud" | "poll" | "temperature" {
+export type QuestionTypeSelectValue =
+  | "single"
+  | "multi"
+  | "ranking"
+  | "tag_cloud"
+  | "poll"
+  | "temperature"
+  | "geo_poll"
+  | "debate_poll";
+
+export function getQuestionTypeSelectValue(question: QuestionForm): QuestionTypeSelectValue {
   if (question.type === "temperature") return "temperature";
+  if (isGeoPollPreset(question)) return "geo_poll";
+  if (isDebatePollPreset(question)) return "debate_poll";
   if (
     (question.subQuizId == null || question.subQuizId === undefined) &&
     (question.type === "single" || question.type === "multi") &&
@@ -245,13 +283,52 @@ export function getQuestionTypeSelectValue(
   return question.type;
 }
 
+export function getQuestionTypeDisplayLabel(question: QuestionForm): string {
+  const value = getQuestionTypeSelectValue(question);
+  if (value === "geo_poll") {
+    return question.geoPollDictionary === GEO_POLL_DICTIONARY_WORLD_COUNTRIES
+      ? "Геоопрос · Страны"
+      : "Геоопрос · Города";
+  }
+  if (value === "debate_poll") return "Дебаты";
+  if (value === "poll") return "Голосование";
+  if (value === "tag_cloud") return "Облако тегов";
+  if (value === "ranking") return "Ранжирование";
+  if (value === "temperature") return "Температура";
+  if (value === "multi") return "Несколько правильных";
+  return "Один правильный";
+}
+
 /** Копия вопроса/голосования для вставки в комнату (без id, без ответов, неактивна). */
 export function cloneQuestionForm(source: QuestionForm): QuestionForm {
   const cloned = JSON.parse(JSON.stringify(source)) as QuestionForm;
   delete cloned.id;
   cloned.isActive = false;
   cloned.adminDone = false;
+  // Клон дебатов — отдельная серия, а не новый раунд текущей.
+  if (isDebatePollPreset(cloned)) {
+    cloned.debateSeriesId = `dbs_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`;
+    cloned.debateRoundIndex = 0;
+  }
   return cloned;
+}
+
+/** Фильтрует блоки «Голосования» по набору глобальных индексов (актуальные / отработанные). */
+export function filterVotesDisplayBlocks(
+  blocks: ReturnType<typeof buildVotesDisplayBlocks>,
+  allowedIndices: ReadonlySet<number>,
+): ReturnType<typeof buildVotesDisplayBlocks> {
+  const out: ReturnType<typeof buildVotesDisplayBlocks> = [];
+  for (const block of blocks) {
+    if (block.kind === "single") {
+      if (allowedIndices.has(block.formIndex)) out.push(block);
+      continue;
+    }
+    const formIndices = block.formIndices.filter((i) => allowedIndices.has(i));
+    if (formIndices.length > 0)
+      out.push({ kind: "debate_series", seriesId: block.seriesId, formIndices });
+  }
+  return out;
 }
 
 export function createEmptyQuestion(subQuizId: string | null = null): QuestionForm {
@@ -292,7 +369,48 @@ function coerceMaxAnswers(raw: unknown): number | undefined {
   return Math.max(1, Math.min(5, Math.trunc(n)));
 }
 
+function normalizeGeoPollQuestionForm(form: QuestionForm): QuestionForm {
+  if (!isGeoPollPreset(form)) return form;
+  return {
+    ...form,
+    type: "single",
+    editorQuizMode: false,
+    projectorDebateLayout: false,
+    debateBaselineQuestionId: null,
+    debateSeriesId: null,
+    debateRoundIndex: null,
+    debateSeriesResultTitle: null,
+    geoPollDictionary: form.geoPollDictionary ?? GEO_POLL_DICTIONARY_WORLD_CITIES,
+    showVoteCount: false,
+    showCorrectOption: false,
+    options: [],
+  };
+}
+
+function normalizeDebateQuestionForm(form: QuestionForm): QuestionForm {
+  if (!isDebatePollPreset(form)) return form;
+  return {
+    ...form,
+    debateSeriesId:
+      form.debateSeriesId?.trim() ||
+      `dbs_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`,
+    debateRoundIndex:
+      form.debateRoundIndex != null && Number.isFinite(form.debateRoundIndex)
+        ? Math.max(0, Math.trunc(form.debateRoundIndex))
+        : 0,
+    debateSeriesResultTitle: form.debateSeriesResultTitle?.trim() || null,
+    options: withDebateOptionColors(form.options),
+  };
+}
+
+function normalizeInteractiveQuestionForm(form: QuestionForm): QuestionForm {
+  return normalizeDebateQuestionForm(normalizeGeoPollQuestionForm(form));
+}
+
 export function toQuestionReplaceInput(q: QuestionForm) {
+  const inQuiz = q.subQuizId != null && q.subQuizId !== undefined;
+  const geoPoll = !inQuiz && isGeoPollPreset(q);
+  const debatePoll = !inQuiz && isDebatePollPreset(q);
   const scoringMode: "poll" | "quiz" =
     q.type === "temperature"
       ? "poll"
@@ -305,8 +423,9 @@ export function toQuestionReplaceInput(q: QuestionForm) {
             : isEditorQuizMode(q)
               ? "quiz"
               : "poll";
-  const options =
-    q.type === "tag_cloud" && !isEditorQuizMode(q)
+  const options = geoPoll
+    ? []
+    : q.type === "tag_cloud" && !isEditorQuizMode(q)
       ? []
       : q.type === "tag_cloud" && isEditorQuizMode(q)
         ? q.options
@@ -316,7 +435,9 @@ export function toQuestionReplaceInput(q: QuestionForm) {
           ? q.options.map((o) =>
               normalizeOptionForSave({ ...o, text: o.text.trim() }, questionAllowsOptionImages(q)),
             )
-          : q.options.map((o) => normalizeOptionForSave(o, questionAllowsOptionImages(q)));
+          : (debatePoll ? withDebateOptionColors(q.options) : q.options).map((o) =>
+              normalizeOptionForSave(o, questionAllowsOptionImages(q)),
+            );
   return {
     id: q.id,
     text: q.text.trim(),
@@ -345,16 +466,42 @@ export function toQuestionReplaceInput(q: QuestionForm) {
         ? {
             temperatureSubtitle: q.temperatureSubtitle?.trim() || null,
           }
-        : q.type === "tag_cloud"
-          ? {
-              tagCloudPlayerHint: q.tagCloudPlayerHint?.trim() || null,
-              ...(isEditorQuizMode(q)
-                ? {
-                    rankingPointsByRank: tagCloudRankingPointsForSave(q),
-                  }
-                : {}),
-            }
-          : {}),
+        : q.type === "single" || q.type === "multi"
+          ? inQuiz
+            ? {
+                debateBaselineQuestionId: null,
+                projectorDebateLayout: false,
+                debateSeriesId: null,
+                debateRoundIndex: null,
+                debateSeriesResultTitle: null,
+                geoPollDictionary: null,
+              }
+            : {
+                debateBaselineQuestionId: geoPoll
+                  ? null
+                  : q.debateBaselineQuestionId?.trim() || null,
+                projectorDebateLayout: geoPoll ? false : (q.projectorDebateLayout ?? false),
+                debateSeriesId: geoPoll ? null : q.debateSeriesId?.trim() || null,
+                debateRoundIndex: geoPoll
+                  ? null
+                  : q.debateRoundIndex != null && Number.isFinite(q.debateRoundIndex)
+                    ? Math.max(0, Math.trunc(q.debateRoundIndex))
+                    : null,
+                debateSeriesResultTitle: geoPoll ? null : q.debateSeriesResultTitle?.trim() || null,
+                geoPollDictionary: geoPoll
+                  ? (q.geoPollDictionary ?? GEO_POLL_DICTIONARY_WORLD_CITIES)
+                  : null,
+              }
+          : q.type === "tag_cloud"
+            ? {
+                tagCloudPlayerHint: q.tagCloudPlayerHint?.trim() || null,
+                ...(isEditorQuizMode(q)
+                  ? {
+                      rankingPointsByRank: tagCloudRankingPointsForSave(q),
+                    }
+                  : {}),
+              }
+            : {}),
     options,
   };
 }
@@ -363,17 +510,145 @@ export function buildRoomContentPayload(
   sheets: SubQuizSheet[],
   questionForms: QuestionForm[],
 ): RoomContentPayload {
+  const synced = syncDebateSeriesOptionSlots(questionForms);
   const subQuizzes = sheets.map((sq, sortOrder) => ({
     id: sq.id,
     title: sq.title.trim() || "Квиз",
     questionFlowMode: sq.questionFlowMode ?? "manual",
     sortOrder,
-    questions: questionForms.filter((q) => q.subQuizId === sq.id).map(toQuestionReplaceInput),
+    questions: synced.filter((q) => q.subQuizId === sq.id).map(toQuestionReplaceInput),
   }));
-  const standaloneQuestions = questionForms
+  const standaloneQuestions = synced
     .filter((q) => q.subQuizId === null)
     .map(toQuestionReplaceInput);
   return { subQuizzes, standaloneQuestions };
+}
+
+/** Синхронизирует текст/цвет сторон по слотам во всех раундах одной серии (источник — раунд 0 или первый). */
+export function syncDebateSeriesOptionSlots(forms: QuestionForm[]): QuestionForm[] {
+  const bySeries = new Map<string, QuestionForm[]>();
+  for (const q of forms) {
+    const seriesId = q.debateSeriesId?.trim();
+    if (!seriesId || !isDebatePollPreset(q)) continue;
+    const list = bySeries.get(seriesId) ?? [];
+    list.push(q);
+    bySeries.set(seriesId, list);
+  }
+  if (bySeries.size === 0) return forms;
+  const canonicalBySeries = new Map<
+    string,
+    { options: OptionForm[]; resultTitle: string | null }
+  >();
+  for (const [seriesId, list] of bySeries) {
+    const sorted = [...list].sort((a, b) => (a.debateRoundIndex ?? 0) - (b.debateRoundIndex ?? 0));
+    const source = sorted[0]!;
+    const titled = sorted.find((q) => q.debateSeriesResultTitle?.trim()) ?? source;
+    canonicalBySeries.set(seriesId, {
+      options: withDebateOptionColors(source.options),
+      resultTitle: titled.debateSeriesResultTitle?.trim() || null,
+    });
+  }
+  return forms.map((q) => {
+    const seriesId = q.debateSeriesId?.trim();
+    if (!seriesId || !isDebatePollPreset(q)) return q;
+    const canon = canonicalBySeries.get(seriesId);
+    if (!canon) return q;
+    return {
+      ...q,
+      debateSeriesResultTitle: canon.resultTitle,
+      options: q.options.map((opt, i) => {
+        const src = canon.options[i];
+        if (!src) return opt;
+        return {
+          ...opt,
+          text: src.text,
+          color: src.color,
+          isCorrect: src.isCorrect,
+        };
+      }),
+    };
+  });
+}
+
+export type DebateSeriesBlock = {
+  seriesId: string;
+  /** Глобальные индексы questionForms, отсортированные по раунду. */
+  formIndices: number[];
+};
+
+/** Группирует standalone-голосования: серия дебатов → один блок, остальное — одиночные.
+ * Порядок блоков следует порядку появления в `forms` (серия — по первому раунду).
+ */
+export type VotesDisplayBlock =
+  | { kind: "debate_series"; seriesId: string; formIndices: number[] }
+  | { kind: "single"; formIndex: number };
+
+export function buildVotesDisplayBlocks(forms: QuestionForm[]): VotesDisplayBlock[] {
+  const used = new Set<number>();
+  const blocks: VotesDisplayBlock[] = [];
+  for (let index = 0; index < forms.length; index += 1) {
+    if (used.has(index)) continue;
+    const q = forms[index]!;
+    if (q.subQuizId != null) continue;
+    const seriesId = q.debateSeriesId?.trim();
+    if (seriesId && isDebatePollPreset(q)) {
+      const formIndices = forms
+        .map((row, rowIndex) => ({ q: row, index: rowIndex }))
+        .filter(
+          ({ q: row }) =>
+            row.subQuizId == null &&
+            row.debateSeriesId?.trim() === seriesId &&
+            isDebatePollPreset(row),
+        )
+        .sort(
+          (a, b) => (a.q.debateRoundIndex ?? 0) - (b.q.debateRoundIndex ?? 0) || a.index - b.index,
+        )
+        .map((row) => row.index);
+      for (const i of formIndices) used.add(i);
+      blocks.push({ kind: "debate_series", seriesId, formIndices });
+      continue;
+    }
+    used.add(index);
+    blocks.push({ kind: "single", formIndex: index });
+  }
+  return blocks;
+}
+
+/** Переставляет блоки голосований; возвращает новый массив форм или `null`, если порядок не менялся. */
+export function applyVotesDisplayBlocksReorder(
+  forms: QuestionForm[],
+  blocks: VotesDisplayBlock[],
+  fromBlockIndex: number,
+  toBlockIndex: number,
+): QuestionForm[] | null {
+  if (fromBlockIndex === toBlockIndex) return null;
+  if (
+    fromBlockIndex < 0 ||
+    toBlockIndex < 0 ||
+    fromBlockIndex >= blocks.length ||
+    toBlockIndex >= blocks.length
+  ) {
+    return null;
+  }
+
+  const nextBlocks = [...blocks];
+  const [moved] = nextBlocks.splice(fromBlockIndex, 1);
+  if (!moved) return null;
+  nextBlocks.splice(toBlockIndex, 0, moved);
+
+  const flattenBlock = (block: VotesDisplayBlock): number[] =>
+    block.kind === "debate_series" ? [...block.formIndices] : [block.formIndex];
+
+  const sourceIndices = blocks.flatMap(flattenBlock);
+  const positions = [...sourceIndices].sort((a, b) => a - b);
+  const reorderedIndices = nextBlocks.flatMap(flattenBlock);
+  if (positions.length !== reorderedIndices.length) return null;
+
+  const next = [...forms];
+  positions.forEach((position, index) => {
+    next[position] = forms[reorderedIndices[index]!]!;
+  });
+  return next;
 }
 
 export function serializeRoomContent(sheets: SubQuizSheet[], questionForms: QuestionForm[]) {
@@ -429,6 +704,9 @@ function normalizeOptionForSave(option: OptionForm, includeImages: boolean): Opt
     isCorrect: option.isCorrect,
     imageUrl: includeImages ? option.imageUrl?.trim() || undefined : undefined,
     ...(option.weight != null ? { weight: option.weight } : {}),
+    ...(option.color != null && option.color.trim()
+      ? { color: option.color.trim() }
+      : { color: null }),
   };
 }
 
@@ -478,7 +756,14 @@ export function validateQuestionFormEntry(q: QuestionForm, index: number): strin
     return null;
   }
 
+  if (isGeoPollPreset(q)) {
+    return null;
+  }
+
   if (q.type === "temperature") {
+    if (q.subQuizId != null) {
+      return `Вопрос ${label}: измерение температуры недоступно в квизах.`;
+    }
     if (q.options.length < 2) {
       return `Вопрос ${label}: для измерения температуры нужно минимум 2 варианта.`;
     }
@@ -591,6 +876,7 @@ export function mapLoadedRoomQuestions(
         isCorrect: Boolean(o.isCorrect),
         imageUrl: o.imageUrl?.trim() || undefined,
         ...(o.weight != null ? { weight: o.weight } : {}),
+        ...(o.color?.trim() ? { color: o.color.trim() } : {}),
       })),
     );
     const form: QuestionForm = {
@@ -624,9 +910,30 @@ export function mapLoadedRoomQuestions(
         q.type === "RANKING" ? q.rankingPlayerHint?.trim() || defaultRankingPlayerHint(kind) : "",
       tagCloudPlayerHint: q.type === "TAG_CLOUD" ? q.tagCloudPlayerHint?.trim() || "" : "",
       temperatureSubtitle: q.type === "TEMPERATURE" ? q.temperatureSubtitle?.trim() || "" : "",
+      debateBaselineQuestionId:
+        q.type === "SINGLE" || q.type === "MULTI"
+          ? q.debateBaselineQuestionId?.trim() || null
+          : null,
+      projectorDebateLayout:
+        q.type === "SINGLE" || q.type === "MULTI" ? Boolean(q.projectorDebateLayout) : false,
+      debateSeriesId:
+        q.type === "SINGLE" || q.type === "MULTI" ? q.debateSeriesId?.trim() || null : null,
+      debateRoundIndex:
+        q.type === "SINGLE" || q.type === "MULTI"
+          ? q.debateRoundIndex != null && Number.isFinite(q.debateRoundIndex)
+            ? Math.trunc(q.debateRoundIndex)
+            : null
+          : null,
+      debateSeriesResultTitle:
+        q.type === "SINGLE" || q.type === "MULTI"
+          ? q.debateSeriesResultTitle?.trim() || null
+          : null,
+      geoPollDictionary:
+        q.type === "SINGLE" || q.type === "MULTI" ? q.geoPollDictionary?.trim() || null : null,
       options,
     };
-    return form.type === "tag_cloud" ? normalizeTagCloudQuestionPoints(form) : form;
+    const normalized = form.type === "tag_cloud" ? normalizeTagCloudQuestionPoints(form) : form;
+    return normalizeInteractiveQuestionForm(normalized);
   });
 }
 
@@ -645,6 +952,7 @@ export function mergeServerQuestionsIntoForms(
         isCorrect: Boolean(o.isCorrect),
         imageUrl: o.imageUrl?.trim() || undefined,
         ...(o.weight != null ? { weight: o.weight } : {}),
+        ...(o.color?.trim() ? { color: o.color.trim() } : {}),
       })),
     );
     const prev = mergeFrom.find((item) => item.id === q.id);
@@ -684,9 +992,37 @@ export function mergeServerQuestionsIntoForms(
       temperatureSubtitle:
         prev?.temperatureSubtitle ??
         (q.type === "TEMPERATURE" ? q.temperatureSubtitle?.trim() || "" : ""),
+      debateBaselineQuestionId:
+        q.type === "SINGLE" || q.type === "MULTI"
+          ? (prev?.debateBaselineQuestionId ?? q.debateBaselineQuestionId?.trim() ?? null)
+          : null,
+      projectorDebateLayout:
+        q.type === "SINGLE" || q.type === "MULTI"
+          ? (prev?.projectorDebateLayout ?? Boolean(q.projectorDebateLayout))
+          : false,
+      debateSeriesId:
+        q.type === "SINGLE" || q.type === "MULTI"
+          ? (prev?.debateSeriesId ?? q.debateSeriesId?.trim() ?? null)
+          : null,
+      debateRoundIndex:
+        q.type === "SINGLE" || q.type === "MULTI"
+          ? (prev?.debateRoundIndex ??
+            (q.debateRoundIndex != null && Number.isFinite(q.debateRoundIndex)
+              ? Math.trunc(q.debateRoundIndex)
+              : null))
+          : null,
+      debateSeriesResultTitle:
+        q.type === "SINGLE" || q.type === "MULTI"
+          ? (prev?.debateSeriesResultTitle ?? q.debateSeriesResultTitle?.trim() ?? null)
+          : null,
+      geoPollDictionary:
+        q.type === "SINGLE" || q.type === "MULTI"
+          ? (prev?.geoPollDictionary ?? q.geoPollDictionary?.trim() ?? null)
+          : null,
       options,
     };
-    return form.type === "tag_cloud" ? normalizeTagCloudQuestionPoints(form) : form;
+    const normalized = form.type === "tag_cloud" ? normalizeTagCloudQuestionPoints(form) : form;
+    return normalizeInteractiveQuestionForm(normalized);
   });
 }
 

@@ -1,6 +1,7 @@
 import type { ActiveQuestion } from "./types";
 
 export function getQuestionTypeLabel(question: ActiveQuestion): string {
+  if (question.geoPollDictionary) return "Геоопрос";
   if (question.type === "single") return "Один ответ";
   if (question.type === "multi") return "Несколько ответов";
   if (question.type === "temperature") return "Измерение температуры";

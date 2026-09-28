@@ -5,22 +5,27 @@ import {
   CardContent,
   IconButton,
   Link,
-  MenuItem,
   Stack,
   TextField,
+  Tooltip,
   Typography,
 } from "@mui/material";
 import { sanitizeBannerLinkUrl } from "../../../utils/safeUrls";
 import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
 import ArrowUpwardIcon from "@mui/icons-material/ArrowUpward";
 import ArrowDownwardIcon from "@mui/icons-material/ArrowDownward";
+import EditOutlinedIcon from "@mui/icons-material/EditOutlined";
 import KeyboardArrowDownIcon from "@mui/icons-material/KeyboardArrowDown";
 import QuestionAnswerIcon from "@mui/icons-material/QuestionAnswer";
 import EventNoteIcon from "@mui/icons-material/EventNote";
+import VisibilityIcon from "@mui/icons-material/Visibility";
+import VisibilityOffIcon from "@mui/icons-material/VisibilityOff";
 import { isQuizResultsTileId } from "../../../publicViewContract";
 import { PlayerPhotoWallCollageTile } from "../../quiz/PlayerPhotoWallCollageTile";
 import { PlayerQuizResultsTile } from "../../quiz/PlayerQuizResultsTile";
-import type { BannerEditorState, BannerSize, OrderedTile } from "./types";
+import type { BannerEditorState, OrderedTile } from "./types";
+
+const PREVIEW_TILE_SIZE = 100;
 
 type Props = {
   tiles: OrderedTile[];
@@ -29,13 +34,14 @@ type Props = {
   onMoveUp: (id: string) => void;
   onMoveDown: (id: string) => void;
   onToggleBannerVisible: (bannerId: string, next: boolean) => void;
+  photoWallTileVisible: boolean;
+  onTogglePhotoWallTileVisible: (next: boolean) => void;
   onDeleteBanner: (bannerId: string) => void;
   onStartEdit: (tile: Extract<OrderedTile, { kind: "banner" }>) => void;
   onCancelEdit: () => void;
   onSaveEdit: (bannerId: string) => void;
   onChangeEditLinkUrl: (value: string) => void;
   onChangeEditBackgroundUrl: (value: string) => void;
-  onChangeEditSize: (value: BannerSize) => void;
 };
 
 export function TilesOrderList({
@@ -45,13 +51,14 @@ export function TilesOrderList({
   onMoveUp,
   onMoveDown,
   onToggleBannerVisible,
+  photoWallTileVisible,
+  onTogglePhotoWallTileVisible,
   onDeleteBanner,
   onStartEdit,
   onCancelEdit,
   onSaveEdit,
   onChangeEditLinkUrl,
   onChangeEditBackgroundUrl,
-  onChangeEditSize,
 }: Props) {
   return (
     <Card variant="outlined">
@@ -95,6 +102,8 @@ export function TilesOrderList({
                     tile.kind === "speaker" || tile.kind === "program"
                       ? {
                           width: 200,
+                          flexShrink: 0,
+                          alignSelf: "flex-start",
                           borderRadius: 1,
                           border: "1px solid",
                           borderColor: "divider",
@@ -109,26 +118,28 @@ export function TilesOrderList({
                           minHeight: 70,
                           position: "relative",
                         }
-                      : tile.kind === "quiz_results"
-                        ? { flexShrink: 0 }
-                        : tile.kind === "photo_wall"
-                          ? { flexShrink: 0 }
-                          : {
-                              width: tile.size === "1x1" ? 100 : tile.size === "full" ? 320 : 200,
-                              aspectRatio:
-                                tile.size === "1x1"
-                                  ? "1 / 1"
-                                  : tile.size === "full"
-                                    ? "4 / 1"
-                                    : "2 / 1",
-                              borderRadius: 1,
-                              border: "1px solid",
-                              borderColor: "divider",
-                              backgroundImage: `url("${tile.previewUrl}")`,
-                              backgroundSize: "cover",
-                              backgroundPosition: "center",
-                              backgroundRepeat: "no-repeat",
-                            }
+                      : tile.kind === "quiz_results" || tile.kind === "photo_wall"
+                        ? {
+                            width: PREVIEW_TILE_SIZE,
+                            height: PREVIEW_TILE_SIZE,
+                            flexShrink: 0,
+                            alignSelf: "flex-start",
+                            boxSizing: "border-box",
+                          }
+                        : {
+                            width: PREVIEW_TILE_SIZE,
+                            height: PREVIEW_TILE_SIZE,
+                            flexShrink: 0,
+                            alignSelf: "flex-start",
+                            boxSizing: "border-box",
+                            borderRadius: 1,
+                            border: "1px solid",
+                            borderColor: "divider",
+                            backgroundImage: `url("${tile.previewUrl}")`,
+                            backgroundSize: "cover",
+                            backgroundPosition: "center",
+                            backgroundRepeat: "no-repeat",
+                          }
                   }
                 >
                   {tile.kind === "speaker" ? (
@@ -176,7 +187,7 @@ export function TilesOrderList({
                   {tile.kind === "quiz_results" ? (
                     <PlayerQuizResultsTile
                       preview
-                      previewWidth={100}
+                      previewWidth={PREVIEW_TILE_SIZE}
                       title={tile.title}
                       score={10}
                       brandPrimaryColor={tile.brandPrimaryColor}
@@ -186,7 +197,7 @@ export function TilesOrderList({
                   {tile.kind === "photo_wall" ? (
                     <PlayerPhotoWallCollageTile
                       preview
-                      previewWidth={100}
+                      previewWidth={PREVIEW_TILE_SIZE}
                       photoSrcs={tile.photoSrcs}
                     />
                   ) : null}
@@ -196,16 +207,6 @@ export function TilesOrderList({
                   {tile.kind === "banner" ? (
                     <Typography variant="caption" color="text.secondary">
                       Уникальных кликов: {bannerClickCounts[tile.banner.id] ?? 0}
-                    </Typography>
-                  ) : null}
-                  {tile.kind === "banner" ? (
-                    <Typography variant="caption" color="text.secondary">
-                      Размер: {tile.size}
-                    </Typography>
-                  ) : null}
-                  {tile.kind === "banner" ? (
-                    <Typography variant="caption" color="text.secondary">
-                      ID: {tile.banner.id}
                     </Typography>
                   ) : null}
                   {tile.kind === "banner" ? (
@@ -238,11 +239,6 @@ export function TilesOrderList({
                       Плитка 1×1: вкл/выкл в блоке управления квизом («Отчёт игрокам»)
                     </Typography>
                   ) : null}
-                  {tile.kind === "photo_wall" ? (
-                    <Typography variant="caption" color="text.secondary">
-                      Плитка 1×1: вкл/выкл на вкладке «Фотостена»
-                    </Typography>
-                  ) : null}
                   {tile.kind === "banner" && editor.editingId === tile.banner.id ? (
                     <Stack spacing={1}>
                       <TextField
@@ -259,18 +255,6 @@ export function TilesOrderList({
                         onChange={(e) => onChangeEditBackgroundUrl(e.target.value)}
                         fullWidth
                       />
-                      <TextField
-                        select
-                        size="small"
-                        label="Размер"
-                        value={editor.editSize}
-                        onChange={(e) => onChangeEditSize(e.target.value as BannerSize)}
-                        fullWidth
-                      >
-                        <MenuItem value="2x1">2x1</MenuItem>
-                        <MenuItem value="1x1">1x1</MenuItem>
-                        <MenuItem value="full">Во всю ширину</MenuItem>
-                      </TextField>
                       <Stack direction="row" spacing={1}>
                         <Button
                           size="small"
@@ -302,24 +286,76 @@ export function TilesOrderList({
                       <ArrowDownwardIcon fontSize="small" />
                     </IconButton>
                     {tile.kind === "banner" ? (
-                      <Button
-                        size="small"
-                        variant={tile.banner.isVisible ? "outlined" : "contained"}
-                        onClick={() =>
-                          onToggleBannerVisible(tile.banner.id, !tile.banner.isVisible)
+                      <Tooltip
+                        title={
+                          tile.banner.isVisible
+                            ? "Убрать с экрана пользователя"
+                            : "Вывести на экран пользователя"
                         }
                       >
-                        {tile.banner.isVisible ? "Убрать с экрана" : "Вывести на экран"}
-                      </Button>
+                        <IconButton
+                          size="small"
+                          aria-label={
+                            tile.banner.isVisible
+                              ? "Убрать с экрана пользователя"
+                              : "Вывести на экран пользователя"
+                          }
+                          aria-pressed={tile.banner.isVisible}
+                          color={tile.banner.isVisible ? "primary" : "default"}
+                          onClick={() =>
+                            onToggleBannerVisible(tile.banner.id, !tile.banner.isVisible)
+                          }
+                        >
+                          {tile.banner.isVisible ? (
+                            <VisibilityIcon fontSize="small" />
+                          ) : (
+                            <VisibilityOffIcon fontSize="small" />
+                          )}
+                        </IconButton>
+                      </Tooltip>
+                    ) : null}
+                    {tile.kind === "photo_wall" ? (
+                      <Tooltip
+                        title={
+                          photoWallTileVisible
+                            ? "Скрыть плитку фотостены у пользователя"
+                            : "Показать плитку фотостены пользователю"
+                        }
+                      >
+                        <IconButton
+                          size="small"
+                          aria-label={
+                            photoWallTileVisible
+                              ? "Скрыть плитку фотостены у пользователя"
+                              : "Показать плитку фотостены пользователю"
+                          }
+                          aria-pressed={photoWallTileVisible}
+                          color={photoWallTileVisible ? "primary" : "default"}
+                          onClick={() => onTogglePhotoWallTileVisible(!photoWallTileVisible)}
+                        >
+                          {photoWallTileVisible ? (
+                            <VisibilityIcon fontSize="small" />
+                          ) : (
+                            <VisibilityOffIcon fontSize="small" />
+                          )}
+                        </IconButton>
+                      </Tooltip>
                     ) : null}
                     {tile.kind === "banner" && editor.editingId !== tile.banner.id ? (
-                      <Button size="small" variant="outlined" onClick={() => onStartEdit(tile)}>
-                        Редактировать
-                      </Button>
+                      <Tooltip title="Редактировать">
+                        <IconButton
+                          size="small"
+                          aria-label="Редактировать баннер"
+                          onClick={() => onStartEdit(tile)}
+                        >
+                          <EditOutlinedIcon fontSize="small" />
+                        </IconButton>
+                      </Tooltip>
                     ) : null}
                     {tile.kind === "banner" ? (
                       <IconButton
                         size="small"
+                        color="error"
                         aria-label="Удалить баннер"
                         onClick={() => onDeleteBanner(tile.banner.id)}
                       >
