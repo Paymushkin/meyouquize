@@ -19,7 +19,7 @@ describe("socketConnectErrorMessage", () => {
     expect(socketConnectErrorMessage("10.0.0.5")).toContain("площадки");
   });
 
-  it("returns dev backend hint for localhost in vite dev", () => {
+  it("returns local backend hint for localhost", () => {
     expect(socketConnectErrorMessage("localhost")).toContain("порт 4000");
   });
 
