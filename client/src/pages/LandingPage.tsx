@@ -1480,7 +1480,7 @@ const SHOW_LANDING_DEMO_SECTION = false;
 
 export function LandingPage() {
   return (
-    <BrandPageLayout documentTitle="Meyouquize — интерактивные квизы и голосования для мероприятий">
+    <BrandPageLayout documentTitle="МИЮ — интерактивные квизы и голосования для мероприятий">
       <Box sx={{ position: "relative" }}>
         <BrandHeader overHero />
         <LandingHeroSection />

@@ -3,6 +3,7 @@ import path from "node:path";
 import { createRequire } from "node:module";
 import type { Request } from "express";
 import PDFDocument from "pdfkit";
+import { groupSpeakerQuestionsBySession } from "@meyouquize/shared";
 import type { PublicEventReport } from "./quiz-service.js";
 import { buildReportPdfHtml } from "./report-pdf-html.js";
 
@@ -120,15 +121,34 @@ async function renderSimplePdf(report: PublicEventReport): Promise<Buffer> {
       doc.fontSize(14).text("Вопросы спикерам");
       doc.fontSize(11).text(`Всего вопросов: ${report.speakerQuestions.total}`);
       doc.text(`На экране: ${report.speakerQuestions.onScreen}`);
-      report.speakerQuestions.items.slice(0, 20).forEach((item, index) => {
-        const reactionsText =
-          item.reactions.length > 0
-            ? item.reactions.map((reaction) => `${reaction.reaction} ${reaction.count}`).join(", ")
-            : "нет";
-        doc.text(
-          `${index + 1}. [${item.speakerName}] ${item.text} — автор: ${item.author}, реакции: ${reactionsText}`,
-        );
-      });
+      const speakerGroups = groupSpeakerQuestionsBySession(
+        report.speakerQuestions.items.slice(0, 20),
+        (report.speakerQuestions.sessions ?? []).map((s) => ({
+          id: s.id,
+          name: s.name,
+          speakers: [],
+        })),
+      );
+      let index = 0;
+      for (const group of speakerGroups) {
+        if (speakerGroups.length > 1) {
+          doc.fontSize(12).text(group.sessionName);
+        }
+        for (const item of group.items) {
+          index += 1;
+          const reactionsText =
+            item.reactions.length > 0
+              ? item.reactions
+                  .map((reaction) => `${reaction.reaction} ${reaction.count}`)
+                  .join(", ")
+              : "нет";
+          doc
+            .fontSize(11)
+            .text(
+              `${index}. [${item.speakerName}] ${item.text} — автор: ${item.author}, реакции: ${reactionsText}`,
+            );
+        }
+      }
       doc.moveDown();
     }
 

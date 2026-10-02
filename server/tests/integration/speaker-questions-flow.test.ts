@@ -55,6 +55,8 @@ async function enableSpeakerQuestions(quizId: string) {
     ...DEFAULT_PUBLIC_VIEW_STATE,
     speakerQuestionsEnabled: true,
     speakerTileVisible: true,
+    speakerQuestionSessions: [{ id: "test-session", name: "Основная", speakers: ["Иванов"] }],
+    activeSpeakerSessionId: "test-session",
     speakerQuestionsSpeakers: ["Иванов"],
   });
 }
@@ -158,6 +160,8 @@ describe("speaker questions integration", () => {
     admin.emit("admin:speaker:settings:set", {
       quizId,
       enabled: true,
+      sessions: [{ id: "test-session", name: "Основная", speakers: ["Иванов"] }],
+      activeSpeakerSessionId: "test-session",
       speakers: ["Иванов"],
       reactions: ["👍"],
       showAuthorOnScreen: false,
@@ -169,5 +173,49 @@ describe("speaker questions integration", () => {
 
     const stored = await getStoredPublicView(quizId);
     expect(stored.speakerQuestionsAllowAllSpeakersTarget).toBe(false);
+  });
+
+  it("stamps sessionId on create and moderator sees approved questions", async () => {
+    const { eventName, quizId } = await seedSingleChoiceQuiz(uniqueSlug("speaker-sess"));
+    await enableSpeakerQuestions(quizId);
+    server = await createTestServer();
+
+    const player = await joinPlayerSocket(server.baseUrl, eventName, "Author", "dev-sess-1");
+    sockets.push(player);
+
+    const createdWait = waitForEvent<SpeakerQuestionsUpdate>(player, "speaker:questions:update");
+    player.emit("speaker:question:create", {
+      quizId,
+      speakerName: "Иванов",
+      text: "Вопрос для сессии утро?",
+    });
+    await createdWait;
+
+    const row = await prisma.speakerQuestion.findFirst({
+      where: { quizId },
+      orderBy: { createdAt: "desc" },
+    });
+    expect(row?.sessionId).toBe("test-session");
+    expect(row?.status).toBe("PENDING");
+
+    const moderator = await connectSocket(server.baseUrl);
+    sockets.push(moderator);
+    const pendingWait = waitForEvent<SpeakerQuestionsUpdate>(moderator, "speaker:questions:update");
+    moderator.emit("speaker:questions:subscribe", { slug: eventName, viewer: "moderator" });
+    const pendingPayload = await pendingWait;
+    expect(pendingPayload.items.some((i) => i.id === row!.id)).toBe(false);
+
+    await prisma.speakerQuestion.update({
+      where: { id: row!.id },
+      data: { status: "APPROVED" },
+    });
+
+    const approvedWait = waitForEvent<SpeakerQuestionsUpdate>(
+      moderator,
+      "speaker:questions:update",
+    );
+    moderator.emit("speaker:questions:subscribe", { slug: eventName, viewer: "moderator" });
+    const approvedPayload = await approvedWait;
+    expect(approvedPayload.items.some((i) => i.id === row!.id)).toBe(true);
   });
 });

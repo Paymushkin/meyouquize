@@ -107,9 +107,32 @@ describe("report contracts", () => {
       },
       speakerQuestions: {
         enabled: true,
-        total: 5,
-        onScreen: 2,
-        items: [],
+        total: 2,
+        onScreen: 1,
+        sessions: [
+          { id: "s1", name: "Утро" },
+          { id: "s2", name: "Вечер" },
+        ],
+        items: [
+          {
+            id: "sq1",
+            sessionId: "s1",
+            sessionName: "Утро",
+            speakerName: "Спикер А",
+            text: "Утренний вопрос",
+            author: "Игрок 1",
+            reactions: [{ reaction: "👍", count: 2 }],
+          },
+          {
+            id: "sq2",
+            sessionId: "s2",
+            sessionName: "Вечер",
+            speakerName: "Спикер Б",
+            text: "Вечерний вопрос",
+            author: "Игрок 2",
+            reactions: [],
+          },
+        ],
       },
       feedback: [
         {

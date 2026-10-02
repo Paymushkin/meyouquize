@@ -143,6 +143,8 @@ model SpeakerQuestion {
   quiz           Quiz                  @relation(fields: [quizId], references: [id], onDelete: Cascade)
   participantId  String
   participant    Participant           @relation(fields: [participantId], references: [id], onDelete: Cascade)
+  /** Id сессии из publicView.speakerQuestionSessions; null у legacy-вопросов. */
+  sessionId      String?
   speakerName    String
   text           String
   isVisibleToUsers Boolean              @default(true)
@@ -155,6 +157,7 @@ model SpeakerQuestion {
   @@index([quizId, createdAt])
   @@index([quizId, status, createdAt])
   @@index([quizId, isOnScreen, createdAt])
+  @@index([quizId, sessionId])
 }
 
 model SpeakerQuestionReaction {

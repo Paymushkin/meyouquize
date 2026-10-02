@@ -5,7 +5,11 @@ import { Alert, Box, Button, Container, Snackbar, Stack } from "@mui/material";
 import { resolveClientAssetUrl } from "../utils/resolveClientAssetUrl";
 import { AdminLoginForm } from "../components/AdminLoginForm";
 import { API_BASE } from "../config";
-import { buildPlayerJoinUrl, buildProjectorScreenUrl } from "../publicAppOrigin";
+import {
+  buildPlayerJoinUrl,
+  buildProjectorScreenUrl,
+  buildSpeakerModeratorUrl,
+} from "../publicAppOrigin";
 import { useAdminPlayerTiles } from "../features/admin/useAdminPlayerTiles";
 import { useAdminEventBootstrap } from "../features/admin/useAdminEventBootstrap";
 import { useAdminFeedbackCatalog } from "../features/admin/useAdminFeedbackCatalog";
@@ -52,6 +56,10 @@ import { usePublicViewEmitter } from "../hooks/usePublicViewEmitter";
 import { recordServerPublicView } from "../features/publicView/publicViewEmitCoordination";
 import { useSpeakerQuestionsAdminActions } from "../hooks/useSpeakerQuestionsAdminActions";
 import { shouldFallbackProjectorToTitleAfterSpeakerOff } from "../features/speakerQuestionsAdmin/speakerOnScreenProjectorFallback";
+import {
+  shouldShowSpeakersNavBadge,
+  syncKnownSpeakerQuestionIds,
+} from "../features/speakerQuestions/adminSpeakerNavBadge";
 import { useAdminColorMode } from "../theme/AdminColorModeProvider";
 import { socket } from "../socket";
 import {
@@ -564,6 +572,29 @@ export function AdminEventPage() {
     writeAdminUiSection(eventName, activeSection);
   }, [eventName, activeSection]);
 
+  const knownSpeakerQuestionIdsRef = useRef<Set<string> | null>(null);
+  const [speakersNavBadge, setSpeakersNavBadge] = useState(false);
+
+  useEffect(() => {
+    knownSpeakerQuestionIdsRef.current = null;
+    setSpeakersNavBadge(false);
+  }, [eventName]);
+
+  useEffect(() => {
+    if (activeSection === "speakers") {
+      setSpeakersNavBadge(false);
+    }
+  }, [activeSection]);
+
+  useEffect(() => {
+    const nextIds = (speakerQuestions.payload?.items ?? []).map((item) => item.id);
+    const synced = syncKnownSpeakerQuestionIds(knownSpeakerQuestionIdsRef.current, nextIds);
+    knownSpeakerQuestionIdsRef.current = synced.knownIds;
+    if (shouldShowSpeakersNavBadge(synced.hasNew, activeSection)) {
+      setSpeakersNavBadge(true);
+    }
+  }, [speakerQuestions.payload?.items, activeSection]);
+
   useEffect(() => {
     if (!eventName) return;
     writeAdminUiQuestionsTab(eventName, roomQuestionsTab);
@@ -1062,8 +1093,9 @@ export function AdminEventPage() {
   }, [room?.id, room?.publicView]);
 
   useEffect(() => {
-    document.title = "Админ";
-  }, []);
+    const title = editableTitle.trim() || room?.title?.trim();
+    document.title = title || "МИЮ";
+  }, [editableTitle, room?.title]);
 
   useEffect(() => {
     setEditableTitle(room?.title ?? "");
@@ -1267,6 +1299,8 @@ export function AdminEventPage() {
 
   const {
     saveSpeakerSettings,
+    persistActiveSpeakerSession,
+    persistSpeakerSessions,
     setSpeakerQuestionOnScreen,
     hideSpeakerQuestion,
     restoreSpeakerQuestion,
@@ -1485,10 +1519,33 @@ export function AdminEventPage() {
       onToggleShowRecipientOnScreen: speakerQuestions.panelSetters.setShowRecipientOnScreen,
       onToggleShowReactionsOnScreen: speakerQuestions.panelSetters.setShowReactionsOnScreen,
       onToggleAllowAllSpeakersTarget: speakerQuestions.panelSetters.setAllowAllSpeakersTarget,
-      onSpeakersTextChange: speakerQuestions.panelSetters.setSpeakersText,
+      onToggleModeratorShowAll: speakerQuestions.panelSetters.setModeratorShowAll,
+      onSessionsChange: speakerQuestions.panelSetters.setSessions,
+      onPersistSessions: (
+        next: typeof speakerQuestions.settings.sessions,
+        activeSpeakerSessionId?: string | null,
+      ) => {
+        speakerQuestions.panelSetters.setSessions(next);
+        if (activeSpeakerSessionId !== undefined) {
+          speakerQuestions.panelSetters.setActiveSpeakerSessionId(activeSpeakerSessionId);
+        }
+        persistSpeakerSessions(next, activeSpeakerSessionId);
+      },
+      onActiveSpeakerSessionIdChange: (next: string | null) => {
+        speakerQuestions.panelSetters.setActiveSpeakerSessionId(next);
+        persistActiveSpeakerSession(next);
+      },
       onSaveSettings: saveSpeakerSettings,
+      moderatorPageUrl: room?.slug ? buildSpeakerModeratorUrl(room.slug) : undefined,
     }),
-    [speakerQuestions.panelSetters, saveSpeakerSettings],
+    [
+      speakerQuestions.panelSetters,
+      speakerQuestions.settings.sessions,
+      saveSpeakerSettings,
+      persistActiveSpeakerSession,
+      persistSpeakerSessions,
+      room?.slug,
+    ],
   );
 
   const onSelectResultsSubQuiz = useCallback(
@@ -1585,7 +1642,11 @@ export function AdminEventPage() {
       ) : null}
       {isAuth && room && (
         <Stack direction="row" spacing={0} alignItems="stretch">
-          <AdminEventNavSidebar activeSection={activeSection} onSectionChange={setActiveSection} />
+          <AdminEventNavSidebar
+            activeSection={activeSection}
+            onSectionChange={setActiveSection}
+            sectionBadges={{ speakers: speakersNavBadge }}
+          />
           <Box sx={{ flex: 1, minWidth: 0, mt: 0 }}>
             <Stack spacing={3}>
               <AdminEventSectionRouter
@@ -1670,6 +1731,7 @@ export function AdminEventPage() {
                   },
                 }}
                 speakers={{
+                  eventName,
                   speakerQuestions,
                   panelActions: speakerPanelActions,
                   onHide: hideSpeakerQuestion,

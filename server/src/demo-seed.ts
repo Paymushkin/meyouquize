@@ -516,6 +516,22 @@ function buildDemoPublicView(params: {
     speakerQuestionsShowAuthorOnScreen: false,
     speakerQuestionsShowRecipientOnScreen: true,
     speakerQuestionsShowReactionsOnScreen: true,
+    speakerQuestionSessions: [
+      {
+        id: "demo-session-1",
+        name: "Основная",
+        speakers: [
+          "Александр Петров",
+          "Екатерина Смирнова",
+          "Дмитрий Иванов",
+          "Анна Кузнецова",
+          "Сергей Волков",
+          "Ольга Романова",
+          "Михаил Ковалёв",
+        ],
+      },
+    ],
+    activeSpeakerSessionId: "demo-session-1",
     speakerQuestionsSpeakers: [
       "Александр Петров",
       "Екатерина Смирнова",

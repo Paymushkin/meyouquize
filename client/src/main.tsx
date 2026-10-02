@@ -17,6 +17,7 @@ import { AdminSubQuizResultsPage } from "./pages/AdminSubQuizResultsPage";
 import { AdminUsersPage } from "./pages/AdminUsersPage";
 import { PublicReportPage } from "./pages/PublicReportPage";
 import { LandingPage } from "./pages/LandingPage";
+import { SpeakerModeratorPage } from "./pages/SpeakerModeratorPage";
 import { NotFoundPage } from "./pages/NotFoundPage";
 import { ForbiddenPage } from "./pages/ForbiddenPage";
 import { AdminSectionLayout } from "./components/admin/AdminSectionLayout";
@@ -124,6 +125,7 @@ function App() {
           <Route path="/q/:slug" element={<QuizPlayPage />} />
           <Route path="/q/:slug/results" element={<ResultsPage />} />
           <Route path="/p/:slug" element={<ResultsPage />} />
+          <Route path="/s/:slug" element={<SpeakerModeratorPage />} />
           <Route path="/report/:slug" element={<PublicReportPage />} />
           <Route path="/admin" element={<AdminSectionLayout />}>
             <Route index element={<AdminRoomsPage />} />

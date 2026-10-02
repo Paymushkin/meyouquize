@@ -43,7 +43,7 @@ const baseReport: PublicEventReport = {
   ],
   randomizer: { currentWinners: [], history: [] },
   reactions: { overlayText: "", widgets: [] },
-  speakerQuestions: { enabled: false, total: 0, onScreen: 0, items: [] },
+  speakerQuestions: { enabled: false, total: 0, onScreen: 0, sessions: [], items: [] },
   feedback: [],
   subQuizParticipantTables: [],
   banners: [],

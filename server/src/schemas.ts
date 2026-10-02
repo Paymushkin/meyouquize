@@ -522,12 +522,24 @@ export const setPublicViewSchema = z.object({
   showFirstCorrectAnswerer: z.boolean().optional(),
   firstCorrectWinnersCount: z.number().int().min(1).max(20).optional(),
   speakerQuestionsEnabled: z.boolean().optional(),
+  speakerQuestionSessions: z
+    .array(
+      z.object({
+        id: z.string().trim().min(1).max(80),
+        name: z.string().trim().min(1).max(80),
+        speakers: z.array(z.string().trim().min(1).max(80)).max(100),
+      }),
+    )
+    .max(40)
+    .optional(),
+  activeSpeakerSessionId: z.string().trim().min(1).max(80).nullable().optional(),
   speakerQuestionsSpeakers: z.array(z.string().trim().min(1).max(80)).max(100).optional(),
   speakerQuestionsReactions: z.array(z.string().trim().min(1).max(16)).max(12).optional(),
   speakerQuestionsShowAuthorOnScreen: z.boolean().optional(),
   speakerQuestionsShowRecipientOnScreen: z.boolean().optional(),
   speakerQuestionsShowReactionsOnScreen: z.boolean().optional(),
   speakerQuestionsAllowAllSpeakersTarget: z.boolean().optional(),
+  speakerQuestionsModeratorShowAll: z.boolean().optional(),
   showEventTitleOnPlayer: z.boolean().optional(),
   playerAutoJoinRandomNickname: z.boolean().optional(),
   playerBanners: z
@@ -738,7 +750,7 @@ export const updateEventThemeSchema = z
 
 export const subscribeSpeakerQuestionsSchema = z.object({
   slug: z.string().min(1),
-  viewer: z.enum(["player", "projector", "admin"]).optional(),
+  viewer: z.enum(["player", "projector", "admin", "moderator"]).optional(),
 });
 
 export const createSpeakerQuestionSchema = z.object({
@@ -788,11 +800,23 @@ export const adminSpeakerSettingsSchema = z.object({
   quizId: z.string().min(1),
   enabled: z.boolean().optional(),
   speakers: z.array(z.string().trim().min(1).max(80)).max(100).optional(),
+  sessions: z
+    .array(
+      z.object({
+        id: z.string().trim().min(1).max(80),
+        name: z.string().trim().min(1).max(80),
+        speakers: z.array(z.string().trim().min(1).max(80)).max(100),
+      }),
+    )
+    .max(40)
+    .optional(),
+  activeSpeakerSessionId: z.string().trim().min(1).max(80).nullable().optional(),
   reactions: z.array(z.string().trim().min(1).max(16)).max(12).optional(),
   showAuthorOnScreen: z.boolean().optional(),
   showRecipientOnScreen: z.boolean().optional(),
   showReactionsOnScreen: z.boolean().optional(),
   allowAllSpeakersTarget: z.boolean().optional(),
+  moderatorShowAll: z.boolean().optional(),
 });
 
 export const activateQuestionSchema = z.object({

@@ -144,10 +144,11 @@ export function SpeakerQuestionsDialog({
   const reactions = speakerQuestions?.settings.reactions ?? DEFAULT_SPEAKER_REACTIONS;
   const speakers = speakerQuestions?.settings.speakers ?? [];
   const allowAllSpeakersTarget = speakerQuestions?.settings.allowAllSpeakersTarget !== false;
+  const activeSessionId = speakerQuestions?.settings.activeSpeakerSessionId ?? null;
   const selectValue = normalizeSpeakerUiSelection(speakerName, allowAllSpeakersTarget, speakers);
   const actualItems = useMemo(
-    () => filterActualSpeakerQuestions(speakerQuestions?.items ?? []),
-    [speakerQuestions?.items],
+    () => filterActualSpeakerQuestions(speakerQuestions?.items ?? [], activeSessionId),
+    [speakerQuestions?.items, activeSessionId],
   );
   const mineItems = useMemo(
     () => filterMySpeakerQuestions(speakerQuestions?.items ?? []),

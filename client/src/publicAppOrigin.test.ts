@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   buildPlayerJoinUrl,
   buildProjectorScreenUrl,
+  buildSpeakerModeratorUrl,
   resolvePlayerFacingOrigin,
 } from "./publicAppOrigin";
 
@@ -40,6 +41,14 @@ describe("buildProjectorScreenUrl", () => {
   it("builds projector path", () => {
     expect(buildProjectorScreenUrl("demo", { windowOrigin: "http://192.168.0.154" })).toBe(
       "http://192.168.0.154/p/demo",
+    );
+  });
+});
+
+describe("buildSpeakerModeratorUrl", () => {
+  it("builds moderator path", () => {
+    expect(buildSpeakerModeratorUrl("demo", { windowOrigin: "http://192.168.0.154" })).toBe(
+      "http://192.168.0.154/s/demo",
     );
   });
 });

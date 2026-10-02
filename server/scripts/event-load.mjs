@@ -527,9 +527,15 @@ console.info(
 
 const createTasks = [...createIndices].map(async (idx) => {
   const c = joinedClients[idx];
-  if (!c?.socket) return { ok: false, err: "no_client" };
+  if (!c?.socket) {
+    bumpReason(speakerCreateFailReasons, "no_client");
+    return { ok: false, err: "no_client" };
+  }
   const quizId = c.quizId || resolveSubmitTargetFromState(c.lastState).quizId;
-  if (!quizId) return { ok: false, err: "no_quiz_id" };
+  if (!quizId) {
+    bumpReason(speakerCreateFailReasons, "no_quiz_id");
+    return { ok: false, err: "no_quiz_id" };
+  }
   await sleep(sampleDelayMs(speakerCreateSpreadMs, "uniform"));
   const speakerName = pickSpeakerTarget(c.speakers, c.allowAllSpeakers);
   const text = `Вопрос от нагрузки ${idx} — ${Date.now()}`.slice(0, 120);
@@ -538,16 +544,34 @@ const createTasks = [...createIndices].map(async (idx) => {
   return result;
 });
 
+const createResults = await Promise.all(createTasks);
+const createOk = createResults.filter((r) => r.ok).length;
+console.info(`[event-load] speaker_create_ok=${createOk}/${createResults.length}`);
+if (createResults.length - createOk > 0) {
+  console.info(`[event-load] speaker_create_fail_reasons ${topReasons(speakerCreateFailReasons)}`);
+}
+logLatencyStats("[event-load] speaker_create_ms", speakerCreateLatencies);
+
+// Реакции на вопросы спикеров — только после create, иначе пул id ещё пустой.
 const reactTasks = [...reactIndices].map(async (idx) => {
   const c = joinedClients[idx];
-  if (!c?.socket) return { ok: false, err: "no_client" };
+  if (!c?.socket) {
+    bumpReason(speakerReactFailReasons, "no_client");
+    return { ok: false, err: "no_client" };
+  }
   const quizId = c.quizId || resolveSubmitTargetFromState(c.lastState).quizId;
-  if (!quizId) return { ok: false, err: "no_quiz_id" };
+  if (!quizId) {
+    bumpReason(speakerReactFailReasons, "no_quiz_id");
+    return { ok: false, err: "no_quiz_id" };
+  }
   const pool =
     speakerQuestionIds.length > 0
       ? speakerQuestionIds
       : c.speakerItems.map((item) => item.id).filter(Boolean);
-  if (pool.length === 0) return { ok: false, err: "no_speaker_questions" };
+  if (pool.length === 0) {
+    bumpReason(speakerReactFailReasons, "no_speaker_questions");
+    return { ok: false, err: "no_speaker_questions" };
+  }
   await sleep(sampleDelayMs(speakerReactSpreadMs, "uniform"));
   const questionId = pool[Math.floor(Math.random() * pool.length)];
   const reaction = c.reactions[Math.floor(Math.random() * c.reactions.length)] || "👍";
@@ -558,9 +582,15 @@ const reactTasks = [...reactIndices].map(async (idx) => {
 
 const reactionTasks = [...reactionIndices].map(async (idx) => {
   const c = joinedClients[idx];
-  if (!c?.socket) return { ok: false, err: "no_client" };
+  if (!c?.socket) {
+    bumpReason(reactionFailReasons, "no_client");
+    return { ok: false, err: "no_client" };
+  }
   const quizId = c.quizId || resolveSubmitTargetFromState(c.lastState).quizId;
-  if (!quizId) return { ok: false, err: "no_quiz_id" };
+  if (!quizId) {
+    bumpReason(reactionFailReasons, "no_quiz_id");
+    return { ok: false, err: "no_quiz_id" };
+  }
   await sleep(sampleDelayMs(reactionSpreadMs, "uniform"));
   const reactionType = c.reactions[Math.floor(Math.random() * c.reactions.length)] || "👍";
   const result = await reactionToggle(c.socket, quizId, reactionType);
@@ -568,18 +598,10 @@ const reactionTasks = [...reactionIndices].map(async (idx) => {
   return result;
 });
 
-const [createResults, reactResults, reactionResults] = await Promise.all([
-  Promise.all(createTasks),
+const [reactResults, reactionResults] = await Promise.all([
   Promise.all(reactTasks),
   Promise.all(reactionTasks),
 ]);
-
-const createOk = createResults.filter((r) => r.ok).length;
-console.info(`[event-load] speaker_create_ok=${createOk}/${createResults.length}`);
-if (createResults.length - createOk > 0) {
-  console.info(`[event-load] speaker_create_fail_reasons ${topReasons(speakerCreateFailReasons)}`);
-}
-logLatencyStats("[event-load] speaker_create_ms", speakerCreateLatencies);
 
 const reactOk = reactResults.filter((r) => r.ok).length;
 console.info(`[event-load] speaker_react_ok=${reactOk}/${reactResults.length}`);

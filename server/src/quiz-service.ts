@@ -3,8 +3,10 @@ import {
   collectTagCloudQuizReferenceAliases,
   computeTemperatureWeightedAverage,
   expandTagCloudSubmitLines,
+  findSpeakerSessionName,
   formatTagCloudReferenceAnswer,
   groupDebateSeriesQuestionIds,
+  normalizeSpeakerQuestionSessions,
   normalizeTagComparable,
   parseStoredTagAnswersJson,
   resolveDebateSeriesResultTitle,
@@ -2371,8 +2373,11 @@ export type PublicEventReport = {
     enabled: boolean;
     total: number;
     onScreen: number;
+    sessions: Array<{ id: string; name: string }>;
     items: Array<{
       id: string;
+      sessionId: string | null;
+      sessionName: string | null;
       speakerName: string;
       text: string;
       author: string;
@@ -2473,6 +2478,7 @@ export async function getPublicReportBySlug(slug: string): Promise<PublicEventRe
         take: 100,
         select: {
           id: true,
+          sessionId: true,
           speakerName: true,
           text: true,
           participant: { select: { nickname: true } },
@@ -2507,6 +2513,11 @@ export async function getPublicReportBySlug(slug: string): Promise<PublicEventRe
     if (voteQuestionIdSet.size === 0) return true;
     return voteQuestionIdSet.has(row.questionId);
   });
+  const speakerSessionsNorm = normalizeSpeakerQuestionSessions({
+    sessions: view.speakerQuestionSessions,
+    activeSpeakerSessionId: view.activeSpeakerSessionId,
+    speakers: view.speakerQuestionsSpeakers,
+  });
   const speakerItems = speakerItemsRaw.map((item) => {
     const reactionCountByValue = new Map<string, number>();
     for (const reaction of item.reactions) {
@@ -2517,6 +2528,8 @@ export async function getPublicReportBySlug(slug: string): Promise<PublicEventRe
     }
     return {
       id: item.id,
+      sessionId: item.sessionId ?? null,
+      sessionName: findSpeakerSessionName(speakerSessionsNorm.sessions, item.sessionId),
       speakerName: item.speakerName,
       text: item.text,
       author: item.participant.nickname,
@@ -2648,6 +2661,7 @@ export async function getPublicReportBySlug(slug: string): Promise<PublicEventRe
         enabled: view.speakerQuestionsEnabled,
         total: items.length,
         onScreen,
+        sessions: speakerSessionsNorm.sessions.map((s) => ({ id: s.id, name: s.name })),
         items,
       };
     })(),

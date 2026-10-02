@@ -7,6 +7,7 @@ import type { useAdminSpeakerQuestions } from "../../features/admin/useAdminSpea
 import type { SpeakerQuestionItem } from "../../types/speakerQuestions";
 
 export type AdminEventSpeakersTabProps = {
+  eventName: string;
   speakerQuestions: ReturnType<typeof useAdminSpeakerQuestions>;
   panelActions: AdminSpeakerQuestionsPanelActions;
   onHide: (id: string) => void;
@@ -18,6 +19,7 @@ export type AdminEventSpeakersTabProps = {
 };
 
 export function AdminEventSpeakersTab({
+  eventName,
   speakerQuestions,
   panelActions,
   onHide,
@@ -32,6 +34,7 @@ export function AdminEventSpeakersTab({
 
   return (
     <AdminSpeakersSection
+      eventName={eventName}
       settings={settings}
       panelActions={panelActions}
       questions={questions}

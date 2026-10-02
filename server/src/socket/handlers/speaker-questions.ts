@@ -16,7 +16,12 @@ import {
 import { prisma } from "../../prisma.js";
 import { containsProfanity } from "../../profanity.js";
 import { getQuizBySlug, getQuizPublicState } from "../../quiz-service.js";
-import { isKnownSpeakerTargetValue, SPEAKER_ALL_TARGET } from "@meyouquize/shared";
+import {
+  isKnownSpeakerTargetValue,
+  SPEAKER_ALL_TARGET,
+  normalizeSpeakerQuestionSessions,
+  findSpeakerSessionName,
+} from "@meyouquize/shared";
 import type { EnrichedSocket } from "../handler-common.js";
 import { assertAdmin, fail } from "../handler-common.js";
 import { allowSocketAction } from "../action-rate-limit.js";
@@ -33,6 +38,8 @@ import {
 
 type SpeakerQuestionWire = {
   id: string;
+  sessionId: string | null;
+  sessionName: string | null;
   speakerName: string;
   text: string;
   authorNickname: string;
@@ -45,7 +52,7 @@ type SpeakerQuestionWire = {
   createdAt: string;
 };
 
-type ViewerMode = "player" | "projector" | "admin";
+type ViewerMode = "player" | "projector" | "admin" | "moderator";
 
 const SPEAKER_QUESTIONS_SUBSCRIBE_RATE_WINDOW_MS = 60_000;
 const SPEAKER_QUESTIONS_SUBSCRIBE_RATE_MAX_PER_WINDOW = 5;
@@ -57,12 +64,27 @@ const SPEAKER_QUESTION_REACT_RATE_MAX_PER_WINDOW = 20;
 const SPEAKER_QUESTION_DELETE_RATE_WINDOW_MS = 60_000;
 const SPEAKER_QUESTION_DELETE_RATE_MAX_PER_WINDOW = 5;
 
+function resolveViewerModeFromSocketData(data: {
+  isAdmin?: boolean;
+  speakerViewer?: ViewerMode;
+}): ViewerMode {
+  if (data.isAdmin) return "admin";
+  if (data.speakerViewer === "projector") return "projector";
+  if (data.speakerViewer === "moderator") return "moderator";
+  return "player";
+}
+
 async function buildSpeakerQuestionsPayload(
   quizId: string,
   participantId?: string | null,
   viewMode: ViewerMode = "player",
 ) {
   const view = await getStoredPublicView(quizId);
+  const sessionsNorm = normalizeSpeakerQuestionSessions({
+    sessions: view.speakerQuestionSessions,
+    activeSpeakerSessionId: view.activeSpeakerSessionId,
+    speakers: view.speakerQuestionsSpeakers,
+  });
   const availableReactions =
     Array.isArray(view.speakerQuestionsReactions) && view.speakerQuestionsReactions.length > 0
       ? view.speakerQuestionsReactions
@@ -102,17 +124,22 @@ async function buildSpeakerQuestionsPayload(
     myReactionsByQuestion.set(row.speakerQuestionId, prev);
   }
   const adminView = viewMode === "admin";
+  const moderatorView = viewMode === "moderator";
   const projectorView = viewMode === "projector";
+  const moderatorShowAll = view.speakerQuestionsModeratorShowAll === true;
   const items: SpeakerQuestionWire[] = rows
-    .filter(
-      (row) =>
-        adminView ||
-        (projectorView && row.isOnScreen) ||
-        row.isVisibleToUsers ||
-        (participantId != null && row.participantId === participantId),
-    )
+    .filter((row) => {
+      if (adminView) return true;
+      if (moderatorView) {
+        return moderatorShowAll || row.status === "APPROVED";
+      }
+      if (projectorView) return row.isOnScreen;
+      return row.isVisibleToUsers || (participantId != null && row.participantId === participantId);
+    })
     .map((row) => ({
       id: row.id,
+      sessionId: row.sessionId ?? null,
+      sessionName: findSpeakerSessionName(sessionsNorm.sessions, row.sessionId),
       speakerName: row.speakerName,
       text: row.text,
       authorNickname: row.participant.nickname,
@@ -128,12 +155,15 @@ async function buildSpeakerQuestionsPayload(
   return {
     settings: {
       enabled: speakerFeatureEnabled,
-      speakers: view.speakerQuestionsSpeakers,
+      speakers: sessionsNorm.speakers,
+      sessions: sessionsNorm.sessions,
+      activeSpeakerSessionId: sessionsNorm.activeSpeakerSessionId,
       reactions: availableReactions,
       showAuthorOnScreen: view.speakerQuestionsShowAuthorOnScreen,
       showRecipientOnScreen: view.speakerQuestionsShowRecipientOnScreen,
       showReactionsOnScreen: view.speakerQuestionsShowReactionsOnScreen,
       allowAllSpeakersTarget: view.speakerQuestionsAllowAllSpeakersTarget,
+      moderatorShowAll,
     },
     items,
   };
@@ -159,21 +189,13 @@ export async function broadcastSpeakerQuestions(
 
   for (const s of playerSockets) {
     if (excludeSocketId && s.id === excludeSocketId) continue;
-    const mode: ViewerMode = s.data.isAdmin
-      ? "admin"
-      : s.data.speakerViewer === "projector"
-        ? "projector"
-        : "player";
+    const mode = resolveViewerModeFromSocketData(s.data);
     const payload = await getPayload(s.data.participantId ?? null, mode);
     s.emit("speaker:questions:update", payload);
   }
   for (const s of dashboardSockets) {
     if (excludeSocketId && s.id === excludeSocketId) continue;
-    const mode: ViewerMode = s.data.isAdmin
-      ? "admin"
-      : s.data.speakerViewer === "projector"
-        ? "projector"
-        : "player";
+    const mode = resolveViewerModeFromSocketData(s.data);
     const payload = await getPayload(s.data.participantId ?? null, mode);
     s.emit("speaker:questions:update", payload);
   }
@@ -181,7 +203,9 @@ export async function broadcastSpeakerQuestions(
 
 function resolveViewerMode(socket: EnrichedSocket, rawViewer?: ViewerMode): ViewerMode {
   if (socket.data.isAdmin) return "admin";
-  return rawViewer === "projector" ? "projector" : "player";
+  if (rawViewer === "projector") return "projector";
+  if (rawViewer === "moderator") return "moderator";
+  return "player";
 }
 
 async function ensureQuestionInQuiz(questionId: string, quizId: string) {
@@ -212,7 +236,7 @@ export function registerSpeakerQuestionsHandlers(socket: EnrichedSocket, io: Ser
       const viewer = resolveViewerMode(socket, payload.viewer);
       socket.data.speakerViewer = viewer;
       await socket.join(quizPlayerRoom(quiz.id));
-      if (socket.data.isAdmin || viewer === "projector") {
+      if (socket.data.isAdmin || viewer === "projector" || viewer === "moderator") {
         await socket.join(quizDashboardRoom(quiz.id));
       }
       const result = await buildSpeakerQuestionsPayload(quiz.id, socket.data.participantId, viewer);
@@ -227,10 +251,22 @@ export function registerSpeakerQuestionsHandlers(socket: EnrichedSocket, io: Ser
       await assertAdmin(socket);
       const payload = adminSpeakerSettingsSchema.parse(raw);
       const prevView = await getStoredPublicView(payload.quizId);
+      const sessionsNorm = normalizeSpeakerQuestionSessions({
+        sessions:
+          payload.sessions !== undefined ? payload.sessions : prevView.speakerQuestionSessions,
+        activeSpeakerSessionId:
+          payload.activeSpeakerSessionId !== undefined
+            ? payload.activeSpeakerSessionId
+            : prevView.activeSpeakerSessionId,
+        speakers:
+          payload.speakers !== undefined ? payload.speakers : prevView.speakerQuestionsSpeakers,
+      });
       const next = mergePublicViewState(prevView, {
         speakerQuestionsEnabled: payload.enabled,
         speakerTileVisible: payload.enabled,
-        speakerQuestionsSpeakers: payload.speakers,
+        speakerQuestionSessions: sessionsNorm.sessions,
+        activeSpeakerSessionId: sessionsNorm.activeSpeakerSessionId,
+        speakerQuestionsSpeakers: sessionsNorm.speakers,
         speakerQuestionsReactions: payload.reactions,
         speakerQuestionsShowAuthorOnScreen: payload.showAuthorOnScreen,
         ...(payload.showRecipientOnScreen !== undefined
@@ -241,6 +277,9 @@ export function registerSpeakerQuestionsHandlers(socket: EnrichedSocket, io: Ser
           : {}),
         ...(payload.allowAllSpeakersTarget !== undefined
           ? { speakerQuestionsAllowAllSpeakersTarget: payload.allowAllSpeakersTarget }
+          : {}),
+        ...(payload.moderatorShowAll !== undefined
+          ? { speakerQuestionsModeratorShowAll: payload.moderatorShowAll }
           : {}),
       });
       await saveStoredPublicView(payload.quizId, next);
@@ -284,13 +323,18 @@ export function registerSpeakerQuestionsHandlers(socket: EnrichedSocket, io: Ser
       if (!view.speakerQuestionsEnabled && !view.speakerTileVisible) {
         throw new Error("Функция выключена администратором");
       }
+      const sessionsNorm = normalizeSpeakerQuestionSessions({
+        sessions: view.speakerQuestionSessions,
+        activeSpeakerSessionId: view.activeSpeakerSessionId,
+        speakers: view.speakerQuestionsSpeakers,
+      });
       if (
         payload.speakerName === SPEAKER_ALL_TARGET &&
         view.speakerQuestionsAllowAllSpeakersTarget === false
       ) {
         throw new Error("Вариант «всем спикерам» отключён");
       }
-      if (!isKnownSpeakerTargetValue(payload.speakerName, view.speakerQuestionsSpeakers)) {
+      if (!isKnownSpeakerTargetValue(payload.speakerName, sessionsNorm.speakers)) {
         throw new Error("Спикер не найден");
       }
       if (containsProfanity(payload.text)) throw new Error("Вопрос содержит недопустимые слова");
@@ -298,6 +342,7 @@ export function registerSpeakerQuestionsHandlers(socket: EnrichedSocket, io: Ser
         data: {
           quizId: payload.quizId,
           participantId: socket.data.participantId,
+          sessionId: sessionsNorm.activeSpeakerSessionId,
           speakerName: payload.speakerName,
           text: payload.text,
           isVisibleToUsers: false,
@@ -419,9 +464,18 @@ export function registerSpeakerQuestionsHandlers(socket: EnrichedSocket, io: Ser
     try {
       await assertAdmin(socket);
       const payload = adminSpeakerQuestionStatusSchema.parse(raw);
+      const status = payload.status as SpeakerQuestionStatus;
       await prisma.speakerQuestion.update({
         where: { id: payload.speakerQuestionId },
-        data: { status: payload.status as SpeakerQuestionStatus },
+        data: {
+          status,
+          // Скрыть → снимаем UI; Вернуть → APPROVED = UI вкл.
+          ...(status === SpeakerQuestionStatus.REJECTED
+            ? { isVisibleToUsers: false, isOnScreen: false }
+            : status === SpeakerQuestionStatus.APPROVED
+              ? { isVisibleToUsers: true }
+              : {}),
+        },
       });
       await broadcastSpeakerQuestions(io, payload.quizId);
     } catch (error) {
@@ -496,9 +550,27 @@ export function registerSpeakerQuestionsHandlers(socket: EnrichedSocket, io: Ser
     try {
       await assertAdmin(socket);
       const payload = adminSpeakerQuestionUserVisibleSchema.parse(raw);
+      const current = await prisma.speakerQuestion.findUnique({
+        where: { id: payload.speakerQuestionId },
+        select: { status: true, quizId: true },
+      });
+      if (!current || current.quizId !== payload.quizId) throw new Error("Question not found");
+      // UI вкл. ↔ APPROVED; UI выкл. ↔ PENDING (скрытые REJECTED не трогаем статусом через UI).
+      if (current.status === SpeakerQuestionStatus.REJECTED && payload.isVisibleToUsers) {
+        throw new Error("Сначала верните вопрос из скрытых");
+      }
       await prisma.speakerQuestion.update({
         where: { id: payload.speakerQuestionId },
-        data: { isVisibleToUsers: payload.isVisibleToUsers },
+        data: {
+          isVisibleToUsers: payload.isVisibleToUsers,
+          ...(current.status === SpeakerQuestionStatus.REJECTED
+            ? {}
+            : {
+                status: payload.isVisibleToUsers
+                  ? SpeakerQuestionStatus.APPROVED
+                  : SpeakerQuestionStatus.PENDING,
+              }),
+        },
       });
       await broadcastSpeakerQuestions(io, payload.quizId);
     } catch (error) {

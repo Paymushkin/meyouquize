@@ -26,6 +26,7 @@ import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import {
   formatTemperatureScaleLabel,
   formatVoteDistributionPercent,
+  groupSpeakerQuestionsBySession,
   voteDistributionPercentWidth,
   type ReportModuleId,
 } from "@meyouquize/shared";
@@ -141,8 +142,11 @@ type PublicReportPayload = {
     enabled: boolean;
     total: number;
     onScreen: number;
+    sessions?: Array<{ id: string; name: string }>;
     items: Array<{
       id: string;
+      sessionId?: string | null;
+      sessionName?: string | null;
       speakerName: string;
       text: string;
       author: string;
@@ -1269,7 +1273,16 @@ export function PublicReportPage() {
             </CardContent>
           </Card>
         );
-      case "speaker_questions_summary":
+      case "speaker_questions_summary": {
+        const speakerGroups = groupSpeakerQuestionsBySession(
+          payload!.speakerQuestions.items.slice(0, 30),
+          (payload!.speakerQuestions.sessions ?? []).map((s) => ({
+            id: s.id,
+            name: s.name,
+            speakers: [],
+          })),
+        );
+        const showSessionHeaders = speakerGroups.length > 1;
         return (
           <Card variant="outlined" className="report-card">
             <CardContent>
@@ -1293,37 +1306,60 @@ export function PublicReportPage() {
                   {payload!.speakerQuestions.total}
                 </Box>
               </Stack>
-              <TableContainer sx={{ mt: 1.25 }}>
-                <Table size="small">
-                  <TableHead>
-                    <TableRow>
-                      <TableCell>Кому</TableCell>
-                      <TableCell>Вопрос</TableCell>
-                      <TableCell>Автор</TableCell>
-                      <TableCell>Реакции</TableCell>
-                    </TableRow>
-                  </TableHead>
-                  <TableBody>
-                    {payload!.speakerQuestions.items.slice(0, 30).map((item) => (
-                      <TableRow key={item.id}>
-                        <TableCell>{item.speakerName}</TableCell>
-                        <TableCell>{item.text}</TableCell>
-                        <TableCell>{item.author}</TableCell>
-                        <TableCell>
-                          {item.reactions.length > 0
-                            ? item.reactions
-                                .map((reaction) => `${reaction.reaction} (${reaction.count})`)
-                                .join(", ")
-                            : "нет"}
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </TableContainer>
+              <Stack spacing={2} sx={{ mt: 1.25 }}>
+                {speakerGroups.map((group) => (
+                  <Box key={group.sessionId ?? "__none__"}>
+                    {showSessionHeaders ? (
+                      <Typography variant="subtitle1" sx={{ mb: 0.75, fontWeight: 700 }}>
+                        {group.sessionName}
+                        <Box
+                          component="span"
+                          sx={{
+                            ml: 1,
+                            color: "text.secondary",
+                            fontWeight: 600,
+                            fontSize: "0.85em",
+                          }}
+                        >
+                          {group.items.length}
+                        </Box>
+                      </Typography>
+                    ) : null}
+                    <TableContainer>
+                      <Table size="small">
+                        <TableHead>
+                          <TableRow>
+                            <TableCell>Кому</TableCell>
+                            <TableCell>Вопрос</TableCell>
+                            <TableCell>Автор</TableCell>
+                            <TableCell>Реакции</TableCell>
+                          </TableRow>
+                        </TableHead>
+                        <TableBody>
+                          {group.items.map((item) => (
+                            <TableRow key={item.id}>
+                              <TableCell>{item.speakerName}</TableCell>
+                              <TableCell>{item.text}</TableCell>
+                              <TableCell>{item.author}</TableCell>
+                              <TableCell>
+                                {item.reactions.length > 0
+                                  ? item.reactions
+                                      .map((reaction) => `${reaction.reaction} (${reaction.count})`)
+                                      .join(", ")
+                                  : "нет"}
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </TableContainer>
+                  </Box>
+                ))}
+              </Stack>
             </CardContent>
           </Card>
         );
+      }
       default:
         return null;
     }

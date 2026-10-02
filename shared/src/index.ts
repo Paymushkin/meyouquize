@@ -28,6 +28,18 @@ import {
 } from "./brandFontFaces.js";
 import { sanitizeVoteOptionBorderColor } from "./voteOptionBorderColor.js";
 import { sanitizeVoteFillColor, sanitizeVoteQuestionTextColor } from "./voteQuestionTextStyle.js";
+import type { SpeakerQuestionSession } from "./speakerQuestionSessions.js";
+import { normalizeSpeakerQuestionSessions } from "./speakerQuestionSessions.js";
+export type { SpeakerQuestionSession } from "./speakerQuestionSessions.js";
+export {
+  DEFAULT_SPEAKER_SESSION_NAME,
+  LEGACY_DEFAULT_SPEAKER_SESSION_ID,
+  createSpeakerSessionId,
+  findSpeakerSessionName,
+  groupSpeakerQuestionsBySession,
+  normalizeSpeakerQuestionSessions,
+} from "./speakerQuestionSessions.js";
+export type { SpeakerQuestionSessionGroup } from "./speakerQuestionSessions.js";
 
 export type QuestionType = "single" | "multi" | "tag_cloud" | "ranking" | "temperature";
 export type QuizStatus = "draft" | "live" | "finished";
@@ -317,7 +329,14 @@ export interface PublicViewState {
   firstCorrectWinnersCount: number;
   /** Секция «Вопросы спикерам»: показывать кнопку у игроков */
   speakerQuestionsEnabled: boolean;
-  /** Секция «Вопросы спикерам»: список спикеров (можно выбрать конкретного или "всем") */
+  /** Сессии вопросов спикерам (спикеры внутри каждой сессии). */
+  speakerQuestionSessions: SpeakerQuestionSession[];
+  /** Активная сессия: её спикеры доступны игроку при создании вопроса. */
+  activeSpeakerSessionId: string | null;
+  /**
+   * Секция «Вопросы спикерам»: список спикеров активной сессии
+   * (derived; для обратной совместимости player/projector).
+   */
   speakerQuestionsSpeakers: string[];
   /** Секция «Вопросы спикерам»: список доступных реакций */
   speakerQuestionsReactions: string[];
@@ -329,6 +348,11 @@ export interface PublicViewState {
   speakerQuestionsShowReactionsOnScreen: boolean;
   /** Разрешить в форме игрока вариант «Всем спикерам» */
   speakerQuestionsAllowAllSpeakersTarget: boolean;
+  /**
+   * Страница модератора `/s/:slug`: показывать все вопросы (true)
+   * или только со статусом APPROVED (false, по умолчанию).
+   */
+  speakerQuestionsModeratorShowAll: boolean;
   /** Показывать название ивента в интерфейсе игрока */
   showEventTitleOnPlayer: boolean;
   /** Вход в ивент без формы: сразу случайный ник (пользователь может сменить позже). */
@@ -587,12 +611,15 @@ export const DEFAULT_PUBLIC_VIEW_STATE: PublicViewState = {
   showFirstCorrectAnswerer: false,
   firstCorrectWinnersCount: 1,
   speakerQuestionsEnabled: false,
+  speakerQuestionSessions: [],
+  activeSpeakerSessionId: null,
   speakerQuestionsSpeakers: [],
   speakerQuestionsReactions: ["👍", "🔥", "👏", "❤️"],
   speakerQuestionsShowAuthorOnScreen: false,
   speakerQuestionsShowRecipientOnScreen: true,
   speakerQuestionsShowReactionsOnScreen: true,
   speakerQuestionsAllowAllSpeakersTarget: true,
+  speakerQuestionsModeratorShowAll: false,
   showEventTitleOnPlayer: true,
   playerAutoJoinRandomNickname: false,
   playerBanners: [],
@@ -1414,12 +1441,24 @@ export function normalizePublicViewState(
       typeof value?.speakerQuestionsEnabled === "boolean"
         ? value.speakerQuestionsEnabled
         : base.speakerQuestionsEnabled,
-    speakerQuestionsSpeakers: Array.isArray(value?.speakerQuestionsSpeakers)
-      ? value.speakerQuestionsSpeakers
-          .filter((item) => typeof item === "string" && item.trim().length > 0)
-          .map((item) => item.trim().slice(0, 80))
-          .slice(0, 100)
-      : [...base.speakerQuestionsSpeakers],
+    ...(() => {
+      const normalizedSessions = normalizeSpeakerQuestionSessions({
+        sessions: value?.speakerQuestionSessions ?? base.speakerQuestionSessions,
+        activeSpeakerSessionId:
+          value?.activeSpeakerSessionId !== undefined
+            ? value.activeSpeakerSessionId
+            : base.activeSpeakerSessionId,
+        speakers:
+          value?.speakerQuestionsSpeakers !== undefined
+            ? value.speakerQuestionsSpeakers
+            : base.speakerQuestionsSpeakers,
+      });
+      return {
+        speakerQuestionSessions: normalizedSessions.sessions,
+        activeSpeakerSessionId: normalizedSessions.activeSpeakerSessionId,
+        speakerQuestionsSpeakers: normalizedSessions.speakers,
+      };
+    })(),
     speakerQuestionsReactions: Array.isArray(value?.speakerQuestionsReactions)
       ? value.speakerQuestionsReactions
           .filter((item) => typeof item === "string")
@@ -1443,6 +1482,10 @@ export function normalizePublicViewState(
       typeof value?.speakerQuestionsAllowAllSpeakersTarget === "boolean"
         ? value.speakerQuestionsAllowAllSpeakersTarget
         : base.speakerQuestionsAllowAllSpeakersTarget,
+    speakerQuestionsModeratorShowAll:
+      typeof value?.speakerQuestionsModeratorShowAll === "boolean"
+        ? value.speakerQuestionsModeratorShowAll
+        : base.speakerQuestionsModeratorShowAll,
     showEventTitleOnPlayer:
       typeof value?.showEventTitleOnPlayer === "boolean"
         ? value.showEventTitleOnPlayer
