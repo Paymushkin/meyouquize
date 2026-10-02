@@ -41,7 +41,11 @@ function playerBannersForEmit(banners: PublicBanner[]): PublicBanner[] {
       ...item,
       linkUrl: sanitizeBannerLinkUrl(item.linkUrl),
     }))
-    .filter((item) => item.id && item.linkUrl && item.backgroundUrl);
+    .filter((item) => {
+      if (!item.id || !item.linkUrl) return false;
+      if (item.visualStyle === "tile") return Boolean(item.text?.trim());
+      return Boolean(item.backgroundUrl);
+    });
 }
 
 /** Явное значение из patch, в т.ч. `""` для сброса (в отличие от `??`). */

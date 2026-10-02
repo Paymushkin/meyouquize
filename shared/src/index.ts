@@ -254,12 +254,23 @@ export {
   sanitizePhotoWallBaseUrl,
   sanitizePhotoWallImageExt,
 } from "./photoWall.js";
+export type PublicBannerVisualStyle = "image" | "tile";
+
 export type PublicBanner = {
   id: string;
   linkUrl: string;
+  /** Для visualStyle=image; для tile может быть пустым. */
   backgroundUrl: string;
   size: "2x1" | "1x1" | "full";
   isVisible: boolean;
+  /** image (по умолчанию) — картинка; tile — как плитка спикеров (цвет + текст). */
+  visualStyle?: PublicBannerVisualStyle;
+  /** Текст для visualStyle=tile */
+  text?: string;
+  /** Фон для visualStyle=tile */
+  backgroundColor?: string;
+  /** Цвет текста для visualStyle=tile */
+  textColor?: string;
 };
 export type PublicReactionWidget = {
   id: string;
@@ -1010,18 +1021,43 @@ function sanitizeBanners(items: PublicBanner[] | undefined): PublicBanner[] {
     .map((item) => {
       const size: PublicBanner["size"] =
         item.size === "1x1" ? "1x1" : item.size === "full" ? "full" : "2x1";
-      return {
+      const visualStyle: PublicBannerVisualStyle = item.visualStyle === "tile" ? "tile" : "image";
+      const text = typeof item.text === "string" ? item.text.trim().slice(0, 120) : "";
+      const backgroundColor =
+        typeof item.backgroundColor === "string" && /^#([0-9a-fA-F]{6})$/.test(item.backgroundColor)
+          ? item.backgroundColor
+          : "#1976d2";
+      const textColor =
+        typeof item.textColor === "string" && /^#([0-9a-fA-F]{6})$/.test(item.textColor)
+          ? item.textColor
+          : "#ffffff";
+      const base = {
         id: item.id.trim().slice(0, 80),
         linkUrl: sanitizeBannerLinkUrl(typeof item.linkUrl === "string" ? item.linkUrl : undefined),
         backgroundUrl:
           typeof item.backgroundUrl === "string" ? item.backgroundUrl.trim().slice(0, 1000) : "",
-        size,
+        size: visualStyle === "tile" ? ("full" as const) : size,
         isVisible: typeof item.isVisible === "boolean" ? item.isVisible : false,
       };
+      if (visualStyle === "tile") {
+        return {
+          ...base,
+          visualStyle,
+          text: text || "Баннер",
+          backgroundColor,
+          textColor,
+        };
+      }
+      return {
+        ...base,
+        visualStyle: "image" as const,
+      };
     })
-    .filter(
-      (item) => item.id.length > 0 && item.linkUrl.length > 0 && item.backgroundUrl.length > 0,
-    )
+    .filter((item) => {
+      if (!item.id || !item.linkUrl) return false;
+      if (item.visualStyle === "tile") return Boolean(item.text?.trim());
+      return item.backgroundUrl.length > 0;
+    })
     .slice(0, 50);
 }
 

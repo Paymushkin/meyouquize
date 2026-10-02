@@ -109,6 +109,10 @@ export type QuizState = {
     backgroundUrl: string;
     size: "2x1" | "1x1" | "full";
     isVisible: boolean;
+    visualStyle?: "image" | "tile";
+    text?: string;
+    backgroundColor?: string;
+    textColor?: string;
   }>;
   activePlayerBannerId?: string;
   speakerTileText?: string;

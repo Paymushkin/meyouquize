@@ -57,6 +57,7 @@ import { recordServerPublicView } from "../features/publicView/publicViewEmitCoo
 import { useSpeakerQuestionsAdminActions } from "../hooks/useSpeakerQuestionsAdminActions";
 import { shouldFallbackProjectorToTitleAfterSpeakerOff } from "../features/speakerQuestionsAdmin/speakerOnScreenProjectorFallback";
 import {
+  acknowledgeSpeakerQuestionIds,
   shouldShowSpeakersNavBadge,
   syncKnownSpeakerQuestionIds,
 } from "../features/speakerQuestions/adminSpeakerNavBadge";
@@ -115,25 +116,49 @@ function isSupportedPublicMode(mode: unknown): mode is PublicViewMode {
 
 function getPublicBanners(value: unknown): PublicBanner[] {
   if (!Array.isArray(value)) return [];
-  return value.flatMap((item) => {
+  return value.flatMap((item): PublicBanner[] => {
     if (!item || typeof item !== "object") return [];
     const row = item as Record<string, unknown>;
-    if (
-      typeof row.id !== "string" ||
-      typeof row.linkUrl !== "string" ||
-      typeof row.backgroundUrl !== "string"
-    )
-      return [];
+    if (typeof row.id !== "string" || typeof row.linkUrl !== "string") return [];
+    const visualStyle = row.visualStyle === "tile" ? ("tile" as const) : ("image" as const);
+    const backgroundUrl = typeof row.backgroundUrl === "string" ? row.backgroundUrl : "";
+    if (visualStyle === "image" && !backgroundUrl) return [];
+    const text = typeof row.text === "string" ? row.text.trim() : "";
+    if (visualStyle === "tile" && !text) return [];
     const size: PublicBanner["size"] =
-      row.size === "1x1" ? "1x1" : row.size === "full" ? "full" : "2x1";
+      visualStyle === "tile"
+        ? "full"
+        : row.size === "1x1"
+          ? "1x1"
+          : row.size === "full"
+            ? "full"
+            : "2x1";
+    const hex6 = (v: unknown, fallback: string) =>
+      typeof v === "string" && /^#([0-9a-fA-F]{6})$/.test(v) ? v : fallback;
+    if (visualStyle === "tile") {
+      return [
+        {
+          id: row.id,
+          linkUrl: row.linkUrl,
+          backgroundUrl: "",
+          size,
+          isVisible: Boolean(row.isVisible),
+          visualStyle: "tile",
+          text,
+          backgroundColor: hex6(row.backgroundColor, "#1976d2"),
+          textColor: hex6(row.textColor, "#ffffff"),
+        },
+      ];
+    }
     return [
       {
         id: row.id,
         linkUrl: row.linkUrl,
-        backgroundUrl: row.backgroundUrl,
+        backgroundUrl,
         size,
         isVisible: Boolean(row.isVisible),
-      } satisfies PublicBanner,
+        visualStyle: "image",
+      },
     ];
   });
 }
@@ -581,13 +606,20 @@ export function AdminEventPage() {
   }, [eventName]);
 
   useEffect(() => {
+    const items = speakerQuestions.payload?.items;
     if (activeSection === "speakers") {
+      // Админ смотрит актуальный Q&A — точка не нужна, текущий список «просмотрен».
       setSpeakersNavBadge(false);
+      if (items) {
+        knownSpeakerQuestionIdsRef.current = acknowledgeSpeakerQuestionIds(
+          items.map((item) => item.id),
+        );
+      }
+      return;
     }
-  }, [activeSection]);
-
-  useEffect(() => {
-    const nextIds = (speakerQuestions.payload?.items ?? []).map((item) => item.id);
+    // Не фиксируем baseline по null-payload (иначе все id после первой загрузки станут «новыми»).
+    if (!items) return;
+    const nextIds = items.map((item) => item.id);
     const synced = syncKnownSpeakerQuestionIds(knownSpeakerQuestionIdsRef.current, nextIds);
     knownSpeakerQuestionIdsRef.current = synced.knownIds;
     if (shouldShowSpeakersNavBadge(synced.hasNew, activeSection)) {

@@ -7,6 +7,16 @@ import {
 import type { PublicBanner } from "../../publicViewContract";
 import { buildOrderedTiles } from "./buildOrderedTiles";
 
+type BannerWriteInput = {
+  linkUrl: string;
+  backgroundUrl?: string;
+  size?: "2x1" | "1x1" | "full";
+  visualStyle?: "image" | "tile";
+  text?: string;
+  backgroundColor?: string;
+  textColor?: string;
+};
+
 type Params = {
   eventName: string;
   banners: PublicBanner[];
@@ -26,13 +36,8 @@ type Params = {
   photoWallCollageSrcs: string[];
   playerTilesGridColumns: 2 | 3;
   onChangePlayerTilesGridColumns: (value: 2 | 3) => void;
-  onCreate: (linkUrl: string, backgroundUrl: string, size: "2x1" | "1x1" | "full") => void;
-  onUpdate: (
-    id: string,
-    linkUrl: string,
-    backgroundUrl: string,
-    size: "2x1" | "1x1" | "full",
-  ) => void;
+  onCreate: (input: BannerWriteInput) => void;
+  onUpdate: (id: string, input: BannerWriteInput) => void;
   onUploadMedia: (file: File) => Promise<string>;
   onSaveSpeakerTile: (text: string, backgroundColor: string, textColor: string) => void;
   onSaveProgramTile: (
@@ -71,10 +76,18 @@ export function useAdminBannersSectionState(params: Params) {
   } = params;
   const [linkUrl, setLinkUrl] = useState("");
   const [backgroundUrl, setBackgroundUrl] = useState("");
+  const [visualStyle, setVisualStyle] = useState<"image" | "tile">("image");
+  const [tileText, setTileText] = useState("Баннер");
+  const [tileBackgroundColor, setTileBackgroundColor] = useState("#1976d2");
+  const [tileTextColor, setTileTextColor] = useState("#ffffff");
   const [uploading, setUploading] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editLinkUrl, setEditLinkUrl] = useState("");
   const [editBackgroundUrl, setEditBackgroundUrl] = useState("");
+  const [editVisualStyle, setEditVisualStyle] = useState<"image" | "tile">("image");
+  const [editTileText, setEditTileText] = useState("Баннер");
+  const [editTileBackgroundColor, setEditTileBackgroundColor] = useState("#1976d2");
+  const [editTileTextColor, setEditTileTextColor] = useState("#ffffff");
   const [editSize, setEditSize] = useState<"2x1" | "1x1" | "full">("1x1");
   const [speakerTextDraft, setSpeakerTextDraft] = useState(speakerTileText);
   const [speakerBgColorDraft, setSpeakerBgColorDraft] = useState(speakerTileBackgroundColor);
@@ -170,11 +183,43 @@ export function useAdminBannersSectionState(params: Params) {
     [onUploadMedia],
   );
 
+  const handleUploadEditBannerImage = useCallback(
+    async (file: File) => {
+      setUploading(true);
+      try {
+        const uploadedUrl = await onUploadMedia(file);
+        setEditBackgroundUrl(uploadedUrl);
+      } finally {
+        setUploading(false);
+      }
+    },
+    [onUploadMedia],
+  );
+
   const handleCreateBanner = useCallback(() => {
-    onCreate(linkUrl.trim(), backgroundUrl.trim(), "1x1");
+    if (visualStyle === "tile") {
+      onCreate({
+        linkUrl: linkUrl.trim(),
+        visualStyle: "tile",
+        text: tileText.trim() || "Баннер",
+        backgroundColor: tileBackgroundColor.trim() || "#1976d2",
+        textColor: tileTextColor.trim() || "#ffffff",
+        size: "full",
+      });
+    } else {
+      onCreate({
+        linkUrl: linkUrl.trim(),
+        backgroundUrl: backgroundUrl.trim(),
+        size: "1x1",
+        visualStyle: "image",
+      });
+    }
     setLinkUrl("");
     setBackgroundUrl("");
-  }, [onCreate, linkUrl, backgroundUrl]);
+    setTileText("Баннер");
+    setTileBackgroundColor("#1976d2");
+    setTileTextColor("#ffffff");
+  }, [onCreate, linkUrl, backgroundUrl, visualStyle, tileText, tileBackgroundColor, tileTextColor]);
 
   const handleSaveSpeakerTile = useCallback(() => {
     onSaveSpeakerTile(
@@ -203,25 +248,62 @@ export function useAdminBannersSectionState(params: Params) {
     setEditLinkUrl(banner.linkUrl);
     setEditBackgroundUrl(banner.backgroundUrl);
     setEditSize(banner.size);
+    const style = banner.visualStyle === "tile" ? "tile" : "image";
+    setEditVisualStyle(style);
+    setEditTileText(banner.text?.trim() || "Баннер");
+    setEditTileBackgroundColor(banner.backgroundColor?.trim() || "#1976d2");
+    setEditTileTextColor(banner.textColor?.trim() || "#ffffff");
   }, []);
 
   const cancelEdit = useCallback(() => setEditingId(null), []);
   const saveEdit = useCallback(
     (bannerId: string) => {
-      onUpdate(bannerId, editLinkUrl.trim(), editBackgroundUrl.trim(), "1x1");
+      if (editVisualStyle === "tile") {
+        onUpdate(bannerId, {
+          linkUrl: editLinkUrl.trim(),
+          visualStyle: "tile",
+          text: editTileText.trim() || "Баннер",
+          backgroundColor: editTileBackgroundColor.trim() || "#1976d2",
+          textColor: editTileTextColor.trim() || "#ffffff",
+          size: "full",
+        });
+      } else {
+        onUpdate(bannerId, {
+          linkUrl: editLinkUrl.trim(),
+          backgroundUrl: editBackgroundUrl.trim(),
+          size: "1x1",
+          visualStyle: "image",
+        });
+      }
       setEditingId(null);
     },
-    [onUpdate, editLinkUrl, editBackgroundUrl],
+    [
+      onUpdate,
+      editLinkUrl,
+      editBackgroundUrl,
+      editVisualStyle,
+      editTileText,
+      editTileBackgroundColor,
+      editTileTextColor,
+    ],
   );
 
   return {
     linkUrl,
     backgroundUrl,
+    visualStyle,
+    tileText,
+    tileBackgroundColor,
+    tileTextColor,
     playerTilesGridColumns,
     onChangePlayerTilesGridColumns,
     uploading,
     setLinkUrl,
     setBackgroundUrl,
+    setVisualStyle,
+    setTileText,
+    setTileBackgroundColor,
+    setTileTextColor,
     speakerTextDraft,
     speakerBgColorDraft,
     speakerTextColorDraft,
@@ -242,11 +324,20 @@ export function useAdminBannersSectionState(params: Params) {
     editingId,
     editLinkUrl,
     editBackgroundUrl,
+    editVisualStyle,
+    editTileText,
+    editTileBackgroundColor,
+    editTileTextColor,
     editSize,
     setEditLinkUrl,
     setEditBackgroundUrl,
+    setEditVisualStyle,
+    setEditTileText,
+    setEditTileBackgroundColor,
+    setEditTileTextColor,
     setEditSize,
     handleUploadBannerImage,
+    handleUploadEditBannerImage,
     handleCreateBanner,
     handleSaveSpeakerTile,
     handleSaveProgramTile,

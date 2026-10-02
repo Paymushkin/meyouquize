@@ -31,6 +31,11 @@ export function syncKnownSpeakerQuestionIds(
   return { knownIds: known, hasNew, isInitialSnapshot: false };
 }
 
+/** Пока админ в Q&A — текущий список считается просмотренным. */
+export function acknowledgeSpeakerQuestionIds(nextIds: readonly string[]): Set<string> {
+  return new Set(nextIds);
+}
+
 export function shouldShowSpeakersNavBadge(hasNew: boolean, activeSection: string): boolean {
   return hasNew && activeSection !== "speakers";
 }

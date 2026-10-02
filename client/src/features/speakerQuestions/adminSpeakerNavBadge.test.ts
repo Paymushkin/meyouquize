@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { shouldShowSpeakersNavBadge, syncKnownSpeakerQuestionIds } from "./adminSpeakerNavBadge";
+import {
+  acknowledgeSpeakerQuestionIds,
+  shouldShowSpeakersNavBadge,
+  syncKnownSpeakerQuestionIds,
+} from "./adminSpeakerNavBadge";
 
 describe("adminSpeakerNavBadge", () => {
   it("does not signal new on initial snapshot", () => {
@@ -27,5 +31,17 @@ describe("adminSpeakerNavBadge", () => {
     expect(shouldShowSpeakersNavBadge(true, "questions")).toBe(true);
     expect(shouldShowSpeakersNavBadge(true, "speakers")).toBe(false);
     expect(shouldShowSpeakersNavBadge(false, "questions")).toBe(false);
+  });
+
+  it("acknowledge replaces last seen set with current ids", () => {
+    expect([...acknowledgeSpeakerQuestionIds(["x", "y"])]).toEqual(["x", "y"]);
+  });
+
+  it("after acknowledge, same ids are not new; only later ids are", () => {
+    const seen = acknowledgeSpeakerQuestionIds(["a", "b"]);
+    const same = syncKnownSpeakerQuestionIds(seen, ["a", "b"]);
+    expect(same.hasNew).toBe(false);
+    const later = syncKnownSpeakerQuestionIds(same.knownIds, ["a", "b", "c"]);
+    expect(later.hasNew).toBe(true);
   });
 });

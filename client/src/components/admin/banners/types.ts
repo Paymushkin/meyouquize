@@ -48,4 +48,8 @@ export type BannerEditorState = {
   editLinkUrl: string;
   editBackgroundUrl: string;
   editSize: BannerSize;
+  editVisualStyle: "image" | "tile";
+  editTileText: string;
+  editTileBackgroundColor: string;
+  editTileTextColor: string;
 };

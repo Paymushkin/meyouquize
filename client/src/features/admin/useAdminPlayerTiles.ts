@@ -126,18 +126,39 @@ export function useAdminPlayerTiles({
   );
 
   const createPlayerBanner = useCallback(
-    (linkUrl: string, backgroundUrl: string, size: "2x1" | "1x1" | "full") => {
+    (input: {
+      linkUrl: string;
+      backgroundUrl?: string;
+      size?: "2x1" | "1x1" | "full";
+      visualStyle?: "image" | "tile";
+      text?: string;
+      backgroundColor?: string;
+      textColor?: string;
+    }) => {
       if (!quizId) return;
-      const next: PublicBanner[] = [
-        ...playerBanners,
-        {
-          id: globalThis.crypto?.randomUUID?.() ?? `banner_${Date.now()}`,
-          linkUrl,
-          backgroundUrl,
-          size,
-          isVisible: false,
-        },
-      ];
+      const visualStyle = input.visualStyle === "tile" ? "tile" : "image";
+      const nextBanner: PublicBanner =
+        visualStyle === "tile"
+          ? {
+              id: globalThis.crypto?.randomUUID?.() ?? `banner_${Date.now()}`,
+              linkUrl: input.linkUrl,
+              backgroundUrl: "",
+              size: "full",
+              isVisible: false,
+              visualStyle: "tile",
+              text: input.text?.trim() || "Баннер",
+              backgroundColor: input.backgroundColor?.trim() || "#1976d2",
+              textColor: input.textColor?.trim() || "#ffffff",
+            }
+          : {
+              id: globalThis.crypto?.randomUUID?.() ?? `banner_${Date.now()}`,
+              linkUrl: input.linkUrl,
+              backgroundUrl: input.backgroundUrl ?? "",
+              size: input.size ?? "1x1",
+              isVisible: false,
+              visualStyle: "image",
+            };
+      const next: PublicBanner[] = [...playerBanners, nextBanner];
       const nextOrder = buildPlayerTilesOrder(playerTilesOrder, next);
       setPlayerBanners(next);
       setPlayerTilesOrder(nextOrder);
@@ -179,11 +200,45 @@ export function useAdminPlayerTiles({
   );
 
   const updatePlayerBanner = useCallback(
-    (id: string, linkUrl: string, backgroundUrl: string, size: "2x1" | "1x1" | "full") => {
+    (
+      id: string,
+      input: {
+        linkUrl: string;
+        backgroundUrl?: string;
+        size?: "2x1" | "1x1" | "full";
+        visualStyle?: "image" | "tile";
+        text?: string;
+        backgroundColor?: string;
+        textColor?: string;
+      },
+    ) => {
       if (!quizId) return;
-      const next = playerBanners.map((item) =>
-        item.id === id ? { ...item, linkUrl, backgroundUrl, size } : item,
-      );
+      const visualStyle = input.visualStyle === "tile" ? "tile" : "image";
+      const next = playerBanners.map((item) => {
+        if (item.id !== id) return item;
+        if (visualStyle === "tile") {
+          return {
+            ...item,
+            linkUrl: input.linkUrl,
+            backgroundUrl: "",
+            size: "full" as const,
+            visualStyle: "tile" as const,
+            text: input.text?.trim() || "Баннер",
+            backgroundColor: input.backgroundColor?.trim() || "#1976d2",
+            textColor: input.textColor?.trim() || "#ffffff",
+          };
+        }
+        return {
+          ...item,
+          linkUrl: input.linkUrl,
+          backgroundUrl: input.backgroundUrl ?? "",
+          size: input.size ?? "1x1",
+          visualStyle: "image" as const,
+          text: undefined,
+          backgroundColor: undefined,
+          textColor: undefined,
+        };
+      });
       setPlayerBanners(next);
       emitPublicViewPatch({ playerBanners: next });
       refreshQuizState();

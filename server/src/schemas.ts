@@ -547,9 +547,19 @@ export const setPublicViewSchema = z.object({
       z.object({
         id: z.string().trim().min(1).max(80),
         linkUrl: optionalBannerLinkUrlSchema,
-        backgroundUrl: clientAssetUrlSchema,
+        backgroundUrl: optionalClientAssetUrlSchema,
         size: z.enum(["2x1", "1x1", "full"]).optional(),
         isVisible: z.boolean().optional(),
+        visualStyle: z.enum(["image", "tile"]).optional(),
+        text: z.string().trim().max(120).optional(),
+        backgroundColor: z
+          .string()
+          .regex(/^#([0-9a-fA-F]{6})$/)
+          .optional(),
+        textColor: z
+          .string()
+          .regex(/^#([0-9a-fA-F]{6})$/)
+          .optional(),
       }),
     )
     .max(50)

@@ -12,6 +12,10 @@ type BannerItem = {
   linkUrl: string;
   backgroundUrl: string;
   size: "2x1" | "1x1" | "full";
+  visualStyle?: "image" | "tile";
+  text?: string;
+  backgroundColor?: string;
+  textColor?: string;
 };
 
 export function getVisiblePlayerBanners(banners: BannerItem[] | undefined): BannerItem[] {

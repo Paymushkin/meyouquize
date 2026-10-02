@@ -78,7 +78,10 @@ export function buildOrderedTiles(
       return {
         id,
         kind: "banner" as const,
-        label: `Баннер: ${banner.linkUrl}`,
+        label:
+          banner.visualStyle === "tile"
+            ? `Баннер (плитка): ${banner.text?.trim() || banner.linkUrl}`
+            : `Баннер: ${banner.linkUrl}`,
         previewUrl: banner.backgroundUrl,
         size: banner.size,
         banner,

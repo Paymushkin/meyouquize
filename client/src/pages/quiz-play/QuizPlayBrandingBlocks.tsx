@@ -53,6 +53,10 @@ type BannerTile = {
   linkUrl: string;
   backgroundUrl: string;
   size: "2x1" | "1x1" | "full";
+  visualStyle?: "image" | "tile";
+  text?: string;
+  backgroundColor?: string;
+  textColor?: string;
 };
 
 type QuizPlayContainerSxParams = {
@@ -422,9 +426,54 @@ export function PlayerTilesGrid(props: PlayerTilesGridProps) {
         const banner = visibleBannerById.get(tileId);
         if (!banner) return null;
         const safeBannerLinkUrl = sanitizeBannerLinkUrl(banner.linkUrl);
-        const safeBannerBackgroundUrl = sanitizeClientAssetUrl(banner.backgroundUrl);
-        if (!safeBannerLinkUrl || !safeBannerBackgroundUrl) return null;
+        if (!safeBannerLinkUrl) return null;
         const bannerOpensMail = safeBannerLinkUrl.startsWith("mailto:");
+        const isTileVisual = banner.visualStyle === "tile";
+        if (isTileVisual) {
+          const tileText = banner.text?.trim() || "Баннер";
+          const tileBg = banner.backgroundColor?.trim() || brandPrimaryColor;
+          const tileFg = banner.textColor?.trim() || "#fff";
+          return (
+            <Box
+              key={banner.id}
+              component="a"
+              href={safeBannerLinkUrl}
+              {...(bannerOpensMail ? {} : { target: "_blank", rel: "noopener noreferrer" })}
+              onClick={() => onBannerClick(banner.id)}
+              sx={{
+                gridColumn: "1 / -1",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "flex-start",
+                width: "100%",
+                height: "auto",
+                justifySelf: "stretch",
+                position: "relative",
+                border: "none",
+                borderRadius: 2,
+                px: 2.5,
+                py: 2,
+                cursor: "pointer",
+                textAlign: "left",
+                textDecoration: "none",
+                whiteSpace: "pre-line",
+                backgroundColor: tileBg,
+                color: tileFg,
+                boxShadow: 3,
+                transition: "background-color 120ms ease",
+                "&:hover": {
+                  backgroundColor: alpha(tileBg, 0.88),
+                },
+              }}
+            >
+              <Typography component="span" sx={playerFullWidthTileLabelSx}>
+                {tileText}
+              </Typography>
+            </Box>
+          );
+        }
+        const safeBannerBackgroundUrl = sanitizeClientAssetUrl(banner.backgroundUrl);
+        if (!safeBannerBackgroundUrl) return null;
         return (
           <Box
             key={banner.id}

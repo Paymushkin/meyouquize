@@ -22,7 +22,9 @@
     "loadtest:geo-capitals": "node scripts/geo-poll-subject-capitals.mjs",
     "loadtest:geo-mix": "node scripts/geo-poll-regions-mix.mjs",
     "loadtest:geo-40": "node scripts/geo-poll-regions-40.mjs",
+    "loadtest:geo-n": "node scripts/geo-poll-concurrent.mjs",
     "loadtest:debate-sweep": "node scripts/debate-poll-sweep.mjs",
+    "loadtest:debate-n": "node scripts/debate-poll-concurrent.mjs",
     "geo:ru-index": "node scripts/build-geo-ru-index.mjs"
   },
   "dependencies": {

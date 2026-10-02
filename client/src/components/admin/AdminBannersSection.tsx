@@ -9,12 +9,26 @@ import { TilesOrderList } from "./banners/TilesOrderList";
 type Props = {
   eventName: string;
   banners: PublicBanner[];
-  onCreate: (linkUrl: string, backgroundUrl: string, size: "2x1" | "1x1" | "full") => void;
+  onCreate: (input: {
+    linkUrl: string;
+    backgroundUrl?: string;
+    size?: "2x1" | "1x1" | "full";
+    visualStyle?: "image" | "tile";
+    text?: string;
+    backgroundColor?: string;
+    textColor?: string;
+  }) => void;
   onUpdate: (
     id: string,
-    linkUrl: string,
-    backgroundUrl: string,
-    size: "2x1" | "1x1" | "full",
+    input: {
+      linkUrl: string;
+      backgroundUrl?: string;
+      size?: "2x1" | "1x1" | "full";
+      visualStyle?: "image" | "tile";
+      text?: string;
+      backgroundColor?: string;
+      textColor?: string;
+    },
   ) => void;
   onUploadMedia: (file: File) => Promise<string>;
   speakerTileText: string;
@@ -140,10 +154,18 @@ export function AdminBannersSection({
               <BannerCreateTab
                 linkUrl={state.linkUrl}
                 backgroundUrl={state.backgroundUrl}
+                visualStyle={state.visualStyle}
+                tileText={state.tileText}
+                tileBackgroundColor={state.tileBackgroundColor}
+                tileTextColor={state.tileTextColor}
                 gridColumns={state.playerTilesGridColumns}
                 uploading={state.uploading}
                 onChangeLinkUrl={state.setLinkUrl}
                 onChangeBackgroundUrl={state.setBackgroundUrl}
+                onChangeVisualStyle={state.setVisualStyle}
+                onChangeTileText={state.setTileText}
+                onChangeTileBackgroundColor={state.setTileBackgroundColor}
+                onChangeTileTextColor={state.setTileTextColor}
                 onChangeGridColumns={state.onChangePlayerTilesGridColumns}
                 onUpload={state.handleUploadBannerImage}
                 onCreate={state.handleCreateBanner}
@@ -187,6 +209,10 @@ export function AdminBannersSection({
           editLinkUrl: state.editLinkUrl,
           editBackgroundUrl: state.editBackgroundUrl,
           editSize: state.editSize,
+          editVisualStyle: state.editVisualStyle,
+          editTileText: state.editTileText,
+          editTileBackgroundColor: state.editTileBackgroundColor,
+          editTileTextColor: state.editTileTextColor,
         }}
         onMoveUp={onMoveTileUp}
         onMoveDown={onMoveTileDown}
@@ -199,6 +225,12 @@ export function AdminBannersSection({
         onSaveEdit={state.saveEdit}
         onChangeEditLinkUrl={state.setEditLinkUrl}
         onChangeEditBackgroundUrl={state.setEditBackgroundUrl}
+        onChangeEditVisualStyle={state.setEditVisualStyle}
+        onChangeEditTileText={state.setEditTileText}
+        onChangeEditTileBackgroundColor={state.setEditTileBackgroundColor}
+        onChangeEditTileTextColor={state.setEditTileTextColor}
+        uploading={state.uploading}
+        onUploadEditImage={state.handleUploadEditBannerImage}
       />
     </Stack>
   );
