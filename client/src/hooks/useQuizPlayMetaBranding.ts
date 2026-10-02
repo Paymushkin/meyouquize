@@ -19,6 +19,7 @@ export function useQuizPlayMetaBranding({ slug, quiz }: Params) {
   const [metaBrandPlayerBackgroundImageUrl, setMetaBrandPlayerBackgroundImageUrl] = useState("");
   const [metaBrandBodyBackgroundColor, setMetaBrandBodyBackgroundColor] =
     useState(DEFAULT_BRAND_BODY_BG);
+  const [metaBrandSurfaceColor, setMetaBrandSurfaceColor] = useState(DEFAULT_BRAND_BODY_BG);
   const [metaBrandPrimaryColor, setMetaBrandPrimaryColor] = useState(DEFAULT_BRAND_PRIMARY);
   const [metaBrandAccentColor, setMetaBrandAccentColor] = useState(DEFAULT_BRAND_ACCENT);
   const [metaBrandTextColor, setMetaBrandTextColor] = useState(DEFAULT_BRAND_TEXT);
@@ -57,6 +58,7 @@ export function useQuizPlayMetaBranding({ slug, quiz }: Params) {
           title?: string;
           brandPlayerBackgroundImageUrl?: string;
           brandBodyBackgroundColor?: string;
+          brandSurfaceColor?: string;
           brandPrimaryColor?: string;
           brandAccentColor?: string;
           brandTextColor?: string;
@@ -78,6 +80,9 @@ export function useQuizPlayMetaBranding({ slug, quiz }: Params) {
           payload.brandBodyBackgroundColor.trim()
         ) {
           setMetaBrandBodyBackgroundColor(payload.brandBodyBackgroundColor);
+        }
+        if (typeof payload.brandSurfaceColor === "string" && payload.brandSurfaceColor.trim()) {
+          setMetaBrandSurfaceColor(payload.brandSurfaceColor);
         }
         if (typeof payload.brandPrimaryColor === "string" && payload.brandPrimaryColor.trim()) {
           setMetaBrandPrimaryColor(payload.brandPrimaryColor);
@@ -129,6 +134,15 @@ export function useQuizPlayMetaBranding({ slug, quiz }: Params) {
     if (typeof quiz?.brandPlayerBackgroundImageUrl === "string") {
       setMetaBrandPlayerBackgroundImageUrl(quiz.brandPlayerBackgroundImageUrl);
     }
+    if (
+      typeof quiz?.brandBodyBackgroundColor === "string" &&
+      quiz.brandBodyBackgroundColor.trim()
+    ) {
+      setMetaBrandBodyBackgroundColor(quiz.brandBodyBackgroundColor);
+    }
+    if (typeof quiz?.brandSurfaceColor === "string" && quiz.brandSurfaceColor.trim()) {
+      setMetaBrandSurfaceColor(quiz.brandSurfaceColor);
+    }
     if (typeof quiz?.brandLogoUrl === "string") {
       setMetaBrandLogoUrl(quiz.brandLogoUrl);
     }
@@ -142,11 +156,13 @@ export function useQuizPlayMetaBranding({ slug, quiz }: Params) {
       setMetaBrandFontUrls(quiz.brandFontUrls);
     }
   }, [
+    quiz?.brandBodyBackgroundColor,
     quiz?.brandFontFamily,
     quiz?.brandFontUrl,
     quiz?.brandFontUrls,
     quiz?.brandLogoUrl,
     quiz?.brandPlayerBackgroundImageUrl,
+    quiz?.brandSurfaceColor,
   ]);
 
   const titleText = useMemo(
@@ -171,6 +187,11 @@ export function useQuizPlayMetaBranding({ slug, quiz }: Params) {
   const brandBodyBackgroundColor = useMemo(
     () => quiz?.brandBodyBackgroundColor?.trim() || metaBrandBodyBackgroundColor,
     [metaBrandBodyBackgroundColor, quiz?.brandBodyBackgroundColor],
+  );
+  const brandSurfaceColor = useMemo(
+    () =>
+      quiz?.brandSurfaceColor?.trim() || metaBrandSurfaceColor.trim() || brandBodyBackgroundColor,
+    [brandBodyBackgroundColor, metaBrandSurfaceColor, quiz?.brandSurfaceColor],
   );
   const brandTextColor = useMemo(
     () => quiz?.brandTextColor?.trim() || metaBrandTextColor.trim() || DEFAULT_BRAND_TEXT,
@@ -216,6 +237,7 @@ export function useQuizPlayMetaBranding({ slug, quiz }: Params) {
     formInputTextColor,
     brandPlayerBackgroundImageUrl,
     brandBodyBackgroundColor,
+    brandSurfaceColor,
     brandLogoUrl,
     brandFontFamily,
     brandFontUrl,

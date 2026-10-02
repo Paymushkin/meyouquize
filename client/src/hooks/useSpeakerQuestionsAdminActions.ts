@@ -89,6 +89,13 @@ export function useSpeakerQuestionsAdminActions({ quizId, speakerSettings, setMe
     },
     [emitSpeakerSettings],
   );
+
+  const persistModeratorShowAll = useCallback(
+    (moderatorShowAll: boolean) => {
+      emitSpeakerSettings({ moderatorShowAll }, "Настройки модератора сохранены");
+    },
+    [emitSpeakerSettings],
+  );
   const setSpeakerQuestionStatus = useCallback(
     (id: string, status: "PENDING" | "APPROVED" | "REJECTED") => {
       if (!quizId) return;
@@ -167,6 +174,7 @@ export function useSpeakerQuestionsAdminActions({ quizId, speakerSettings, setMe
     saveSpeakerSettings,
     persistActiveSpeakerSession,
     persistSpeakerSessions,
+    persistModeratorShowAll,
     setSpeakerQuestionStatus,
     setSpeakerQuestionOnScreen,
     hideSpeakerQuestion,

@@ -1142,6 +1142,7 @@ export function buildApp() {
       status: quiz.status,
       brandPrimaryColor: view.brandPrimaryColor,
       brandAccentColor: view.brandAccentColor,
+      brandSurfaceColor: view.brandSurfaceColor,
       brandTextColor: view.brandTextColor,
       brandInputTextColor: view.brandInputTextColor,
       playerVoteOptionTextColor: view.playerVoteOptionTextColor,

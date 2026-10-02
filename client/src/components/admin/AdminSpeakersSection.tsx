@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Card, CardContent, Stack, Tab, Tabs } from "@mui/material";
+import { Box, Card, CardContent, Stack, Tab, Tabs } from "@mui/material";
 import VisibilityOffOutlinedIcon from "@mui/icons-material/VisibilityOffOutlined";
 import UndoOutlinedIcon from "@mui/icons-material/UndoOutlined";
 import type { SpeakerQuestionItem } from "../../types/speakerQuestions";
@@ -106,27 +106,35 @@ export function AdminSpeakersSection(props: Props) {
   const filteredHidden = filterBySessionTab(hidden, activeTab);
 
   return (
-    <Stack spacing={2}>
+    <Stack spacing={2} sx={{ width: "100%", minWidth: 0, maxWidth: "100%" }}>
       <AdminSpeakerSettingsPanel settings={settings} actions={panelActions} />
-      <Tabs
-        value={activeTab}
-        onChange={(_, v: string) => {
-          setSessionTab(v);
-          writeSpeakerSessionTab(tabScope, v);
-        }}
-        variant="scrollable"
-        scrollButtons="auto"
-        textColor="inherit"
-        sx={SPEAKER_SESSION_TABS_SX}
-      >
-        {tabs.map((tab) => (
-          <Tab
-            key={tab.id}
-            value={tab.id}
-            label={<SessionTabLabel name={tab.name} count={countsByTab.get(tab.id) ?? 0} />}
-          />
-        ))}
-      </Tabs>
+      <Box sx={{ width: "100%", minWidth: 0, maxWidth: "100%", overflow: "hidden" }}>
+        <Tabs
+          value={activeTab}
+          onChange={(_, v: string) => {
+            setSessionTab(v);
+            writeSpeakerSessionTab(tabScope, v);
+          }}
+          variant="scrollable"
+          scrollButtons="auto"
+          allowScrollButtonsMobile
+          textColor="inherit"
+          sx={{
+            ...SPEAKER_SESSION_TABS_SX,
+            width: "100%",
+            minWidth: 0,
+            maxWidth: "100%",
+          }}
+        >
+          {tabs.map((tab) => (
+            <Tab
+              key={tab.id}
+              value={tab.id}
+              label={<SessionTabLabel name={tab.name} count={countsByTab.get(tab.id) ?? 0} />}
+            />
+          ))}
+        </Tabs>
+      </Box>
       <Card variant="outlined">
         <CardContent>
           <SpeakerQuestionsTable

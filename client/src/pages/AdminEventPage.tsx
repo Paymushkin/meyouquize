@@ -1301,6 +1301,7 @@ export function AdminEventPage() {
     saveSpeakerSettings,
     persistActiveSpeakerSession,
     persistSpeakerSessions,
+    persistModeratorShowAll,
     setSpeakerQuestionOnScreen,
     hideSpeakerQuestion,
     restoreSpeakerQuestion,
@@ -1519,7 +1520,10 @@ export function AdminEventPage() {
       onToggleShowRecipientOnScreen: speakerQuestions.panelSetters.setShowRecipientOnScreen,
       onToggleShowReactionsOnScreen: speakerQuestions.panelSetters.setShowReactionsOnScreen,
       onToggleAllowAllSpeakersTarget: speakerQuestions.panelSetters.setAllowAllSpeakersTarget,
-      onToggleModeratorShowAll: speakerQuestions.panelSetters.setModeratorShowAll,
+      onToggleModeratorShowAll: (next: boolean) => {
+        speakerQuestions.panelSetters.setModeratorShowAll(next);
+        persistModeratorShowAll(next);
+      },
       onSessionsChange: speakerQuestions.panelSetters.setSessions,
       onPersistSessions: (
         next: typeof speakerQuestions.settings.sessions,
@@ -1544,6 +1548,7 @@ export function AdminEventPage() {
       saveSpeakerSettings,
       persistActiveSpeakerSession,
       persistSpeakerSessions,
+      persistModeratorShowAll,
       room?.slug,
     ],
   );
@@ -1647,8 +1652,8 @@ export function AdminEventPage() {
             onSectionChange={setActiveSection}
             sectionBadges={{ speakers: speakersNavBadge }}
           />
-          <Box sx={{ flex: 1, minWidth: 0, mt: 0 }}>
-            <Stack spacing={3}>
+          <Box sx={{ flex: 1, minWidth: 0, mt: 0, overflowX: "hidden" }}>
+            <Stack spacing={3} sx={{ width: "100%", minWidth: 0 }}>
               <AdminEventSectionRouter
                 activeSection={activeSection}
                 general={{

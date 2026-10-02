@@ -16,14 +16,14 @@ export function SessionTabLabel({ name, count }: { name: string; count: number }
         component="span"
         sx={{
           position: "absolute",
-          top: -4,
-          right: 0,
+          top: -8,
+          right: -6,
           minWidth: 14,
           height: 14,
           px: 0.35,
           borderRadius: 7,
-          bgcolor: "#fff",
-          color: "#5b3fa8",
+          bgcolor: "primary.main",
+          color: "primary.contrastText",
           fontSize: 10,
           fontWeight: 800,
           lineHeight: "14px",
@@ -40,6 +40,8 @@ export function SessionTabLabel({ name, count }: { name: string; count: number }
 export const SPEAKER_SESSION_TABS_SX = {
   color: "#fff",
   minHeight: 40,
+  pt: 1,
+  overflow: "hidden",
   "& .MuiTab-root": {
     color: "rgba(255,255,255,0.72)",
     minHeight: 40,
@@ -49,10 +51,14 @@ export const SPEAKER_SESSION_TABS_SX = {
     fontWeight: 600,
   },
   "& .MuiTabs-flexContainer": {
-    overflow: "visible",
+    gap: 0,
   },
   "& .MuiTabs-scroller": {
-    overflow: "visible !important",
+    overflowX: "auto !important",
+    overflowY: "hidden !important",
+    // Badge counts sit above the tab label.
+    marginTop: -4,
+    paddingTop: 4,
   },
   "& .Mui-selected": {
     color: "#fff",
