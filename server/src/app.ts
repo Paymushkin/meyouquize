@@ -1062,7 +1062,8 @@ export function buildApp() {
       : req.params.eventName;
     const parsed = upsertFeedbackFormSchema.safeParse(req.body);
     if (!parsed.success) {
-      return res.status(400).json({ error: "Invalid payload" });
+      const message = parsed.error.issues[0]?.message ?? "Invalid payload";
+      return res.status(400).json({ error: message });
     }
     const quizId = await getQuizIdByEventName(eventName);
     if (!quizId) return res.status(404).json({ error: "Room not found" });
@@ -1082,7 +1083,8 @@ export function buildApp() {
     const formId = Array.isArray(req.params.formId) ? req.params.formId[0] : req.params.formId;
     const parsed = upsertFeedbackFormSchema.safeParse(req.body);
     if (!parsed.success) {
-      return res.status(400).json({ error: "Invalid payload" });
+      const message = parsed.error.issues[0]?.message ?? "Invalid payload";
+      return res.status(400).json({ error: message });
     }
     const quizId = await getQuizIdByEventName(eventName);
     if (!quizId) return res.status(404).json({ error: "Room not found" });

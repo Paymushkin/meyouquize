@@ -5,6 +5,7 @@ import {
   replaceRoomContentSchema,
   setPublicViewSchema,
   submitAnswerSchema,
+  upsertFeedbackFormSchema,
 } from "../src/schemas.js";
 
 const baseQuestion = {
@@ -374,6 +375,47 @@ describe("replaceRoomContentSchema geo poll", () => {
       standaloneQuestions: [],
     });
     expect(parsed.success).toBe(false);
+  });
+});
+
+describe("upsertFeedbackFormSchema multi scales", () => {
+  it("accepts multi question with option texts up to 120 chars", () => {
+    const option = "Цифровая трансформация и новые технологии на практике";
+    expect(option.length).toBeGreaterThan(40);
+    expect(option.length).toBeLessThanOrEqual(120);
+    const parsed = upsertFeedbackFormSchema.safeParse({
+      title: "Обратная связь",
+      scales: [
+        {
+          id: "s1",
+          label: "Что интересно?",
+          selection: "multi",
+          maxAnswers: 2,
+          options: [option, "Другое"],
+        },
+      ],
+      openFields: [],
+    });
+    expect(parsed.success).toBe(true);
+  });
+
+  it("rejects empty maxAnswers null after preprocess as unlimited multi", () => {
+    const parsed = upsertFeedbackFormSchema.safeParse({
+      title: "Обратная связь",
+      scales: [
+        {
+          id: "s1",
+          label: "Что интересно?",
+          selection: "multi",
+          maxAnswers: null,
+          options: ["A", "B", "C"],
+        },
+      ],
+    });
+    expect(parsed.success).toBe(true);
+    if (parsed.success) {
+      expect(parsed.data.scales[0]?.maxAnswers).toBeUndefined();
+    }
   });
 });
 

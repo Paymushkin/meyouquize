@@ -873,7 +873,7 @@ export const bannerClickSchema = z.object({
   bannerId: z.string().trim().min(1).max(80),
 });
 
-const feedbackScaleOptionSchema = z.string().trim().min(1).max(40);
+const feedbackScaleOptionSchema = z.string().trim().min(1).max(120);
 
 export const feedbackScaleSchema = z
   .object({
@@ -881,7 +881,10 @@ export const feedbackScaleSchema = z
     label: z.string().trim().min(1).max(200),
     options: z.array(feedbackScaleOptionSchema).min(2).max(10),
     selection: z.enum(["single", "multi"]).optional().default("single"),
-    maxAnswers: z.coerce.number().int().min(1).max(10).optional(),
+    maxAnswers: z.preprocess(
+      (value) => (value === null || value === "" ? undefined : value),
+      z.coerce.number().int().min(1).max(10).optional(),
+    ),
   })
   .superRefine((value, ctx) => {
     if (value.selection !== "multi") return;
