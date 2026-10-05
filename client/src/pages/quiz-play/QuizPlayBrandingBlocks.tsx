@@ -926,7 +926,11 @@ export function JoinCard(props: JoinCardProps) {
       <CardContent sx={JOIN_CARD_CONTENT_SX}>
         <Stack spacing={2}>
           <Stack spacing={0.75}>
-            <Stack direction={pcq<"column" | "row">("column", "row")} spacing={1}>
+            <Stack
+              direction={pcq<"column" | "row">("column", "row")}
+              spacing={0}
+              sx={{ gap: pcq(1.5, 1.5) }}
+            >
               <OutlinedInput
                 autoFocus
                 inputRef={nicknameInputRef}

@@ -68,6 +68,65 @@ describe("PublicReportPage", () => {
     expect(await screen.findByText("Итоги участия")).toBeTruthy();
   });
 
+  it("does not render event header when module is disabled", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => ({
+        ok: true,
+        json: async () => ({
+          title: "Демо событие",
+          slug: "demo",
+          generatedAt: new Date().toISOString(),
+          branding: {
+            brandPrimaryColor: "#7c5acb",
+            brandAccentColor: "#1976d2",
+            brandSurfaceColor: "#ffffff",
+            brandTextColor: "#1f1f1f",
+            brandFontFamily: "Jost, Arial, sans-serif",
+            brandLogoUrl: "",
+            brandProjectorBackgroundImageUrl: "",
+            brandBodyBackgroundColor: "#000000",
+          },
+          config: {
+            reportTitle: "Отчет без шапки",
+            reportModules: ["participation_summary"],
+            reportVoteQuestionIds: [],
+            reportQuizQuestionIds: [],
+            reportQuizSubQuizIds: [],
+            reportPublished: true,
+          },
+          summary: {
+            participantsCount: 10,
+            questionsCount: 4,
+            subQuizzesCount: 1,
+            answersCount: 36,
+          },
+          leaderboard: [],
+          quizQuestions: [],
+          voteQuestions: [],
+          randomizer: { currentWinners: [], history: [] },
+          reactions: { overlayText: "", widgets: [] },
+          speakerQuestions: { enabled: false, total: 0, onScreen: 0, sessions: [], items: [] },
+          feedback: [],
+          subQuizParticipantTables: [],
+          banners: [],
+        }),
+      })),
+    );
+
+    render(
+      <MemoryRouter initialEntries={["/report/demo"]}>
+        <Routes>
+          <Route path="/report/:slug" element={<PublicReportPage />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    expect(await screen.findByText("Итоги участия")).toBeTruthy();
+    expect(screen.queryByText("Отчет без шапки")).toBeNull();
+    expect(screen.queryByText("Событие: Демо событие")).toBeNull();
+  });
+
   it("renders banners block when module is enabled", async () => {
     vi.stubGlobal(
       "fetch",

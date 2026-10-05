@@ -700,7 +700,6 @@ export function PublicReportPage() {
   }
 
   const modules = payload!.config.reportModules;
-  const hasModule = (id: ReportModuleId) => modules.includes(id);
   const tableBySubId = new Map(
     (payload!.subQuizParticipantTables ?? []).map((t) => [t.subQuizId, t] as const),
   );
@@ -756,7 +755,6 @@ export function PublicReportPage() {
     { label: "Форм обратной связи", value: payload!.feedback.length },
   ].filter((item) => item.value > 0);
   const feedbackFormsToShow = payload!.feedback;
-  const showReportHeading = hasModule("event_header") || modules.length > 0;
 
   const renderReportModule = (moduleId: ReportModuleId): ReactNode => {
     switch (moduleId) {
@@ -1388,19 +1386,6 @@ export function PublicReportPage() {
             p: isPdfMode ? 1.5 : 0,
           }}
         >
-          {showReportHeading && !hasModule("event_header") ? (
-            <Card variant="outlined" className="report-card">
-              <CardContent>
-                <Typography variant="h4">
-                  {payload!.config.reportTitle || payload!.title}
-                </Typography>
-                <Typography variant="body2" color="text.secondary">
-                  Событие: {payload!.title}
-                </Typography>
-              </CardContent>
-            </Card>
-          ) : null}
-
           {modules.map((moduleId) => (
             <Fragment key={moduleId}>{renderReportModule(moduleId)}</Fragment>
           ))}
