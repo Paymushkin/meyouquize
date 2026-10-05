@@ -171,6 +171,10 @@ export function useQuizPlaySocket({
         setError("Слишком много тегов для этого вопроса. Уберите лишние ответы.");
         return;
       }
+      if (joinedRef.current && message.includes("Слишком много попыток подключения")) {
+        onJoinSettled?.();
+        return;
+      }
       const displayMessage =
         message === "Join failed"
           ? "Не удалось войти в комнату. Проверьте имя и повторите попытку."

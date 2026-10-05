@@ -83,17 +83,6 @@ function allowReactionBurst(socketId: string): boolean {
 export function registerQuizPlayHandlers(socket: EnrichedSocket, io: Server) {
   socket.on("quiz:join", async (raw: unknown) => {
     try {
-      if (
-        !allowSocketAction({
-          socketId: socket.id,
-          action: "quiz:join",
-          windowMs: JOIN_RATE_WINDOW_MS,
-          maxPerWindow: JOIN_RATE_MAX_PER_WINDOW,
-        })
-      ) {
-        fail(socket, "Слишком много попыток подключения. Подождите немного и попробуйте снова.");
-        return;
-      }
       const payload = joinQuizSchema.parse(raw);
       const recent = lastJoinAckBySocket.get(socket.id);
       const now = Date.now();
@@ -104,6 +93,21 @@ export function registerQuizPlayHandlers(socket: EnrichedSocket, io: Server) {
         socket.data.quizId === recent.quizId
       ) {
         socket.emit("quiz:joined", { ok: true, nickname: recent.nickname });
+        return;
+      }
+      const allowed = allowSocketAction({
+        socketId: socket.id,
+        action: "quiz:join",
+        windowMs: JOIN_RATE_WINDOW_MS,
+        maxPerWindow: JOIN_RATE_MAX_PER_WINDOW,
+      });
+      if (!allowed) {
+        // Уже в комнате (типично после клика по баннеру / visibility): не пугаем игрока ошибкой.
+        if (socket.data.participantId && socket.data.quizId && recent?.nickname) {
+          socket.emit("quiz:joined", { ok: true, nickname: recent.nickname });
+          return;
+        }
+        fail(socket, "Слишком много попыток подключения. Подождите немного и попробуйте снова.");
         return;
       }
       const joined = await joinQuiz(payload);
