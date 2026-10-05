@@ -214,6 +214,7 @@ export {
   isGeoPollPreset,
   withDebateOptionColors,
 } from "./interactivePresets.js";
+export { resolveMultiMaxAnswers } from "./multiMaxAnswers.js";
 export {
   DEBATE_DEFAULT_OPTION_COLORS,
   contrastingTextOnColor,

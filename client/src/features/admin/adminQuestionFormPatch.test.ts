@@ -70,17 +70,22 @@ describe("patchQuestionForm", () => {
     expect(result.rankingPointsByRank).toEqual([1, 1]);
   });
 
-  it("switches to temperature with default weights when options are empty", () => {
+  it("when switching to multi bumps legacy maxAnswers=1", () => {
     const result = patchQuestionForm(
-      baseQuestion({ options: [] }),
-      { type: "temperature" },
+      baseQuestion({
+        type: "single",
+        maxAnswers: 1,
+        options: [
+          { text: "A", isCorrect: true },
+          { text: "B", isCorrect: false },
+          { text: "C", isCorrect: false },
+        ],
+      }),
+      { type: "multi" },
       rankingHints,
     );
-    expect(result.type).toBe("temperature");
-    expect(result.editorQuizMode).toBe(false);
-    expect(result.options).toHaveLength(DEFAULT_TEMPERATURE_OPTION_WEIGHTS.length);
-    expect(result.options.map((o) => o.weight)).toEqual([...DEFAULT_TEMPERATURE_OPTION_WEIGHTS]);
-    expect(result.options.every((o) => !o.isCorrect)).toBe(true);
+    expect(result.type).toBe("multi");
+    expect(result.maxAnswers).toBe(3);
   });
 
   it("keeps only one correct option in quiz-mode single", () => {

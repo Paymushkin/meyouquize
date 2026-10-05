@@ -8,6 +8,7 @@ import {
   GEO_POLL_DICTIONARY_WORLD_COUNTRIES,
   isDebatePollPreset,
   isGeoPollPreset,
+  resolveMultiMaxAnswers,
   withDebateOptionColors,
 } from "@meyouquize/shared";
 import {
@@ -369,6 +370,12 @@ function coerceMaxAnswers(raw: unknown): number | undefined {
   return Math.max(1, Math.min(5, Math.trunc(n)));
 }
 
+function maxAnswersForLoadedForm(type: QuestionType, raw: unknown, optionCount: number): number {
+  const coerced = coerceMaxAnswers(raw);
+  if (type === "multi") return resolveMultiMaxAnswers(coerced, optionCount);
+  return coerced ?? 3;
+}
+
 function normalizeGeoPollQuestionForm(form: QuestionForm): QuestionForm {
   if (!isGeoPollPreset(form)) return form;
   return {
@@ -444,7 +451,16 @@ export function toQuestionReplaceInput(q: QuestionForm) {
     imageUrl: questionAllowsQuestionImage(q) ? q.imageUrl?.trim() || undefined : undefined,
     type: q.type,
     points: coerceQuestionPoints(q.points),
-    maxAnswers: coerceMaxAnswers(q.maxAnswers),
+    maxAnswers:
+      q.type === "multi"
+        ? (() => {
+            const optionCount = Math.max(1, q.options.length);
+            const raw = Math.trunc(q.maxAnswers) || 0;
+            // 1 = без лимита (схема maxAnswers ≤ 5; число вариантов может быть больше).
+            if (raw <= 1 || raw >= optionCount) return 1;
+            return Math.min(5, optionCount, raw);
+          })()
+        : coerceMaxAnswers(q.maxAnswers),
     scoringMode,
     projectorShowFirstCorrect: q.projectorShowFirstCorrect ?? true,
     projectorFirstCorrectWinnersCount: Math.max(
@@ -790,6 +806,16 @@ export function validateQuestionFormEntry(q: QuestionForm, index: number): strin
       : `Вопрос ${label}: у каждого варианта должен быть текст.`;
   }
 
+  if (q.type === "multi") {
+    const max = Number(q.maxAnswers);
+    const optionCount = q.options.length;
+    const limitedOk = Number.isFinite(max) && max >= 2 && max <= Math.min(5, optionCount);
+    const unlimitedOk = Number.isFinite(max) && max === optionCount;
+    if (!limitedOk && !unlimitedOk) {
+      return `Вопрос ${label}: для нескольких ответов укажите лимит от 2 до ${Math.min(5, optionCount)} (или ${optionCount} — без лимита).`;
+    }
+  }
+
   if (!isEditorQuizMode(q)) {
     return null;
   }
@@ -888,7 +914,11 @@ export function mapLoadedRoomQuestions(
       type: prismaQuestionTypeToFormType(q.type),
       editorQuizMode: editorQuizModeFromLoadedQuestion(q, subQuizId),
       points: coerceQuestionPoints(q.points),
-      maxAnswers: coerceMaxAnswers(q.maxAnswers) ?? 3,
+      maxAnswers: maxAnswersForLoadedForm(
+        prismaQuestionTypeToFormType(q.type),
+        q.maxAnswers,
+        options.length,
+      ),
       isActive: q.isActive,
       adminDone: Boolean(q.adminDone),
       showVoteCount: false,
@@ -966,7 +996,11 @@ export function mergeServerQuestionsIntoForms(
       type: prismaQuestionTypeToFormType(q.type),
       editorQuizMode: editorQuizModeFromLoadedQuestion(q, subQuizId),
       points: coerceQuestionPoints(q.points),
-      maxAnswers: coerceMaxAnswers(q.maxAnswers) ?? 3,
+      maxAnswers: maxAnswersForLoadedForm(
+        prismaQuestionTypeToFormType(q.type),
+        q.maxAnswers,
+        options.length,
+      ),
       isActive: q.isActive,
       adminDone: Boolean(q.adminDone),
       showVoteCount: prev?.showVoteCount ?? false,

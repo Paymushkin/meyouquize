@@ -1,4 +1,4 @@
-import { expandTagCloudSubmitLines } from "@meyouquize/shared";
+import { expandTagCloudSubmitLines, resolveMultiMaxAnswers } from "@meyouquize/shared";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { GeoPollOption } from "../components/quiz/PlayerGeoPollAutocomplete";
 import { socket } from "../socket";
@@ -234,6 +234,18 @@ export function useQuizPlayQuestionFlow(params: Params) {
       if (!nonQuizActiveQuestion) return;
       if (nonQuizActiveQuestion.type === "single" || nonQuizActiveQuestion.type === "temperature") {
         setSelected((prev) => (prev.includes(id) ? [] : [id]));
+        return;
+      }
+      if (nonQuizActiveQuestion.type === "multi") {
+        const maxAnswers = resolveMultiMaxAnswers(
+          nonQuizActiveQuestion.maxAnswers,
+          nonQuizActiveQuestion.options.length,
+        );
+        setSelected((prev) => {
+          if (prev.includes(id)) return prev.filter((v) => v !== id);
+          if (prev.length >= maxAnswers) return prev;
+          return [...prev, id];
+        });
         return;
       }
       setSelected((prev) => (prev.includes(id) ? prev.filter((v) => v !== id) : [...prev, id]));

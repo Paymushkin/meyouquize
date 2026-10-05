@@ -875,11 +875,26 @@ export const bannerClickSchema = z.object({
 
 const feedbackScaleOptionSchema = z.string().trim().min(1).max(40);
 
-export const feedbackScaleSchema = z.object({
-  id: z.string().trim().min(1).max(80),
-  label: z.string().trim().min(1).max(200),
-  options: z.array(feedbackScaleOptionSchema).min(2).max(10),
-});
+export const feedbackScaleSchema = z
+  .object({
+    id: z.string().trim().min(1).max(80),
+    label: z.string().trim().min(1).max(200),
+    options: z.array(feedbackScaleOptionSchema).min(2).max(10),
+    selection: z.enum(["single", "multi"]).optional().default("single"),
+    maxAnswers: z.coerce.number().int().min(1).max(10).optional(),
+  })
+  .superRefine((value, ctx) => {
+    if (value.selection !== "multi") return;
+    const optionCount = value.options.length;
+    const maxAnswers = value.maxAnswers ?? optionCount;
+    if (maxAnswers < 2 || maxAnswers > optionCount) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: `Для нескольких ответов укажите лимит от 2 до ${optionCount}`,
+        path: ["maxAnswers"],
+      });
+    }
+  });
 
 export const feedbackOpenFieldSchema = z.object({
   id: z.string().trim().min(1).max(80),
@@ -934,7 +949,13 @@ export const feedbackQuizIdSchema = z.object({
 
 export const submitFeedbackSchema = z.object({
   quizId: z.string().min(1),
-  scaleAnswers: z.record(z.string().trim().min(1).max(80), z.number().int().min(0).max(9)),
+  scaleAnswers: z.record(
+    z.string().trim().min(1).max(80),
+    z.union([
+      z.number().int().min(0).max(9),
+      z.array(z.number().int().min(0).max(9)).min(1).max(10),
+    ]),
+  ),
   openFieldAnswers: z
     .record(z.string().trim().min(1).max(80), z.string().trim().max(2000))
     .optional(),

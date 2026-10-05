@@ -585,16 +585,19 @@ export function AdminEventQuestionDialog({
                   </ToggleButtonGroup>
                 </Stack>
               ) : null}
-              {question.type === "tag_cloud" ? (
+              {question.type === "tag_cloud" || question.type === "multi" ? (
                 <TextField
                   type="number"
                   label="Макс. ответов"
                   value={question.maxAnswers}
-                  onChange={(e) =>
+                  onChange={(e) => {
+                    const optionCount = Math.max(2, question.options.length);
+                    const min = question.type === "multi" ? 2 : 1;
+                    const max = question.type === "multi" ? optionCount : 5;
                     onUpdateQuestion({
-                      maxAnswers: Math.min(5, Math.max(1, Number(e.target.value) || 1)),
-                    })
-                  }
+                      maxAnswers: Math.min(max, Math.max(min, Number(e.target.value) || min)),
+                    });
+                  }}
                   size="small"
                   slotProps={{ inputLabel: { shrink: true } }}
                   sx={{
@@ -602,7 +605,7 @@ export function AdminEventQuestionDialog({
                     width: { xs: "100%", sm: 140 },
                     maxWidth: "100%",
                   }}
-                  helperText="От 1 до 5"
+                  helperText={question.type === "multi" ? undefined : "От 1 до 5"}
                 />
               ) : null}
               {isEditorQuizMode(question) &&

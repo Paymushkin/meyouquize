@@ -168,7 +168,7 @@ type PublicReportPayload = {
     }>;
     responses: Array<{
       nickname: string;
-      scaleAnswers: Record<string, number>;
+      scaleAnswers: Record<string, number | number[]>;
       openFieldAnswers: Record<string, string>;
       comment: string | null;
       submittedAt: string;

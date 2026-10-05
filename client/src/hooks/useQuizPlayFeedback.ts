@@ -1,6 +1,11 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { socket } from "../socket";
-import type { ActiveFeedbackForm } from "../types/feedback";
+import {
+  isFeedbackScaleMulti,
+  resolveFeedbackMultiMaxAnswers,
+  type ActiveFeedbackForm,
+  type FeedbackScaleAnswers,
+} from "../types/feedback";
 import { parseSocketErrorMessage } from "../utils/socketError";
 
 type Params = {
@@ -21,7 +26,7 @@ export function useQuizPlayFeedback({
   const [dismissedFeedbackActivationKey, setDismissedFeedbackActivationKey] = useState<
     string | null
   >(null);
-  const [scaleAnswers, setScaleAnswers] = useState<Record<string, number>>({});
+  const [scaleAnswers, setScaleAnswers] = useState<FeedbackScaleAnswers>({});
   const [openFieldAnswers, setOpenFieldAnswers] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState("");
@@ -116,13 +121,38 @@ export function useQuizPlayFeedback({
     if (!activeFeedbackForm || feedbackSubmitted) return false;
     return activeFeedbackForm.scales.every((scale) => {
       const answer = scaleAnswers[scale.id];
+      if (isFeedbackScaleMulti(scale)) {
+        if (!Array.isArray(answer) || answer.length < 1) return false;
+        const maxAnswers = resolveFeedbackMultiMaxAnswers(scale);
+        return (
+          answer.length <= maxAnswers &&
+          answer.every((idx) => idx >= 0 && idx < scale.options.length)
+        );
+      }
       return typeof answer === "number" && answer >= 0 && answer < scale.options.length;
     });
   }, [activeFeedbackForm, feedbackSubmitted, scaleAnswers]);
 
-  const selectScaleOption = useCallback((scaleId: string, optionIndex: number) => {
-    setScaleAnswers((prev) => ({ ...prev, [scaleId]: optionIndex }));
-  }, []);
+  const selectScaleOption = useCallback(
+    (scaleId: string, optionIndex: number) => {
+      const scale = activeFeedbackForm?.scales.find((item) => item.id === scaleId);
+      if (!scale) return;
+      if (isFeedbackScaleMulti(scale)) {
+        const maxAnswers = resolveFeedbackMultiMaxAnswers(scale);
+        setScaleAnswers((prev) => {
+          const current = Array.isArray(prev[scaleId]) ? (prev[scaleId] as number[]) : [];
+          if (current.includes(optionIndex)) {
+            return { ...prev, [scaleId]: current.filter((idx) => idx !== optionIndex) };
+          }
+          if (current.length >= maxAnswers) return prev;
+          return { ...prev, [scaleId]: [...current, optionIndex] };
+        });
+        return;
+      }
+      setScaleAnswers((prev) => ({ ...prev, [scaleId]: optionIndex }));
+    },
+    [activeFeedbackForm],
+  );
 
   const setOpenFieldAnswer = useCallback((fieldId: string, value: string) => {
     setOpenFieldAnswers((prev) => ({ ...prev, [fieldId]: value }));

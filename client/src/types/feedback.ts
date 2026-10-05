@@ -1,12 +1,23 @@
+import { resolveMultiMaxAnswers } from "@meyouquize/shared";
+
 export const FEEDBACK_SCALE_MIN_OPTIONS = 2;
 export const FEEDBACK_SCALE_MAX_OPTIONS = 10;
 export const FEEDBACK_OPEN_FIELD_MAX = 10;
+
+export type FeedbackScaleSelection = "single" | "multi";
 
 export type FeedbackScale = {
   id: string;
   label: string;
   options: string[];
+  /** По умолчанию single (шкала). multi — несколько вариантов с лимитом. */
+  selection?: FeedbackScaleSelection;
+  /** Для multi: сколько вариантов может выбрать игрок. */
+  maxAnswers?: number;
 };
+
+export type FeedbackScaleAnswerValue = number | number[];
+export type FeedbackScaleAnswers = Record<string, FeedbackScaleAnswerValue>;
 
 export type FeedbackOpenField = {
   id: string;
@@ -59,6 +70,23 @@ export function feedbackScaleOptionKey(scaleId: string, optionIndex: number): st
   return `${scaleId}:${optionIndex}`;
 }
 
+export function isFeedbackScaleMulti(scale: Pick<FeedbackScale, "selection">): boolean {
+  return scale.selection === "multi";
+}
+
+export function resolveFeedbackMultiMaxAnswers(scale: FeedbackScale): number {
+  return resolveMultiMaxAnswers(scale.maxAnswers, scale.options.length, FEEDBACK_SCALE_MAX_OPTIONS);
+}
+
+export function normalizeFeedbackScaleAnswer(value: unknown): number | number[] | undefined {
+  if (typeof value === "number" && Number.isInteger(value)) return value;
+  if (!Array.isArray(value)) return undefined;
+  const indexes = value
+    .filter((item): item is number => typeof item === "number" && Number.isInteger(item))
+    .map((item) => Math.trunc(item));
+  return indexes.length > 0 ? indexes : undefined;
+}
+
 export type FeedbackResultsPayload = {
   form: FeedbackFormConfig;
   responseCount: number;
@@ -66,7 +94,7 @@ export type FeedbackResultsPayload = {
   scaleStats: FeedbackScaleStat[];
   responses: Array<{
     nickname: string;
-    scaleAnswers: Record<string, number>;
+    scaleAnswers: FeedbackScaleAnswers;
     openFieldAnswers: Record<string, string>;
     /** @deprecated use openFieldAnswers */
     comment: string | null;
@@ -76,10 +104,23 @@ export type FeedbackResultsPayload = {
   }>;
 };
 
-export function createEmptyScale(label = ""): FeedbackScale {
+export function createEmptyScale(
+  label = "",
+  selection: FeedbackScaleSelection = "single",
+): FeedbackScale {
+  if (selection === "multi") {
+    return {
+      id: crypto.randomUUID(),
+      label,
+      selection: "multi",
+      maxAnswers: 2,
+      options: ["Вариант 1", "Вариант 2", "Вариант 3"],
+    };
+  }
   return {
     id: crypto.randomUUID(),
     label,
+    selection: "single",
     options: ["1", "2", "3", "4", "5"],
   };
 }

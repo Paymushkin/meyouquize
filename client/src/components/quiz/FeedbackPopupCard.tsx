@@ -16,13 +16,17 @@ import {
   PLAYER_POPUP_OVERLAY_SX,
 } from "./playerDialogStyles";
 import { playerFeedbackScaleTitleSx } from "../../features/voteUi/voteQuestionLayout";
-import type { ActiveFeedbackForm } from "../../types/feedback";
+import {
+  isFeedbackScaleMulti,
+  type ActiveFeedbackForm,
+  type FeedbackScaleAnswers,
+} from "../../types/feedback";
 
 type Props = {
   brandPrimaryColor: string;
   playerVoteOptionTextColor: string;
   form: ActiveFeedbackForm;
-  scaleAnswers: Record<string, number>;
+  scaleAnswers: FeedbackScaleAnswers;
   openFieldAnswers: Record<string, string>;
   onOpenFieldChange: (fieldId: string, value: string) => void;
   onSelectOption: (scaleId: string, optionIndex: number) => void;
@@ -123,7 +127,10 @@ export function FeedbackPopupCard(props: Props) {
                       }}
                     >
                       {scale.options.map((option, optionIndex) => {
-                        const isSelected = scaleAnswers[scale.id] === optionIndex;
+                        const answer = scaleAnswers[scale.id];
+                        const isSelected = isFeedbackScaleMulti(scale)
+                          ? Array.isArray(answer) && answer.includes(optionIndex)
+                          : answer === optionIndex;
                         return (
                           <Button
                             key={`${scale.id}-${optionIndex}`}

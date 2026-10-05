@@ -11,6 +11,8 @@ import {
   IconButton,
   Stack,
   TextField,
+  ToggleButton,
+  ToggleButtonGroup,
   Typography,
 } from "@mui/material";
 import { useEffect, useState } from "react";
@@ -21,8 +23,10 @@ import {
   FEEDBACK_OPEN_FIELD_MAX,
   FEEDBACK_SCALE_MAX_OPTIONS,
   FEEDBACK_SCALE_MIN_OPTIONS,
+  isFeedbackScaleMulti,
   type FeedbackOpenField,
   type FeedbackScale,
+  type FeedbackScaleSelection,
 } from "../../../types/feedback";
 
 export type FeedbackFormDraft = {
@@ -61,6 +65,25 @@ export function FeedbackFormEditorDialog(props: Props) {
     }));
   }
 
+  function setScaleSelection(index: number, selection: FeedbackScaleSelection) {
+    setDraft((prev) => ({
+      ...prev,
+      scales: prev.scales.map((scale, idx) => {
+        if (idx !== index) return scale;
+        if (selection === "multi") {
+          const optionCount = Math.max(FEEDBACK_SCALE_MIN_OPTIONS, scale.options.length);
+          const maxAnswers = Math.min(
+            optionCount,
+            Math.max(2, scale.maxAnswers ?? Math.min(2, optionCount)),
+          );
+          return { ...scale, selection: "multi", maxAnswers };
+        }
+        const { maxAnswers: _drop, ...rest } = scale;
+        return { ...rest, selection: "single" };
+      }),
+    }));
+  }
+
   function updateOpenField(index: number, patch: Partial<FeedbackOpenField>) {
     setDraft((prev) => ({
       ...prev,
@@ -77,7 +100,11 @@ export function FeedbackFormEditorDialog(props: Props) {
         if (idx !== scaleIndex) return scale;
         const options = [...scale.options] as FeedbackScale["options"];
         options[optionIndex] = value;
-        return { ...scale, options };
+        const next: FeedbackScale = { ...scale, options };
+        if (isFeedbackScaleMulti(scale) && (scale.maxAnswers ?? 0) > options.length) {
+          next.maxAnswers = options.length;
+        }
+        return next;
       }),
     }));
   }
@@ -88,7 +115,12 @@ export function FeedbackFormEditorDialog(props: Props) {
       scales: prev.scales.map((scale, idx) => {
         if (idx !== scaleIndex) return scale;
         if (scale.options.length <= FEEDBACK_SCALE_MIN_OPTIONS) return scale;
-        return { ...scale, options: scale.options.filter((_, i) => i !== optionIndex) };
+        const options = scale.options.filter((_, i) => i !== optionIndex);
+        const next: FeedbackScale = { ...scale, options };
+        if (isFeedbackScaleMulti(scale) && (scale.maxAnswers ?? 0) > options.length) {
+          next.maxAnswers = options.length;
+        }
+        return next;
       }),
     }));
   }
@@ -121,102 +153,173 @@ export function FeedbackFormEditorDialog(props: Props) {
             fullWidth
             disabled={readOnly}
           />
-          {draft.scales.map((scale, scaleIndex) => (
-            <Box
-              key={scale.id}
-              sx={{
-                p: 2,
-                border: "1px solid",
-                borderColor: "divider",
-                borderRadius: 1,
-              }}
-            >
-              <Stack spacing={1.5}>
-                <Stack direction="row" spacing={1} alignItems="center">
-                  <TextField
-                    label={`Шкала ${scaleIndex + 1}`}
-                    value={scale.label}
-                    onChange={(e) => updateScale(scaleIndex, { label: e.target.value })}
-                    fullWidth
-                    disabled={readOnly}
-                  />
-                  <Button
-                    color="error"
-                    onClick={() =>
-                      setDraft((prev) => ({
-                        ...prev,
-                        scales: prev.scales.filter((_, idx) => idx !== scaleIndex),
-                      }))
-                    }
-                    disabled={readOnly || draft.scales.length <= 1}
-                    aria-label="Удалить шкалу"
+          {draft.scales.map((scale, scaleIndex) => {
+            const multi = isFeedbackScaleMulti(scale);
+            return (
+              <Box
+                key={scale.id}
+                sx={{
+                  p: 2,
+                  border: "1px solid",
+                  borderColor: "divider",
+                  borderRadius: 1,
+                }}
+              >
+                <Stack spacing={1.5}>
+                  <Stack
+                    direction={{ xs: "column", sm: "row" }}
+                    spacing={1}
+                    alignItems={{ sm: "center" }}
+                    flexWrap="wrap"
                   >
-                    <DeleteOutlineIcon />
-                  </Button>
-                </Stack>
-                <Stack direction={{ xs: "column", sm: "row" }} spacing={1} flexWrap="wrap">
-                  {scale.options.map((option, optionIndex) => (
-                    <Stack
-                      key={`${scale.id}-${optionIndex}`}
-                      spacing={0.25}
-                      sx={{ flex: { sm: "1 1 0" }, minWidth: { sm: 100 }, maxWidth: "100%" }}
+                    <ToggleButtonGroup
+                      exclusive
+                      size="small"
+                      value={multi ? "multi" : "single"}
+                      onChange={(_event, next) => {
+                        if (!next) return;
+                        setScaleSelection(scaleIndex, next);
+                      }}
+                      disabled={readOnly}
+                      sx={{ width: { xs: "100%", sm: "auto" } }}
                     >
-                      <IconButton
-                        size="small"
-                        color="error"
-                        onClick={() => removeScaleOption(scaleIndex, optionIndex)}
-                        disabled={readOnly || scale.options.length <= FEEDBACK_SCALE_MIN_OPTIONS}
-                        aria-label={`Удалить вариант ${optionIndex + 1}`}
-                        sx={{ alignSelf: "flex-start", ml: -0.5 }}
-                      >
-                        <DeleteOutlineIcon fontSize="small" />
-                      </IconButton>
+                      <ToggleButton value="single" sx={{ flex: { xs: 1, sm: "none" }, px: 2 }}>
+                        Один ответ
+                      </ToggleButton>
+                      <ToggleButton value="multi" sx={{ flex: { xs: 1, sm: "none" }, px: 2 }}>
+                        Несколько
+                      </ToggleButton>
+                    </ToggleButtonGroup>
+                    {multi ? (
                       <TextField
-                        label={`Вариант ${optionIndex + 1}`}
-                        value={option}
-                        onChange={(e) => updateScaleOption(scaleIndex, optionIndex, e.target.value)}
+                        type="number"
+                        label="Макс. ответов"
+                        value={scale.maxAnswers ?? Math.min(2, scale.options.length)}
+                        onChange={(e) => {
+                          const optionCount = Math.max(
+                            FEEDBACK_SCALE_MIN_OPTIONS,
+                            scale.options.length,
+                          );
+                          updateScale(scaleIndex, {
+                            maxAnswers: Math.min(
+                              optionCount,
+                              Math.max(2, Number(e.target.value) || 2),
+                            ),
+                          });
+                        }}
                         size="small"
-                        fullWidth
                         disabled={readOnly}
+                        slotProps={{ inputLabel: { shrink: true } }}
+                        sx={{
+                          flex: "0 1 140px",
+                          width: { xs: "100%", sm: 140 },
+                          maxWidth: "100%",
+                        }}
                       />
-                    </Stack>
-                  ))}
-                </Stack>
-                {!readOnly && scale.options.length < FEEDBACK_SCALE_MAX_OPTIONS ? (
-                  <TextField
-                    label="Новый вариант (введите и нажмите Enter)"
-                    placeholder="Текст нового варианта"
-                    value={newOptionByScaleId[scale.id] ?? ""}
-                    onChange={(e) =>
-                      setNewOptionByScaleId((prev) => ({ ...prev, [scale.id]: e.target.value }))
-                    }
-                    onBlur={() => commitNewScaleOption(scaleIndex)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") {
-                        e.preventDefault();
-                        commitNewScaleOption(scaleIndex);
+                    ) : null}
+                  </Stack>
+                  <Stack direction="row" spacing={1} alignItems="center">
+                    <TextField
+                      label={multi ? `Вопрос ${scaleIndex + 1}` : `Шкала ${scaleIndex + 1}`}
+                      value={scale.label}
+                      onChange={(e) => updateScale(scaleIndex, { label: e.target.value })}
+                      fullWidth
+                      disabled={readOnly}
+                    />
+                    <Button
+                      color="error"
+                      onClick={() =>
+                        setDraft((prev) => ({
+                          ...prev,
+                          scales: prev.scales.filter((_, idx) => idx !== scaleIndex),
+                        }))
                       }
-                    }}
-                    size="small"
-                    fullWidth
-                    disabled={readOnly}
-                  />
-                ) : null}
-              </Stack>
-            </Box>
-          ))}
-          <Button
-            startIcon={<AddIcon />}
-            onClick={() =>
-              setDraft((prev) => ({
-                ...prev,
-                scales: [...prev.scales, createEmptyScale("Новая шкала")],
-              }))
-            }
-            disabled={readOnly || draft.scales.length >= 10}
-          >
-            Добавить шкалу
-          </Button>
+                      disabled={readOnly || draft.scales.length <= 1}
+                      aria-label="Удалить вопрос"
+                    >
+                      <DeleteOutlineIcon />
+                    </Button>
+                  </Stack>
+                  <Stack direction={{ xs: "column", sm: "row" }} spacing={1} flexWrap="wrap">
+                    {scale.options.map((option, optionIndex) => (
+                      <Stack
+                        key={`${scale.id}-${optionIndex}`}
+                        spacing={0.25}
+                        sx={{ flex: { sm: "1 1 0" }, minWidth: { sm: 100 }, maxWidth: "100%" }}
+                      >
+                        <IconButton
+                          size="small"
+                          color="error"
+                          onClick={() => removeScaleOption(scaleIndex, optionIndex)}
+                          disabled={readOnly || scale.options.length <= FEEDBACK_SCALE_MIN_OPTIONS}
+                          aria-label={`Удалить вариант ${optionIndex + 1}`}
+                          sx={{ alignSelf: "flex-start", ml: -0.5 }}
+                        >
+                          <DeleteOutlineIcon fontSize="small" />
+                        </IconButton>
+                        <TextField
+                          label={`Вариант ${optionIndex + 1}`}
+                          value={option}
+                          onChange={(e) =>
+                            updateScaleOption(scaleIndex, optionIndex, e.target.value)
+                          }
+                          size="small"
+                          fullWidth
+                          disabled={readOnly}
+                        />
+                      </Stack>
+                    ))}
+                  </Stack>
+                  {!readOnly && scale.options.length < FEEDBACK_SCALE_MAX_OPTIONS ? (
+                    <TextField
+                      label="Новый вариант (введите и нажмите Enter)"
+                      placeholder="Текст нового варианта"
+                      value={newOptionByScaleId[scale.id] ?? ""}
+                      onChange={(e) =>
+                        setNewOptionByScaleId((prev) => ({ ...prev, [scale.id]: e.target.value }))
+                      }
+                      onBlur={() => commitNewScaleOption(scaleIndex)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          e.preventDefault();
+                          commitNewScaleOption(scaleIndex);
+                        }
+                      }}
+                      size="small"
+                      fullWidth
+                      disabled={readOnly}
+                    />
+                  ) : null}
+                </Stack>
+              </Box>
+            );
+          })}
+          <Stack direction={{ xs: "column", sm: "row" }} spacing={1}>
+            <Button
+              startIcon={<AddIcon />}
+              onClick={() =>
+                setDraft((prev) => ({
+                  ...prev,
+                  scales: [...prev.scales, createEmptyScale("Новая шкала")],
+                }))
+              }
+              disabled={readOnly || draft.scales.length >= 10}
+            >
+              Добавить шкалу
+            </Button>
+            <Button
+              startIcon={<AddIcon />}
+              onClick={() =>
+                setDraft((prev) => ({
+                  ...prev,
+                  scales: [...prev.scales, createEmptyScale("Новый вопрос", "multi")],
+                }))
+              }
+              disabled={readOnly || draft.scales.length >= 10}
+            >
+              Добавить вопрос с вариантами
+            </Button>
+          </Stack>
           <Typography variant="subtitle1" sx={{ pt: 0.5 }}>
             Открытые поля
           </Typography>

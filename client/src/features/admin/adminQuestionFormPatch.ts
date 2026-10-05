@@ -61,6 +61,9 @@ export function patchQuestionForm(
         next.options = next.options.map((o, idx) => ({ ...o, isCorrect: idx === 0 }));
       }
     }
+    if (patch.type === "multi" && (next.maxAnswers ?? 1) <= 1) {
+      next.maxAnswers = Math.min(5, Math.max(2, next.options.length || 2));
+    }
   } else if (patch.type === "temperature") {
     next.editorQuizMode = false;
     if (next.options.length < 2) {

@@ -10,6 +10,7 @@ import {
   normalizeTagComparable,
   parseStoredTagAnswersJson,
   resolveDebateSeriesResultTitle,
+  resolveMultiMaxAnswers,
   sanitizeOptionColor,
   sanitizeTagCloudManualByQuestionId,
   sumDebateSeriesOptionStats,
@@ -384,6 +385,13 @@ function pointsForReplaceQuestion(q: QuestionReplaceInput): number {
 
 function maxAnswersForReplaceQuestion(q: QuestionReplaceInput): number {
   if (q.type === "tag_cloud") return q.maxAnswers ?? 3;
+  if (q.type === "multi") {
+    const optionCount = Math.max(1, q.options.length);
+    // 1 = без лимита (legacy и явный «все варианты»; схема maxAnswers ≤ 5).
+    const raw = Math.trunc(q.maxAnswers ?? 0) || 0;
+    if (raw <= 1 || raw >= optionCount) return 1;
+    return Math.min(5, optionCount, raw);
+  }
   if (q.type === "ranking") return q.options.length;
   if (q.type === "temperature") return 1;
   return 1;
@@ -1136,7 +1144,10 @@ export async function getQuizPublicState(quizId: string) {
       imageUrl: q.imageUrl ?? undefined,
       type: prismaTypeToApi(q.type),
       scoringMode: q.scoringMode === ScoringMode.POLL ? "poll" : "quiz",
-      maxAnswers: q.maxAnswers,
+      maxAnswers:
+        q.type === QuestionType.MULTI
+          ? resolveMultiMaxAnswers(q.maxAnswers, q.options.length)
+          : q.maxAnswers,
       options: q.options.map((o) => ({
         id: o.id,
         text: o.text,
@@ -1173,7 +1184,10 @@ export async function getQuizPublicState(quizId: string) {
           imageUrl: activeQuestion.imageUrl ?? undefined,
           type: prismaTypeToApi(activeQuestion.type),
           scoringMode: activeQuestion.scoringMode === ScoringMode.POLL ? "poll" : "quiz",
-          maxAnswers: activeQuestion.maxAnswers,
+          maxAnswers:
+            activeQuestion.type === QuestionType.MULTI
+              ? resolveMultiMaxAnswers(activeQuestion.maxAnswers, activeQuestion.options.length)
+              : activeQuestion.maxAnswers,
           options: activeQuestion.options.map((o) => ({
             id: o.id,
             text: o.text,
@@ -2399,7 +2413,7 @@ export type PublicEventReport = {
     }>;
     responses: Array<{
       nickname: string;
-      scaleAnswers: Record<string, number>;
+      scaleAnswers: Record<string, number | number[]>;
       openFieldAnswers: Record<string, string>;
       comment: string | null;
       submittedAt: string;
@@ -3136,6 +3150,14 @@ export async function submitAnswer(payload: {
   } else if (question.type === QuestionType.TEMPERATURE) {
     if (selected.length !== 1) {
       throw new Error("Temperature requires exactly one option");
+    }
+  } else if (question.type === QuestionType.MULTI) {
+    if (selected.length < 1) {
+      throw new Error("At least one option is required");
+    }
+    const maxAnswers = resolveMultiMaxAnswers(question.maxAnswers, question.options.length);
+    if (selected.length > maxAnswers) {
+      throw new Error(`Too many options: max ${maxAnswers}`);
     }
   } else if (selected.length < 1) {
     throw new Error("At least one option is required");

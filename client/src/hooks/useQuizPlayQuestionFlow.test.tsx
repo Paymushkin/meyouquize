@@ -61,6 +61,61 @@ describe("useQuizPlayQuestionFlow", () => {
     expect(result.current.selected).toEqual(["o2"]);
   });
 
+  it("limits multi selection by maxAnswers", () => {
+    const question = makeQuestion({
+      type: "multi",
+      maxAnswers: 2,
+      options: [
+        { id: "o1", text: "A" },
+        { id: "o2", text: "B" },
+        { id: "o3", text: "C" },
+      ],
+    });
+    const quiz = makeQuiz({ activeQuestion: question, activeQuestions: [question] });
+    const { result } = renderHook(() =>
+      useQuizPlayQuestionFlow({
+        quiz,
+        submittedQuestionIds: [],
+        submittedAnswers: {},
+        playerAnswersHydrated: true,
+      }),
+    );
+
+    act(() => result.current.toggleOption("o1"));
+    act(() => result.current.toggleOption("o2"));
+    act(() => result.current.toggleOption("o3"));
+    expect(result.current.selected).toEqual(["o1", "o2"]);
+
+    act(() => result.current.toggleOption("o1"));
+    expect(result.current.selected).toEqual(["o2"]);
+  });
+
+  it("allows all options for legacy multi maxAnswers=1", () => {
+    const question = makeQuestion({
+      type: "multi",
+      maxAnswers: 1,
+      options: [
+        { id: "o1", text: "A" },
+        { id: "o2", text: "B" },
+        { id: "o3", text: "C" },
+      ],
+    });
+    const quiz = makeQuiz({ activeQuestion: question, activeQuestions: [question] });
+    const { result } = renderHook(() =>
+      useQuizPlayQuestionFlow({
+        quiz,
+        submittedQuestionIds: [],
+        submittedAnswers: {},
+        playerAnswersHydrated: true,
+      }),
+    );
+
+    act(() => result.current.toggleOption("o1"));
+    act(() => result.current.toggleOption("o2"));
+    act(() => result.current.toggleOption("o3"));
+    expect(result.current.selected).toEqual(["o1", "o2", "o3"]);
+  });
+
   it("emits answer:submit for selected options", () => {
     const quiz = makeQuiz();
     const { result } = renderHook(() =>

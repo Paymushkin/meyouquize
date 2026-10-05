@@ -169,6 +169,34 @@ describe("mapLoadedRoomQuestions", () => {
     expect(form.options[0]?.isCorrect).toBe(true);
     expect(form.adminDone).toBe(true);
   });
+
+  it("expands legacy multi maxAnswers=1 to option count", () => {
+    const [form] = mapLoadedRoomQuestions(
+      [
+        {
+          id: "q-multi",
+          text: "Multi",
+          type: "MULTI",
+          scoringMode: "POLL",
+          points: 0,
+          maxAnswers: 1,
+          adminDone: false,
+          order: 0,
+          isActive: false,
+          options: [
+            { id: "o1", text: "A", isCorrect: true },
+            { id: "o2", text: "B", isCorrect: true },
+            { id: "o3", text: "C", isCorrect: false },
+          ],
+        },
+      ],
+      {},
+      null,
+    );
+
+    expect(form.type).toBe("multi");
+    expect(form.maxAnswers).toBe(3);
+  });
 });
 
 function baseQuestionForm(overrides: Partial<QuestionForm> = {}): QuestionForm {
@@ -274,6 +302,37 @@ describe("validateQuestionFormEntry", () => {
       ),
     ).toMatch(/макс. ответов/);
   });
+
+  it("validates multi max answers limit", () => {
+    expect(
+      validateQuestionFormEntry(
+        baseQuestionForm({
+          type: "multi",
+          maxAnswers: 1,
+          options: [
+            { text: "A", isCorrect: true },
+            { text: "B", isCorrect: false },
+            { text: "C", isCorrect: false },
+          ],
+        }),
+        0,
+      ),
+    ).toMatch(/лимит/);
+    expect(
+      validateQuestionFormEntry(
+        baseQuestionForm({
+          type: "multi",
+          maxAnswers: 2,
+          options: [
+            { text: "A", isCorrect: true },
+            { text: "B", isCorrect: false },
+            { text: "C", isCorrect: false },
+          ],
+        }),
+        0,
+      ),
+    ).toBeNull();
+  });
 });
 
 describe("toQuestionReplaceInput", () => {
@@ -322,6 +381,34 @@ describe("toQuestionReplaceInput", () => {
       }),
     );
     expect(payload.options.map((o) => o.color)).toEqual(["#1976d2", "#112233", "#90a4ae"]);
+  });
+
+  it("stores multi unlimited as maxAnswers=1 and keeps explicit limits", () => {
+    const unlimited = toQuestionReplaceInput(
+      baseQuestionForm({
+        type: "multi",
+        maxAnswers: 3,
+        options: [
+          { text: "A", isCorrect: true },
+          { text: "B", isCorrect: false },
+          { text: "C", isCorrect: false },
+        ],
+      }),
+    );
+    expect(unlimited.maxAnswers).toBe(1);
+
+    const limited = toQuestionReplaceInput(
+      baseQuestionForm({
+        type: "multi",
+        maxAnswers: 2,
+        options: [
+          { text: "A", isCorrect: true },
+          { text: "B", isCorrect: false },
+          { text: "C", isCorrect: false },
+        ],
+      }),
+    );
+    expect(limited.maxAnswers).toBe(2);
   });
 });
 

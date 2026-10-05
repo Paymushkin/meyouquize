@@ -278,7 +278,7 @@ model FeedbackForm {
   title              String             @default("Обратная связь")
   isActive           Boolean            @default(false)
   isClosed           Boolean            @default(false)
-  /** [{ id, label, options: string[5] }] */
+  /** [{ id, label, options: string[], selection?: 'single'|'multi', maxAnswers?: number }] */
   scales             Json
   /** [{ id, label, placeholder }] */
   openFields         Json               @default("[]")
@@ -302,7 +302,7 @@ model FeedbackResponse {
   feedbackForm   FeedbackForm @relation(fields: [feedbackFormId], references: [id], onDelete: Cascade)
   participantId  String
   participant    Participant  @relation(fields: [participantId], references: [id], onDelete: Cascade)
-  /** { scaleId: optionIndex 0..4 } */
+  /** { scaleId: optionIndex | optionIndex[] } */
   scaleAnswers     Json
   /** { openFieldId: text } */
   openFieldAnswers Json               @default("{}")

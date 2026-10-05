@@ -115,6 +115,40 @@ describe("useQuizPlayFeedback", () => {
     });
   });
 
+  it("limits multi scale selection by maxAnswers", () => {
+    const form = makeForm();
+    form.scales = [
+      {
+        id: "multi-1",
+        label: "Pick some",
+        selection: "multi",
+        maxAnswers: 2,
+        options: ["A", "B", "C"],
+      },
+    ];
+    const { result } = renderHook(() =>
+      useQuizPlayFeedback({
+        quizId: "quiz-1",
+        activeFeedbackForm: form,
+        joined: true,
+      }),
+    );
+
+    act(() => fireSocketEvent("player:feedback-status", { submitted: false }));
+    act(() => result.current.selectScaleOption("multi-1", 0));
+    act(() => result.current.selectScaleOption("multi-1", 1));
+    act(() => result.current.selectScaleOption("multi-1", 2));
+    expect(result.current.scaleAnswers).toEqual({ "multi-1": [0, 1] });
+    expect(result.current.canSubmitFeedback).toBe(true);
+
+    act(() => result.current.submitFeedback());
+    expect(mockSocket.emit).toHaveBeenCalledWith("feedback:submit", {
+      quizId: "quiz-1",
+      scaleAnswers: { "multi-1": [0, 1] },
+      openFieldAnswers: {},
+    });
+  });
+
   it("hides popup after dismiss until next activation", () => {
     const form = makeForm();
     const { result } = renderHook(() =>
