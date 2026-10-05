@@ -88,7 +88,6 @@ export function FeedbackPopupCard(props: Props) {
     boxShadow: "none",
     lineHeight: 1.2,
     whiteSpace: "pre-line",
-    height: "auto",
     px: 2,
     py: 1.25,
   });
