@@ -86,7 +86,7 @@ export function VoteResultOptionRow(props: Props) {
               pointerEvents: "none",
               px: 1,
               py: 0.55,
-              whiteSpace: "normal",
+              whiteSpace: "pre-line",
               overflowWrap: "anywhere",
               lineHeight: 1.2,
             }}

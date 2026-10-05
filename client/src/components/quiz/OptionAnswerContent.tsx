@@ -36,7 +36,17 @@ export function OptionAnswerContent(props: Props) {
           }}
         />
         {hasText ? (
-          <Box sx={{ width: "100%", textAlign: "left", lineHeight: 1.3, ...textSx }}>{text}</Box>
+          <Box
+            sx={{
+              width: "100%",
+              textAlign: "left",
+              lineHeight: 1.3,
+              whiteSpace: "pre-line",
+              ...textSx,
+            }}
+          >
+            {text}
+          </Box>
         ) : null}
       </Stack>
     );
@@ -55,7 +65,9 @@ export function OptionAnswerContent(props: Props) {
           borderRadius={0.75}
         />
       ) : null}
-      {hasText ? <Box sx={{ minWidth: 0, flex: 1, ...textSx }}>{text}</Box> : null}
+      {hasText ? (
+        <Box sx={{ minWidth: 0, flex: 1, whiteSpace: "pre-line", ...textSx }}>{text}</Box>
+      ) : null}
     </Stack>
   );
 }

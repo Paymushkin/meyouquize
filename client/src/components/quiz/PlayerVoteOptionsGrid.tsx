@@ -44,7 +44,7 @@ function buildOptionButtonSx(
     boxShadow: "none",
     justifyContent: "flex-start",
     textAlign: "left" as const,
-    whiteSpace: "normal" as const,
+    whiteSpace: "pre-line" as const,
     px: cardLayout ? pcq(1, 1.5) : 2,
     py: cardLayout ? pcq(1, 1.5) : 1.25,
     ...(cardLayout

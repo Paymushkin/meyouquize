@@ -87,7 +87,8 @@ export function FeedbackPopupCard(props: Props) {
     transition: "background-color 180ms ease, border-color 180ms ease, color 180ms ease",
     boxShadow: "none",
     lineHeight: 1.2,
-    whiteSpace: "nowrap",
+    whiteSpace: "pre-line",
+    height: "auto",
     px: 2,
     py: 1.25,
   });

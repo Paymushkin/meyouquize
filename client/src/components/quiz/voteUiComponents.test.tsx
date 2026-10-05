@@ -26,6 +26,23 @@ describe("PlayerVoteOptionsGrid", () => {
     expect(screen.getByText("Beta")).toBeTruthy();
   });
 
+  it("preserves line breaks in option text", () => {
+    render(
+      <PlayerVoteOptionsGrid
+        options={[{ id: "a", text: "Первая строка\nВторая строка" }]}
+        displayedSelected={[]}
+        answeredCurrentQuestion={false}
+        brandPrimaryColor="#7c5acb"
+        playerVoteOptionTextColor="#ffffff"
+        onToggleOption={vi.fn()}
+      />,
+    );
+
+    const label = screen.getByText(/Первая строка/);
+    expect(label.textContent).toBe("Первая строка\nВторая строка");
+    expect(getComputedStyle(label).whiteSpace).toBe("pre-line");
+  });
+
   it("uses debate option colors for accents", () => {
     const colors = resolvePlayerVoteOptionColors(
       [
