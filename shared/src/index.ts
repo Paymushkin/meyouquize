@@ -430,6 +430,8 @@ export interface PublicViewState {
   projectorJoinQrVisible: boolean;
   /** Проектор: масштаб браузера (CSS zoom), коэффициент 0.5–5.0 */
   projectorBrowserZoom: number;
+  /** Проектор: макс. ширина контейнера контента (px) */
+  projectorContentMaxWidthPx: number;
   /** Проектор: компактный QR в углу на голосованиях и других экранах */
   projectorJoinQrOverlayVisible: boolean;
   /** Проектор: подпись рядом с QR-кодом входа */
@@ -565,6 +567,28 @@ export const PROJECTOR_BROWSER_ZOOM_MAX = 5;
 export const PROJECTOR_BROWSER_ZOOM_STEP = 0.1;
 export const DEFAULT_PROJECTOR_BROWSER_ZOOM = 1;
 
+/** Макс. ширина контента проектора (px). */
+export const PROJECTOR_CONTENT_MAX_WIDTH_PX_MIN = 800;
+export const PROJECTOR_CONTENT_MAX_WIDTH_PX_MAX = 7680;
+export const DEFAULT_PROJECTOR_CONTENT_MAX_WIDTH_PX = 1920;
+
+export function clampProjectorContentMaxWidthPx(
+  value: unknown,
+  fallback: number = DEFAULT_PROJECTOR_CONTENT_MAX_WIDTH_PX,
+): number {
+  const n =
+    typeof value === "number" && Number.isFinite(value)
+      ? value
+      : typeof value === "string" && value.trim() !== ""
+        ? Number(value)
+        : NaN;
+  if (!Number.isFinite(n)) return fallback;
+  return Math.min(
+    PROJECTOR_CONTENT_MAX_WIDTH_PX_MAX,
+    Math.max(PROJECTOR_CONTENT_MAX_WIDTH_PX_MIN, Math.round(n)),
+  );
+}
+
 /** Старый формат (проценты 75–150) → коэффициент. */
 function coerceProjectorBrowserZoomInput(value: unknown): number | null {
   if (typeof value === "number" && Number.isFinite(value)) return value;
@@ -699,6 +723,7 @@ export const DEFAULT_PUBLIC_VIEW_STATE: PublicViewState = {
   playerVoteProgressBarColor: "#F3F722",
   projectorJoinQrVisible: DEFAULT_PROJECTOR_JOIN_QR_VISIBLE,
   projectorBrowserZoom: DEFAULT_PROJECTOR_BROWSER_ZOOM,
+  projectorContentMaxWidthPx: DEFAULT_PROJECTOR_CONTENT_MAX_WIDTH_PX,
   projectorJoinQrOverlayVisible: DEFAULT_PROJECTOR_JOIN_QR_OVERLAY_VISIBLE,
   projectorJoinQrText: DEFAULT_PROJECTOR_JOIN_QR_TEXT,
   projectorJoinQrTextColor: DEFAULT_PROJECTOR_JOIN_QR_TEXT_COLOR,
@@ -1677,6 +1702,10 @@ export function normalizePublicViewState(
         (value as { projectorBrowserZoomPercent?: unknown } | undefined)
           ?.projectorBrowserZoomPercent,
       base.projectorBrowserZoom,
+    ),
+    projectorContentMaxWidthPx: clampProjectorContentMaxWidthPx(
+      value?.projectorContentMaxWidthPx,
+      base.projectorContentMaxWidthPx,
     ),
     projectorJoinQrOverlayVisible:
       typeof value?.projectorJoinQrOverlayVisible === "boolean"

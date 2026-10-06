@@ -214,7 +214,7 @@ export function ResultsPage() {
     setReactionBursts((prev) => prev.filter((b) => nowMs - b.bornAtMs < b.durationMs));
   }, [nowMs, reactionBursts.length]);
 
-  const containerContentMaxPx = 1920;
+  const containerContentMaxPx = view.projectorContentMaxWidthPx;
   const isFullScreenWidgetMode =
     view.mode === "leaderboard" ||
     view.mode === "speaker_questions" ||
@@ -318,6 +318,9 @@ export function ResultsPage() {
                   justifyContent: fullScreenCloud ? "flex-start" : "center",
                   py: 0,
                   px: PROJECTOR_QUESTION_CONTENT_PX,
+                  width: "100%",
+                  maxWidth: containerContentMaxPx,
+                  mx: "auto",
                 }
               : isFullScreenWidgetMode
                 ? {

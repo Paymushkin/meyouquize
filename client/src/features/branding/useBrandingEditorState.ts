@@ -1,6 +1,7 @@
 import type { BrandThemeId } from "@meyouquize/shared";
 import {
   DEFAULT_PROJECTOR_BROWSER_ZOOM,
+  DEFAULT_PROJECTOR_CONTENT_MAX_WIDTH_PX,
   DEFAULT_PROJECTOR_JOIN_QR_OVERLAY_CORNER,
   DEFAULT_PROJECTOR_JOIN_QR_OVERLAY_INSET_VERTICAL_PX,
   DEFAULT_PROJECTOR_JOIN_QR_OVERLAY_INSET_HORIZONTAL_PX,
@@ -10,6 +11,7 @@ import {
   DEFAULT_PROJECTOR_JOIN_QR_TEXT_COLOR,
   DEFAULT_PROJECTOR_JOIN_QR_VISIBLE,
   clampProjectorBrowserZoom,
+  clampProjectorContentMaxWidthPx,
   normalizePublicViewState,
   type ProjectorJoinQrOverlayCorner,
 } from "@meyouquize/shared";
@@ -90,6 +92,9 @@ export function useBrandingEditorState() {
   const [projectorJoinQrOverlayCorner, setProjectorJoinQrOverlayCorner] =
     useState<ProjectorJoinQrOverlayCorner>(DEFAULT_PROJECTOR_JOIN_QR_OVERLAY_CORNER);
   const [projectorBrowserZoom, setProjectorBrowserZoom] = useState(DEFAULT_PROJECTOR_BROWSER_ZOOM);
+  const [projectorContentMaxWidthPx, setProjectorContentMaxWidthPx] = useState(
+    DEFAULT_PROJECTOR_CONTENT_MAX_WIDTH_PX,
+  );
   const [speakerTileBackgroundColor, setSpeakerTileBackgroundColor] = useState("#1976d2");
   const [speakerTileTextColor, setSpeakerTileTextColor] = useState("#ffffff");
   const [programTileBackgroundColor, setProgramTileBackgroundColor] = useState("#ffffff");
@@ -255,6 +260,9 @@ export function useBrandingEditorState() {
       });
       setProjectorBrowserZoom(
         clampProjectorBrowserZoom(normalizePublicViewState(pv).projectorBrowserZoom),
+      );
+      setProjectorContentMaxWidthPx(
+        clampProjectorContentMaxWidthPx(normalizePublicViewState(pv).projectorContentMaxWidthPx),
       );
     },
     [],
@@ -447,6 +455,8 @@ export function useBrandingEditorState() {
     setProjectorJoinQrOverlayCorner,
     projectorBrowserZoom,
     setProjectorBrowserZoom,
+    projectorContentMaxWidthPx,
+    setProjectorContentMaxWidthPx,
     speakerTileBackgroundColor,
     setSpeakerTileBackgroundColor,
     speakerTileTextColor,

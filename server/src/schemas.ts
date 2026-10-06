@@ -628,6 +628,7 @@ export const setPublicViewSchema = z.object({
     .optional(),
   projectorJoinQrVisible: z.boolean().optional(),
   projectorBrowserZoom: z.number().min(0.5).max(5).optional(),
+  projectorContentMaxWidthPx: z.number().int().min(800).max(7680).optional(),
   projectorJoinQrOverlayVisible: z.boolean().optional(),
   projectorJoinQrText: z.string().trim().max(PROJECTOR_JOIN_QR_TEXT_MAX_LENGTH).optional(),
   projectorJoinQrTextColor: z

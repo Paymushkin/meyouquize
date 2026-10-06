@@ -8,12 +8,16 @@ import {
   DEFAULT_PROJECTOR_JOIN_QR_OVERLAY_INSET_VERTICAL_PX,
   DEFAULT_PROJECTOR_JOIN_QR_OVERLAY_CORNER,
   DEFAULT_PROJECTOR_BROWSER_ZOOM,
+  DEFAULT_PROJECTOR_CONTENT_MAX_WIDTH_PX,
   PROJECTOR_BROWSER_ZOOM_MIN,
   PROJECTOR_BROWSER_ZOOM_MAX,
   PROJECTOR_BROWSER_ZOOM_STEP,
+  PROJECTOR_CONTENT_MAX_WIDTH_PX_MIN,
+  PROJECTOR_CONTENT_MAX_WIDTH_PX_MAX,
   PROJECTOR_JOIN_QR_TEXT_MAX_LENGTH,
   PROJECTOR_JOIN_QR_OVERLAY_CORNERS,
   clampProjectorBrowserZoom,
+  clampProjectorContentMaxWidthPx,
   normalizePublicViewState,
   resolveBannerUniqueClicks,
   sanitizeBrandThemeId,
@@ -64,6 +68,7 @@ type BrandingKeys =
   | "brandBodyBackgroundColor"
   | "projectorJoinQrVisible"
   | "projectorBrowserZoom"
+  | "projectorContentMaxWidthPx"
   | "projectorJoinQrOverlayVisible"
   | "projectorJoinQrText"
   | "projectorJoinQrTextColor"
@@ -143,12 +148,16 @@ export {
   DEFAULT_PROJECTOR_JOIN_QR_OVERLAY_INSET_VERTICAL_PX,
   DEFAULT_PROJECTOR_JOIN_QR_OVERLAY_CORNER,
   DEFAULT_PROJECTOR_BROWSER_ZOOM,
+  DEFAULT_PROJECTOR_CONTENT_MAX_WIDTH_PX,
   PROJECTOR_BROWSER_ZOOM_MIN,
   PROJECTOR_BROWSER_ZOOM_MAX,
   PROJECTOR_BROWSER_ZOOM_STEP,
+  PROJECTOR_CONTENT_MAX_WIDTH_PX_MIN,
+  PROJECTOR_CONTENT_MAX_WIDTH_PX_MAX,
   PROJECTOR_JOIN_QR_TEXT_MAX_LENGTH,
   PROJECTOR_JOIN_QR_OVERLAY_CORNERS,
   clampProjectorBrowserZoom,
+  clampProjectorContentMaxWidthPx,
   normalizePublicViewState,
   resolveBannerUniqueClicks,
   QUIZ_RESULTS_TILE_ID,
@@ -191,6 +200,7 @@ export function toBrandingState(payload: Partial<PublicViewPayload>): BrandingSt
     brandTheme: sanitizeBrandThemeId(view.brandTheme),
     projectorJoinQrVisible: view.projectorJoinQrVisible,
     projectorBrowserZoom: view.projectorBrowserZoom,
+    projectorContentMaxWidthPx: view.projectorContentMaxWidthPx,
     projectorJoinQrOverlayVisible: view.projectorJoinQrOverlayVisible,
     projectorJoinQrText: view.projectorJoinQrText,
     projectorJoinQrTextColor: view.projectorJoinQrTextColor,

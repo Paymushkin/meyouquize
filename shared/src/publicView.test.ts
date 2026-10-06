@@ -345,6 +345,21 @@ describe("projectorBrowserZoom", () => {
   });
 });
 
+describe("projectorContentMaxWidthPx", () => {
+  it("defaults to 1920 and clamps to 800–7680", () => {
+    expect(DEFAULT_PUBLIC_VIEW_STATE.projectorContentMaxWidthPx).toBe(1920);
+    expect(
+      normalizePublicViewState({ projectorContentMaxWidthPx: 1600 }).projectorContentMaxWidthPx,
+    ).toBe(1600);
+    expect(
+      normalizePublicViewState({ projectorContentMaxWidthPx: 100 }).projectorContentMaxWidthPx,
+    ).toBe(800);
+    expect(
+      normalizePublicViewState({ projectorContentMaxWidthPx: 99999 }).projectorContentMaxWidthPx,
+    ).toBe(7680);
+  });
+});
+
 describe("DEFAULT_PUBLIC_VIEW_STATE", () => {
   it("has stable defaults", () => {
     expect(DEFAULT_PUBLIC_VIEW_STATE.mode).toBe("title");

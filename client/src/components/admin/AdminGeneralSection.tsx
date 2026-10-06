@@ -23,8 +23,11 @@ import {
   PROJECTOR_BROWSER_ZOOM_MAX,
   PROJECTOR_BROWSER_ZOOM_MIN,
   PROJECTOR_BROWSER_ZOOM_STEP,
+  PROJECTOR_CONTENT_MAX_WIDTH_PX_MAX,
+  PROJECTOR_CONTENT_MAX_WIDTH_PX_MIN,
   PROJECTOR_JOIN_QR_TEXT_MAX_LENGTH,
   clampProjectorBrowserZoom,
+  clampProjectorContentMaxWidthPx,
   type PublicViewSetPatch,
 } from "../../publicViewContract";
 import { CompactColorField } from "./branding/CompactColorField";
@@ -42,6 +45,8 @@ type Props = {
   setProjectorJoinQrVisible: (value: boolean) => void;
   projectorBrowserZoom: number;
   setProjectorBrowserZoom: (value: number) => void;
+  projectorContentMaxWidthPx: number;
+  setProjectorContentMaxWidthPx: (value: number) => void;
   projectorJoinQrText: string;
   setProjectorJoinQrText: (value: string) => void;
   projectorJoinQrTextColor: string;
@@ -63,6 +68,8 @@ export function AdminGeneralSection(props: Props) {
     setProjectorJoinQrVisible,
     projectorBrowserZoom,
     setProjectorBrowserZoom,
+    projectorContentMaxWidthPx,
+    setProjectorContentMaxWidthPx,
     projectorJoinQrText,
     setProjectorJoinQrText,
     projectorJoinQrTextColor,
@@ -83,10 +90,15 @@ export function AdminGeneralSection(props: Props) {
   const [qrTargetUrl, setQrTargetUrl] = useState("");
   const [qrDataUrl, setQrDataUrl] = useState("");
   const [zoomDraft, setZoomDraft] = useState(String(projectorBrowserZoom));
+  const [maxWidthDraft, setMaxWidthDraft] = useState(String(projectorContentMaxWidthPx));
 
   useEffect(() => {
     setZoomDraft(String(projectorBrowserZoom));
   }, [projectorBrowserZoom]);
+
+  useEffect(() => {
+    setMaxWidthDraft(String(projectorContentMaxWidthPx));
+  }, [projectorContentMaxWidthPx]);
 
   async function copyToClipboard(value: string) {
     if (!value) return;
@@ -112,6 +124,14 @@ export function AdminGeneralSection(props: Props) {
     if (next === projectorBrowserZoom) return;
     setProjectorBrowserZoom(next);
     emitBrandingPatch({ projectorBrowserZoom: next });
+  }
+
+  function commitContentMaxWidth(raw: string) {
+    const next = clampProjectorContentMaxWidthPx(raw, projectorContentMaxWidthPx);
+    setMaxWidthDraft(String(next));
+    if (next === projectorContentMaxWidthPx) return;
+    setProjectorContentMaxWidthPx(next);
+    emitBrandingPatch({ projectorContentMaxWidthPx: next });
   }
 
   return (
@@ -255,6 +275,31 @@ export function AdminGeneralSection(props: Props) {
                     max: PROJECTOR_BROWSER_ZOOM_MAX,
                     step: PROJECTOR_BROWSER_ZOOM_STEP,
                     "aria-label": "Масштаб проектора",
+                  }}
+                  sx={{ width: 96 }}
+                />
+              </Box>
+              <Box sx={switchRowSx}>
+                <Typography variant="body2" sx={rowLabelSx}>
+                  Макс. ширина контейнера, px
+                </Typography>
+                <TextField
+                  id="projector-content-max-width"
+                  type="number"
+                  size="small"
+                  value={maxWidthDraft}
+                  onChange={(e) => setMaxWidthDraft(e.target.value)}
+                  onBlur={() => commitContentMaxWidth(maxWidthDraft)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.currentTarget.blur();
+                    }
+                  }}
+                  inputProps={{
+                    min: PROJECTOR_CONTENT_MAX_WIDTH_PX_MIN,
+                    max: PROJECTOR_CONTENT_MAX_WIDTH_PX_MAX,
+                    step: 10,
+                    "aria-label": "Макс. ширина контейнера проектора",
                   }}
                   sx={{ width: 96 }}
                 />

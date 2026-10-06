@@ -16,6 +16,8 @@ export type AdminEventGeneralTabProps = {
   setProjectorJoinQrVisible: (value: boolean) => void;
   projectorBrowserZoom: number;
   setProjectorBrowserZoom: (value: number) => void;
+  projectorContentMaxWidthPx: number;
+  setProjectorContentMaxWidthPx: (value: number) => void;
   projectorJoinQrText: string;
   setProjectorJoinQrText: (value: string) => void;
   projectorJoinQrTextColor: string;
@@ -36,6 +38,8 @@ export function AdminEventGeneralTab({
   setProjectorJoinQrVisible,
   projectorBrowserZoom,
   setProjectorBrowserZoom,
+  projectorContentMaxWidthPx,
+  setProjectorContentMaxWidthPx,
   projectorJoinQrText,
   setProjectorJoinQrText,
   projectorJoinQrTextColor,
@@ -57,6 +61,8 @@ export function AdminEventGeneralTab({
         setProjectorJoinQrVisible={setProjectorJoinQrVisible}
         projectorBrowserZoom={projectorBrowserZoom}
         setProjectorBrowserZoom={setProjectorBrowserZoom}
+        projectorContentMaxWidthPx={projectorContentMaxWidthPx}
+        setProjectorContentMaxWidthPx={setProjectorContentMaxWidthPx}
         projectorJoinQrText={projectorJoinQrText}
         setProjectorJoinQrText={setProjectorJoinQrText}
         projectorJoinQrTextColor={projectorJoinQrTextColor}

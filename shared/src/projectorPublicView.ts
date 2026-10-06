@@ -71,6 +71,7 @@ const PROJECTOR_BRANDING_KEYS = [
   "brandTheme",
   "projectorJoinQrVisible",
   "projectorBrowserZoom",
+  "projectorContentMaxWidthPx",
   "projectorJoinQrOverlayVisible",
   "projectorJoinQrText",
   "projectorJoinQrTextColor",
