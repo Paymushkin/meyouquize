@@ -25,6 +25,20 @@ describe("buildDebateCompareRows", () => {
     expect(rows[1]?.finalPercent).toBe(48);
     expect(rows[1]?.deltaPp).toBeCloseTo(18, 5);
   });
+
+  it("falls back to placeholder labels when option text is missing", () => {
+    const rows = buildDebateCompareRows(
+      [
+        { optionId: "a", text: undefined, count: 50 },
+        { optionId: "b", count: 50 },
+      ],
+      [
+        { optionId: "a2", text: undefined, count: 40 },
+        { optionId: "b2", count: 60 },
+      ],
+    );
+    expect(rows.map((row) => row.text)).toEqual(["Вариант 1", "Вариант 2"]);
+  });
 });
 
 describe("formatDebateSwingLabel", () => {
@@ -57,6 +71,21 @@ describe("sumDebateSeriesOptionStats", () => {
     ]);
     expect(summed.map((r) => r.count)).toEqual([13, 12]);
     expect(summed[0]?.color).toBe("#222222");
+  });
+
+  it("keeps placeholder text when rounds have image-only options", () => {
+    const summed = sumDebateSeriesOptionStats([
+      [
+        { optionId: "a1", text: undefined, count: 4, imageUrl: "/a.png" },
+        { optionId: "b1", count: 1, imageUrl: "/b.png" },
+      ],
+      [
+        { optionId: "a2", text: undefined, count: 2, imageUrl: "/a.png" },
+        { optionId: "b2", count: 3, imageUrl: "/b.png" },
+      ],
+    ]);
+    expect(summed.map((r) => r.count)).toEqual([6, 4]);
+    expect(summed.map((r) => r.text)).toEqual(["Вариант 1", "Вариант 2"]);
   });
 });
 

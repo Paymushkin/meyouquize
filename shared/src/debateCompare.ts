@@ -1,6 +1,9 @@
+import { optionTextTrimmed } from "./voteOptionContent.js";
+
 export type DebateOptionStat = {
   optionId: string;
-  text: string;
+  /** Может отсутствовать у image-only вариантов с провода. */
+  text?: string;
   count: number;
 };
 
@@ -48,7 +51,7 @@ export function buildDebateCompareRows(
     const finalPercent = f?.percent ?? 0;
     rows.push({
       optionId: f?.optionId ?? b?.optionId ?? `row-${i}`,
-      text: (f?.text ?? b?.text ?? "").trim() || `Вариант ${i + 1}`,
+      text: optionTextTrimmed(f?.text) || optionTextTrimmed(b?.text) || `Вариант ${i + 1}`,
       baselinePercent,
       finalPercent,
       baselineCount: b?.count ?? 0,
@@ -121,7 +124,7 @@ export function sumDebateSeriesOptionStats(
       const row = round[i];
       if (!row) continue;
       count += Math.max(0, row.count);
-      if (row.text.trim()) text = row.text.trim();
+      if (row.text?.trim()) text = row.text.trim();
       if (row.optionId) optionId = row.optionId;
       if (row.imageUrl) imageUrl = row.imageUrl;
       if (row.color) color = row.color;

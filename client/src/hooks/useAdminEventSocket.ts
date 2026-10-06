@@ -83,6 +83,7 @@ type Params = {
   setPlayerVoteProgressTrackColor: (value: string) => void;
   setPlayerVoteProgressBarColor: (value: string) => void;
   setProjectorJoinQrVisible: (value: boolean) => void;
+  setProjectorBrowserZoom: (value: number) => void;
   setProjectorJoinQrOverlayVisible: (value: boolean) => void;
   setProjectorJoinQrText: (value: string) => void;
   setProjectorJoinQrTextColor: (value: string) => void;
@@ -157,6 +158,7 @@ export function useAdminEventSocket<TQuestion extends QuestionFormPatchable>(
     setPlayerVoteProgressTrackColor,
     setPlayerVoteProgressBarColor,
     setProjectorJoinQrVisible,
+    setProjectorBrowserZoom,
     setProjectorJoinQrOverlayVisible,
     setProjectorJoinQrText,
     setProjectorJoinQrTextColor,
@@ -237,6 +239,7 @@ export function useAdminEventSocket<TQuestion extends QuestionFormPatchable>(
       setPlayerVoteProgressTrackColor(nextBranding.playerVoteProgressTrackColor);
       setPlayerVoteProgressBarColor(nextBranding.playerVoteProgressBarColor);
       setProjectorJoinQrVisible(nextBranding.projectorJoinQrVisible);
+      setProjectorBrowserZoom(nextBranding.projectorBrowserZoom);
       setProjectorJoinQrOverlayVisible(nextBranding.projectorJoinQrOverlayVisible);
       setProjectorJoinQrText(nextBranding.projectorJoinQrText);
       setProjectorJoinQrTextColor(nextBranding.projectorJoinQrTextColor);
@@ -284,6 +287,7 @@ export function useAdminEventSocket<TQuestion extends QuestionFormPatchable>(
       setPlayerVoteProgressTrackColor,
       setPlayerVoteProgressBarColor,
       setProjectorJoinQrVisible,
+      setProjectorBrowserZoom,
       setProjectorJoinQrText,
       setProjectorJoinQrTextColor,
       setProjectorJoinQrOverlaySizePx,

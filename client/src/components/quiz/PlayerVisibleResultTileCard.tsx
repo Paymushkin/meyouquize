@@ -3,6 +3,8 @@ import { alpha } from "@mui/material/styles";
 import {
   optionAltText,
   optionHasImage,
+  optionText,
+  optionTextTrimmed,
   PLAYER_RESULT_PREVIEW_OPTION_IMAGE_SIZE,
 } from "../../features/quizPlay/voteOptionImages";
 import type { PlayerVisibleResultTile } from "../../pages/quiz-play/types";
@@ -23,7 +25,8 @@ function ResultPreviewOptionRow(props: {
 }) {
   const { row, pct, optionTextColor, progressBarColor } = props;
   const hasImage = optionHasImage(row.imageUrl);
-  const hasText = Boolean(row.text.trim());
+  const hasText = Boolean(optionTextTrimmed(row.text));
+  const displayText = optionText(row.text);
 
   return (
     <Box sx={{ p: 0, minWidth: 0 }}>
@@ -78,7 +81,7 @@ function ResultPreviewOptionRow(props: {
             <Typography
               variant="caption"
               component="div"
-              title={row.text}
+              title={displayText}
               sx={{
                 color: optionTextColor,
                 fontWeight: 400,
@@ -101,7 +104,7 @@ function ResultPreviewOptionRow(props: {
                   maxHeight: "2.3em",
                 }}
               >
-                {row.text}
+                {displayText}
               </Box>
             </Typography>
           ) : null}

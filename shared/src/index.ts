@@ -428,6 +428,8 @@ export interface PublicViewState {
   playerVoteProgressBarColor: string;
   /** Проектор: крупный QR на экране ивента (title) */
   projectorJoinQrVisible: boolean;
+  /** Проектор: масштаб браузера (CSS zoom), коэффициент 0.5–5.0 */
+  projectorBrowserZoom: number;
   /** Проектор: компактный QR в углу на голосованиях и других экранах */
   projectorJoinQrOverlayVisible: boolean;
   /** Проектор: подпись рядом с QR-кодом входа */
@@ -558,6 +560,37 @@ export const PROJECTOR_JOIN_QR_TEXT_MAX_LENGTH = 200;
 export const DEFAULT_PROJECTOR_JOIN_QR_TEXT = "Сканируйте QR-код, чтобы войти в ивент";
 export const DEFAULT_PROJECTOR_JOIN_QR_TEXT_COLOR = "#ffffff";
 
+export const PROJECTOR_BROWSER_ZOOM_MIN = 0.5;
+export const PROJECTOR_BROWSER_ZOOM_MAX = 5;
+export const PROJECTOR_BROWSER_ZOOM_STEP = 0.1;
+export const DEFAULT_PROJECTOR_BROWSER_ZOOM = 1;
+
+/** Старый формат (проценты 75–150) → коэффициент. */
+function coerceProjectorBrowserZoomInput(value: unknown): number | null {
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  if (typeof value === "string" && value.trim() !== "") {
+    const n = Number(value);
+    if (Number.isFinite(n)) return n;
+  }
+  return null;
+}
+
+export function clampProjectorBrowserZoom(
+  value: unknown,
+  fallback: number = DEFAULT_PROJECTOR_BROWSER_ZOOM,
+): number {
+  let n = coerceProjectorBrowserZoomInput(value);
+  if (n == null) return fallback;
+  // Миграция: ранее хранили проценты (75–150).
+  if (n >= 10) n = n / 100;
+  const stepped = Math.round(n / PROJECTOR_BROWSER_ZOOM_STEP) * PROJECTOR_BROWSER_ZOOM_STEP;
+  const clamped = Math.min(
+    PROJECTOR_BROWSER_ZOOM_MAX,
+    Math.max(PROJECTOR_BROWSER_ZOOM_MIN, stepped),
+  );
+  return Math.round(clamped * 10) / 10;
+}
+
 export type ProjectorJoinQrOverlayCorner =
   | "top_right"
   | "top_left"
@@ -665,6 +698,7 @@ export const DEFAULT_PUBLIC_VIEW_STATE: PublicViewState = {
   playerVoteProgressTrackColor: "#6a5600",
   playerVoteProgressBarColor: "#F3F722",
   projectorJoinQrVisible: DEFAULT_PROJECTOR_JOIN_QR_VISIBLE,
+  projectorBrowserZoom: DEFAULT_PROJECTOR_BROWSER_ZOOM,
   projectorJoinQrOverlayVisible: DEFAULT_PROJECTOR_JOIN_QR_OVERLAY_VISIBLE,
   projectorJoinQrText: DEFAULT_PROJECTOR_JOIN_QR_TEXT,
   projectorJoinQrTextColor: DEFAULT_PROJECTOR_JOIN_QR_TEXT_COLOR,
@@ -824,12 +858,15 @@ export function collectTagCloudCorrectAliases(
 }
 
 /** Все эталонные строки квиза: каждый непустой вариант — отдельный эталон. */
-export function collectTagCloudQuizReferenceAliases(options: Array<{ text: string }>): string[] {
+export function collectTagCloudQuizReferenceAliases(
+  options: Array<{ text?: string | null }>,
+): string[] {
   const out: string[] = [];
   const seen = new Set<string>();
   for (const o of options) {
-    if (!o.text.trim()) continue;
-    for (const alias of parseTagCloudReferenceAliases(o.text)) {
+    const text = typeof o.text === "string" ? o.text.trim() : "";
+    if (!text) continue;
+    for (const alias of parseTagCloudReferenceAliases(text)) {
       if (!seen.has(alias)) {
         seen.add(alias);
         out.push(alias);
@@ -841,18 +878,19 @@ export function collectTagCloudQuizReferenceAliases(options: Array<{ text: strin
 
 /** Текст «верного ответа» для отчёта участника. */
 export function formatTagCloudReferenceAnswer(
-  options: Array<{ text: string; isCorrect: boolean }>,
+  options: Array<{ text?: string | null; isCorrect: boolean }>,
   mode: "quiz" | "poll",
 ): string {
   const reference =
     mode === "quiz"
-      ? options.filter((o) => o.text.trim())
-      : options.filter((o) => o.isCorrect && o.text.trim());
+      ? options.filter((o) => typeof o.text === "string" && o.text.trim())
+      : options.filter((o) => o.isCorrect && typeof o.text === "string" && o.text.trim());
   if (reference.length === 0) return "—";
   return reference
     .map((o) => {
-      const aliases = parseTagCloudReferenceAliases(o.text);
-      return aliases.length > 0 ? aliases.join(" / ") : o.text.trim();
+      const text = typeof o.text === "string" ? o.text : "";
+      const aliases = parseTagCloudReferenceAliases(text);
+      return aliases.length > 0 ? aliases.join(" / ") : text.trim();
     })
     .join(" · ");
 }
@@ -1634,6 +1672,12 @@ export function normalizePublicViewState(
       typeof value?.projectorJoinQrVisible === "boolean"
         ? value.projectorJoinQrVisible
         : base.projectorJoinQrVisible,
+    projectorBrowserZoom: clampProjectorBrowserZoom(
+      value?.projectorBrowserZoom ??
+        (value as { projectorBrowserZoomPercent?: unknown } | undefined)
+          ?.projectorBrowserZoomPercent,
+      base.projectorBrowserZoom,
+    ),
     projectorJoinQrOverlayVisible:
       typeof value?.projectorJoinQrOverlayVisible === "boolean"
         ? value.projectorJoinQrOverlayVisible
@@ -1918,6 +1962,8 @@ export {
   optionHasImage,
   optionHasTextOrImage,
   optionImageUrl,
+  optionText,
+  optionTextTrimmed,
   questionHasOptionImages,
 } from "./voteOptionContent.js";
 

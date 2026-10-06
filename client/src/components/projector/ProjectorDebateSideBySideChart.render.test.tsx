@@ -80,3 +80,41 @@ describe("ProjectorDebateSideBySideChart zero results", () => {
     expect(fills.every((fill) => !fill.startsWith("rgba("))).toBe(true);
   });
 });
+
+describe("ProjectorDebateSideBySideChart image-only options", () => {
+  it("renders without crashing when option text is missing", () => {
+    expect(() =>
+      render(
+        <ThemeProvider theme={theme}>
+          <ProjectorDebateSideBySideChart
+            rows={[
+              {
+                optionId: "a",
+                text: undefined as unknown as string,
+                imageUrl: "/a.png",
+                color: "#1976d2",
+                percent: 60,
+                percentLabel: "60%",
+              },
+              {
+                optionId: "b",
+                text: "",
+                imageUrl: "/b.png",
+                color: "#c62828",
+                percent: 40,
+                percentLabel: "40%",
+              },
+            ]}
+            questionRevealStage="results"
+            voteOptionTextColor="#ffffff"
+            voteOptionBorderColor="#ffffff"
+            voteProgressTrackColor="#333333"
+            voteProgressBarColor="#ffffff"
+          />
+        </ThemeProvider>,
+      ),
+    ).not.toThrow();
+    expect(screen.getByText("60%")).toBeTruthy();
+    expect(screen.getByText("40%")).toBeTruthy();
+  });
+});

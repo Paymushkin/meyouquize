@@ -5,12 +5,12 @@ import { useId, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { feature } from "topojson-client";
 import type { FeatureCollection, Geometry } from "geojson";
 import countries110m from "world-atlas/countries-110m.json";
-import { geoPollMapKind } from "@meyouquize/shared";
+import { geoPollMapKind, optionText } from "@meyouquize/shared";
 import { projectRussiaLatLon, russiaSvgMap } from "./russiaMapGeometry";
 
 type ProjectorGeoPollMapProps = {
   dictionaryId: string;
-  optionStats: Array<{ text: string; count: number; lat?: number; lon?: number }>;
+  optionStats: Array<{ text?: string; count: number; lat?: number; lon?: number }>;
   brandPrimaryColor?: string;
   voteOptionTextColor?: string;
   brandFontFamily?: string;
@@ -86,7 +86,7 @@ function projectWorldMarkers(
       const projected = projection([row.lon!, row.lat!]);
       if (!projected) return null;
       return {
-        name: row.text,
+        name: optionText(row.text),
         count: row.count,
         x: projected[0]!,
         y: projected[1]!,
@@ -103,7 +103,7 @@ function projectRussiaMarkers(optionStats: ProjectorGeoPollMapProps["optionStats
     )
     .map((row) => {
       const { x, y } = projectRussiaLatLon(row.lat!, row.lon!);
-      return { name: row.text, count: row.count, x, y };
+      return { name: optionText(row.text), count: row.count, x, y };
     });
 }
 
@@ -674,7 +674,7 @@ export function ProjectorGeoPollMap({
   }, [mapKind, markers, pathHitMetas]);
   const [appearanceOrder, setAppearanceOrder] = useState<string[]>([]);
   useLayoutEffect(() => {
-    const liveNames = optionStats.map((row) => row.text);
+    const liveNames = optionStats.map((row) => optionText(row.text));
     const live = new Set(liveNames);
     setAppearanceOrder((prev) => {
       const kept = prev.filter((name) => live.has(name));
@@ -693,7 +693,9 @@ export function ProjectorGeoPollMap({
     return [...optionStats].sort((a, b) => {
       const byCount = b.count - a.count;
       if (byCount !== 0) return byCount;
-      return (orderIndex.get(b.text) ?? -1) - (orderIndex.get(a.text) ?? -1);
+      return (
+        (orderIndex.get(optionText(b.text)) ?? -1) - (orderIndex.get(optionText(a.text)) ?? -1)
+      );
     });
   }, [appearanceOrder, optionStats]);
   const mapBoxRef = useRef<HTMLDivElement | null>(null);
@@ -839,42 +841,45 @@ export function ProjectorGeoPollMap({
           overflow: "hidden",
         }}
       >
-        {topRows.map((row) => (
-          <Stack
-            key={row.text}
-            data-geo-sidebar-row=""
-            direction="row"
-            justifyContent="space-between"
-            spacing={2}
-            sx={{
-              py: 0.75,
-              flexShrink: 0,
-              borderBottom: `1px solid ${alpha(voteOptionTextColor, 0.12)}`,
-              ...(appearingKeys.has(row.text)
-                ? {
-                    animation: "geoPollSidebarIn 0.7s ease-out",
-                    "@keyframes geoPollSidebarIn": {
-                      "0%": { opacity: 0, transform: "translateX(12px)" },
-                      "100%": { opacity: 1, transform: "translateX(0)" },
-                    },
-                  }
-                : null),
-            }}
-          >
-            <Typography
-              variant="body1"
-              sx={{ color: voteOptionTextColor, fontFamily: brandFontFamily }}
+        {topRows.map((row) => {
+          const label = optionText(row.text);
+          return (
+            <Stack
+              key={label || row.count}
+              data-geo-sidebar-row=""
+              direction="row"
+              justifyContent="space-between"
+              spacing={2}
+              sx={{
+                py: 0.75,
+                flexShrink: 0,
+                borderBottom: `1px solid ${alpha(voteOptionTextColor, 0.12)}`,
+                ...(appearingKeys.has(label)
+                  ? {
+                      animation: "geoPollSidebarIn 0.7s ease-out",
+                      "@keyframes geoPollSidebarIn": {
+                        "0%": { opacity: 0, transform: "translateX(12px)" },
+                        "100%": { opacity: 1, transform: "translateX(0)" },
+                      },
+                    }
+                  : null),
+              }}
             >
-              {markerDisplayName(row.text)}
-            </Typography>
-            <Typography
-              variant="body1"
-              sx={{ color: voteOptionTextColor, fontWeight: 700, fontFamily: brandFontFamily }}
-            >
-              {row.count}
-            </Typography>
-          </Stack>
-        ))}
+              <Typography
+                variant="body1"
+                sx={{ color: voteOptionTextColor, fontFamily: brandFontFamily }}
+              >
+                {markerDisplayName(label)}
+              </Typography>
+              <Typography
+                variant="body1"
+                sx={{ color: voteOptionTextColor, fontWeight: 700, fontFamily: brandFontFamily }}
+              >
+                {row.count}
+              </Typography>
+            </Stack>
+          );
+        })}
       </Stack>
     </Stack>
   );

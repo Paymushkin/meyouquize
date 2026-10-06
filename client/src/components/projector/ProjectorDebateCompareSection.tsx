@@ -3,6 +3,7 @@ import { alpha } from "@mui/material/styles";
 import {
   buildDebateCompareRows,
   formatDebateSwingLabel,
+  optionTextTrimmed,
   voteProgressBarFillStyle,
   voteProgressTrackBackground,
   voteQuestionTextTypographyStyle,
@@ -40,17 +41,18 @@ export function ProjectorDebateCompareSection(props: ProjectorDebateCompareSecti
   const rows = buildDebateCompareRows(
     baselineQuestion.optionStats.map((o) => ({
       optionId: o.optionId,
-      text: o.text,
+      text: o.text ?? "",
       count: o.count,
     })),
     finalQuestion.optionStats.map((o) => ({
       optionId: o.optionId,
-      text: o.text,
+      text: o.text ?? "",
       count: o.count,
     })),
   );
   const swingLabel = formatDebateSwingLabel(rows);
-  const questionText = finalQuestion.text.trim() || baselineQuestion.text.trim();
+  const questionText =
+    optionTextTrimmed(finalQuestion.text) || optionTextTrimmed(baselineQuestion.text);
   const questionTextSx = voteQuestionTextTypographyStyle(voteQuestionTextColor);
   const questionTitleTypographySx = buildProjectorQuestionTitleTypographySx({
     fontSize: projectorQuestionTitleFontSizeSx(questionText.length, rows.length),

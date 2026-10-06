@@ -328,6 +328,23 @@ describe("projectorJoinQr visibility", () => {
   });
 });
 
+describe("projectorBrowserZoom", () => {
+  it("defaults to 1 and clamps to 0.5–5 with step 0.1", () => {
+    expect(DEFAULT_PUBLIC_VIEW_STATE.projectorBrowserZoom).toBe(1);
+    expect(normalizePublicViewState({ projectorBrowserZoom: 1.2 }).projectorBrowserZoom).toBe(1.2);
+    expect(normalizePublicViewState({ projectorBrowserZoom: 0.2 }).projectorBrowserZoom).toBe(0.5);
+    expect(normalizePublicViewState({ projectorBrowserZoom: 9 }).projectorBrowserZoom).toBe(5);
+  });
+
+  it("migrates legacy percent values", () => {
+    expect(
+      normalizePublicViewState({
+        projectorBrowserZoomPercent: 120,
+      } as Parameters<typeof normalizePublicViewState>[0]).projectorBrowserZoom,
+    ).toBe(1.2);
+  });
+});
+
 describe("DEFAULT_PUBLIC_VIEW_STATE", () => {
   it("has stable defaults", () => {
     expect(DEFAULT_PUBLIC_VIEW_STATE.mode).toBe("title");

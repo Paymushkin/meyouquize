@@ -8,6 +8,8 @@ import {
   collectTagCloudQuizReferenceAliases,
   isGeoPollDictionary,
   normalizeTagComparable,
+  optionText,
+  optionTextTrimmed,
   singlePollDebateSideBySideEligible,
   VOTE_MIN_BAR_DISPLAY_PERCENT,
   voteFillOutlineColor,
@@ -271,14 +273,17 @@ export function QuestionChart(props: QuestionChartProps) {
     const layout = cloud<ProjectorLayoutWord>()
       .size([layoutW, layoutH])
       .words(
-        sourceWords.map((word) => ({
-          text: word.text.toLocaleUpperCase("ru-RU"),
-          count: word.count,
-          size: fontSize(word.count, word.text),
-          x: 0,
-          y: 0,
-          rotate: 0,
-        })),
+        sourceWords.map((word) => {
+          const text = optionText(word.text);
+          return {
+            text: text.toLocaleUpperCase("ru-RU"),
+            count: word.count,
+            size: fontSize(word.count, text),
+            x: 0,
+            y: 0,
+            rotate: 0,
+          };
+        }),
       )
       .padding((d) => {
         const w = d as ProjectorLayoutWord;
@@ -316,7 +321,7 @@ export function QuestionChart(props: QuestionChartProps) {
   ]);
 
   const voteRows = useMemo(() => {
-    if (question.type === "tag_cloud" || question.optionStats.length === 0) return [];
+    if (question.type === "tag_cloud" || (question.optionStats?.length ?? 0) === 0) return [];
     const total = question.optionStats.reduce((sum, item) => sum + item.count, 0);
     return question.optionStats.map((o) => {
       const percent = total > 0 ? (o.count / total) * 100 : 0;
@@ -357,7 +362,7 @@ export function QuestionChart(props: QuestionChartProps) {
       return {
         optionId: o.optionId,
         isCorrect: o.isCorrect,
-        text: o.text,
+        text: o.text ?? "",
         imageUrl: o.imageUrl,
         percent,
         barDisplayPercent,
@@ -434,7 +439,7 @@ export function QuestionChart(props: QuestionChartProps) {
           return {
             optionId: o.optionId,
             isCorrect: false,
-            text: o.text,
+            text: o.text ?? "",
             imageUrl: o.imageUrl,
             percent: barPercent,
             barDisplayPercent,
@@ -467,7 +472,7 @@ export function QuestionChart(props: QuestionChartProps) {
         return {
           optionId: o.optionId,
           isCorrect: false,
-          text: o.text,
+          text: o.text ?? "",
           imageUrl: o.imageUrl,
           percent: barPercent,
           barDisplayPercent,
@@ -616,7 +621,10 @@ export function QuestionChart(props: QuestionChartProps) {
   const hasOptionImages = questionHasOptionImages(question.optionStats);
   const rankingStatHeader = question.type === "ranking" ? rankingBlock.statColumnTitle : null;
   const answersCount = barRows.length;
-  const longestAnswerLength = barRows.reduce((max, row) => Math.max(max, row.text.length), 0);
+  const longestAnswerLength = barRows.reduce(
+    (max, row) => Math.max(max, optionText(row.text).length),
+    0,
+  );
   const answersCountPenalty = answersCount > 6 ? Math.min(0.36, (answersCount - 6) * 0.06) : 0;
   const answerLengthPenalty =
     longestAnswerLength > 24 ? Math.min(0.32, (longestAnswerLength - 24) * 0.008) : 0;
@@ -655,7 +663,7 @@ export function QuestionChart(props: QuestionChartProps) {
     >
       <ProjectorSideBySideContent
         imageUrl={"imageUrl" in row ? row.imageUrl : undefined}
-        alt={row.text.trim() || "Вариант"}
+        alt={optionTextTrimmed(row.text) || "Вариант"}
         spacing={2}
         imageSx={{
           width: { xs: 120, sm: 140, md: 160 },
@@ -664,7 +672,7 @@ export function QuestionChart(props: QuestionChartProps) {
           borderRadius: 1.25,
         }}
       >
-        {row.text.trim() ? (
+        {optionTextTrimmed(row.text) ? (
           <Typography
             variant="h4"
             align="left"
@@ -679,7 +687,7 @@ export function QuestionChart(props: QuestionChartProps) {
               },
             }}
           >
-            {row.text}
+            {optionText(row.text)}
           </Typography>
         ) : null}
       </ProjectorSideBySideContent>

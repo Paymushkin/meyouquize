@@ -2,6 +2,7 @@ import { useMemo } from "react";
 import { Fade, Stack, Typography } from "@mui/material";
 import {
   isGeoPollDictionary,
+  optionTextTrimmed,
   voteQuestionTextTypographyStyle,
   type PublicViewState,
 } from "@meyouquize/shared";
@@ -47,10 +48,10 @@ export function ProjectorQuestionSection(props: ProjectorQuestionSectionProps) {
     firstCorrectWinnersShown,
     debateSeriesRounds = [],
   } = props;
-  const questionLength = selectedQuestion.text.trim().length;
+  const questionLength = optionTextTrimmed(selectedQuestion.text).length;
   const isGeoPoll = isGeoPollDictionary(selectedQuestion.geoPollDictionary);
   /** Для geo-poll города в optionStats растут — не должны сжимать заголовок. */
-  const titleOptionsCount = isGeoPoll ? 0 : selectedQuestion.optionStats.length;
+  const titleOptionsCount = isGeoPoll ? 0 : (selectedQuestion.optionStats?.length ?? 0);
   const waitingForFirstWinner =
     view.showFirstCorrectAnswerer &&
     !showProjectorWinnersHero &&
@@ -79,14 +80,15 @@ export function ProjectorQuestionSection(props: ProjectorQuestionSectionProps) {
     maxHeight: { xs: "38vh", md: "52vh" },
   } as const;
 
+  const questionTitle = optionTextTrimmed(selectedQuestion.text);
   const questionTitleBlock = (
     <ProjectorSideBySideContent
       imageUrl={selectedQuestion.imageUrl}
-      alt={selectedQuestion.text.trim() || "Вопрос"}
+      alt={questionTitle || "Вопрос"}
       spacing={3}
       imageSx={projectorQuestionImageSx}
     >
-      {selectedQuestion.text.trim() ? (
+      {questionTitle ? (
         <Typography
           variant="h3"
           align="left"
@@ -109,11 +111,11 @@ export function ProjectorQuestionSection(props: ProjectorQuestionSectionProps) {
       <Stack spacing={1.5} sx={{ width: "100%" }}>
         <ProjectorSideBySideContent
           imageUrl={selectedQuestion.imageUrl}
-          alt={selectedQuestion.text.trim() || "Вопрос"}
+          alt={questionTitle || "Вопрос"}
           spacing={3}
           imageSx={projectorQuestionImageSx}
         >
-          {selectedQuestion.text.trim() ? (
+          {questionTitle ? (
             <Typography
               variant="h3"
               align="left"
@@ -133,6 +135,7 @@ export function ProjectorQuestionSection(props: ProjectorQuestionSectionProps) {
   }, [
     fullScreenCloud,
     isTagCloudQuestion,
+    questionTitle,
     questionTitleTypographySx,
     selectedQuestion.imageUrl,
     selectedQuestion.text,

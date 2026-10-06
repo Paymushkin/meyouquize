@@ -74,11 +74,36 @@ describe("VoteResultOptionRow", () => {
     expect(screen.getByText("Вариант A")).toBeTruthy();
     expect(screen.getByText("42%")).toBeTruthy();
   });
+
+  it("renders image-only option without text", () => {
+    expect(() =>
+      render(
+        <VoteResultOptionRow
+          text={undefined}
+          imageUrl="/media/a.png"
+          pct={55}
+          rightStatValue="55%"
+          isCorrectAnswer={false}
+          isUserAnswer={false}
+          canShowUserAnswer={false}
+          playerVoteOptionTextColor="#ffffff"
+          playerVoteProgressBarColor="#1976d2"
+        />,
+      ),
+    ).not.toThrow();
+    expect(screen.getByText("55%")).toBeTruthy();
+  });
 });
 
 describe("ProjectorOptionLabel", () => {
   it("renders text-only label", () => {
     render(<ProjectorOptionLabel text="Проекторный вариант" />);
     expect(screen.getByText("Проекторный вариант")).toBeTruthy();
+  });
+
+  it("renders image-only label without text", () => {
+    expect(() =>
+      render(<ProjectorOptionLabel text={undefined} imageUrl="/media/a.png" />),
+    ).not.toThrow();
   });
 });

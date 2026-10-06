@@ -201,6 +201,30 @@ describe("applyQuestionResultManualDisplay", () => {
     });
   });
 
+  it("adds override-only options with text label", () => {
+    const row = {
+      questionId: "q-1",
+      type: "single",
+      optionStats: [{ optionId: "o1", text: "A", count: 2, isCorrect: true }],
+      tagCloud: [],
+    };
+    expect(
+      applyQuestionResultManualDisplay(row, {
+        "q-1": {
+          hiddenTagTexts: [],
+          injectedTagWords: [],
+          tagCountOverrides: [],
+          optionVoteCountOverrides: [{ text: "o-new", count: 7 }],
+        },
+      }),
+    ).toMatchObject({
+      optionStats: [
+        { optionId: "o1", text: "A", count: 2 },
+        { optionId: "o-new", text: "o-new", count: 7 },
+      ],
+    });
+  });
+
   it("merges tag cloud manual adjustments", () => {
     const row = {
       questionId: "q-tc",

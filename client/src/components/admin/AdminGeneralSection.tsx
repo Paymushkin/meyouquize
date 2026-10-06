@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Box,
   Card,
@@ -20,7 +20,11 @@ import QRCode from "qrcode";
 import { buildPlayerJoinUrl, buildProjectorScreenUrl } from "../../publicAppOrigin";
 import {
   DEFAULT_PROJECTOR_JOIN_QR_TEXT,
+  PROJECTOR_BROWSER_ZOOM_MAX,
+  PROJECTOR_BROWSER_ZOOM_MIN,
+  PROJECTOR_BROWSER_ZOOM_STEP,
   PROJECTOR_JOIN_QR_TEXT_MAX_LENGTH,
+  clampProjectorBrowserZoom,
   type PublicViewSetPatch,
 } from "../../publicViewContract";
 import { CompactColorField } from "./branding/CompactColorField";
@@ -36,6 +40,8 @@ type Props = {
   onTogglePlayerAutoJoinRandomNickname: (next: boolean) => void;
   projectorJoinQrVisible: boolean;
   setProjectorJoinQrVisible: (value: boolean) => void;
+  projectorBrowserZoom: number;
+  setProjectorBrowserZoom: (value: number) => void;
   projectorJoinQrText: string;
   setProjectorJoinQrText: (value: string) => void;
   projectorJoinQrTextColor: string;
@@ -55,6 +61,8 @@ export function AdminGeneralSection(props: Props) {
     onTogglePlayerAutoJoinRandomNickname,
     projectorJoinQrVisible,
     setProjectorJoinQrVisible,
+    projectorBrowserZoom,
+    setProjectorBrowserZoom,
     projectorJoinQrText,
     setProjectorJoinQrText,
     projectorJoinQrTextColor,
@@ -74,6 +82,11 @@ export function AdminGeneralSection(props: Props) {
   const [qrLabel, setQrLabel] = useState("");
   const [qrTargetUrl, setQrTargetUrl] = useState("");
   const [qrDataUrl, setQrDataUrl] = useState("");
+  const [zoomDraft, setZoomDraft] = useState(String(projectorBrowserZoom));
+
+  useEffect(() => {
+    setZoomDraft(String(projectorBrowserZoom));
+  }, [projectorBrowserZoom]);
 
   async function copyToClipboard(value: string) {
     if (!value) return;
@@ -91,6 +104,14 @@ export function AdminGeneralSection(props: Props) {
     setQrTargetUrl(value);
     setQrDataUrl(nextQrData);
     setQrOpen(true);
+  }
+
+  function commitZoom(raw: string) {
+    const next = clampProjectorBrowserZoom(raw, projectorBrowserZoom);
+    setZoomDraft(String(next));
+    if (next === projectorBrowserZoom) return;
+    setProjectorBrowserZoom(next);
+    emitBrandingPatch({ projectorBrowserZoom: next });
   }
 
   return (
@@ -213,6 +234,31 @@ export function AdminGeneralSection(props: Props) {
               </Stack>
             </Stack>
             <Stack spacing={1}>
+              <Box sx={switchRowSx}>
+                <Typography variant="body2" sx={rowLabelSx}>
+                  Масштаб проектора
+                </Typography>
+                <TextField
+                  id="projector-browser-zoom"
+                  type="number"
+                  size="small"
+                  value={zoomDraft}
+                  onChange={(e) => setZoomDraft(e.target.value)}
+                  onBlur={() => commitZoom(zoomDraft)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.currentTarget.blur();
+                    }
+                  }}
+                  inputProps={{
+                    min: PROJECTOR_BROWSER_ZOOM_MIN,
+                    max: PROJECTOR_BROWSER_ZOOM_MAX,
+                    step: PROJECTOR_BROWSER_ZOOM_STEP,
+                    "aria-label": "Масштаб проектора",
+                  }}
+                  sx={{ width: 96 }}
+                />
+              </Box>
               <Box sx={switchRowSx}>
                 <Typography variant="body2">Показывать название ивента у пользователя</Typography>
                 <Switch

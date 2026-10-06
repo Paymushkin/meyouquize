@@ -2,6 +2,8 @@ import { Box, Typography } from "@mui/material";
 import { alpha } from "@mui/material/styles";
 import {
   contrastingTextOnColor,
+  optionText,
+  optionTextTrimmed,
   voteProgressTrackBackground,
   withDebateOptionColors,
 } from "@meyouquize/shared";
@@ -13,7 +15,7 @@ import {
 
 type DebateRow = {
   optionId: string;
-  text: string;
+  text?: string;
   imageUrl?: string;
   color?: string;
   percent: number;
@@ -43,7 +45,7 @@ export function formatDebatePercentLabel(percent: number): string {
 
 /** Цвета сегментов: как в админке — сохранённый цвет или дефолт по индексу. */
 export function debateSideBySideSegmentColors(
-  rows: Array<{ text: string; color?: string | null }>,
+  rows: Array<{ text?: string; color?: string | null }>,
 ): string[] {
   return withDebateOptionColors(rows).map((row) => row.color);
 }
@@ -98,7 +100,7 @@ export function ProjectorDebateSideBySideChart(props: ProjectorDebateSideBySideC
           >
             <ProjectorSideBySideContent
               imageUrl={row.imageUrl}
-              alt={row.text.trim() || "Вариант"}
+              alt={optionTextTrimmed(row.text) || "Вариант"}
               spacing={1.5}
               imageSx={{
                 width: { xs: 96, md: 120 },
@@ -107,7 +109,7 @@ export function ProjectorDebateSideBySideChart(props: ProjectorDebateSideBySideC
                 borderRadius: 1.25,
               }}
             >
-              {row.text.trim() ? (
+              {optionTextTrimmed(row.text) ? (
                 <Typography
                   variant="h4"
                   align="left"
@@ -118,7 +120,7 @@ export function ProjectorDebateSideBySideChart(props: ProjectorDebateSideBySideC
                     fontWeight: 500,
                   }}
                 >
-                  {row.text}
+                  {optionText(row.text)}
                 </Typography>
               ) : null}
             </ProjectorSideBySideContent>
@@ -155,7 +157,7 @@ export function ProjectorDebateSideBySideChart(props: ProjectorDebateSideBySideC
       {rows.map((row, index) => {
         const color = segmentColors[index]!;
         const width = widths[index] ?? 0;
-        const optionLabel = row.text.trim();
+        const optionLabel = optionTextTrimmed(row.text);
         const showName = !barOnly && optionLabel.length > 0;
         const fillColor = debateSegmentFillColor(color);
         const labelColor = debateSegmentLabelColor(color);
@@ -272,7 +274,7 @@ export function debateSideBySideSegmentWidths(
 export function buildDebateSideBySideRows(
   optionStats: Array<{
     optionId: string;
-    text: string;
+    text?: string;
     imageUrl?: string;
     color?: string;
     count: number;
@@ -286,7 +288,7 @@ export function buildDebateSideBySideRows(
     const percentLabel = showVoteCount ? `${percentText} (${o.count})` : percentText;
     return {
       optionId: o.optionId,
-      text: o.text,
+      text: o.text ?? "",
       imageUrl: o.imageUrl,
       color: o.color,
       percent,

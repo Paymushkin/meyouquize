@@ -3,6 +3,8 @@ import { pcq } from "../../features/quizPlay/playerContainerQuery";
 import {
   optionAltText,
   optionHasImage,
+  optionText,
+  optionTextTrimmed,
   PLAYER_VOTE_INLINE_OPTION_IMAGE_SIZE,
 } from "../../features/quizPlay/voteOptionImages";
 import { QuestionAssetImage } from "./QuestionAssetImage";
@@ -10,7 +12,7 @@ import { QuestionAssetImage } from "./QuestionAssetImage";
 export type OptionAnswerLayout = "inline" | "card";
 
 type Props = {
-  text: string;
+  text?: string | null;
   imageUrl?: string | null;
   layout?: OptionAnswerLayout;
   textSx?: Record<string, unknown>;
@@ -20,7 +22,8 @@ type Props = {
 export function OptionAnswerContent(props: Props) {
   const { text, imageUrl, layout = "inline", textSx, compact = false } = props;
   const hasImage = optionHasImage(imageUrl);
-  const hasText = Boolean(text.trim());
+  const hasText = Boolean(optionTextTrimmed(text));
+  const displayText = optionText(text);
   const alt = optionAltText(text);
 
   if (layout === "card" && hasImage) {
@@ -45,7 +48,7 @@ export function OptionAnswerContent(props: Props) {
               ...textSx,
             }}
           >
-            {text}
+            {displayText}
           </Box>
         ) : null}
       </Stack>
@@ -66,7 +69,7 @@ export function OptionAnswerContent(props: Props) {
         />
       ) : null}
       {hasText ? (
-        <Box sx={{ minWidth: 0, flex: 1, whiteSpace: "pre-line", ...textSx }}>{text}</Box>
+        <Box sx={{ minWidth: 0, flex: 1, whiteSpace: "pre-line", ...textSx }}>{displayText}</Box>
       ) : null}
     </Stack>
   );

@@ -56,7 +56,8 @@ export type ReactionSession = {
 
 export type PlayerVisibleResultOptionStat = {
   optionId: string;
-  text: string;
+  /** Image-only варианты / ручные override могут прийти без текста. */
+  text?: string;
   imageUrl?: string;
   count: number;
   isCorrect: boolean;

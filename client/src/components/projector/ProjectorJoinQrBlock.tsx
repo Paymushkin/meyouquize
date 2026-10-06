@@ -14,11 +14,13 @@ export function ProjectorJoinQrBlock(props: Props) {
       spacing={{ xs: 1, sm: 2 }}
       sx={{
         mt: 2,
-        width: { xs: "100%", sm: 1280 },
-        maxWidth: "100%",
+        width: "100%",
+        maxWidth: 1280,
         mx: "auto",
         alignItems: "center",
         justifyContent: "space-between",
+        boxSizing: "border-box",
+        containerType: "inline-size",
       }}
     >
       <Typography
@@ -29,8 +31,9 @@ export function ProjectorJoinQrBlock(props: Props) {
           textAlign: "left",
           whiteSpace: "pre-line",
           width: "100%",
+          minWidth: 0,
           pr: { sm: 2 },
-          fontSize: "clamp(1.75rem, 4.8vw, 3.5rem)",
+          fontSize: "clamp(1.75rem, 8cqw, 3.5rem)",
           lineHeight: 1.15,
         }}
       >
@@ -41,8 +44,9 @@ export function ProjectorJoinQrBlock(props: Props) {
         src={qrDataUrl}
         alt="QR-код входа в ивент"
         sx={{
-          width: "clamp(200px, 32vw, 420px)",
-          height: "clamp(200px, 32vw, 420px)",
+          width: "clamp(160px, 36cqw, 420px)",
+          height: "clamp(160px, 36cqw, 420px)",
+          maxWidth: "100%",
           borderRadius: 1,
           flexShrink: 0,
         }}

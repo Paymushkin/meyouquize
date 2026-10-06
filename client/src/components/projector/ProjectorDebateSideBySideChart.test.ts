@@ -23,6 +23,18 @@ describe("buildDebateSideBySideRows", () => {
     expect(rows[1]?.percentLabel).toBe("60%");
   });
 
+  it("tolerates missing option text", () => {
+    const rows = buildDebateSideBySideRows(
+      [
+        { optionId: "a", text: undefined, count: 10, imageUrl: "/a.png" },
+        { optionId: "b", count: 5, imageUrl: "/b.png" },
+      ],
+      false,
+    );
+    expect(rows.map((row) => row.text)).toEqual(["", ""]);
+    expect(rows[0]?.percent).toBeCloseTo(66.666, 1);
+  });
+
   it("labels every option as 0% when there are no votes", () => {
     const rows = buildDebateSideBySideRows(
       [

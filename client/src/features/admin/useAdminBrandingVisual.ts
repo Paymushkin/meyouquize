@@ -96,6 +96,8 @@ export function useAdminBrandingVisual({ emitBrandingPatchRef, tileBrandSettersR
     setBrandTheme: editor.setBrandTheme,
     projectorJoinQrVisible: editor.projectorJoinQrVisible,
     setProjectorJoinQrVisible: editor.setProjectorJoinQrVisible,
+    projectorBrowserZoom: editor.projectorBrowserZoom,
+    setProjectorBrowserZoom: editor.setProjectorBrowserZoom,
     projectorJoinQrOverlayVisible: editor.projectorJoinQrOverlayVisible,
     setProjectorJoinQrOverlayVisible: editor.setProjectorJoinQrOverlayVisible,
     projectorJoinQrText: editor.projectorJoinQrText,

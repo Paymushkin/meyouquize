@@ -4,13 +4,15 @@ import {
   optionAltText,
   optionHasImage,
   optionImageUrl,
+  optionText,
+  optionTextTrimmed,
   PLAYER_VOTE_RESULT_OPTION_IMAGE_SIZE,
 } from "../../features/quizPlay/voteOptionImages";
 import { QuestionAssetImage } from "./QuestionAssetImage";
 import { VoteResultsStatColumn } from "./VoteResultsStatColumn";
 
 type Props = {
-  text: string;
+  text?: string | null;
   imageUrl?: string | null;
   pct: number;
   rightStatValue: string;
@@ -33,7 +35,8 @@ export function VoteResultOptionRow(props: Props) {
     playerVoteOptionTextColor,
     playerVoteProgressBarColor,
   } = props;
-  const hasOptionText = Boolean(text.trim());
+  const hasOptionText = Boolean(optionTextTrimmed(text));
+  const displayText = optionText(text);
   const imageSize = PLAYER_VOTE_RESULT_OPTION_IMAGE_SIZE;
 
   return (
@@ -77,7 +80,7 @@ export function VoteResultOptionRow(props: Props) {
         {hasOptionText ? (
           <Typography
             component="div"
-            title={text}
+            title={displayText}
             sx={{
               position: "relative",
               color: playerVoteOptionTextColor,
@@ -91,7 +94,7 @@ export function VoteResultOptionRow(props: Props) {
               lineHeight: 1.2,
             }}
           >
-            {text}
+            {displayText}
           </Typography>
         ) : null}
       </Box>

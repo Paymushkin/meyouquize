@@ -627,6 +627,7 @@ export const setPublicViewSchema = z.object({
     .regex(/^#([0-9a-fA-F]{6})$/)
     .optional(),
   projectorJoinQrVisible: z.boolean().optional(),
+  projectorBrowserZoom: z.number().min(0.5).max(5).optional(),
   projectorJoinQrOverlayVisible: z.boolean().optional(),
   projectorJoinQrText: z.string().trim().max(PROJECTOR_JOIN_QR_TEXT_MAX_LENGTH).optional(),
   projectorJoinQrTextColor: z

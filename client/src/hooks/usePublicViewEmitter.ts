@@ -170,6 +170,7 @@ type UsePublicViewEmitterParams = {
   appliedEventThemeName?: string;
   appliedEventThemeKey?: string;
   projectorJoinQrVisible: boolean;
+  projectorBrowserZoom: number;
   projectorJoinQrOverlayVisible: boolean;
   projectorJoinQrText: string;
   projectorJoinQrTextColor: string;
@@ -280,6 +281,7 @@ export function usePublicViewEmitter(params: UsePublicViewEmitterParams) {
     appliedEventThemeName,
     appliedEventThemeKey,
     projectorJoinQrVisible,
+    projectorBrowserZoom,
     projectorJoinQrOverlayVisible,
     projectorJoinQrText,
     projectorJoinQrTextColor,
@@ -491,6 +493,7 @@ export function usePublicViewEmitter(params: UsePublicViewEmitterParams) {
           ? { appliedEventThemeKey: nextAppliedEventThemeKey }
           : {}),
         projectorJoinQrVisible: patch.projectorJoinQrVisible ?? projectorJoinQrVisible,
+        projectorBrowserZoom: patch.projectorBrowserZoom ?? projectorBrowserZoom,
         projectorJoinQrOverlayVisible:
           patch.projectorJoinQrOverlayVisible ?? projectorJoinQrOverlayVisible,
         projectorJoinQrText: patch.projectorJoinQrText ?? projectorJoinQrText,
@@ -604,6 +607,7 @@ export function usePublicViewEmitter(params: UsePublicViewEmitterParams) {
       appliedEventThemeName,
       appliedEventThemeKey,
       projectorJoinQrVisible,
+      projectorBrowserZoom,
       projectorJoinQrOverlayVisible,
       projectorJoinQrText,
       projectorJoinQrTextColor,

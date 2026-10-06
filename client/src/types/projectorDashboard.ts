@@ -2,7 +2,8 @@
 
 export type ProjectorOptionStat = {
   optionId: string;
-  text: string;
+  /** Image-only варианты могут прийти без текста. */
+  text?: string;
   imageUrl?: string;
   count: number;
   isCorrect: boolean;

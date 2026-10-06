@@ -75,6 +75,71 @@ export function ResultsPage() {
   );
 
   useEffect(() => {
+    const zoom = view.projectorBrowserZoom;
+    const html = document.documentElement;
+    const body = document.body;
+    const root = document.getElementById("root");
+
+    // Имитация Ctrl+/−: zoom на body.
+    // Ширина/высота 100/zoom → после zoom визуально ровно экран, без выхода за края.
+    const viewportWidth = `${100 / zoom}vw`;
+    const viewportHeight = `${100 / zoom}vh`;
+    body.style.setProperty("zoom", String(zoom));
+    body.style.width = viewportWidth;
+    body.style.maxWidth = viewportWidth;
+    body.style.height = viewportHeight;
+    body.style.minHeight = viewportHeight;
+    body.style.maxHeight = viewportHeight;
+    body.style.display = "flex";
+    body.style.flexDirection = "column";
+    body.style.justifyContent = "center";
+    body.style.alignItems = "center";
+    body.style.boxSizing = "border-box";
+    body.style.overflow = "hidden";
+    body.style.margin = "0";
+    html.style.width = "100%";
+    html.style.height = "100%";
+    html.style.overflow = "hidden";
+    if (root) {
+      root.style.width = "100%";
+      root.style.height = "100%";
+      root.style.maxWidth = "100%";
+      root.style.maxHeight = "100%";
+      root.style.overflow = "hidden";
+      root.style.boxSizing = "border-box";
+      root.style.flex = "1 1 auto";
+    }
+
+    return () => {
+      body.style.removeProperty("zoom");
+      body.style.removeProperty("width");
+      body.style.removeProperty("max-width");
+      body.style.removeProperty("height");
+      body.style.removeProperty("min-height");
+      body.style.removeProperty("max-height");
+      body.style.removeProperty("display");
+      body.style.removeProperty("flex-direction");
+      body.style.removeProperty("justify-content");
+      body.style.removeProperty("align-items");
+      body.style.removeProperty("box-sizing");
+      body.style.removeProperty("overflow");
+      body.style.removeProperty("margin");
+      html.style.removeProperty("width");
+      html.style.removeProperty("height");
+      html.style.removeProperty("overflow");
+      if (root) {
+        root.style.removeProperty("width");
+        root.style.removeProperty("height");
+        root.style.removeProperty("max-width");
+        root.style.removeProperty("max-height");
+        root.style.removeProperty("overflow");
+        root.style.removeProperty("box-sizing");
+        root.style.removeProperty("flex");
+      }
+    };
+  }, [view.projectorBrowserZoom]);
+
+  useEffect(() => {
     if (!reactionSession?.isActive) {
       prevCountsRef.current = {};
       initializedReactionSessionIdRef.current = null;
@@ -192,7 +257,8 @@ export function ResultsPage() {
         maxWidth={false}
         disableGutters
         sx={{
-          minHeight: "100dvh",
+          minHeight: "100%",
+          height: "100%",
           width: "100%",
           bgcolor: "#000",
         }}
@@ -205,6 +271,7 @@ export function ResultsPage() {
       <ProjectorViewportBackground
         backgroundColor={geoPollFullBleed ? "#111111" : view.projectorBackground}
         backgroundImageUrl={geoPollFullBleed ? undefined : brandProjectorBackgroundImageUrl}
+        contentZoom={view.projectorBrowserZoom}
       />
       {showJoinQrOverlay && joinQrOverlayDataUrl ? (
         <ProjectorJoinQrOverlay
@@ -221,26 +288,21 @@ export function ResultsPage() {
         sx={{
           position: "relative",
           zIndex: 1,
+          width: "100%",
+          height: "100%",
+          maxWidth: "100%",
+          maxHeight: "100%",
+          minHeight: "100%",
+          overflow: "hidden",
+          boxSizing: "border-box",
           backgroundColor: "transparent",
           fontFamily: view.brandFontFamily,
           "& .MuiTypography-root, & .MuiButton-root, & .MuiChip-root, & .MuiInputBase-root, & .MuiFormLabel-root":
             {
               fontFamily: view.brandFontFamily,
             },
-          ...(!fullScreenContainer && !isFullScreenWidgetMode
-            ? {
-                width: "100%",
-                maxWidth: containerContentMaxPx,
-                mx: "auto",
-                px: { xs: 2, sm: 3 },
-                boxSizing: "border-box",
-              }
-            : {}),
           ...(showEventTitleScreen
             ? {
-                minHeight: "100vh",
-                width: "100vw",
-                maxWidth: "none",
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
@@ -250,29 +312,29 @@ export function ResultsPage() {
               }
             : fullScreenCloud || barQuestionCentered
               ? {
-                  minHeight: "100dvh",
-                  height: "100dvh",
                   display: "flex",
                   flexDirection: "column",
                   alignItems: "flex-start",
                   justifyContent: fullScreenCloud ? "flex-start" : "center",
                   py: 0,
                   px: PROJECTOR_QUESTION_CONTENT_PX,
-                  boxSizing: "border-box",
-                  ...(fullScreenCloud ? { overflow: "hidden" } : {}),
                 }
               : isFullScreenWidgetMode
                 ? {
-                    minHeight: "100dvh",
-                    height: "100dvh",
-                    width: "100vw",
-                    maxWidth: "100vw",
                     py: 0,
                     px: 0,
-                    overflow: "hidden",
                     mx: 0,
                   }
-                : { py: 4 }),
+                : {
+                    py: 4,
+                    ...(!fullScreenContainer
+                      ? {
+                          maxWidth: containerContentMaxPx,
+                          mx: "auto",
+                          px: { xs: 2, sm: 3 },
+                        }
+                      : {}),
+                  }),
         }}
       >
         {view.mode === "leaderboard" && leadersShown.length > 0 && (
@@ -290,12 +352,16 @@ export function ResultsPage() {
           <Stack
             spacing={2}
             sx={{
-              minHeight: "100dvh",
+              minHeight: "100%",
+              height: "100%",
               width: "100%",
+              maxWidth: "100%",
               alignItems: "center",
               justifyContent: "center",
               textAlign: "center",
               px: 2,
+              boxSizing: "border-box",
+              overflow: "hidden",
             }}
           >
             {!showJoinQrBlock && (
@@ -402,11 +468,14 @@ export function ResultsPage() {
             sx={{
               py: 4,
               width: "100%",
-              minHeight: "100dvh",
+              maxWidth: "100%",
+              minHeight: "100%",
+              height: "100%",
               justifyContent: "center",
               alignItems: "center",
               px: { xs: 2, sm: 3 },
               boxSizing: "border-box",
+              overflow: "hidden",
             }}
           >
             {screenSpeakerQuestions.map((item, idx, arr) => {
@@ -553,7 +622,16 @@ export function ResultsPage() {
         {view.mode === "reactions" && (
           <Stack
             spacing={2}
-            sx={{ py: 3, width: "100%", minHeight: "100dvh", position: "relative" }}
+            sx={{
+              py: 3,
+              width: "100%",
+              maxWidth: "100%",
+              minHeight: "100%",
+              height: "100%",
+              position: "relative",
+              overflow: "hidden",
+              boxSizing: "border-box",
+            }}
           >
             {view.reactionsOverlayText?.trim() ? (
               <Box
@@ -648,7 +726,11 @@ export function ResultsPage() {
                 {reactionList.map((reaction) => (
                   <Typography
                     key={reaction}
-                    sx={{ fontSize: { xs: "2rem", md: "2.5rem" }, fontWeight: 700, lineHeight: 1 }}
+                    sx={{
+                      fontSize: { xs: "2rem", md: "2.5rem" },
+                      fontWeight: 700,
+                      lineHeight: 1,
+                    }}
                   >
                     {reaction} {reactionSession?.counts[reaction] ?? 0}
                   </Typography>

@@ -101,6 +101,49 @@ describe("ProjectorQuestionSection debate series round bars", () => {
     expect(screen.getByText("Раунд 3")).toBeTruthy();
   });
 
+  it("does not crash when question and options have no text", () => {
+    expect(() =>
+      render(
+        <ThemeProvider theme={theme}>
+          <ProjectorQuestionSection
+            selectedQuestion={{
+              questionId: "img",
+              text: undefined as unknown as string,
+              imageUrl: "/q.png",
+              type: "single",
+              optionStats: [
+                {
+                  optionId: "o1",
+                  text: undefined,
+                  imageUrl: "/a.png",
+                  count: 3,
+                  isCorrect: false,
+                },
+                {
+                  optionId: "o2",
+                  text: undefined,
+                  imageUrl: "/b.png",
+                  count: 1,
+                  isCorrect: true,
+                },
+              ],
+            }}
+            view={{
+              ...DEFAULT_PUBLIC_VIEW_STATE,
+              mode: "question",
+              questionId: "img",
+              questionRevealStage: "results",
+            }}
+            showProjectorWinnersHero={false}
+            fullScreenCloud={false}
+            isTagCloudQuestion={false}
+            firstCorrectWinnersShown={[]}
+          />
+        </ThemeProvider>,
+      ),
+    ).not.toThrow();
+  });
+
   it("does not render round labels when rounds list is empty", () => {
     render(
       <ThemeProvider theme={theme}>

@@ -3,6 +3,8 @@ export {
   optionHasImage,
   optionHasTextOrImage,
   optionImageUrl,
+  optionText,
+  optionTextTrimmed,
   questionHasOptionImages,
 } from "@meyouquize/shared";
 
@@ -14,8 +16,9 @@ export const PROJECTOR_OPTION_LABEL_IMAGE_SIZE_COMPACT = 72;
 
 export const PLAYER_OPTION_IMAGE_GRID_COLUMNS = "repeat(2, minmax(0, 1fr))";
 
-export function optionAltText(text: string, fallback = "Вариант"): string {
-  return text.trim() || fallback;
+export function optionAltText(text?: string | null, fallback = "Вариант"): string {
+  const trimmed = typeof text === "string" ? text.trim() : "";
+  return trimmed || fallback;
 }
 
 export function playerOptionImageGridTemplate(hasOptionImages: boolean): string {
