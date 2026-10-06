@@ -41,6 +41,10 @@ import { PlayerVisibleResultTileCard } from "../../components/quiz/PlayerVisible
 import { pcq } from "../../features/quizPlay/playerContainerQuery";
 import { buildPlayerTilesGridColumnsSx } from "../../features/quizPlay/playerTilesGridColumns";
 import { buildBrandBackground } from "../../features/branding/brandVisual";
+import {
+  quizPlayConnectionDotColor,
+  type QuizPlayConnectionIndicator,
+} from "../../features/quizPlay/connectionChip";
 import { resolveClientAssetUrl } from "../../utils/resolveClientAssetUrl";
 import {
   sanitizeBannerLinkUrl,
@@ -524,9 +528,7 @@ export function PlayerTilesGrid(props: PlayerTilesGridProps) {
   );
 }
 
-type ConnectionChipState =
-  | { label: string; variant: "filled"; accentFill: true }
-  | { label: string; color: "warning" | "error"; variant: "filled" | "outlined" };
+type ConnectionChipState = QuizPlayConnectionIndicator;
 
 const PLAYER_BAR_ROOT_SX: SxProps<Theme> = { mb: 3 };
 
@@ -552,37 +554,13 @@ const NICKNAME_CHIP_SX: SxProps<Theme> = {
   },
 };
 
-function buildConnectionChipSx(
-  connectionChip: ConnectionChipState,
-  accentBackgroundColor: string,
-  accentTextColor: string,
-): SxProps<Theme> {
-  const accentFill = "accentFill" in connectionChip;
-  return {
-    alignItems: "center",
-    borderRadius: 1.25,
-    fontWeight: 400,
-    ...(accentFill
-      ? {
-          backgroundColor: accentBackgroundColor,
-          color: accentTextColor,
-          border: "1px solid rgba(255,255,255,0.35)",
-          boxShadow: `0 0 0 1px ${alpha(accentBackgroundColor, 0.45)} inset`,
-        }
-      : {}),
-    "& .MuiChip-label": {
-      display: "flex",
-      alignItems: "center",
-      height: "100%",
-      fontWeight: 400,
-      letterSpacing: 0.2,
-      ...(accentFill ? { color: accentTextColor } : {}),
-    },
-    "& .MuiChip-icon": {
-      ...(accentFill ? { color: accentTextColor } : {}),
-    },
-  };
-}
+const CONNECTION_DOT_SX = {
+  width: 10,
+  height: 10,
+  borderRadius: "50%",
+  flexShrink: 0,
+  boxShadow: "0 0 0 2px rgba(255,255,255,0.55)",
+} as const;
 
 const JOIN_CARD_ROOT_SX: SxProps<Theme> = {
   width: "100%",
@@ -714,14 +692,13 @@ export function buildBrandOutlinedButtonSx(textColor: string): SxProps<Theme> {
 
 type PlayerIdentityBarProps = {
   nickname: string;
-  formBackgroundColor: string;
-  formTextColor: string;
   connectionChip: ConnectionChipState;
   onNicknameClick: () => void;
 };
 
 export function PlayerIdentityBar(props: PlayerIdentityBarProps) {
-  const { nickname, formBackgroundColor, formTextColor, connectionChip, onNicknameClick } = props;
+  const { nickname, connectionChip, onNicknameClick } = props;
+  const dotColor = quizPlayConnectionDotColor(connectionChip.tone);
   return (
     <Box sx={PLAYER_BAR_ROOT_SX}>
       <Stack direction="row" alignItems="center" justifyContent="space-between" spacing={1}>
@@ -739,13 +716,17 @@ export function PlayerIdentityBar(props: PlayerIdentityBarProps) {
             </IconButton>
           </Tooltip>
         </Stack>
-        <Chip
-          size="small"
-          label={connectionChip.label}
-          {...("accentFill" in connectionChip ? {} : { color: connectionChip.color })}
-          variant={connectionChip.variant}
-          sx={buildConnectionChipSx(connectionChip, formBackgroundColor, formTextColor)}
-        />
+        <Tooltip title={connectionChip.label}>
+          <Box
+            component="span"
+            role="status"
+            aria-label={connectionChip.label}
+            sx={{
+              ...CONNECTION_DOT_SX,
+              bgcolor: dotColor,
+            }}
+          />
+        </Tooltip>
       </Stack>
     </Box>
   );

@@ -634,8 +634,6 @@ export function QuizPlayPage() {
             {joined ? (
               <PlayerIdentityBar
                 nickname={nickname}
-                formBackgroundColor={formBackgroundColor}
-                formTextColor={formTextColor}
                 connectionChip={connectionChip}
                 onNicknameClick={editNickname}
               />
