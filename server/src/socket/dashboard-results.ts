@@ -6,7 +6,10 @@ import {
   invalidateDashboardResultsCache,
   setDashboardDebounceToken,
 } from "../dashboard-results-cache.js";
-import { isDashboardDebounceTokenCurrent } from "../dashboard-results-build.js";
+import {
+  dashboardBroadcastDelayMs,
+  isDashboardDebounceTokenCurrent,
+} from "../dashboard-results-build.js";
 import { getDashboardResults, getQuizPublicState, type DashboardResults } from "../quiz-service.js";
 import { prisma } from "../prisma.js";
 import { getStoredPublicView } from "./public-view-store.js";
@@ -20,18 +23,24 @@ function emitDashboardBundle(io: Server, quizId: string, results: DashboardResul
 type PendingDebounce = {
   timer: ReturnType<typeof setTimeout>;
   token: string;
+  burstStartedAt: number;
 };
 
 const pendingTimers = new Map<string, PendingDebounce>();
 /** Один пересчёт на quizId за раз: параллельные submit/admin не дублируют getDashboardResults. */
 const inFlightBroadcast = new Map<string, Promise<void>>();
+/** Submit во время in-flight: после текущего пересчёта нужен ещё один. */
+const dirtyAfterBroadcast = new Set<string>();
 
 export function scheduleDashboardResultsBroadcast(io: Server, quizId: string) {
   const debounceMs = env.dashboardResultsDebounceMs;
+  const maxWaitMs = env.dashboardResultsMaxWaitMs;
   const token = randomUUID();
-  void setDashboardDebounceToken(quizId, token, debounceMs);
-
   const existing = pendingTimers.get(quizId);
+  const burstStartedAt = existing?.burstStartedAt ?? Date.now();
+  const delayMs = dashboardBroadcastDelayMs(debounceMs, maxWaitMs, Date.now() - burstStartedAt);
+  void setDashboardDebounceToken(quizId, token, Math.max(debounceMs, maxWaitMs, delayMs));
+
   if (existing) clearTimeout(existing.timer);
 
   const timer = setTimeout(() => {
@@ -44,9 +53,9 @@ export function scheduleDashboardResultsBroadcast(io: Server, quizId: string) {
       }
       await broadcastDashboardResultsNow(io, quizId);
     })();
-  }, debounceMs);
+  }, delayMs);
 
-  pendingTimers.set(quizId, { timer, token });
+  pendingTimers.set(quizId, { timer, token, burstStartedAt });
 }
 
 export async function broadcastDashboardResultsNow(io: Server, quizId: string): Promise<void> {
@@ -55,7 +64,10 @@ export async function broadcastDashboardResultsNow(io: Server, quizId: string): 
   pendingTimers.delete(quizId);
 
   const running = inFlightBroadcast.get(quizId);
-  if (running) return running;
+  if (running) {
+    dirtyAfterBroadcast.add(quizId);
+    return running;
+  }
 
   const task = (async () => {
     try {
@@ -64,6 +76,9 @@ export async function broadcastDashboardResultsNow(io: Server, quizId: string): 
       emitDashboardBundle(io, quizId, results);
     } finally {
       inFlightBroadcast.delete(quizId);
+      if (dirtyAfterBroadcast.delete(quizId)) {
+        scheduleDashboardResultsBroadcast(io, quizId);
+      }
     }
   })();
 

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { debounceTokenTtlMs } from "../src/dashboard-results-cache.js";
 import {
   attachAnswersToQuestions,
+  dashboardBroadcastDelayMs,
   groupAnswersByQuestionId,
   isDashboardDebounceTokenCurrent,
 } from "../src/dashboard-results-build.js";
@@ -43,5 +44,25 @@ describe("isDashboardDebounceTokenCurrent", () => {
     expect(isDashboardDebounceTokenCurrent("t1", "t1")).toBe(true);
     expect(isDashboardDebounceTokenCurrent("t1", "t2")).toBe(false);
     expect(isDashboardDebounceTokenCurrent("t1", null)).toBe(false);
+  });
+});
+
+describe("dashboardBroadcastDelayMs", () => {
+  it("uses trailing debounce at the start of a burst", () => {
+    expect(dashboardBroadcastDelayMs(220, 2000, 0)).toBe(220);
+  });
+
+  it("keeps debounce until maxWait is close", () => {
+    expect(dashboardBroadcastDelayMs(220, 2000, 1500)).toBe(220);
+    expect(dashboardBroadcastDelayMs(220, 2000, 1900)).toBe(100);
+  });
+
+  it("forces an emit when the burst has lasted maxWait", () => {
+    expect(dashboardBroadcastDelayMs(220, 2000, 2000)).toBe(0);
+    expect(dashboardBroadcastDelayMs(220, 2000, 5000)).toBe(0);
+  });
+
+  it("disables maxWait when set to 0", () => {
+    expect(dashboardBroadcastDelayMs(220, 0, 5000)).toBe(220);
   });
 });

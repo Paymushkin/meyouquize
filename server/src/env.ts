@@ -56,8 +56,9 @@ applyDevClusterDefault();
  * Несколько воркеров: `CLUSTER_WORKERS` в
  * `server/src/index.ts` + обязательный `REDIS_URL` для Socket.IO (см. attachSocketIoRedisAdapter).
  *
- * Дашборд результатов: `DASHBOARD_RESULTS_DEBOUNCE_MS` — пауза перед пересчётом после
- * всплеска `answer:submit` (меньше — живее UI, больше — меньше нагрузки на Postgres).
+ * Дашборд результатов: `DASHBOARD_RESULTS_DEBOUNCE_MS` — пауза после последнего submit;
+ * `DASHBOARD_RESULTS_MAX_WAIT_MS` — не реже этого интервала во время непрерывного всплеска
+ * (иначе график молчит, пока голоса идут чаще debounce). 0 = только trailing debounce.
  */
 /**
  * Разрешить CORS для http(s)://*:5173 с частных IP / localhost, если не production
@@ -199,6 +200,18 @@ const socketIoPingIntervalMs = Math.min(
   Math.max(3_000, socketIoPingTimeoutMs - 2_000),
 );
 
+const dashboardResultsDebounceMs = Math.max(
+  0,
+  Number.parseInt(process.env.DASHBOARD_RESULTS_DEBOUNCE_MS ?? "220", 10) || 220,
+);
+const parsedDashboardMaxWait = Number.parseInt(
+  process.env.DASHBOARD_RESULTS_MAX_WAIT_MS ?? "2000",
+  10,
+);
+const dashboardResultsMaxWaitMs = Number.isFinite(parsedDashboardMaxWait)
+  ? Math.max(0, parsedDashboardMaxWait)
+  : 2000;
+
 console.info(`[env] CLUSTER_WORKERS=${clusterWorkers} (set CLUSTER_WORKERS=1 to disable cluster)`);
 console.info(
   `[env] localAdminNoAuth=${resolveLocalAdminNoAuth(networkMode)} (LAN/dev без пароля; отключить: LOCAL_ADMIN_NO_AUTH=0)`,
@@ -224,10 +237,12 @@ export const env = {
   adminSessionHours: Number(process.env.ADMIN_SESSION_HOURS ?? 8),
   redisUrl: process.env.REDIS_URL?.trim() || undefined,
   /** Склейка всплесков пересчёта дашборда (мс). */
-  dashboardResultsDebounceMs: Math.max(
-    0,
-    Number.parseInt(process.env.DASHBOARD_RESULTS_DEBOUNCE_MS ?? "220", 10) || 220,
-  ),
+  dashboardResultsDebounceMs,
+  /**
+   * Максимальная тишина дашборда при непрерывном потоке голосов (мс).
+   * 0 = только ждать паузу debounce (график замирает на пике).
+   */
+  dashboardResultsMaxWaitMs,
   /** Короткий кэш payload дашборда в Redis (мс); 0 = выключен. Требует REDIS_URL. */
   dashboardResultsCacheMs: Math.max(
     0,

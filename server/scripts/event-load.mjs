@@ -3,18 +3,27 @@
  *
  * Пример:
  *   BASE_URL=https://meyou.site QUIZ_SLUG=test-room node scripts/event-load.mjs
+ *
+ * HTTP с одной машины: HTTP_CONCURRENCY=60, HTTP_BOOTSTRAP_RETRIES=3,
+ * META_CACHE_MS=2000, SPA качается один раз (SKIP_SPA_ASSETS=1 — только meta).
  */
 import { io } from "socket.io-client";
 import {
   buildAnswerPayloadFromQuestion,
   buildJoinSchedule,
+  collectOpenVoteTargetsFromState,
   countByRatio,
+  createInflightCache,
+  createSemaphore,
+  createTtlCache,
+  isRetryableBootstrapError,
   parseAssetUrlsFromHtml,
   percentile,
   pickIndicesByRatio,
   pickSpeakerTarget,
   resolveAssetUrl,
   resolveSubmitTargetFromState,
+  retryAsync,
   sampleDelayMs,
   topReasons,
 } from "./event-load-helpers.mjs";
@@ -27,6 +36,10 @@ const joinDistribution = (process.env.JOIN_DISTRIBUTION || "uniform").trim().toL
 const joinAckTimeoutMs = Number(process.env.JOIN_ACK_TIMEOUT_MS || 25_000);
 const joinConnectRetries = Math.max(1, Number(process.env.JOIN_CONNECT_RETRIES ?? "3"));
 const joinConnectBackoffMs = Math.max(0, Number(process.env.JOIN_CONNECT_BACKOFF_MS ?? "400"));
+const httpConcurrency = Math.max(1, Number(process.env.HTTP_CONCURRENCY ?? "60") || 60);
+const httpBootstrapRetries = Math.max(1, Number(process.env.HTTP_BOOTSTRAP_RETRIES ?? "3") || 3);
+const metaCacheMs = Math.max(0, Number(process.env.META_CACHE_MS ?? "2000") || 0);
+const skipSpaAssets = (process.env.SKIP_SPA_ASSETS ?? "").trim() === "1";
 const joinFailTolerance = Math.max(
   0,
   Number.parseInt(process.env.JOIN_FAIL_TOLERANCE ?? "1", 10) || 0,
@@ -103,42 +116,61 @@ function logLatencyStats(prefix, latencies) {
   );
 }
 
-async function fetchHttpBootstrap() {
+const httpSem = createSemaphore(httpConcurrency);
+
+async function limitedFetch(url, init) {
+  return httpSem.run(() => fetch(url, init));
+}
+
+const spaAssets = createInflightCache(async () => {
+  const pageUrl = new URL(`/q/${slug}`, base).toString();
+  const pageRes = await limitedFetch(pageUrl, { redirect: "follow" });
+  if (!pageRes.ok) {
+    throw new Error(`page_http_${pageRes.status}`);
+  }
+  const html = await pageRes.text();
+  const assets = parseAssetUrlsFromHtml(html);
+  const assetPaths = [...assets.script, ...assets.stylesheet].slice(0, 6);
+  await Promise.all(
+    assetPaths.map(async (path) => {
+      const url = resolveAssetUrl(path, base);
+      const res = await limitedFetch(url);
+      if (!res.ok) bumpReason(httpFailReasons, `asset_http_${res.status}`);
+    }),
+  );
+  return true;
+});
+
+const loadQuizMeta = createTtlCache(async () => {
+  if (forcedQuizId) return { id: forcedQuizId };
+  const metaUrl = new URL(`/api/quiz/by-slug/${slug}/meta`, base).toString();
+  const metaRes = await limitedFetch(metaUrl);
+  if (!metaRes.ok) {
+    throw new Error(`meta_http_${metaRes.status}`);
+  }
+  return metaRes.json();
+}, metaCacheMs);
+
+async function fetchHttpBootstrapOnce() {
   const t0 = Date.now();
   try {
-    const pageUrl = new URL(`/q/${slug}`, base).toString();
-    const pageRes = await fetch(pageUrl, { redirect: "follow" });
-    if (!pageRes.ok) {
-      bumpReason(httpFailReasons, `page_http_${pageRes.status}`);
-      return { ok: false, err: `page_http_${pageRes.status}` };
-    }
-    const html = await pageRes.text();
-    const assets = parseAssetUrlsFromHtml(html);
-    const assetPaths = [...assets.script, ...assets.stylesheet].slice(0, 6);
-    await Promise.all(
-      assetPaths.map(async (path) => {
-        const url = resolveAssetUrl(path, base);
-        const res = await fetch(url);
-        if (!res.ok) bumpReason(httpFailReasons, `asset_http_${res.status}`);
-      }),
-    );
-    if (forcedQuizId) {
-      httpBootstrapLatencies.push(Date.now() - t0);
-      return { ok: true, meta: { id: forcedQuizId } };
-    }
-    const metaUrl = new URL(`/api/quiz/by-slug/${slug}/meta`, base).toString();
-    const metaRes = await fetch(metaUrl);
-    if (!metaRes.ok) {
-      bumpReason(httpFailReasons, `meta_http_${metaRes.status}`);
-      return { ok: false, err: `meta_http_${metaRes.status}` };
-    }
-    const meta = await metaRes.json();
+    if (!skipSpaAssets) await spaAssets.get();
+    const meta = await loadQuizMeta();
     httpBootstrapLatencies.push(Date.now() - t0);
     return { ok: true, meta };
   } catch (err) {
-    bumpReason(httpFailReasons, err instanceof Error ? err.message : String(err));
-    return { ok: false, err: err instanceof Error ? err.message : String(err) };
+    const message = err instanceof Error ? err.message : String(err);
+    bumpReason(httpFailReasons, message);
+    return { ok: false, err: message };
   }
+}
+
+function fetchHttpBootstrap() {
+  return retryAsync(fetchHttpBootstrapOnce, {
+    attempts: httpBootstrapRetries,
+    delayMs: joinConnectBackoffMs,
+    isRetryable: (result) => !result.ok && isRetryableBootstrapError(result.err),
+  });
 }
 
 function makeClient(i, startDelayMs = 0) {
@@ -427,6 +459,9 @@ console.info(
   `[event-load] players=${players} join_ramp_ms=${joinRampMs} vote_window_ms=${voteWindowMs} hold_ms=${holdMs} target≈${Math.round((joinRampMs + voteWindowMs + postVotePauseMs + holdMs + speakerCreateSpreadMs + speakerReactSpreadMs + reactionSpreadMs) / 1000)}s`,
 );
 console.info(
+  `[event-load] http_concurrency=${httpConcurrency} bootstrap_retries=${httpBootstrapRetries} meta_cache_ms=${metaCacheMs} spa_assets=${skipSpaAssets ? "skip" : "warmup-once"}`,
+);
+console.info(
   `[event-load] speaker_create_ratio=${speakerCreateRatio} speaker_react_ratio=${speakerReactRatio} reaction_ratio=${reactionRatio}`,
 );
 
@@ -459,8 +494,26 @@ let submitOk = 0;
 let submitTotal = 0;
 let submitSkipped = false;
 
-const target = await resolveSubmitTarget(joinedClients);
-if (!target) {
+const voteAllActive = (process.env.VOTE_ALL_ACTIVE ?? "1").trim() !== "0";
+const seedTarget = await resolveSubmitTarget(joinedClients);
+const voteTargets = (() => {
+  if (forcedQuizId && forcedQuestionId && forcedOptionId) {
+    return seedTarget ? [seedTarget] : [];
+  }
+  if (!voteAllActive) return seedTarget ? [seedTarget] : [];
+  for (const c of joinedClients) {
+    const fromState = collectOpenVoteTargetsFromState(c.lastState);
+    if (fromState.length > 0) {
+      return fromState.map((t) => ({
+        ...t,
+        quizId: t.quizId || seedTarget?.quizId || c.quizId,
+      }));
+    }
+  }
+  return seedTarget ? [seedTarget] : [];
+})();
+
+if (voteTargets.length === 0) {
   submitSkipped = true;
   console.warn(
     "[event-load] vote: нет активного вопроса. Откройте вопрос в админке или задайте QUIZ_ID + QUESTION_ID + OPTION_ID.",
@@ -469,7 +522,9 @@ if (!target) {
   const n = joinedClients.length;
   const delays = joinedClients.map(() => sampleDelayMs(voteWindowMs, voteDistribution));
   console.info(
-    `[event-load] vote_start question=${target.questionId.slice(0, 8)}… voters=${n} window_ms=${voteWindowMs}`,
+    `[event-load] vote_start questions=${voteTargets.length} (${voteTargets
+      .map((t) => t.questionId.slice(0, 8))
+      .join(", ")}) voters=${n} window_ms=${voteWindowMs}`,
   );
   const voteResults = await Promise.all(
     joinedClients.map(
@@ -477,37 +532,52 @@ if (!target) {
         new Promise((resolve) => {
           const delayMs = delays[idx] ?? 0;
           setTimeout(async () => {
-            const stateTarget = resolveSubmitTargetFromState(c.lastState);
-            const quizId = target.quizId || stateTarget.quizId || c.quizId;
-            const questionId = target.questionId || stateTarget.questionId;
-            const question = stateTarget.question || target.question;
-            const payload = buildAnswerPayloadFromQuestion(question);
-            if (!quizId || !questionId) {
-              resolve({ ok: false, err: "no_submit_target" });
-              return;
+            const stateTargets = collectOpenVoteTargetsFromState(c.lastState);
+            const questions =
+              stateTargets.length > 0
+                ? stateTargets
+                : voteTargets.map((t) => ({
+                    quizId: t.quizId || c.quizId,
+                    questionId: t.questionId,
+                    question: t.question,
+                  }));
+            /** @type {Array<{ ok: boolean; err?: string }>} */
+            const round = [];
+            for (const q of questions) {
+              const quizId = q.quizId || c.quizId;
+              const payload = buildAnswerPayloadFromQuestion(q.question);
+              if (!quizId || !q.questionId) {
+                round.push({ ok: false, err: "no_submit_target" });
+                continue;
+              }
+              round.push(await submitAnswer(c.socket, quizId, q.questionId, payload));
             }
-            resolve(await submitAnswer(c.socket, quizId, questionId, payload));
+            resolve(round);
           }, delayMs);
         }),
     ),
   );
 
   let submitFail = 0;
-  submitTotal = n;
+  submitTotal = 0;
   for (const vr of voteResults) {
-    if (!vr.ok) {
-      submitFail += 1;
-      bumpReason(submitFailReasons, vr.err);
+    const items = Array.isArray(vr) ? vr : [vr];
+    for (const item of items) {
+      submitTotal += 1;
+      if (!item.ok) {
+        submitFail += 1;
+        bumpReason(submitFailReasons, item.err);
+      }
     }
   }
-  submitOk = n - submitFail;
-  console.info(`[event-load] submit_ok=${submitOk}/${n}`);
+  submitOk = submitTotal - submitFail;
+  console.info(`[event-load] submit_ok=${submitOk}/${submitTotal}`);
   if (submitFail > 0) {
     console.info(`[event-load] submit_fail_reasons ${topReasons(submitFailReasons)}`);
   }
   logLatencyStats("[event-load] submit_roundtrip_ms", submitLatencies);
 
-  const submitFailRate = n > 0 ? submitFail / n : 0;
+  const submitFailRate = submitTotal > 0 ? submitFail / submitTotal : 0;
   if (submitFailRate > submitFailMaxRate) {
     console.error(
       `[event-load] submit SLO: fail_rate=${(submitFailRate * 100).toFixed(1)}% > max=${(submitFailMaxRate * 100).toFixed(1)}%`,
