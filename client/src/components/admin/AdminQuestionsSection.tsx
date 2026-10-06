@@ -149,6 +149,12 @@ type Props = {
     onToggle: () => void;
   };
   onReorderVoteInList?: (fromLocalIndex: number, toLocalIndex: number) => void;
+  /**
+   * Когда в секции один пункт (карточка-блок в списке голосований),
+   * ручка запускает перестановку блока у родителя, а не локальный список.
+   */
+  onHostBlockDragStart?: () => void;
+  onHostBlockDragEnd?: () => void;
   /** Клонировать голосование комнаты (вкладка «Голосования»). */
   onCloneQuestion?: (globalIndex: number) => void;
 };
@@ -196,11 +202,14 @@ export function AdminQuestionsSection(props: Props) {
     voteListManageMode = false,
     voteListManageToggle,
     onReorderVoteInList,
+    onHostBlockDragStart,
+    onHostBlockDragEnd,
     onCloneQuestion,
   } = props;
 
   const [dragLocalIndex, setDragLocalIndex] = useState<number | null>(null);
   const [dropLocalIndex, setDropLocalIndex] = useState<number | null>(null);
+  const hostBlockDrag = Boolean(onHostBlockDragStart) && questionForms.length <= 1;
 
   const [voteAdjustEditIndices, setVoteAdjustEditIndices] = useState<Set<number>>(() => new Set());
 
@@ -433,21 +442,29 @@ export function AdminQuestionsSection(props: Props) {
                             </span>
                           </Tooltip>
                         ) : null}
-                        {voteListManageMode && onReorderVoteInList ? (
+                        {voteListManageMode && (onReorderVoteInList || onHostBlockDragStart) ? (
                           <Tooltip title="Перетащите для изменения порядка">
                             <Box
                               component="span"
                               draggable
                               onDragStart={(event) => {
                                 event.stopPropagation();
-                                setDragLocalIndex(qIndex);
-                                setDropLocalIndex(null);
+                                if (hostBlockDrag) {
+                                  onHostBlockDragStart?.();
+                                } else {
+                                  setDragLocalIndex(qIndex);
+                                  setDropLocalIndex(null);
+                                }
                                 event.dataTransfer.effectAllowed = "move";
                                 event.dataTransfer.setData("text/plain", String(qIndex));
                               }}
                               onDragEnd={() => {
-                                setDragLocalIndex(null);
-                                setDropLocalIndex(null);
+                                if (hostBlockDrag) {
+                                  onHostBlockDragEnd?.();
+                                } else {
+                                  setDragLocalIndex(null);
+                                  setDropLocalIndex(null);
+                                }
                               }}
                               onClick={(event) => event.stopPropagation()}
                               sx={{

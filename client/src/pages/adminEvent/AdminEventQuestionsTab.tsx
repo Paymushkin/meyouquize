@@ -818,8 +818,14 @@ export function AdminEventQuestionsTab({
   debateSeriesShowRounds,
   onToggleDebateSeriesShowRounds,
 }: AdminEventQuestionsTabProps) {
-  const [votesBlockDragIndex, setVotesBlockDragIndex] = useState<number | null>(null);
-  const [votesBlockDropIndex, setVotesBlockDropIndex] = useState<number | null>(null);
+  const [votesBlockDrag, setVotesBlockDrag] = useState<{
+    scope: "active" | "done";
+    index: number;
+  } | null>(null);
+  const [votesBlockDrop, setVotesBlockDrop] = useState<{
+    scope: "active" | "done";
+    index: number;
+  } | null>(null);
   const importParticipantsToFreeList = useCallback(
     (nicknames: string[]) => {
       if (nicknames.length === 0) return;
@@ -1273,46 +1279,66 @@ export function AdminEventQuestionsTab({
                         );
                         const isDropTarget =
                           voteListManageMode &&
-                          votesBlockDropIndex === blockIndex &&
-                          votesBlockDragIndex != null &&
-                          votesBlockDragIndex !== blockIndex;
+                          votesBlockDrop?.scope === "active" &&
+                          votesBlockDrop.index === blockIndex &&
+                          votesBlockDrag?.scope === "active" &&
+                          votesBlockDrag.index !== blockIndex;
                         const blockDropSx = {
                           outline: isDropTarget ? "2px solid" : undefined,
                           outlineColor: isDropTarget ? "primary.main" : undefined,
                           opacity:
-                            voteListManageMode && votesBlockDragIndex === blockIndex ? 0.55 : 1,
+                            voteListManageMode &&
+                            votesBlockDrag?.scope === "active" &&
+                            votesBlockDrag.index === blockIndex
+                              ? 0.55
+                              : 1,
                         } as const;
                         const blockDragHandlers = voteListManageMode
                           ? {
                               onDragOver: (event: DragEvent) => {
-                                if (votesBlockDragIndex === null) return;
+                                if (votesBlockDrag?.scope !== "active") return;
                                 event.preventDefault();
                                 event.dataTransfer.dropEffect = "move";
-                                setVotesBlockDropIndex(blockIndex);
+                                setVotesBlockDrop({ scope: "active", index: blockIndex });
                               },
                               onDragLeave: () => {
-                                setVotesBlockDropIndex((current) =>
-                                  current === blockIndex ? null : current,
+                                setVotesBlockDrop((current) =>
+                                  current?.scope === "active" && current.index === blockIndex
+                                    ? null
+                                    : current,
                                 );
                               },
                               onDrop: (event: DragEvent) => {
                                 event.preventDefault();
                                 event.stopPropagation();
                                 if (
-                                  votesBlockDragIndex != null &&
-                                  votesBlockDragIndex !== blockIndex
+                                  votesBlockDrag?.scope === "active" &&
+                                  votesBlockDrag.index !== blockIndex
                                 ) {
                                   void reorderVoteDisplayBlocks(
-                                    votesBlockDragIndex,
+                                    votesBlockDrag.index,
                                     blockIndex,
                                     activeVoteIndices,
                                   );
                                 }
-                                setVotesBlockDragIndex(null);
-                                setVotesBlockDropIndex(null);
+                                setVotesBlockDrag(null);
+                                setVotesBlockDrop(null);
                               },
                             }
                           : {};
+                        const hostBlockDragProps =
+                          voteListManageMode && block.kind === "single"
+                            ? {
+                                onHostBlockDragStart: () => {
+                                  setVotesBlockDrag({ scope: "active", index: blockIndex });
+                                  setVotesBlockDrop(null);
+                                },
+                                onHostBlockDragEnd: () => {
+                                  setVotesBlockDrag(null);
+                                  setVotesBlockDrop(null);
+                                },
+                              }
+                            : {};
                         return block.kind === "debate_series" ? (
                           <DebateSeriesBlockShell
                             key={`series-${block.seriesId}`}
@@ -1342,12 +1368,12 @@ export function AdminEventQuestionsTab({
                             adminDoneMode="markDone"
                             onToggleAdminDone={() => void setQuestionsAdminDone(indices, true)}
                             onBlockDragStart={() => {
-                              setVotesBlockDragIndex(blockIndex);
-                              setVotesBlockDropIndex(null);
+                              setVotesBlockDrag({ scope: "active", index: blockIndex });
+                              setVotesBlockDrop(null);
                             }}
                             onBlockDragEnd={() => {
-                              setVotesBlockDragIndex(null);
-                              setVotesBlockDropIndex(null);
+                              setVotesBlockDrag(null);
+                              setVotesBlockDrop(null);
                             }}
                             onDragOver={blockDragHandlers.onDragOver}
                             onDragLeave={blockDragHandlers.onDragLeave}
@@ -1402,6 +1428,7 @@ export function AdminEventQuestionsTab({
                               onReorderVoteInList={(fromLocal, toLocal) =>
                                 void reorderVoteInList(fromLocal, toLocal, indices)
                               }
+                              {...hostBlockDragProps}
                               addQuestion={() => addQuestionToSubQuiz(null)}
                               onCloneQuestion={(g) => void cloneQuestionAtIndex(g)}
                             />
@@ -1434,7 +1461,7 @@ export function AdminEventQuestionsTab({
                           {filterVotesDisplayBlocks(
                             buildVotesDisplayBlocks(questionForms),
                             new Set(doneVoteIndices),
-                          ).map((block) => {
+                          ).map((block, blockIndex) => {
                             const indices =
                               block.kind === "debate_series"
                                 ? block.formIndices
@@ -1442,6 +1469,68 @@ export function AdminEventQuestionsTab({
                             const selectedLocal = indices.indexOf(
                               doneVoteIndices[doneVotesSelectedListIndex] ?? -1,
                             );
+                            const isDropTarget =
+                              voteListManageMode &&
+                              votesBlockDrop?.scope === "done" &&
+                              votesBlockDrop.index === blockIndex &&
+                              votesBlockDrag?.scope === "done" &&
+                              votesBlockDrag.index !== blockIndex;
+                            const blockDropSx = {
+                              outline: isDropTarget ? "2px solid" : undefined,
+                              outlineColor: isDropTarget ? "primary.main" : undefined,
+                              opacity:
+                                voteListManageMode &&
+                                votesBlockDrag?.scope === "done" &&
+                                votesBlockDrag.index === blockIndex
+                                  ? 0.55
+                                  : 1,
+                            } as const;
+                            const blockDragHandlers = voteListManageMode
+                              ? {
+                                  onDragOver: (event: DragEvent) => {
+                                    if (votesBlockDrag?.scope !== "done") return;
+                                    event.preventDefault();
+                                    event.dataTransfer.dropEffect = "move";
+                                    setVotesBlockDrop({ scope: "done", index: blockIndex });
+                                  },
+                                  onDragLeave: () => {
+                                    setVotesBlockDrop((current) =>
+                                      current?.scope === "done" && current.index === blockIndex
+                                        ? null
+                                        : current,
+                                    );
+                                  },
+                                  onDrop: (event: DragEvent) => {
+                                    event.preventDefault();
+                                    event.stopPropagation();
+                                    if (
+                                      votesBlockDrag?.scope === "done" &&
+                                      votesBlockDrag.index !== blockIndex
+                                    ) {
+                                      void reorderVoteDisplayBlocks(
+                                        votesBlockDrag.index,
+                                        blockIndex,
+                                        doneVoteIndices,
+                                      );
+                                    }
+                                    setVotesBlockDrag(null);
+                                    setVotesBlockDrop(null);
+                                  },
+                                }
+                              : {};
+                            const hostBlockDragProps =
+                              voteListManageMode && block.kind === "single"
+                                ? {
+                                    onHostBlockDragStart: () => {
+                                      setVotesBlockDrag({ scope: "done", index: blockIndex });
+                                      setVotesBlockDrop(null);
+                                    },
+                                    onHostBlockDragEnd: () => {
+                                      setVotesBlockDrag(null);
+                                      setVotesBlockDrop(null);
+                                    },
+                                  }
+                                : {};
                             return block.kind === "debate_series" ? (
                               <DebateSeriesBlockShell
                                 key={`done-series-${block.seriesId}`}
@@ -1470,7 +1559,18 @@ export function AdminEventQuestionsTab({
                                 manageMode={voteListManageMode}
                                 adminDoneMode="markActive"
                                 onToggleAdminDone={() => void setQuestionsAdminDone(indices, false)}
-                                paperSx={{ bgcolor: "background.paper" }}
+                                onBlockDragStart={() => {
+                                  setVotesBlockDrag({ scope: "done", index: blockIndex });
+                                  setVotesBlockDrop(null);
+                                }}
+                                onBlockDragEnd={() => {
+                                  setVotesBlockDrag(null);
+                                  setVotesBlockDrop(null);
+                                }}
+                                onDragOver={blockDragHandlers.onDragOver}
+                                onDragLeave={blockDragHandlers.onDragLeave}
+                                onDrop={blockDragHandlers.onDrop}
+                                paperSx={{ bgcolor: "background.paper", ...blockDropSx }}
                               >
                                 <AdminQuestionsSection
                                   {...questionsSectionBindings}
@@ -1492,7 +1592,10 @@ export function AdminEventQuestionsTab({
                               <Paper
                                 key={`done-single-${block.formIndex}`}
                                 variant="outlined"
-                                sx={{ bgcolor: "background.paper" }}
+                                sx={{ bgcolor: "background.paper", ...blockDropSx }}
+                                onDragOver={blockDragHandlers.onDragOver}
+                                onDragLeave={blockDragHandlers.onDragLeave}
+                                onDrop={blockDragHandlers.onDrop}
                               >
                                 <AdminQuestionsSection
                                   {...questionsSectionBindings}
@@ -1510,6 +1613,7 @@ export function AdminEventQuestionsTab({
                                   onReorderVoteInList={(fromLocal, toLocal) =>
                                     void reorderVoteInList(fromLocal, toLocal, indices)
                                   }
+                                  {...hostBlockDragProps}
                                   addQuestion={() => addQuestionToSubQuiz(null)}
                                   onCloneQuestion={(g) => void cloneQuestionAtIndex(g)}
                                 />
