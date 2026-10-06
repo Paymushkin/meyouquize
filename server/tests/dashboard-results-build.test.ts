@@ -5,6 +5,8 @@ import {
   dashboardBroadcastDelayMs,
   groupAnswersByQuestionId,
   isDashboardDebounceTokenCurrent,
+  shouldFlushDashboardForMaxWait,
+  shouldHonorRedisDebounceToken,
 } from "../src/dashboard-results-build.js";
 
 describe("groupAnswersByQuestionId", () => {
@@ -64,5 +66,24 @@ describe("dashboardBroadcastDelayMs", () => {
 
   it("disables maxWait when set to 0", () => {
     expect(dashboardBroadcastDelayMs(220, 0, 5000)).toBe(220);
+  });
+});
+
+describe("shouldFlushDashboardForMaxWait", () => {
+  it("flushes after maxWait even if no emit has happened yet", () => {
+    expect(shouldFlushDashboardForMaxWait(2000, 0)).toBe(false);
+    expect(shouldFlushDashboardForMaxWait(2000, 1999)).toBe(false);
+    expect(shouldFlushDashboardForMaxWait(2000, 2000)).toBe(true);
+  });
+
+  it("does not flush when maxWait is disabled", () => {
+    expect(shouldFlushDashboardForMaxWait(0, 10_000)).toBe(false);
+  });
+});
+
+describe("shouldHonorRedisDebounceToken", () => {
+  it("does not let Redis cancel a max-wait flush", () => {
+    expect(shouldHonorRedisDebounceToken(true)).toBe(false);
+    expect(shouldHonorRedisDebounceToken(false)).toBe(true);
   });
 });

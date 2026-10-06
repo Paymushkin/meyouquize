@@ -53,3 +53,19 @@ export function dashboardBroadcastDelayMs(
   if (remaining <= 0) return 0;
   return Math.min(debounce, remaining);
 }
+
+/** Пора слать кадр сразу: прошло maxWait с последнего emit или с начала всплеска. */
+export function shouldFlushDashboardForMaxWait(
+  maxWaitMs: number,
+  elapsedSinceLastEmitOrBurstMs: number,
+): boolean {
+  return maxWaitMs > 0 && elapsedSinceLastEmitOrBurstMs >= maxWaitMs;
+}
+
+/**
+ * Redis-токен отменяет только trailing-таймер.
+ * Max-wait flush нельзя отменять — на кластере каждый submit переписывает токен.
+ */
+export function shouldHonorRedisDebounceToken(isMaxWaitFlush: boolean): boolean {
+  return !isMaxWaitFlush;
+}
