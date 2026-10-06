@@ -1046,7 +1046,11 @@ export async function getQuizPublicState(quizId: string) {
   );
   const [playerVisibleQuestionResults, playerVisibleSeriesResults] = await Promise.all([
     getPlayerVisibleResultsForQuiz(quiz.id, view.playerVisibleResultQuestionIds ?? []),
-    getPlayerVisibleDebateSeriesResultsForQuiz(quiz.id, view.playerVisibleDebateSeriesIds ?? []),
+    getPlayerVisibleDebateSeriesResultsForQuiz(
+      quiz.id,
+      view.playerVisibleDebateSeriesIds ?? [],
+      view.tagCloudManualByQuestionId,
+    ),
   ]);
   const playerVisibleResults = [...playerVisibleQuestionResults, ...playerVisibleSeriesResults];
   const activeFeedbackForm = await getActiveFeedbackFormPublic(quiz.id);
@@ -1325,6 +1329,7 @@ export function playerVisibleDebateSeriesTileId(seriesId: string): string {
 async function getPlayerVisibleDebateSeriesResultsForQuiz(
   quizId: string,
   seriesIds: string[],
+  tagCloudManualByQuestionId?: TagCloudManualByQuestionId,
 ): Promise<PlayerVisibleResultTile[]> {
   const orderedSeriesIds = seriesIds
     .map((id) => id.trim())
@@ -1388,16 +1393,20 @@ async function getPlayerVisibleDebateSeriesResultsForQuiz(
         .filter((item): item is NonNullable<typeof item> => Boolean(item));
       if (rounds.length === 0) return null;
       const summed = sumDebateSeriesOptionStats(
-        rounds.map((round) =>
-          round.optionStats.map((row) => ({
+        rounds.map((round) => {
+          const displayed = applyQuestionResultManualDisplay(
+            round,
+            tagCloudManualByQuestionId ?? {},
+          );
+          return displayed.optionStats.map((row) => ({
             optionId: row.optionId,
             text: row.text,
             count: row.count,
             imageUrl: row.imageUrl,
             color: row.color,
             isCorrect: row.isCorrect,
-          })),
-        ),
+          }));
+        }),
       );
       if (summed.length === 0) return null;
       const title = resolveDebateSeriesResultTitle(

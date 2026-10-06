@@ -276,12 +276,14 @@ export function pickProjectorPublicViewState(view: PublicViewState): PublicViewS
         mode,
         ...branding,
         ...pickViewKeys(resolved, DEBATE_SERIES_MODE_KEYS),
+        tagCloudManualByQuestionId: resolved.tagCloudManualByQuestionId,
       } as PublicViewState;
     case "debate_compare":
       return {
         mode,
         ...branding,
         ...pickViewKeys(resolved, DEBATE_COMPARE_MODE_KEYS),
+        tagCloudManualByQuestionId: resolved.tagCloudManualByQuestionId,
       } as PublicViewState;
     default:
       return { mode, ...branding } as unknown as PublicViewState;

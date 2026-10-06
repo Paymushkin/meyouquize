@@ -1,6 +1,9 @@
+import { alpha } from "@mui/material/styles";
 import { describe, expect, it } from "vitest";
 import {
   buildDebateSideBySideRows,
+  debateSegmentFillColor,
+  debateSegmentLabelColor,
   debateSideBySideSegmentColors,
   debateSideBySideSegmentWidths,
   formatDebatePercentLabel,
@@ -18,6 +21,19 @@ describe("buildDebateSideBySideRows", () => {
     expect(rows[0]?.percent).toBe(40);
     expect(rows[0]?.color).toBe("#112233");
     expect(rows[1]?.percentLabel).toBe("60%");
+  });
+
+  it("labels every option as 0% when there are no votes", () => {
+    const rows = buildDebateSideBySideRows(
+      [
+        { optionId: "er", text: "ЕР", count: 0, color: "#4caf50" },
+        { optionId: "kprf", text: "КПРФ", count: 0, color: "#c62828" },
+        { optionId: "ldpr", text: "ЛДПР", count: 0, color: "#111111" },
+      ],
+      false,
+    );
+    expect(rows.map((row) => row.percent)).toEqual([0, 0, 0]);
+    expect(rows.map((row) => row.percentLabel)).toEqual(["0%", "0%", "0%"]);
   });
 });
 
@@ -71,5 +87,30 @@ describe("debateSideBySideSegmentWidths", () => {
     expect(widths[0]).toBeCloseTo(100 / 3, 5);
     expect(widths[1]).toBeCloseTo(100 / 3, 5);
     expect(widths[2]).toBeCloseTo(100 / 3, 5);
+  });
+});
+
+describe("debateSegmentFillColor", () => {
+  const partyColors = ["#4caf50", "#c62828", "#111111"] as const;
+
+  it("keeps the full party color at 0%", () => {
+    for (const color of partyColors) {
+      expect(debateSegmentFillColor(color)).toBe(color);
+    }
+  });
+
+  it("does not fade or alpha-blend the fill when results are zero", () => {
+    const color = "#4caf50";
+    expect(debateSegmentFillColor(color)).not.toBe(alpha(color, 0.28));
+    expect(debateSegmentFillColor(color)).not.toMatch(/rgba/i);
+  });
+});
+
+describe("debateSegmentLabelColor", () => {
+  it("uses opaque contrast on the fill instead of translucent text", () => {
+    expect(debateSegmentLabelColor("#4caf50")).toBe("#111111");
+    expect(debateSegmentLabelColor("#c62828")).toBe("#ffffff");
+    expect(debateSegmentLabelColor("#111111")).toBe("#ffffff");
+    expect(debateSegmentLabelColor("#4caf50")).not.toMatch(/rgba/i);
   });
 });

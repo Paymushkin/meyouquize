@@ -216,6 +216,58 @@ describe("computeProjectorDerived", () => {
     expect(derived.debateSeriesRounds.map((r) => r.debateRoundIndex)).toEqual([0, 1]);
   });
 
+  it("includes per-round admin vote overrides in cumulative series totals", () => {
+    const derived = computeProjectorDerived({
+      ...initialProjectorSessionState,
+      questions: [
+        {
+          questionId: "r0",
+          text: "Раунд 1",
+          type: "single",
+          projectorDebateLayout: true,
+          debateSeriesId: "ser1",
+          debateRoundIndex: 0,
+          optionStats: [
+            { optionId: "a0", text: "A", count: 10, isCorrect: false, color: "#111111" },
+            { optionId: "b0", text: "B", count: 5, isCorrect: false, color: "#222222" },
+          ],
+        },
+        {
+          questionId: "r1",
+          text: "Раунд 2",
+          type: "single",
+          projectorDebateLayout: true,
+          debateSeriesId: "ser1",
+          debateRoundIndex: 1,
+          optionStats: [
+            { optionId: "a1", text: "A", count: 20, isCorrect: false, color: "#111111" },
+            { optionId: "b1", text: "B", count: 15, isCorrect: false, color: "#222222" },
+          ],
+        },
+      ],
+      view: {
+        ...DEFAULT_PUBLIC_VIEW_STATE,
+        mode: "debate_series",
+        debateSeriesId: "ser1",
+        debateSeriesView: "cumulative",
+        debateSeriesShowRounds: true,
+        questionId: "r1",
+        questionRevealStage: "results",
+        tagCloudManualByQuestionId: {
+          r0: {
+            hiddenTagTexts: [],
+            injectedTagWords: [],
+            tagCountOverrides: [],
+            optionVoteCountOverrides: [{ text: "a0", count: 3, mode: "delta" }],
+          },
+        },
+      },
+    });
+    expect(derived.selectedQuestion?.optionStats.map((r) => r.count)).toEqual([33, 20]);
+    expect(derived.debateSeriesRounds[0]?.optionStats.map((r) => r.count)).toEqual([13, 5]);
+    expect(derived.debateSeriesRounds[1]?.optionStats.map((r) => r.count)).toEqual([20, 15]);
+  });
+
   it("sums only selected past rounds when debateSeriesQuestionIds is set", () => {
     const derived = computeProjectorDerived({
       ...initialProjectorSessionState,

@@ -43,14 +43,21 @@ export function computeProjectorDerived(
   } = view;
   const speakerOnScreenCount = Math.max(0, Math.trunc(options?.speakerOnScreenCount ?? 0));
 
+  const questionsWithVoteOverrides = questions.map(
+    (question) => applyProjectorOptionVoteOverrides(question, view) ?? question,
+  );
+
   const rawSelectedQuestion =
     mode === "question" && publicQuestionId
       ? questions.find((q) => q.questionId === publicQuestionId)
       : mode === "debate_series"
-        ? resolveDebateSeriesProjectorQuestion(questions, view)
+        ? resolveDebateSeriesProjectorQuestion(
+            view.debateSeriesView === "round" ? questions : questionsWithVoteOverrides,
+            view,
+          )
         : undefined;
 
-  // Накопительный итог серии не смешиваем с ручными override одного раунда.
+  // Накопительный итог уже суммирует раунды с override; повторно не применяем по id последнего раунда.
   const selectedQuestion =
     mode === "debate_series" && view.debateSeriesView !== "round"
       ? rawSelectedQuestion

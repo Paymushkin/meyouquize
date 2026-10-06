@@ -96,6 +96,27 @@ describe("projectorPublicViewChanged", () => {
     expect(pickProjectorPublicViewState(next).debateSeriesId).toBe("ser1");
   });
 
+  it("returns true when debate series option vote overrides change", () => {
+    const prev = normalizePublicViewState({
+      mode: "debate_series",
+      questionId: "q1",
+      debateSeriesId: "ser1",
+      debateSeriesView: "cumulative",
+      tagCloudManualByQuestionId: {},
+    });
+    const next = mergePublicViewState(prev, {
+      tagCloudManualByQuestionId: {
+        q1: {
+          hiddenTagTexts: [],
+          injectedTagWords: [],
+          tagCountOverrides: [],
+          optionVoteCountOverrides: [{ text: "opt-1", count: 5, mode: "delta" }],
+        },
+      },
+    });
+    expect(projectorPublicViewChanged(prev, next)).toBe(true);
+  });
+
   it("returns false for identical views", () => {
     const view = normalizePublicViewState(DEFAULT_PUBLIC_VIEW_STATE);
     expect(projectorPublicViewChanged(view, view)).toBe(false);

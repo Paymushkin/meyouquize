@@ -48,6 +48,16 @@ export function debateSideBySideSegmentColors(
   return withDebateOptionColors(rows).map((row) => row.color);
 }
 
+/** Заливка сегмента — полный цвет партии, в том числе при 0%. */
+export function debateSegmentFillColor(color: string): string {
+  return color;
+}
+
+/** Текст на сегменте контрастен к полной заливке, без полупрозрачности. */
+export function debateSegmentLabelColor(color: string): string {
+  return contrastingTextOnColor(color);
+}
+
 export function ProjectorDebateSideBySideChart(props: ProjectorDebateSideBySideChartProps) {
   const {
     rows,
@@ -119,7 +129,6 @@ export function ProjectorDebateSideBySideChart(props: ProjectorDebateSideBySideC
   }
 
   const totalPercent = rows.reduce((sum, row) => sum + row.percent, 0);
-  const hasVotes = totalPercent > 0;
   const widths = debateSideBySideSegmentWidths(
     rows.map((row) => row.percent),
     totalPercent,
@@ -148,10 +157,8 @@ export function ProjectorDebateSideBySideChart(props: ProjectorDebateSideBySideC
         const width = widths[index] ?? 0;
         const optionLabel = row.text.trim();
         const showName = !barOnly && optionLabel.length > 0;
-        const fillColor = hasVotes ? color : alpha(color, 0.28);
-        const labelColor = hasVotes
-          ? contrastingTextOnColor(color)
-          : alpha(voteOptionTextColor, 0.9);
+        const fillColor = debateSegmentFillColor(color);
+        const labelColor = debateSegmentLabelColor(color);
         const compactPercent = width < 14;
         const compactName = width < 22;
         return (
@@ -175,7 +182,7 @@ export function ProjectorDebateSideBySideChart(props: ProjectorDebateSideBySideC
               px: barOnly ? 0 : compactPercent ? 0.35 : 0.75,
               borderRight:
                 index < rows.length - 1
-                  ? `${compact ? 1.5 : 2}px solid ${alpha(voteOptionBorderColor, hasVotes ? 0.55 : 0.35)}`
+                  ? `${compact ? 1.5 : 2}px solid ${alpha(voteOptionBorderColor, 0.55)}`
                   : "none",
               boxSizing: "border-box",
               overflow: "hidden",
@@ -199,7 +206,7 @@ export function ProjectorDebateSideBySideChart(props: ProjectorDebateSideBySideC
                         },
                   lineHeight: 1.05,
                   textAlign: "center",
-                  textShadow: hasVotes ? "0 1px 2px rgba(0,0,0,0.18)" : "none",
+                  textShadow: "0 1px 2px rgba(0,0,0,0.18)",
                   whiteSpace: "nowrap",
                 }}
               >

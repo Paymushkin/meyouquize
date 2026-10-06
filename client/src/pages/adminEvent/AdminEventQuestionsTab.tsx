@@ -63,6 +63,7 @@ import { socket } from "../../socket";
 import type { FeedbackFormConfig } from "../../types/feedback";
 import type { QuestionResult } from "../../admin/adminEventTypes";
 import {
+  applyOptionVoteCountOverrides,
   contrastingTextOnColor,
   debateDefaultOptionColor,
   resolveDebateSeriesResultTitle,
@@ -312,7 +313,7 @@ function DebateSeriesCumulativePreview(props: {
     rounds.map(({ q }) => {
       const colored = withDebateOptionColors(q.options ?? []);
       const live = q.id ? resultById.get(q.id) : undefined;
-      return colored.map((opt, slot) => {
+      const rows = colored.map((opt, slot) => {
         const liveRow =
           (opt.id ? live?.optionStats.find((s) => s.optionId === opt.id) : undefined) ??
           live?.optionStats[slot];
@@ -324,6 +325,7 @@ function DebateSeriesCumulativePreview(props: {
           isCorrect: Boolean(opt.isCorrect),
         };
       });
+      return applyOptionVoteCountOverrides(rows, q.optionVoteCountOverrides ?? []);
     }),
   );
   const total = summed.reduce((acc, row) => acc + Math.max(0, row.count), 0);
