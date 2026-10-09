@@ -1,11 +1,17 @@
 import type { PublicViewPayload } from "@meyouquize/shared";
 import type { PublicViewSetPatch } from "../../publicViewContract";
-import { useCallback, useRef, useState, type Dispatch, type SetStateAction } from "react";
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type Dispatch,
+  type SetStateAction,
+} from "react";
 import type { ReportModuleId } from "../../publicViewContract";
+import { emitAdminPublicViewPatchNow } from "../publicView/emitAdminPublicViewSet";
 import { DEFAULT_REPORT_MODULES, normalizeReportModulesForAdmin } from "./adminReportModules";
 import type { RandomizerHistoryEntry } from "../randomizer/randomizerLogic";
-
-type EmitPatch = (patch: PublicViewSetPatch) => void;
 
 type QuizQuestionGroup = {
   subQuizId: string;
@@ -22,15 +28,30 @@ type ToggleContext = {
 };
 
 type Params = {
-  emitPublicViewPatch: EmitPatch;
+  quizId: string;
   onSpeakerQuestionIdsFromView?: (ids: unknown) => void;
 };
 
-export function useAdminReport({ emitPublicViewPatch, onSpeakerQuestionIdsFromView }: Params) {
+export function useAdminReport({ quizId, onSpeakerQuestionIdsFromView }: Params) {
   const onSpeakerQuestionIdsFromViewRef = useRef(onSpeakerQuestionIdsFromView);
   onSpeakerQuestionIdsFromViewRef.current = onSpeakerQuestionIdsFromView;
+  const quizIdRef = useRef(quizId);
+  quizIdRef.current = quizId;
+  const titleSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const [reportTitle, setReportTitle] = useState("Отчет мероприятия");
+  const emitReportPatch = useCallback((patch: PublicViewSetPatch) => {
+    const id = quizIdRef.current;
+    if (!id) return;
+    emitAdminPublicViewPatchNow({ quizId: id, ...patch });
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (titleSaveTimerRef.current) clearTimeout(titleSaveTimerRef.current);
+    };
+  }, []);
+
+  const [reportTitle, setReportTitleState] = useState("Отчет мероприятия");
   const [reportModules, setReportModules] = useState<ReportModuleId[]>(DEFAULT_REPORT_MODULES);
   const [reportVoteQuestionIds, setReportVoteQuestionIds] = useState<string[]>([]);
   const [reportQuizQuestionIds, setReportQuizQuestionIds] = useState<string[]>([]);
@@ -59,9 +80,29 @@ export function useAdminReport({ emitPublicViewPatch, onSpeakerQuestionIdsFromVi
     toggleContextRef.current = next;
   }, []);
 
+  const setReportTitle = useCallback(
+    (next: string) => {
+      setReportTitleState(next);
+      if (titleSaveTimerRef.current) clearTimeout(titleSaveTimerRef.current);
+      titleSaveTimerRef.current = setTimeout(() => {
+        titleSaveTimerRef.current = null;
+        emitReportPatch({ reportTitle: next });
+      }, 200);
+    },
+    [emitReportPatch],
+  );
+
+  const commitReportTitle = useCallback(() => {
+    if (titleSaveTimerRef.current) {
+      clearTimeout(titleSaveTimerRef.current);
+      titleSaveTimerRef.current = null;
+    }
+    emitReportPatch({ reportTitle });
+  }, [emitReportPatch, reportTitle]);
+
   const applyFromPublicView = useCallback((payload: PublicViewPayload) => {
     if (typeof payload.reportTitle === "string") {
-      setReportTitle(payload.reportTitle);
+      setReportTitleState(payload.reportTitle);
     }
     if (Array.isArray(payload.reportModules)) {
       setReportModules(normalizeReportModulesForAdmin(payload.reportModules));
@@ -132,11 +173,11 @@ export function useAdminReport({ emitPublicViewPatch, onSpeakerQuestionIdsFromVi
             ? prev
             : [...prev, moduleId]
           : prev.filter((id) => id !== moduleId);
-        emitPublicViewPatch({ reportModules: next });
+        emitReportPatch({ reportModules: next });
         return next;
       });
     },
-    [emitPublicViewPatch],
+    [emitReportPatch],
   );
 
   const moveReportModule = useCallback(
@@ -150,11 +191,11 @@ export function useAdminReport({ emitPublicViewPatch, onSpeakerQuestionIdsFromVi
         const temp = next[index];
         next[index] = next[nextIndex]!;
         next[nextIndex] = temp!;
-        emitPublicViewPatch({ reportModules: next });
+        emitReportPatch({ reportModules: next });
         return next;
       });
     },
-    [emitPublicViewPatch],
+    [emitReportPatch],
   );
 
   const toggleReportVoteQuestion = useCallback(
@@ -165,11 +206,11 @@ export function useAdminReport({ emitPublicViewPatch, onSpeakerQuestionIdsFromVi
         const next = enabled
           ? Array.from(new Set([...current, questionId]))
           : current.filter((id) => id !== questionId);
-        emitPublicViewPatch({ reportVoteQuestionIds: next });
+        emitReportPatch({ reportVoteQuestionIds: next });
         return next;
       });
     },
-    [emitPublicViewPatch],
+    [emitReportPatch],
   );
 
   const toggleReportQuizQuestion = useCallback(
@@ -196,7 +237,7 @@ export function useAdminReport({ emitPublicViewPatch, onSpeakerQuestionIdsFromVi
               prevSubQuizIds.length === 0 ? groups.map((group) => group.subQuizId) : prevSubQuizIds;
             return enabled ? Array.from(new Set([...base, parentSubQuizId])) : base;
           })();
-          emitPublicViewPatch({
+          emitReportPatch({
             reportQuizQuestionIds: nextQuestions,
             reportQuizSubQuizIds: nextSubQuizIds,
           });
@@ -206,7 +247,7 @@ export function useAdminReport({ emitPublicViewPatch, onSpeakerQuestionIdsFromVi
         return nextQuestions;
       });
     },
-    [emitPublicViewPatch],
+    [emitReportPatch],
   );
 
   const toggleReportQuiz = useCallback(
@@ -240,7 +281,7 @@ export function useAdminReport({ emitPublicViewPatch, onSpeakerQuestionIdsFromVi
                 ? groups.map((item) => item.subQuizId)
                 : prevSubQuizIds
               ).filter((id) => id !== subQuizId);
-          emitPublicViewPatch({
+          emitReportPatch({
             reportQuizQuestionIds: nextQuestions,
             reportQuizSubQuizIds: nextSubQuizIds,
           });
@@ -250,7 +291,7 @@ export function useAdminReport({ emitPublicViewPatch, onSpeakerQuestionIdsFromVi
         return nextQuestions;
       });
     },
-    [emitPublicViewPatch],
+    [emitReportPatch],
   );
 
   const toggleReportSubQuizParticipantTable = useCallback(
@@ -261,11 +302,11 @@ export function useAdminReport({ emitPublicViewPatch, onSpeakerQuestionIdsFromVi
         const next = enabled
           ? base.filter((id) => id !== subQuizId)
           : Array.from(new Set([...base, subQuizId]));
-        emitPublicViewPatch({ reportSubQuizHideParticipantTableIds: next });
+        emitReportPatch({ reportSubQuizHideParticipantTableIds: next });
         return next;
       });
     },
-    [emitPublicViewPatch],
+    [emitReportPatch],
   );
 
   const allReportRandomizerRunIds = useCallback(() => {
@@ -283,11 +324,11 @@ export function useAdminReport({ emitPublicViewPatch, onSpeakerQuestionIdsFromVi
         const next = enabled
           ? Array.from(new Set([...current, runId]))
           : current.filter((id) => id !== runId);
-        emitPublicViewPatch({ reportRandomizerRunIds: next });
+        emitReportPatch({ reportRandomizerRunIds: next });
         return next;
       });
     },
-    [allReportRandomizerRunIds, emitPublicViewPatch],
+    [allReportRandomizerRunIds, emitReportPatch],
   );
 
   const toggleReportReactionsWidget = useCallback(
@@ -298,11 +339,11 @@ export function useAdminReport({ emitPublicViewPatch, onSpeakerQuestionIdsFromVi
         const next = enabled
           ? Array.from(new Set([...current, widgetId]))
           : current.filter((id) => id !== widgetId);
-        emitPublicViewPatch({ reportReactionsWidgetIds: next });
+        emitReportPatch({ reportReactionsWidgetIds: next });
         return next;
       });
     },
-    [emitPublicViewPatch],
+    [emitReportPatch],
   );
 
   const toggleReportFeedbackForm = useCallback(
@@ -313,25 +354,26 @@ export function useAdminReport({ emitPublicViewPatch, onSpeakerQuestionIdsFromVi
         const next = enabled
           ? Array.from(new Set([...current, formId]))
           : current.filter((id) => id !== formId);
-        emitPublicViewPatch({ reportFeedbackFormIds: next });
+        emitReportPatch({ reportFeedbackFormIds: next });
         return next;
       });
     },
-    [emitPublicViewPatch],
+    [emitReportPatch],
   );
 
   const toggleReportPublished = useCallback(
     (next: boolean, setMessage: (message: string) => void) => {
       setReportPublished(next);
-      emitPublicViewPatch({ reportPublished: next });
+      emitReportPatch({ reportPublished: next });
       setMessage(next ? "Публичный отчет опубликован" : "Публичный отчет скрыт");
     },
-    [emitPublicViewPatch],
+    [emitReportPatch],
   );
 
   return {
     reportTitle,
     setReportTitle,
+    commitReportTitle,
     reportModules,
     reportVoteQuestionIds,
     reportQuizQuestionIds,

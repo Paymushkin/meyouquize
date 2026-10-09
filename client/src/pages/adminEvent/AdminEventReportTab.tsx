@@ -4,7 +4,6 @@ import type { useAdminRandomizer } from "../../features/admin/useAdminRandomizer
 import type { useAdminReactions } from "../../features/admin/useAdminReactions";
 import type { useAdminReport } from "../../features/admin/useAdminReport";
 import type { useAdminSpeakerQuestions } from "../../features/admin/useAdminSpeakerQuestions";
-import type { PublicViewSetPatch } from "../../publicViewContract";
 
 type QuizQuestionGroup = {
   subQuizId: string;
@@ -22,7 +21,6 @@ type Props = {
   speakerQuestions: ReturnType<typeof useAdminSpeakerQuestions>;
   availableQuizQuestions: QuizQuestionGroup[];
   availableVoteQuestions: VoteQuestion[];
-  emitPublicViewPatch: (patch: PublicViewSetPatch) => void;
   setMessage: (message: string) => void;
 };
 
@@ -34,14 +32,13 @@ export function AdminEventReportTab({
   speakerQuestions,
   availableQuizQuestions,
   availableVoteQuestions,
-  emitPublicViewPatch,
   setMessage,
 }: Props) {
   return (
     <AdminReportSection
       reportTitle={adminReport.reportTitle}
       onReportTitleChange={adminReport.setReportTitle}
-      onReportTitleCommit={() => emitPublicViewPatch({ reportTitle: adminReport.reportTitle })}
+      onReportTitleCommit={adminReport.commitReportTitle}
       reportModules={adminReport.reportModules}
       onToggleModule={adminReport.toggleReportModule}
       onMoveModule={adminReport.moveReportModule}

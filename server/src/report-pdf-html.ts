@@ -266,8 +266,8 @@ export function buildReportPdfHtml(
   };
   const primary = b.brandPrimaryColor?.trim() || "#7c5acb";
   const accent = b.brandAccentColor?.trim() || "#1976d2";
-  const bg = b.brandBodyBackgroundColor?.trim() || "#0f1d2a";
-  const surface = b.brandSurfaceColor?.trim() || "#1a2634";
+  const surface = b.brandSurfaceColor?.trim() || "#ffffff";
+  const bg = surface;
   const text = b.brandTextColor?.trim() || "#ffffff";
   const textMuted = `${text}b8`;
   const generatedAt = new Date(report.generatedAt).toLocaleString("ru-RU");
@@ -347,7 +347,7 @@ export function buildReportPdfHtml(
     .banners-table th, .banners-table td { border: 1px solid color-mix(in srgb, var(--text) 16%, transparent); padding: 8px; text-align: left; vertical-align: middle; }
     .banners-table th:last-child, .banners-table td.banner-clicks { text-align: right; width: 72px; }
     .banner-thumb { display: block; max-height: 56px; max-width: 160px; object-fit: contain; border-radius: 6px; }
-    .banner-link { color: var(--accent); word-break: break-word; }
+    .banner-link { color: var(--text) !important; word-break: break-word; text-decoration: underline; }
   </style>
 </head>
 <body data-report-pdf-ready="1">

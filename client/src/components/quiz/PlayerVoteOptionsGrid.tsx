@@ -62,7 +62,8 @@ function buildOptionButtonSx(
       border: "2px solid",
       borderColor: accentColor,
       bgcolor: isSelected ? accentColor : "transparent",
-      color: isSelected ? textOnAccent : "#ffffff",
+      // Невыбранный: тот же цвет, что и рамка; выбранный — контраст на заливке.
+      color: isSelected ? textOnAccent : accentColor,
       "&:hover": {
         bgcolor: isSelected ? alpha(accentColor, 0.88) : "rgba(255,255,255,0.06)",
         borderColor: accentColor,
@@ -104,28 +105,38 @@ export function PlayerVoteOptionsGrid(props: Props) {
   } = props;
   const hasOptionImages = questionHasOptionImages(options);
   const optionColors = resolvePlayerVoteOptionColors(options, coloredByOption);
+  const hugContentLayout = coloredByOption && !hasOptionImages;
 
   return (
     <Box
-      sx={{
-        width: "100%",
-        display: "grid",
-        gridTemplateColumns: playerOptionImageGridTemplate(hasOptionImages),
-        gap: 1.25,
-        alignItems: "stretch",
-      }}
+      sx={
+        hugContentLayout
+          ? {
+              width: "100%",
+              display: "flex",
+              flexWrap: "wrap",
+              gap: 1.25,
+              justifyContent: "center",
+              alignItems: "center",
+            }
+          : {
+              width: "100%",
+              display: "grid",
+              gridTemplateColumns: playerOptionImageGridTemplate(hasOptionImages),
+              gap: 1.25,
+              alignItems: "stretch",
+            }
+      }
     >
       {options.map((option, optionIndex) => {
         const isSelected = displayedSelected.includes(option.id);
-        const spanFullWidth = shouldSpanFullWidthInOptionGrid(
-          hasOptionImages,
-          options.length,
-          optionIndex,
-        );
+        const spanFullWidth =
+          !hugContentLayout &&
+          shouldSpanFullWidthInOptionGrid(hasOptionImages, options.length, optionIndex);
         return (
           <Button
             key={option.id}
-            fullWidth
+            fullWidth={!hugContentLayout}
             variant="outlined"
             color="inherit"
             sx={{
@@ -136,6 +147,15 @@ export function PlayerVoteOptionsGrid(props: Props) {
                 hasOptionImages,
                 optionColors[optionIndex],
               ),
+              ...(hugContentLayout
+                ? {
+                    width: "auto",
+                    minWidth: 0,
+                    maxWidth: "100%",
+                    justifyContent: "center",
+                    textAlign: "center",
+                  }
+                : {}),
               ...(spanFullWidth ? { gridColumn: "1 / -1" } : {}),
             }}
             disabled={answeredCurrentQuestion}
@@ -146,6 +166,8 @@ export function PlayerVoteOptionsGrid(props: Props) {
               imageUrl={option.imageUrl}
               layout={hasOptionImages ? "card" : "inline"}
               compact={hasOptionImages}
+              fillWidth={!hugContentLayout}
+              textSx={hugContentLayout ? { textAlign: "center" } : undefined}
             />
           </Button>
         );

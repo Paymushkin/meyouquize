@@ -31,7 +31,6 @@ import {
   type ReportModuleId,
 } from "@meyouquize/shared";
 import { API_BASE } from "../config";
-import { buildBrandBackground } from "../features/branding/brandVisual";
 import { buildReportTheme } from "../features/report/buildReportTheme";
 import { resolveClientAssetUrl } from "../utils/resolveClientAssetUrl";
 import { useBrandFont } from "../hooks/useBrandFont";
@@ -595,8 +594,9 @@ export function PublicReportPage() {
   const fontFamily = payload?.branding.brandFontFamily ?? "Jost, Arial, sans-serif";
   const logoUrl =
     resolveClientAssetUrl(payload?.branding.brandLogoUrl ?? "") || DEFAULT_REPORT_LOGO_URL;
-  const bgUrl = resolveClientAssetUrl(payload?.branding.brandProjectorBackgroundImageUrl ?? "");
   const brandFontUrl = resolveClientAssetUrl(payload?.branding.brandFontUrl ?? "");
+  /** Фон отчёта — сплошной Surface, без картинки проектора. */
+  const reportBodyBackground = payload?.branding.brandSurfaceColor?.trim() || "#ffffff";
   const pdfRobotoUrl = "/fonts/roboto/Roboto-VariableFont_wdth,wght.ttf";
   useBrandFont(
     isPdfMode ? "Roboto, Arial, sans-serif" : fontFamily,
@@ -613,24 +613,24 @@ export function PublicReportPage() {
   }, [payload?.title]);
 
   useBodyBrandBackground({
-    backgroundColor: payload?.branding.brandBodyBackgroundColor || "#0f1d2a",
+    backgroundColor: reportBodyBackground,
   });
 
-  const backgroundSx = useMemo(() => buildBrandBackground({ backgroundImageUrl: bgUrl }), [bgUrl]);
-  const reportTheme = useMemo(
-    () =>
-      buildReportTheme(
-        payload?.branding ?? {
-          brandPrimaryColor: "#7c5acb",
-          brandAccentColor: "#1976d2",
-          brandSurfaceColor: "#1a2634",
-          brandTextColor: "#ffffff",
-          brandFontFamily: fontFamily,
-          brandBodyBackgroundColor: "#0f1d2a",
-        },
-      ),
-    [payload, fontFamily],
-  );
+  const reportTheme = useMemo(() => {
+    const branding = payload?.branding ?? {
+      brandPrimaryColor: "#7c5acb",
+      brandAccentColor: "#1976d2",
+      brandSurfaceColor: "#ffffff",
+      brandTextColor: "#1f1f1f",
+      brandFontFamily: fontFamily,
+      brandBodyBackgroundColor: "#ffffff",
+    };
+    const pageBg = branding.brandSurfaceColor?.trim() || branding.brandBodyBackgroundColor;
+    return buildReportTheme({
+      ...branding,
+      brandBodyBackgroundColor: pageBg,
+    });
+  }, [payload, fontFamily]);
 
   useEffect(() => {
     if (!isPdfMode || !payload) return;
@@ -640,7 +640,7 @@ export function PublicReportPage() {
       @page { size: A4; margin: 0; }
       html, body, #root { margin: 0 !important; padding: 0 !important; }
       body {
-        background: ${payload.branding.brandBodyBackgroundColor || "#0f1d2a"} !important;
+        background: ${payload.branding.brandSurfaceColor?.trim() || "#ffffff"} !important;
         background-image: none !important;
         font-family: "Roboto", ${fontFamily} !important;
         -webkit-print-color-adjust: exact;
@@ -879,7 +879,16 @@ export function PublicReportPage() {
                           </TableCell>
                           <TableCell sx={{ maxWidth: 320, wordBreak: "break-word" }}>
                             {linkUrl ? (
-                              <Link href={linkUrl} target="_blank" rel="noopener noreferrer">
+                              <Link
+                                href={linkUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                underline="always"
+                                color="inherit"
+                                sx={{
+                                  color: payload!.branding.brandTextColor?.trim() || "text.primary",
+                                }}
+                              >
                                 {linkUrl}
                               </Link>
                             ) : (
@@ -1370,11 +1379,11 @@ export function PublicReportPage() {
         maxWidth={false}
         disableGutters
         sx={{
-          ...backgroundSx,
           minHeight: "100dvh",
           py: isPdfMode ? 0 : 4,
           px: isPdfMode ? 0 : { xs: 2, md: 4 },
-          backgroundColor: payload!.branding.brandBodyBackgroundColor,
+          backgroundColor: reportBodyBackground,
+          backgroundImage: "none",
           fontFamily,
         }}
       >

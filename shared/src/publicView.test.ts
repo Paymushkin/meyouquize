@@ -241,8 +241,8 @@ describe("mergePublicViewState", () => {
     expect(next.hiddenTagTexts).toEqual(["скрытый"]);
   });
 
-  it("backfills banners_summary for legacy report module lists", () => {
-    const state = normalizePublicViewState({
+  it("keeps explicit report module lists without re-adding banners_summary", () => {
+    const legacy = normalizePublicViewState({
       reportModules: [
         "event_header",
         "participation_summary",
@@ -253,15 +253,30 @@ describe("mergePublicViewState", () => {
         "speaker_questions_summary",
       ],
     });
-    expect(state.reportModules).toEqual([
+    expect(legacy.reportModules).not.toContain("banners_summary");
+
+    const optedOut = normalizePublicViewState({
+      reportModules: [
+        "event_header",
+        "participation_summary",
+        "quiz_results",
+        "vote_results",
+        "reactions_summary",
+        "feedback_summary",
+        "randomizer_summary",
+        "speaker_questions_summary",
+      ],
+    });
+    expect(optedOut.reportModules).not.toContain("banners_summary");
+    expect(optedOut.reportModules).toEqual([
       "event_header",
       "participation_summary",
       "quiz_results",
       "vote_results",
       "reactions_summary",
+      "feedback_summary",
       "randomizer_summary",
       "speaker_questions_summary",
-      "banners_summary",
     ]);
   });
 });

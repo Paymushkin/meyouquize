@@ -53,7 +53,7 @@ describe("buildReportPdfHtml", () => {
   it("embeds branding colors and cyrillic text", () => {
     const html = buildReportPdfHtml(baseReport);
     expect(html).toContain("#7c5acb");
-    expect(html).toContain("#0f1d2a");
+    expect(html).toContain("--bg: #1a2634");
     expect(html).toContain("Отчёт");
     expect(html).toContain("Хорошо");
     expect(html).toContain('data-report-pdf-ready="1"');

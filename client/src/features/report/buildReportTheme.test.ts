@@ -15,5 +15,6 @@ describe("buildReportTheme", () => {
     expect(theme.palette.secondary.main).toBe("#00aaff");
     expect(theme.palette.background.default).toBe("#111111");
     expect(theme.palette.text.primary).toBe("#f5f5f5");
+    expect(theme.components?.MuiLink?.defaultProps?.color).toBe("inherit");
   });
 });

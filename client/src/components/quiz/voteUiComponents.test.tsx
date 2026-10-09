@@ -54,6 +54,28 @@ describe("PlayerVoteOptionsGrid", () => {
     );
     expect(colors).toEqual(["#00ff00", "#c62828", "#90a4ae"]);
   });
+
+  it("hugs debate option labels and matches text color to border", () => {
+    render(
+      <PlayerVoteOptionsGrid
+        options={[
+          { id: "a", text: "Алармизм", color: "#c62828" },
+          { id: "b", text: "Оптимизм", color: "#2e7d32" },
+        ]}
+        coloredByOption
+        displayedSelected={[]}
+        answeredCurrentQuestion={false}
+        brandPrimaryColor="#7c5acb"
+        playerVoteOptionTextColor="#ffffff"
+        onToggleOption={vi.fn()}
+      />,
+    );
+
+    const button = screen.getByRole("button", { name: "Алармизм" });
+    expect(button.className).not.toMatch(/MuiButton-fullWidth/);
+    expect(getComputedStyle(button).color).toBe("rgb(198, 40, 40)");
+    expect(getComputedStyle(button).borderColor).toBe("rgb(198, 40, 40)");
+  });
 });
 
 describe("VoteResultOptionRow", () => {

@@ -111,7 +111,8 @@ export function schedulePublicViewSocketEmit(emitFn: () => void, payloadKey: str
   }, DEBOUNCE_MS);
 }
 
-export function flushPublicViewSocketEmitForTests() {
+/** Сбросить debounce и сразу отправить отложенный emit (если был). */
+export function flushPublicViewSocketEmit() {
   if (debounceTimer) {
     clearTimeout(debounceTimer);
     debounceTimer = null;
@@ -120,4 +121,15 @@ export function flushPublicViewSocketEmitForTests() {
   const key = pendingKey;
   pendingEmit = null;
   if (fn) runEmit(fn, key);
+}
+
+/** @deprecated используйте flushPublicViewSocketEmit */
+export function flushPublicViewSocketEmitForTests() {
+  flushPublicViewSocketEmit();
+}
+
+/** Немедленный emit без coalesce с чужим pending (настройки отчёта и т.п.). */
+export function schedulePublicViewSocketEmitImmediate(emitFn: () => void, payloadKey: string) {
+  flushPublicViewSocketEmit();
+  runEmit(emitFn, payloadKey);
 }

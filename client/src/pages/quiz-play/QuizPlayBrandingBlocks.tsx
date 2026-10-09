@@ -3,6 +3,7 @@ import {
   PHOTO_WALL_TILE_ID,
   PROGRAM_TILE_ID,
   SPEAKER_TILE_ID,
+  contrastingTextOnColor,
   ruBallLabel,
 } from "@meyouquize/shared";
 import { isQuizResultsTileId } from "../../publicViewContract";
@@ -837,51 +838,69 @@ export function ReactionsDock(props: ReactionsDockProps) {
         useFlexGap
         sx={{ overflowX: "visible", pb: 0.25 }}
       >
-        {reactions.map((item) => (
-          <Button
-            key={item.type}
-            variant="outlined"
-            color="primary"
-            size="large"
-            onClick={(event) => {
-              onToggleReaction(item.type);
-              spawnBurstsFromButton(item.emoji, event.currentTarget);
-            }}
-            sx={{
-              bgcolor: "rgba(0, 0, 0, 0.52)",
-              borderWidth: 2,
-              borderColor: brandPrimaryColor,
-              "&:hover": {
-                bgcolor: "rgba(0, 0, 0, 0.62)",
+        {reactions.map((item) => {
+          // Эмодзи — квадрат 76×76; длинный текст — ширина по контенту (min = тот же размер).
+          const isShortGlyph = Array.from(item.emoji.trim()).length <= 2;
+          return (
+            <Button
+              key={item.type}
+              variant="outlined"
+              color="inherit"
+              size="large"
+              onClick={(event) => {
+                onToggleReaction(item.type);
+                spawnBurstsFromButton(item.emoji, event.currentTarget);
+              }}
+              sx={{
+                bgcolor: "rgba(0, 0, 0, 0.52)",
                 borderWidth: 2,
                 borderColor: brandPrimaryColor,
-              },
-              "&:active": {
-                bgcolor: brandPrimaryColor,
-                borderColor: brandPrimaryColor,
-              },
-              "&.Mui-focusVisible": {
-                bgcolor: "rgba(0, 0, 0, 0.52)",
-                borderColor: brandPrimaryColor,
-              },
-              ".MuiTouchRipple-child": {
-                backgroundColor: brandPrimaryColor,
-              },
-              textTransform: "none",
-              width: pcq(76, 86),
-              minWidth: pcq(76, 86),
-              height: pcq(76, 86),
-              minHeight: pcq(76, 86),
-              p: 0,
-              fontWeight: 700,
-              borderRadius: 1.5,
-            }}
-          >
-            <Box component="span" sx={{ fontSize: pcq("1.8rem", "2rem"), lineHeight: 1 }}>
-              {item.emoji}
-            </Box>
-          </Button>
-        ))}
+                color: brandPrimaryColor,
+                "&:hover": {
+                  bgcolor: "rgba(0, 0, 0, 0.62)",
+                  borderWidth: 2,
+                  borderColor: brandPrimaryColor,
+                  color: brandPrimaryColor,
+                },
+                "&:active": {
+                  bgcolor: brandPrimaryColor,
+                  borderColor: brandPrimaryColor,
+                  color: contrastingTextOnColor(brandPrimaryColor),
+                },
+                "&.Mui-focusVisible": {
+                  bgcolor: "rgba(0, 0, 0, 0.52)",
+                  borderColor: brandPrimaryColor,
+                  color: brandPrimaryColor,
+                },
+                ".MuiTouchRipple-child": {
+                  backgroundColor: brandPrimaryColor,
+                },
+                textTransform: "none",
+                minWidth: pcq(76, 86),
+                minHeight: pcq(76, 86),
+                width: "auto",
+                height: "auto",
+                px: isShortGlyph ? 0 : pcq(1.75, 2.25),
+                py: isShortGlyph ? 0 : pcq(1.25, 1.5),
+                fontWeight: 700,
+                borderRadius: 1.5,
+              }}
+            >
+              <Box
+                component="span"
+                sx={{
+                  fontSize: isShortGlyph ? pcq("1.8rem", "2rem") : pcq("0.95rem", "1.05rem"),
+                  lineHeight: isShortGlyph ? 1 : 1.2,
+                  whiteSpace: "nowrap",
+                  maxWidth: "100%",
+                  color: "inherit",
+                }}
+              >
+                {item.emoji}
+              </Box>
+            </Button>
+          );
+        })}
       </Stack>
     </Box>
   );

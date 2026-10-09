@@ -17,10 +17,12 @@ type Props = {
   layout?: OptionAnswerLayout;
   textSx?: Record<string, unknown>;
   compact?: boolean;
+  /** false — контент по ширине текста (кнопки-пилюли дебатов). */
+  fillWidth?: boolean;
 };
 
 export function OptionAnswerContent(props: Props) {
-  const { text, imageUrl, layout = "inline", textSx, compact = false } = props;
+  const { text, imageUrl, layout = "inline", textSx, compact = false, fillWidth = true } = props;
   const hasImage = optionHasImage(imageUrl);
   const hasText = Boolean(optionTextTrimmed(text));
   const displayText = optionText(text);
@@ -56,7 +58,12 @@ export function OptionAnswerContent(props: Props) {
   }
 
   return (
-    <Stack direction="row" spacing={1.25} alignItems="center" sx={{ width: "100%", minWidth: 0 }}>
+    <Stack
+      direction="row"
+      spacing={1.25}
+      alignItems="center"
+      sx={{ width: fillWidth ? "100%" : "auto", minWidth: 0 }}
+    >
       {hasImage ? (
         <QuestionAssetImage
           url={imageUrl}
@@ -69,7 +76,16 @@ export function OptionAnswerContent(props: Props) {
         />
       ) : null}
       {hasText ? (
-        <Box sx={{ minWidth: 0, flex: 1, whiteSpace: "pre-line", ...textSx }}>{displayText}</Box>
+        <Box
+          sx={{
+            minWidth: 0,
+            flex: fillWidth ? 1 : "none",
+            whiteSpace: "pre-line",
+            ...textSx,
+          }}
+        >
+          {displayText}
+        </Box>
       ) : null}
     </Stack>
   );

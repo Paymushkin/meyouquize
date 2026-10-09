@@ -1280,19 +1280,12 @@ function sanitizeRandomizerHistory(
     .slice(0, 200);
 }
 
-/** Новые модули отчёта для событий, сохранённых до их появления в дефолте. */
-const REPORT_MODULE_BACKFILL: ReportModuleId[] = ["banners_summary"];
-
+/** Сохраняем явный список модулей как есть (без авто-добавления выключенных). */
 export function backfillReportModules(
   modules: ReportModuleId[],
-  fallback: ReportModuleId[],
+  _fallback?: ReportModuleId[],
 ): ReportModuleId[] {
-  let result = [...modules];
-  for (const moduleId of REPORT_MODULE_BACKFILL) {
-    if (!fallback.includes(moduleId) || result.includes(moduleId)) continue;
-    result = [...result, moduleId];
-  }
-  return result.slice(0, 20);
+  return modules.slice(0, 20);
 }
 
 function sanitizeReportModules(
@@ -1323,7 +1316,7 @@ function sanitizeReportModules(
     if (!next.includes(item)) next.push(item);
   }
   if (next.length === 0) return [...fallback];
-  return backfillReportModules(next, fallback);
+  return next.slice(0, 20);
 }
 
 export function normalizePublicViewState(

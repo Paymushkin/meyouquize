@@ -344,7 +344,7 @@ export function AdminEventPage() {
   speakerReportIdsApplierRef.current = speakerQuestions.applyReportSpeakerQuestionIds;
 
   const adminReport = useAdminReport({
-    emitPublicViewPatch: (patch) => emitPublicViewPatchRef.current(patch),
+    quizId,
     onSpeakerQuestionIdsFromView: (ids) => speakerReportIdsApplierRef.current(ids),
   });
 
@@ -1870,7 +1870,6 @@ export function AdminEventPage() {
                     speakerQuestions,
                     availableQuizQuestions,
                     availableVoteQuestions,
-                    emitPublicViewPatch,
                     setMessage,
                   }}
                   danger={{
