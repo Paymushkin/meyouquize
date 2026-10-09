@@ -44,8 +44,7 @@ export function isDebatePollPreset(input: {
   if (input.subQuizId != null) return false;
   if (input.editorQuizMode) return false;
   if (input.projectorDebateLayout !== true) return false;
-  const count = input.options.length;
-  return count >= 2 && count <= 3;
+  return input.options.length >= 2;
 }
 
 /** Проставляет цвет каждому варианту дебатов (сохранённый или дефолт по индексу). */

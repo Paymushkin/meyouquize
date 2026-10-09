@@ -94,7 +94,7 @@ export function singlePollDebateSideBySideEligible(input: {
 }): boolean {
   if (input.projectorDebateLayout !== true) return false;
   if (input.type !== "single" && input.type !== "multi") return false;
-  return input.optionCount >= 2 && input.optionCount <= 3;
+  return input.optionCount >= 2;
 }
 
 export type DebateSeriesOptionStat = DebateOptionStat & {

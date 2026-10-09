@@ -69,10 +69,45 @@ export function ResultsPage() {
   } = p;
   const geoPollFullBleed =
     view.mode === "question" && isGeoPollQuestion && !showProjectorWinnersHero;
-  const reactionList = useMemo(
-    () => (reactionSession?.reactions?.length ? reactionSession.reactions : [...DEFAULT_REACTIONS]),
-    [reactionSession?.reactions],
-  );
+  const projectorReactionWidget = useMemo(() => {
+    const widgets = view.reactionsWidgets ?? [];
+    if (widgets.length === 0) return undefined;
+    const overlay = view.reactionsOverlayText?.trim() ?? "";
+    if (overlay) {
+      const byTitle = widgets.find((widget) => widget.title.trim() === overlay);
+      if (byTitle) return byTitle;
+    }
+    if (reactionSession?.reactions?.length) {
+      const signature = reactionSession.reactions.join("||");
+      return widgets.find((widget) => widget.reactions.join("||") === signature);
+    }
+    return undefined;
+  }, [reactionSession?.reactions, view.reactionsOverlayText, view.reactionsWidgets]);
+
+  const reactionList = useMemo(() => {
+    if (reactionSession?.isActive && reactionSession.reactions?.length) {
+      return reactionSession.reactions;
+    }
+    if (projectorReactionWidget?.reactions?.length) {
+      return projectorReactionWidget.reactions;
+    }
+    if (reactionSession?.reactions?.length) return reactionSession.reactions;
+    return [...DEFAULT_REACTIONS];
+  }, [projectorReactionWidget?.reactions, reactionSession?.isActive, reactionSession?.reactions]);
+
+  const projectorReactionCounts = useMemo(() => {
+    if (reactionSession?.isActive) return reactionSession.counts;
+    if (!projectorReactionWidget) return reactionSession?.counts ?? {};
+    const row = (view.reactionsWidgetStats ?? []).find(
+      (item) => item.widgetId === projectorReactionWidget.id,
+    );
+    return row?.counts ?? {};
+  }, [
+    projectorReactionWidget,
+    reactionSession?.counts,
+    reactionSession?.isActive,
+    view.reactionsWidgetStats,
+  ]);
 
   useEffect(() => {
     const zoom = view.projectorBrowserZoom;
@@ -322,22 +357,34 @@ export function ResultsPage() {
                   maxWidth: containerContentMaxPx,
                   mx: "auto",
                 }
-              : isFullScreenWidgetMode
+              : view.mode === "randomizer"
                 ? {
                     py: 0,
                     px: 0,
                     mx: 0,
+                    display: "flex",
+                    flexDirection: "column",
+                    alignItems: "stretch",
+                    justifyContent: "center",
+                    height: "100%",
+                    minHeight: "100%",
                   }
-                : {
-                    py: 4,
-                    ...(!fullScreenContainer
-                      ? {
-                          maxWidth: containerContentMaxPx,
-                          mx: "auto",
-                          px: { xs: 2, sm: 3 },
-                        }
-                      : {}),
-                  }),
+                : isFullScreenWidgetMode
+                  ? {
+                      py: 0,
+                      px: 0,
+                      mx: 0,
+                    }
+                  : {
+                      py: 4,
+                      ...(!fullScreenContainer
+                        ? {
+                            maxWidth: containerContentMaxPx,
+                            mx: "auto",
+                            px: { xs: 2, sm: 3 },
+                          }
+                        : {}),
+                    }),
         }}
       >
         {view.mode === "leaderboard" && leadersShown.length > 0 && (
@@ -735,7 +782,7 @@ export function ResultsPage() {
                       lineHeight: 1,
                     }}
                   >
-                    {reaction} {reactionSession?.counts[reaction] ?? 0}
+                    {reaction} {projectorReactionCounts[reaction] ?? 0}
                   </Typography>
                 ))}
               </Stack>

@@ -73,7 +73,7 @@ export type QuestionForm = {
   temperatureSubtitle?: string;
   /** Для дебатов: id baseline-опроса «до». */
   debateBaselineQuestionId?: string | null;
-  /** Side-by-side layout на проекторе (2–3 варианта). */
+  /** Side-by-side layout на проекторе (дебаты, от 2 вариантов). */
   projectorDebateLayout?: boolean;
   /** Серия многораундовых дебатов. */
   debateSeriesId?: string | null;
@@ -572,14 +572,14 @@ export function syncDebateSeriesOptionSlots(forms: QuestionForm[]): QuestionForm
     return {
       ...q,
       debateSeriesResultTitle: canon.resultTitle,
-      options: q.options.map((opt, i) => {
-        const src = canon.options[i];
-        if (!src) return opt;
+      options: canon.options.map((src, i) => {
+        const existing = q.options[i];
         return {
-          ...opt,
+          id: existing?.id,
           text: src.text,
+          isCorrect: Boolean(src.isCorrect),
           color: src.color,
-          isCorrect: src.isCorrect,
+          ...(existing?.imageUrl ? { imageUrl: existing.imageUrl } : {}),
         };
       }),
     };

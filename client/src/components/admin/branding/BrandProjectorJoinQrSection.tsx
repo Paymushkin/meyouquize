@@ -53,7 +53,7 @@ export function BrandProjectorJoinQrSection(props: Props) {
   } = props;
 
   return (
-    <Accordion defaultExpanded>
+    <Accordion>
       <AccordionSummary expandIcon={<ExpandMoreIcon />}>
         <Typography variant="subtitle2">Проектор: компактный QR</Typography>
       </AccordionSummary>

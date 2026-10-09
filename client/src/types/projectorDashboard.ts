@@ -51,7 +51,7 @@ export type ProjectorQuestionResult = {
   temperatureSubtitle?: string;
   /** Для дебатов: id baseline-опроса «до». */
   debateBaselineQuestionId?: string;
-  /** Side-by-side layout на проекторе (2–3 варианта). */
+  /** Side-by-side layout на проекторе (дебаты, от 2 вариантов). */
   projectorDebateLayout?: boolean;
   /** Серия многораундовых дебатов. */
   debateSeriesId?: string;

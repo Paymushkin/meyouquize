@@ -230,7 +230,7 @@ export type QuestionReplaceInput = {
   temperatureSubtitle?: string | null;
   /** Для дебатов: id baseline-опроса «до». */
   debateBaselineQuestionId?: string | null;
-  /** Side-by-side layout на проекторе для 2–3 вариантов. */
+  /** Side-by-side layout на проекторе для дебатов (от 2 вариантов). */
   projectorDebateLayout?: boolean;
   /** Серия многораундовых дебатов. */
   debateSeriesId?: string | null;
@@ -1141,7 +1141,7 @@ export async function getQuizPublicState(quizId: string) {
     brandPlayerBackgroundImageUrl: view.brandPlayerBackgroundImageUrl,
     brandProjectorBackgroundImageUrl: view.brandProjectorBackgroundImageUrl,
     brandBodyBackgroundColor: view.brandBodyBackgroundColor,
-    reactionSession: getReactionSessionPublic(quiz.id),
+    reactionSession: await getReactionSessionPublic(quiz.id),
     quizProgress,
     activeQuestions: activeQuestions.map((q) => ({
       id: q.id,
@@ -2514,7 +2514,7 @@ export async function getPublicReportBySlug(slug: string): Promise<PublicEventRe
 
   const onScreen = speakerStats.find((row) => row.isOnScreen)?._count._all ?? 0;
   const total = speakerStats.reduce((sum, row) => sum + row._count._all, 0);
-  const reactionSession = getReactionSessionPublic(quiz.id);
+  const reactionSession = await getReactionSessionPublic(quiz.id);
   const latestReactionCounts =
     reactionSession?.counts ??
     reactionSession?.history[0]?.counts ??

@@ -7,11 +7,31 @@ export function SessionTabLabel({ name, count }: { name: string; count: number }
       sx={{
         position: "relative",
         display: "inline-flex",
-        alignItems: "center",
+        alignItems: "flex-start",
+        justifyContent: "flex-start",
+        maxWidth: 200,
+        width: "100%",
         pr: 1.75,
+        textAlign: "left",
       }}
     >
-      <Box component="span">{name}</Box>
+      <Box
+        component="span"
+        sx={{
+          display: "-webkit-box",
+          WebkitLineClamp: 2,
+          WebkitBoxOrient: "vertical",
+          overflow: "hidden",
+          textOverflow: "ellipsis",
+          maxWidth: 200,
+          textAlign: "left",
+          whiteSpace: "normal",
+          wordBreak: "break-word",
+          lineHeight: 1.25,
+        }}
+      >
+        {name}
+      </Box>
       <Box
         component="span"
         sx={{
@@ -45,13 +65,18 @@ export const SPEAKER_SESSION_TABS_SX = {
   "& .MuiTab-root": {
     color: "rgba(255,255,255,0.72)",
     minHeight: 40,
+    maxWidth: 232,
     px: 1.25,
     overflow: "visible",
     textTransform: "none",
     fontWeight: 600,
+    whiteSpace: "normal",
+    textAlign: "left",
+    alignItems: "flex-start",
   },
   "& .MuiTabs-flexContainer": {
     gap: 0,
+    alignItems: "stretch",
   },
   "& .MuiTabs-scroller": {
     overflowX: "auto !important",

@@ -6,6 +6,7 @@ import {
   createQuizSchema,
   finishQuizSchema,
   refreshQuizStateSchema,
+  resetReactionWidgetSchema,
   startReactionSessionSchema,
   startSubQuizAutoSchema,
   stopReactionSessionSchema,
@@ -21,8 +22,17 @@ import {
   setQuestionEnabled,
   startSubQuizAuto,
 } from "../../quiz-service.js";
-import { startReactionSession, stopReactionSession } from "../../reactions-service.js";
-import { persistReactionWidgetCounts } from "../../reaction-widget-stats.js";
+import {
+  resetReactionSessionCounts,
+  startReactionSession,
+  stopReactionSession,
+} from "../../reactions-service.js";
+import {
+  clearReactionWidgetCounts,
+  persistReactionWidgetCounts,
+  readReactionWidgetSeedCounts,
+} from "../../reaction-widget-stats.js";
+import { broadcastPublicViewToDashboard } from "../../banner-click-stats.js";
 import { broadcastDashboardResultsNow } from "../dashboard-results.js";
 import { broadcastQuizPublicState } from "../quiz-rooms.js";
 import type { EnrichedSocket } from "../handler-common.js";
@@ -131,19 +141,33 @@ export function registerQuizAdminHandlers(socket: EnrichedSocket, io: Server) {
     try {
       await assertAdmin(socket);
       const payload = startReactionSessionSchema.parse(raw);
-      const session = startReactionSession(payload.quizId, payload.durationSec, payload.reactions);
-      await persistReactionWidgetCounts(payload.quizId, session.reactions, session.counts);
+      const seedCounts = await readReactionWidgetSeedCounts(
+        payload.quizId,
+        payload.reactions ?? [],
+      );
+      const session = await startReactionSession(
+        payload.quizId,
+        payload.durationSec,
+        payload.reactions,
+        seedCounts,
+      );
       const prevTimer = reactionStopTimers.get(payload.quizId);
       if (prevTimer) clearTimeout(prevTimer);
-      const timer = setTimeout(async () => {
+      const timer = setTimeout(() => {
         reactionStopTimers.delete(payload.quizId);
-        try {
-          stopReactionSession(payload.quizId);
-          const autoState = await getQuizPublicState(payload.quizId);
-          await broadcastQuizPublicState(io, payload.quizId, autoState);
-        } catch {
-          // ignore timer errors
-        }
+        void (async () => {
+          try {
+            const stopped = await stopReactionSession(payload.quizId);
+            if (stopped) {
+              await persistReactionWidgetCounts(payload.quizId, stopped.reactions, stopped.counts);
+              await broadcastPublicViewToDashboard(io, payload.quizId);
+            }
+            const autoState = await getQuizPublicState(payload.quizId);
+            await broadcastQuizPublicState(io, payload.quizId, autoState);
+          } catch {
+            // ignore timer errors
+          }
+        })();
       }, payload.durationSec * 1000);
       reactionStopTimers.set(payload.quizId, timer);
       const state = await getQuizPublicState(payload.quizId);
@@ -157,7 +181,11 @@ export function registerQuizAdminHandlers(socket: EnrichedSocket, io: Server) {
     try {
       await assertAdmin(socket);
       const payload = stopReactionSessionSchema.parse(raw);
-      stopReactionSession(payload.quizId);
+      const stopped = await stopReactionSession(payload.quizId);
+      if (stopped) {
+        await persistReactionWidgetCounts(payload.quizId, stopped.reactions, stopped.counts);
+        await broadcastPublicViewToDashboard(io, payload.quizId);
+      }
       const prevTimer = reactionStopTimers.get(payload.quizId);
       if (prevTimer) {
         clearTimeout(prevTimer);
@@ -167,6 +195,21 @@ export function registerQuizAdminHandlers(socket: EnrichedSocket, io: Server) {
       await broadcastQuizPublicState(io, payload.quizId, state);
     } catch (error) {
       fail(socket, error instanceof Error ? error.message : "Stop reactions failed");
+    }
+  });
+
+  socket.on("reactions:widget-reset", async (raw: unknown) => {
+    try {
+      await assertAdmin(socket);
+      const payload = resetReactionWidgetSchema.parse(raw);
+      const cleared = await clearReactionWidgetCounts(payload.quizId, payload.widgetId);
+      if (!cleared) throw new Error("Reaction widget not found");
+      await resetReactionSessionCounts(payload.quizId, cleared.widget.reactions);
+      await broadcastPublicViewToDashboard(io, payload.quizId);
+      const state = await getQuizPublicState(payload.quizId);
+      await broadcastQuizPublicState(io, payload.quizId, state);
+    } catch (error) {
+      fail(socket, error instanceof Error ? error.message : "Reset reaction widget failed");
     }
   });
 

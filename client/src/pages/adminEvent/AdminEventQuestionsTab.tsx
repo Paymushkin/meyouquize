@@ -1,4 +1,5 @@
 import AddIcon from "@mui/icons-material/Add";
+import ContentCopyIcon from "@mui/icons-material/ContentCopy";
 import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
 import DragIndicatorIcon from "@mui/icons-material/DragIndicator";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
@@ -24,6 +25,7 @@ import {
   DialogActions,
   DialogContent,
   DialogTitle,
+  Divider,
   IconButton,
   Paper,
   Stack,
@@ -47,6 +49,7 @@ import { AdminQuestionsSection } from "../../components/admin/AdminQuestionsSect
 import { AdminRandomizerSection } from "../../components/admin/AdminRandomizerSection";
 import { AdminReactionsSection } from "../../components/admin/AdminReactionsSection";
 import { SubQuizControlsCard } from "../../components/admin/SubQuizControlsCard";
+import { CompactColorField } from "../../components/admin/branding/CompactColorField";
 import type { AdminQuestionsSectionSharedBindings } from "../../features/admin/adminQuestionsSectionSharedBindings";
 import type { RoomQuestionsTab } from "../../features/admin/adminUiPersistence";
 import type { useAdminRandomizer } from "../../features/admin/useAdminRandomizer";
@@ -67,6 +70,7 @@ import {
   contrastingTextOnColor,
   debateDefaultOptionColor,
   resolveDebateSeriesResultTitle,
+  sanitizeOptionColor,
   sumDebateSeriesOptionStats,
   withDebateOptionColors,
 } from "@meyouquize/shared";
@@ -77,6 +81,9 @@ function DebateSeriesHeader(props: {
   expanded: boolean;
   onToggleExpanded: () => void;
   onEdit: () => void;
+  cumulativeOnProjector: boolean;
+  cumulativeCanShow: boolean;
+  onToggleCumulativeOnProjector: () => void;
   manageMode?: boolean;
   adminDoneMode?: "markDone" | "markActive";
   adminDoneDisabled?: boolean;
@@ -89,6 +96,9 @@ function DebateSeriesHeader(props: {
     expanded,
     onToggleExpanded,
     onEdit,
+    cumulativeOnProjector,
+    cumulativeCanShow,
+    onToggleCumulativeOnProjector,
     manageMode = false,
     adminDoneMode,
     adminDoneDisabled = false,
@@ -96,6 +106,9 @@ function DebateSeriesHeader(props: {
     onBlockDragStart,
     onBlockDragEnd,
   } = props;
+  const projectorTitle = cumulativeOnProjector
+    ? "Скрыть накопительный итог с экрана"
+    : "Показать накопительный итог на экране";
   return (
     <Stack
       direction="row"
@@ -210,6 +223,23 @@ function DebateSeriesHeader(props: {
           Дебаты · {roundsCount} {roundsCount === 1 ? "раунд" : "раунда"}
         </Typography>
       </Box>
+      <Tooltip title={projectorTitle}>
+        <span>
+          <IconButton
+            size="small"
+            color={cumulativeOnProjector ? "success" : "default"}
+            disabled={!cumulativeCanShow}
+            aria-pressed={cumulativeOnProjector}
+            aria-label={projectorTitle}
+            onClick={(event) => {
+              event.stopPropagation();
+              onToggleCumulativeOnProjector();
+            }}
+          >
+            <BarChartIcon fontSize="small" />
+          </IconButton>
+        </span>
+      </Tooltip>
       <Tooltip title={expanded ? "Свернуть раунды" : "Развернуть раунды"}>
         <IconButton
           size="small"
@@ -225,51 +255,273 @@ function DebateSeriesHeader(props: {
   );
 }
 
+type DebateSeriesEditOptionDraft = { text: string; color: string };
+type DebateSeriesEditRoundDraft = { formIndex: number; roundIndex: number; text: string };
+
 function DebateSeriesEditDialog(props: {
   open: boolean;
   roundsCount: number;
   resultTitle: string;
+  options: DebateSeriesEditOptionDraft[];
+  rounds: DebateSeriesEditRoundDraft[];
   onClose: () => void;
-  onSave: (resultTitle: string) => void;
+  onSave: (payload: {
+    resultTitle: string;
+    options: DebateSeriesEditOptionDraft[];
+    rounds: Array<{ formIndex: number; text: string }>;
+  }) => void;
+  onRemoveSeries: () => void;
+  onRemoveRound: (formIndex: number) => void;
 }) {
-  const { open, roundsCount, resultTitle, onClose, onSave } = props;
+  const {
+    open,
+    roundsCount,
+    resultTitle,
+    options,
+    rounds,
+    onClose,
+    onSave,
+    onRemoveSeries,
+    onRemoveRound,
+  } = props;
   const [draftTitle, setDraftTitle] = useState(resultTitle);
+  const [draftOptions, setDraftOptions] = useState(options);
+  const [draftRounds, setDraftRounds] = useState(rounds);
+  const [confirmDeleteSeries, setConfirmDeleteSeries] = useState(false);
+  const [confirmDeleteRoundIndex, setConfirmDeleteRoundIndex] = useState<number | null>(null);
+
   useEffect(() => {
-    if (open) setDraftTitle(resultTitle);
-  }, [open, resultTitle]);
+    if (!open) return;
+    setDraftTitle(resultTitle);
+    setDraftOptions(options);
+    setDraftRounds(rounds);
+    setConfirmDeleteSeries(false);
+    setConfirmDeleteRoundIndex(null);
+  }, [open, resultTitle, options, rounds]);
+
+  const canRemoveOption = draftOptions.length > 2;
 
   return (
-    <Dialog open={open} onClose={onClose} fullWidth maxWidth="sm">
-      <DialogTitle sx={{ fontWeight: 700 }}>Дебаты</DialogTitle>
-      <DialogContent>
-        <Stack spacing={2} sx={{ pt: 0.5 }}>
-          <Typography variant="body2" color="text.secondary">
-            Серия · {roundsCount} {roundsCount === 1 ? "раунд" : "раунда"}
-          </Typography>
-          <TextField
-            label="Текст финального результата на проекторе"
-            value={draftTitle}
-            onChange={(e) => setDraftTitle(e.target.value)}
-            placeholder="Накопительный итог"
-            fullWidth
-            inputProps={{ maxLength: 200 }}
-            helperText="Показывается при выводе накопительного итога серии на экран"
-          />
-        </Stack>
-      </DialogContent>
-      <DialogActions sx={{ px: 3, pb: 2 }}>
-        <Button onClick={onClose}>Отмена</Button>
-        <Button
-          variant="contained"
-          onClick={() => {
-            onSave(draftTitle.trim());
-            onClose();
+    <>
+      <Dialog open={open} onClose={onClose} fullWidth maxWidth="sm">
+        <DialogTitle sx={{ fontWeight: 700 }}>Дебаты</DialogTitle>
+        <DialogContent>
+          <Stack spacing={2} sx={{ pt: 0.5 }}>
+            <Typography variant="body2" color="text.secondary">
+              Серия · {roundsCount} {roundsCount === 1 ? "раунд" : "раунда"}
+            </Typography>
+            <TextField
+              label="Текст финального результата на проекторе"
+              value={draftTitle}
+              onChange={(e) => setDraftTitle(e.target.value)}
+              placeholder="Накопительный итог"
+              fullWidth
+              inputProps={{ maxLength: 200 }}
+              helperText="Показывается при выводе накопительного итога серии на экран"
+            />
+            <Divider />
+            <Typography variant="subtitle2">Варианты (общие для всех раундов)</Typography>
+            <Stack spacing={1.25}>
+              {draftOptions.map((option, optionIndex) => (
+                <Stack
+                  key={`debate-opt-${optionIndex}`}
+                  direction="row"
+                  spacing={1.5}
+                  alignItems="flex-start"
+                  sx={{ width: "100%", minWidth: 0 }}
+                >
+                  <TextField
+                    label={`Вариант ${optionIndex + 1}`}
+                    value={option.text}
+                    onChange={(e) => {
+                      const text = e.target.value;
+                      setDraftOptions((prev) =>
+                        prev.map((row, i) => (i === optionIndex ? { ...row, text } : row)),
+                      );
+                    }}
+                    size="small"
+                    multiline
+                    minRows={1}
+                    maxRows={4}
+                    sx={{ flex: 1, minWidth: 0 }}
+                  />
+                  <CompactColorField
+                    label="Цвет"
+                    value={
+                      sanitizeOptionColor(option.color, debateDefaultOptionColor(optionIndex)) ??
+                      debateDefaultOptionColor(optionIndex)
+                    }
+                    onChange={(next) => {
+                      setDraftOptions((prev) =>
+                        prev.map((row, i) => (i === optionIndex ? { ...row, color: next } : row)),
+                      );
+                    }}
+                    onBlur={() => undefined}
+                  />
+                  <IconButton
+                    onClick={() =>
+                      setDraftOptions((prev) => prev.filter((_, i) => i !== optionIndex))
+                    }
+                    disabled={!canRemoveOption}
+                    sx={{ flexShrink: 0, mt: 0.5 }}
+                    aria-label={`Удалить вариант ${optionIndex + 1}`}
+                  >
+                    <DeleteOutlineIcon fontSize="small" />
+                  </IconButton>
+                </Stack>
+              ))}
+              <Button
+                size="small"
+                startIcon={<AddIcon />}
+                onClick={() =>
+                  setDraftOptions((prev) => [
+                    ...prev,
+                    {
+                      text: "",
+                      color: debateDefaultOptionColor(prev.length),
+                    },
+                  ])
+                }
+                sx={{ alignSelf: "flex-start" }}
+              >
+                Добавить вариант
+              </Button>
+            </Stack>
+            <Divider />
+            <Typography variant="subtitle2">Раунды</Typography>
+            <Stack spacing={1.25}>
+              {draftRounds.map((round) => (
+                <Stack
+                  key={`debate-round-${round.formIndex}`}
+                  direction="row"
+                  spacing={1}
+                  alignItems="flex-start"
+                >
+                  <TextField
+                    label={`Раунд ${round.roundIndex + 1}`}
+                    value={round.text}
+                    onChange={(e) => {
+                      const text = e.target.value;
+                      setDraftRounds((prev) =>
+                        prev.map((row) =>
+                          row.formIndex === round.formIndex ? { ...row, text } : row,
+                        ),
+                      );
+                    }}
+                    size="small"
+                    fullWidth
+                    multiline
+                    minRows={1}
+                    maxRows={4}
+                  />
+                  <IconButton
+                    onClick={() => setConfirmDeleteRoundIndex(round.formIndex)}
+                    disabled={draftRounds.length <= 1}
+                    sx={{ flexShrink: 0, mt: 0.5 }}
+                    aria-label={`Удалить раунд ${round.roundIndex + 1}`}
+                  >
+                    <DeleteOutlineIcon fontSize="small" />
+                  </IconButton>
+                </Stack>
+              ))}
+            </Stack>
+          </Stack>
+        </DialogContent>
+        <DialogActions
+          sx={{
+            px: 3,
+            pb: 2,
+            pt: 1,
+            justifyContent: "space-between",
+            flexWrap: "nowrap",
+            gap: 1,
           }}
         >
-          Сохранить
-        </Button>
-      </DialogActions>
-    </Dialog>
+          <Tooltip title="Удалить дебаты">
+            <IconButton
+              color="error"
+              onClick={() => setConfirmDeleteSeries(true)}
+              aria-label="Удалить дебаты"
+            >
+              <DeleteOutlineIcon />
+            </IconButton>
+          </Tooltip>
+          <Stack direction="row" spacing={1}>
+            <Button onClick={onClose}>Отмена</Button>
+            <Button
+              variant="contained"
+              onClick={() => {
+                onSave({
+                  resultTitle: draftTitle.trim(),
+                  options: draftOptions,
+                  rounds: draftRounds.map((round) => ({
+                    formIndex: round.formIndex,
+                    text: round.text,
+                  })),
+                });
+                onClose();
+              }}
+            >
+              Сохранить
+            </Button>
+          </Stack>
+        </DialogActions>
+      </Dialog>
+      <Dialog
+        open={confirmDeleteSeries}
+        onClose={() => setConfirmDeleteSeries(false)}
+        maxWidth="xs"
+        fullWidth
+      >
+        <DialogTitle>Удалить дебаты</DialogTitle>
+        <DialogContent>
+          <Typography>
+            Удалить всю серию дебатов ({roundsCount} {roundsCount === 1 ? "раунд" : "раунда"})? Это
+            действие нельзя отменить.
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setConfirmDeleteSeries(false)}>Отмена</Button>
+          <Button
+            color="error"
+            variant="contained"
+            onClick={() => {
+              setConfirmDeleteSeries(false);
+              onClose();
+              onRemoveSeries();
+            }}
+          >
+            Удалить
+          </Button>
+        </DialogActions>
+      </Dialog>
+      <Dialog
+        open={confirmDeleteRoundIndex !== null}
+        onClose={() => setConfirmDeleteRoundIndex(null)}
+        maxWidth="xs"
+        fullWidth
+      >
+        <DialogTitle>Удалить раунд</DialogTitle>
+        <DialogContent>
+          <Typography>Удалить этот раунд? Это действие нельзя отменить.</Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setConfirmDeleteRoundIndex(null)}>Отмена</Button>
+          <Button
+            color="error"
+            variant="contained"
+            onClick={() => {
+              if (confirmDeleteRoundIndex !== null) {
+                onRemoveRound(confirmDeleteRoundIndex);
+              }
+              setConfirmDeleteRoundIndex(null);
+            }}
+          >
+            Удалить
+          </Button>
+        </DialogActions>
+      </Dialog>
+    </>
   );
 }
 
@@ -280,9 +532,6 @@ function DebateSeriesCumulativePreview(props: {
   questionResults: QuestionResult[];
   publicViewMode: PublicViewMode;
   publicViewQuestionId?: string;
-  debateSeriesShowRounds: boolean;
-  setMessage: (message: string) => void;
-  setPublicResultsView: AdminSetPublicResultsView;
 }) {
   const {
     seriesId,
@@ -291,9 +540,6 @@ function DebateSeriesCumulativePreview(props: {
     questionResults,
     publicViewMode,
     publicViewQuestionId,
-    debateSeriesShowRounds,
-    setMessage,
-    setPublicResultsView,
   } = props;
   const rounds = formIndices
     .map((i) => ({ index: i, q: questionForms[i] }))
@@ -301,8 +547,6 @@ function DebateSeriesCumulativePreview(props: {
     .sort((a, b) => (a.q.debateRoundIndex ?? 0) - (b.q.debateRoundIndex ?? 0) || a.index - b.index);
   if (rounds.length === 0) return null;
 
-  const seed = rounds[rounds.length - 1];
-  const canShow = Boolean(seed?.q.id);
   const onProjector =
     publicViewMode === "debate_series" &&
     Boolean(seriesId) &&
@@ -331,119 +575,71 @@ function DebateSeriesCumulativePreview(props: {
   const total = summed.reduce((acc, row) => acc + Math.max(0, row.count), 0);
   if (summed.length === 0) return null;
 
-  const storedTitle = resolveDebateSeriesResultTitle(
-    rounds.map(({ q }) => q.debateSeriesResultTitle).find((t) => t?.trim()) ??
-      rounds[0]?.q.debateSeriesResultTitle,
-  );
-
-  const projectorTitle = onProjector
-    ? "Скрыть накопительный итог с экрана"
-    : "Показать накопительный итог на экране";
-
   return (
-    <Stack spacing={0.75} sx={{ width: "100%" }}>
-      <Stack direction="row" alignItems="center" spacing={0.5}>
-        <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600, flex: 1 }}>
-          {storedTitle}
-          {total <= 0 ? " — пока нет голосов" : ""}
-        </Typography>
-        <Tooltip title={projectorTitle}>
-          <span>
-            <IconButton
-              size="small"
-              color={onProjector ? "success" : "default"}
-              disabled={!canShow}
-              aria-pressed={onProjector}
-              aria-label={projectorTitle}
-              onClick={() => {
-                if (!seed?.q.id) {
-                  setMessage("Сначала сохраните раунды");
-                  return;
-                }
-                if (onProjector) {
-                  setPublicResultsView("title");
-                  return;
-                }
-                setPublicResultsView("debate_series", seed.q.id, {
-                  debateSeriesId: seriesId,
-                  debateSeriesView: "cumulative",
-                  debateSeriesQuestionIds: rounds
-                    .map(({ q }) => q.id)
-                    .filter((id): id is string => Boolean(id)),
-                  debateSeriesShowRounds,
-                });
-              }}
-            >
-              <BarChartIcon fontSize="small" />
-            </IconButton>
-          </span>
-        </Tooltip>
-      </Stack>
-      <Box
-        sx={{
-          display: "flex",
-          width: "100%",
-          height: 36,
-          borderRadius: 1.5,
-          overflow: "hidden",
-          bgcolor: onProjector ? "action.selected" : "action.hover",
-        }}
-      >
-        {summed.map((row, index) => {
-          const percent = total > 0 ? (Math.max(0, row.count) / total) * 100 : 0;
-          const displayPercent =
-            total > 0 ? Math.max(percent, percent > 0 ? 8 : 6) : 100 / summed.length;
-          const color = row.color ?? debateDefaultOptionColor(index);
-          const label =
-            total > 0
-              ? `${String(Math.round(percent * 10) / 10).replace(/\.0$/, "")}% / ${row.count}`
-              : `— / 0`;
-          return (
-            <Box
-              key={row.optionId}
+    <Box
+      sx={{
+        display: "flex",
+        width: "100%",
+        height: 36,
+        borderRadius: 1.5,
+        overflow: "hidden",
+        bgcolor: onProjector ? "action.selected" : "action.hover",
+      }}
+    >
+      {summed.map((row, index) => {
+        const percent = total > 0 ? (Math.max(0, row.count) / total) * 100 : 0;
+        const displayPercent =
+          total > 0 ? Math.max(percent, percent > 0 ? 8 : 6) : 100 / summed.length;
+        const color = row.color ?? debateDefaultOptionColor(index);
+        const label =
+          total > 0
+            ? `${String(Math.round(percent * 10) / 10).replace(/\.0$/, "")}% / ${row.count}`
+            : `— / 0`;
+        return (
+          <Box
+            key={row.optionId}
+            sx={{
+              flexGrow: displayPercent,
+              flexBasis: 0,
+              minWidth: 0,
+              bgcolor: color,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              px: 0.5,
+              gap: 0.5,
+            }}
+            title={`${row.text}: ${row.count} (${label})`}
+          >
+            <Typography
+              variant="caption"
+              noWrap
               sx={{
-                flexGrow: displayPercent,
-                flexBasis: 0,
-                minWidth: 0,
-                bgcolor: color,
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                px: 0.5,
-                gap: 0.5,
+                color: contrastingTextOnColor(color),
+                fontWeight: 700,
+                fontSize: "0.7rem",
+                lineHeight: 1.1,
               }}
-              title={`${row.text}: ${row.count} (${label})`}
             >
-              <Typography
-                variant="caption"
-                noWrap
-                sx={{
-                  color: contrastingTextOnColor(color),
-                  fontWeight: 700,
-                  fontSize: "0.7rem",
-                  lineHeight: 1.1,
-                }}
-              >
-                {row.text}
-              </Typography>
-              <Typography
-                variant="caption"
-                noWrap
-                sx={{
-                  color: contrastingTextOnColor(color),
-                  fontWeight: 700,
-                  fontSize: "0.7rem",
-                  lineHeight: 1.1,
-                  opacity: 0.92,
-                }}
-              >
-                {label}
-              </Typography>
-            </Box>
-          );
-        })}
-      </Box>
-    </Stack>
+              {row.text}
+            </Typography>
+            <Typography
+              variant="caption"
+              noWrap
+              sx={{
+                color: contrastingTextOnColor(color),
+                fontWeight: 700,
+                fontSize: "0.7rem",
+                lineHeight: 1.1,
+                opacity: 0.92,
+              }}
+            >
+              {label}
+            </Typography>
+          </Box>
+        );
+      })}
+    </Box>
   );
 }
 
@@ -459,8 +655,8 @@ function DebateSeriesFooter(props: {
   debateSeriesShowRounds: boolean;
   onToggleDebateSeriesShowRounds: () => void;
   setMessage: (message: string) => void;
-  setPublicResultsView: AdminSetPublicResultsView;
   onAddRound: (globalIndex: number) => void;
+  onCloneSeries: (seriesId: string) => void;
 }) {
   const {
     seriesId,
@@ -474,8 +670,8 @@ function DebateSeriesFooter(props: {
     debateSeriesShowRounds,
     onToggleDebateSeriesShowRounds,
     setMessage,
-    setPublicResultsView,
     onAddRound,
+    onCloneSeries,
   } = props;
   const lastIndex = formIndices[formIndices.length - 1];
   const seed =
@@ -490,6 +686,7 @@ function DebateSeriesFooter(props: {
           .at(-1)
       : undefined;
   const seedIndex = seed?.index ?? lastIndex;
+  const seriesSaved = formIndices.every((i) => Boolean(questionForms[i]?.id));
   const canShowPlayerResults = Boolean(seed?.q.id);
   const playerTitle = playerResultsVisible
     ? "Скрыть результаты в интерфейсе пользователя"
@@ -507,9 +704,6 @@ function DebateSeriesFooter(props: {
         questionResults={questionResults}
         publicViewMode={publicViewMode}
         publicViewQuestionId={publicViewQuestionId}
-        debateSeriesShowRounds={debateSeriesShowRounds}
-        setMessage={setMessage}
-        setPublicResultsView={setPublicResultsView}
       />
       <Stack direction="row" alignItems="center" spacing={0.5} sx={{ width: "100%" }}>
         <Button
@@ -523,6 +717,15 @@ function DebateSeriesFooter(props: {
           }}
         >
           Добавить раунд
+        </Button>
+        <Button
+          startIcon={<ContentCopyIcon />}
+          size="small"
+          variant="outlined"
+          disabled={!seriesSaved}
+          onClick={() => onCloneSeries(seriesId)}
+        >
+          Клонировать
         </Button>
         <Box sx={{ flex: 1 }} />
         <Tooltip title={roundsOnScreenTitle}>
@@ -595,7 +798,17 @@ function DebateSeriesBlockShell(props: {
   setMessage: (message: string) => void;
   setPublicResultsView: AdminSetPublicResultsView;
   onAddRound: (globalIndex: number) => void;
-  onResultTitleChange: (seriesId: string, title: string) => void;
+  onCloneSeries: (seriesId: string) => void;
+  onSaveSeries: (
+    seriesId: string,
+    payload: {
+      resultTitle: string;
+      options: DebateSeriesEditOptionDraft[];
+      rounds: Array<{ formIndex: number; text: string }>;
+    },
+  ) => void;
+  onRemoveSeries: (seriesId: string) => void;
+  onRemoveRound: (formIndex: number) => void;
   paperSx?: object;
   manageMode?: boolean;
   adminDoneMode?: "markDone" | "markActive";
@@ -621,7 +834,10 @@ function DebateSeriesBlockShell(props: {
     setMessage,
     setPublicResultsView,
     onAddRound,
-    onResultTitleChange,
+    onCloneSeries,
+    onSaveSeries,
+    onRemoveSeries,
+    onRemoveRound,
     paperSx,
     manageMode = false,
     adminDoneMode,
@@ -635,12 +851,43 @@ function DebateSeriesBlockShell(props: {
   } = props;
   const [expanded, setExpanded] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
-  const roundsCount = formIndices.filter((i) => questionForms[i]).length;
+  const rounds = formIndices
+    .map((formIndex) => {
+      const q = questionForms[formIndex];
+      if (!q) return null;
+      return {
+        formIndex,
+        roundIndex: q.debateRoundIndex ?? 0,
+        text: q.text,
+      };
+    })
+    .filter((row): row is DebateSeriesEditRoundDraft => Boolean(row))
+    .sort((a, b) => a.roundIndex - b.roundIndex || a.formIndex - b.formIndex);
+  const roundsCount = rounds.length;
   const adminDoneDisabled = formIndices.some((i) => !questionForms[i]?.id);
   const resultTitle = resolveDebateSeriesResultTitle(
     formIndices.map((i) => questionForms[i]?.debateSeriesResultTitle).find((t) => t?.trim()) ??
       null,
   );
+  const seedQuestion = rounds[0] ? questionForms[rounds[0].formIndex] : undefined;
+  const editOptions: DebateSeriesEditOptionDraft[] = withDebateOptionColors(
+    seedQuestion?.options ?? [],
+  ).map((option, index) => ({
+    text: option.text,
+    color: option.color ?? debateDefaultOptionColor(index),
+  }));
+  const seriesRounds = formIndices
+    .map((i) => ({ index: i, q: questionForms[i] }))
+    .filter((row): row is { index: number; q: QuestionForm } => Boolean(row.q))
+    .sort((a, b) => (a.q.debateRoundIndex ?? 0) - (b.q.debateRoundIndex ?? 0) || a.index - b.index);
+  const cumulativeSeed = seriesRounds[seriesRounds.length - 1];
+  const cumulativeCanShow = Boolean(cumulativeSeed?.q.id);
+  const cumulativeOnProjector =
+    publicViewMode === "debate_series" &&
+    Boolean(seriesId) &&
+    seriesRounds.some(
+      ({ q }) => q.id === publicViewQuestionId && q.debateSeriesId?.trim() === seriesId,
+    );
 
   return (
     <Paper
@@ -655,6 +902,26 @@ function DebateSeriesBlockShell(props: {
         expanded={expanded}
         onToggleExpanded={() => setExpanded((v) => !v)}
         onEdit={() => setEditOpen(true)}
+        cumulativeOnProjector={cumulativeOnProjector}
+        cumulativeCanShow={cumulativeCanShow}
+        onToggleCumulativeOnProjector={() => {
+          if (!cumulativeSeed?.q.id) {
+            setMessage("Сначала сохраните раунды");
+            return;
+          }
+          if (cumulativeOnProjector) {
+            setPublicResultsView("title");
+            return;
+          }
+          setPublicResultsView("debate_series", cumulativeSeed.q.id, {
+            debateSeriesId: seriesId,
+            debateSeriesView: "cumulative",
+            debateSeriesQuestionIds: seriesRounds
+              .map(({ q }) => q.id)
+              .filter((id): id is string => Boolean(id)),
+            debateSeriesShowRounds,
+          });
+        }}
         manageMode={manageMode}
         adminDoneMode={adminDoneMode}
         adminDoneDisabled={adminDoneDisabled}
@@ -666,8 +933,12 @@ function DebateSeriesBlockShell(props: {
         open={editOpen}
         roundsCount={roundsCount}
         resultTitle={resultTitle}
+        options={editOptions}
+        rounds={rounds}
         onClose={() => setEditOpen(false)}
-        onSave={(title) => onResultTitleChange(seriesId, title)}
+        onSave={(payload) => onSaveSeries(seriesId, payload)}
+        onRemoveSeries={() => onRemoveSeries(seriesId)}
+        onRemoveRound={onRemoveRound}
       />
       <Collapse in={expanded} timeout="auto" unmountOnExit={false}>
         {children}
@@ -683,8 +954,8 @@ function DebateSeriesBlockShell(props: {
           debateSeriesShowRounds={debateSeriesShowRounds}
           onToggleDebateSeriesShowRounds={onToggleDebateSeriesShowRounds}
           setMessage={setMessage}
-          setPublicResultsView={setPublicResultsView}
           onAddRound={onAddRound}
+          onCloneSeries={onCloneSeries}
         />
       </Collapse>
     </Paper>
@@ -757,8 +1028,18 @@ export type AdminEventQuestionsTabProps = {
     scopeIndices: number[],
   ) => void | Promise<void>;
   cloneQuestionAtIndex: (globalIndex: number) => void | Promise<void>;
+  cloneDebateSeries: (seriesId: string) => void | Promise<void>;
   addDebateSeriesRoundAtIndex: (globalIndex: number) => void | Promise<void>;
-  updateDebateSeriesResultTitle: (seriesId: string, title: string) => void | Promise<void>;
+  updateDebateSeries: (
+    seriesId: string,
+    patch: {
+      resultTitle: string;
+      options: Array<{ text: string; color?: string | null; isCorrect?: boolean }>;
+      rounds: Array<{ formIndex: number; text: string }>;
+    },
+  ) => void | Promise<void>;
+  removeDebateSeries: (seriesId: string) => void | Promise<void>;
+  removeQuestion: (index: number) => void | Promise<void>;
   debateSeriesShowRounds: boolean;
   onToggleDebateSeriesShowRounds: () => void;
 };
@@ -813,8 +1094,11 @@ export function AdminEventQuestionsTab({
   reorderVoteInList,
   reorderVoteDisplayBlocks,
   cloneQuestionAtIndex,
+  cloneDebateSeries,
   addDebateSeriesRoundAtIndex,
-  updateDebateSeriesResultTitle,
+  updateDebateSeries,
+  removeDebateSeries,
+  removeQuestion,
   debateSeriesShowRounds,
   onToggleDebateSeriesShowRounds,
 }: AdminEventQuestionsTabProps) {
@@ -872,7 +1156,7 @@ export function AdminEventQuestionsTab({
   ]);
 
   return (
-    <Stack spacing={2} sx={{ minWidth: 0 }}>
+    <Stack spacing={0} sx={{ minWidth: 0, flex: 1, minHeight: 0, height: "100%" }}>
       <Paper
         variant="outlined"
         elevation={0}
@@ -884,11 +1168,17 @@ export function AdminEventQuestionsTab({
           width: "100%",
           maxWidth: "100%",
           minWidth: 0,
+          flex: 1,
+          minHeight: 0,
+          height: "100%",
           boxSizing: "border-box",
           borderTopLeftRadius: 0,
           borderBottomLeftRadius: 0,
           borderTopRightRadius: 0,
           borderBottomRightRadius: 0,
+          display: "flex",
+          flexDirection: "column",
+          overflow: "hidden",
         }}
       >
         <Tabs
@@ -899,7 +1189,7 @@ export function AdminEventQuestionsTab({
           variant="scrollable"
           scrollButtons="auto"
           allowScrollButtonsMobile
-          sx={{ borderBottom: 1, borderColor: "divider", px: 0.5 }}
+          sx={{ borderBottom: 1, borderColor: "divider", px: 0.5, flexShrink: 0 }}
         >
           <Tab label="Голосования" value="votes" />
           <Tab label="Квизы" value="quizzes" />
@@ -907,7 +1197,7 @@ export function AdminEventQuestionsTab({
           <Tab label="Рандом" value="randomizer" />
           <Tab label="Реакции" value="reactions" />
         </Tabs>
-        <Box sx={{ pt: 2, px: 0.25 }}>
+        <Box sx={{ pt: 2, px: 0.25, flex: 1, minHeight: 0, overflowY: "auto" }}>
           {roomQuestionsTab === "quizzes" &&
             (subQuizSheets.length === 0 ? (
               <Box
@@ -1361,9 +1651,10 @@ export function AdminEventQuestionsTab({
                             setMessage={questionsSectionBindings.setMessage}
                             setPublicResultsView={setPublicResultsView}
                             onAddRound={(g) => void addDebateSeriesRoundAtIndex(g)}
-                            onResultTitleChange={(id, title) =>
-                              void updateDebateSeriesResultTitle(id, title)
-                            }
+                            onCloneSeries={(id) => void cloneDebateSeries(id)}
+                            onSaveSeries={(id, payload) => void updateDebateSeries(id, payload)}
+                            onRemoveSeries={(id) => void removeDebateSeries(id)}
+                            onRemoveRound={(formIndex) => void removeQuestion(formIndex)}
                             manageMode={voteListManageMode}
                             adminDoneMode="markDone"
                             onToggleAdminDone={() => void setQuestionsAdminDone(indices, true)}
@@ -1553,9 +1844,10 @@ export function AdminEventQuestionsTab({
                                 setMessage={questionsSectionBindings.setMessage}
                                 setPublicResultsView={setPublicResultsView}
                                 onAddRound={(g) => void addDebateSeriesRoundAtIndex(g)}
-                                onResultTitleChange={(id, title) =>
-                                  void updateDebateSeriesResultTitle(id, title)
-                                }
+                                onCloneSeries={(id) => void cloneDebateSeries(id)}
+                                onSaveSeries={(id, payload) => void updateDebateSeries(id, payload)}
+                                onRemoveSeries={(id) => void removeDebateSeries(id)}
+                                onRemoveRound={(formIndex) => void removeQuestion(formIndex)}
                                 manageMode={voteListManageMode}
                                 adminDoneMode="markActive"
                                 onToggleAdminDone={() => void setQuestionsAdminDone(indices, false)}
@@ -1741,6 +2033,7 @@ export function AdminEventQuestionsTab({
               onDeleteWidget={adminReactions.deleteWidget}
               onStartWidget={adminReactions.startWidget}
               onStop={adminReactions.stopWidget}
+              onResetWidget={adminReactions.resetWidget}
               onToggleProjector={adminReactions.toggleProjector}
             />
           )}

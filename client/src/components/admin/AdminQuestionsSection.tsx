@@ -378,8 +378,18 @@ export function AdminQuestionsSection(props: Props) {
                     <ListItemButton
                       disableGutters
                       selected={false}
-                      onClick={() => openQuestionDialog(g)}
-                      aria-label={`${questionTypeLabel(question)}: ${question.text.trim() || "Без текста"}`}
+                      onClick={() => {
+                        if (isDebateSeriesQuestion) {
+                          setExpandedQuestionSettingsIndex((current) => (current === g ? null : g));
+                          return;
+                        }
+                        openQuestionDialog(g);
+                      }}
+                      aria-label={
+                        isDebateSeriesQuestion
+                          ? `${debateRoundLabel ?? "Раунд"}: ${question.text.trim() || "Без текста"}`
+                          : `${questionTypeLabel(question)}: ${question.text.trim() || "Без текста"}`
+                      }
                       aria-selected={selectedListIndex === qIndex}
                       sx={{
                         display: "flex",
@@ -1113,7 +1123,7 @@ export function AdminQuestionsSection(props: Props) {
                                   Подробно
                                 </Button>
                               ) : null}
-                              {onCloneQuestion && isStandaloneVote ? (
+                              {onCloneQuestion && isStandaloneVote && !isDebateSeriesQuestion ? (
                                 <Button
                                   startIcon={<ContentCopyIcon />}
                                   size="small"

@@ -259,7 +259,7 @@ export function registerQuizPlayHandlers(socket: EnrichedSocket, io: Server) {
       if (!socket.data.quizId || socket.data.quizId !== payload.quizId)
         throw new Error("Not joined");
       if (!allowReactionBurst(socket.id)) return;
-      const reactionSession = addReaction(
+      const reactionSession = await addReaction(
         payload.quizId,
         socket.data.participantId,
         payload.reactionType,

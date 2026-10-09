@@ -9,7 +9,8 @@ vi.mock("../src/socket/public-view-store.js", () => ({
   saveStoredPublicView,
 }));
 
-const { persistReactionWidgetCounts } = await import("../src/reaction-widget-stats.js");
+const { clearReactionWidgetCounts, persistReactionWidgetCounts, readReactionWidgetSeedCounts } =
+  await import("../src/reaction-widget-stats.js");
 
 describe("persistReactionWidgetCounts", () => {
   beforeEach(() => {
@@ -35,6 +36,34 @@ describe("persistReactionWidgetCounts", () => {
       "quiz-1",
       expect.objectContaining({
         reactionsWidgetStats: [{ widgetId: "w1", counts: { "👍": 2, "❤️": 0 } }],
+      }),
+    );
+  });
+
+  it("reads seed counts from persisted widget stats", async () => {
+    getStoredPublicView.mockResolvedValue({
+      ...DEFAULT_PUBLIC_VIEW_STATE,
+      reactionsOverlayText: "Реакции",
+      reactionsWidgets: [{ id: "w1", title: "Реакции", reactions: ["👍", "❤️"] }],
+      reactionsWidgetStats: [{ widgetId: "w1", counts: { "👍": 5, "❤️": 1 } }],
+    });
+    await expect(readReactionWidgetSeedCounts("quiz-1", ["👍", "❤️"])).resolves.toEqual({
+      "👍": 5,
+      "❤️": 1,
+    });
+  });
+
+  it("clears widget counts to zero", async () => {
+    getStoredPublicView.mockResolvedValue({
+      ...DEFAULT_PUBLIC_VIEW_STATE,
+      reactionsWidgets: [{ id: "w1", title: "Реакции", reactions: ["👍", "❤️"] }],
+      reactionsWidgetStats: [{ widgetId: "w1", counts: { "👍": 5, "❤️": 1 } }],
+    });
+    await clearReactionWidgetCounts("quiz-1", "w1");
+    expect(saveStoredPublicView).toHaveBeenCalledWith(
+      "quiz-1",
+      expect.objectContaining({
+        reactionsWidgetStats: [{ widgetId: "w1", counts: { "👍": 0, "❤️": 0 } }],
       }),
     );
   });

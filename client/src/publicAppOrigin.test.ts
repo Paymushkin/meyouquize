@@ -6,10 +6,14 @@ import {
   resolvePlayerFacingOrigin,
 } from "./publicAppOrigin";
 
+/** Пустая строка отключает import.meta.env.VITE_PUBLIC_PLAYER_ORIGIN из .env.local. */
+const noEnvOverride = { vitePublicPlayerOrigin: "" } as const;
+
 describe("resolvePlayerFacingOrigin", () => {
   it("prefers window origin in browser context", () => {
     expect(
       resolvePlayerFacingOrigin({
+        ...noEnvOverride,
         windowOrigin: "http://192.168.0.154",
       }),
     ).toBe("http://192.168.0.154");
@@ -25,30 +29,36 @@ describe("resolvePlayerFacingOrigin", () => {
   });
 
   it("returns empty without window or override", () => {
-    expect(resolvePlayerFacingOrigin({})).toBe("");
+    expect(resolvePlayerFacingOrigin(noEnvOverride)).toBe("");
   });
 });
 
 describe("buildPlayerJoinUrl", () => {
   it("builds join path", () => {
-    expect(buildPlayerJoinUrl("demo", { windowOrigin: "http://192.168.0.154" })).toBe(
-      "http://192.168.0.154/q/demo",
-    );
+    expect(
+      buildPlayerJoinUrl("demo", { ...noEnvOverride, windowOrigin: "http://192.168.0.154" }),
+    ).toBe("http://192.168.0.154/q/demo");
   });
 });
 
 describe("buildProjectorScreenUrl", () => {
   it("builds projector path", () => {
-    expect(buildProjectorScreenUrl("demo", { windowOrigin: "http://192.168.0.154" })).toBe(
-      "http://192.168.0.154/p/demo",
-    );
+    expect(
+      buildProjectorScreenUrl("demo", {
+        ...noEnvOverride,
+        windowOrigin: "http://192.168.0.154",
+      }),
+    ).toBe("http://192.168.0.154/p/demo");
   });
 });
 
 describe("buildSpeakerModeratorUrl", () => {
   it("builds moderator path", () => {
-    expect(buildSpeakerModeratorUrl("demo", { windowOrigin: "http://192.168.0.154" })).toBe(
-      "http://192.168.0.154/s/demo",
-    );
+    expect(
+      buildSpeakerModeratorUrl("demo", {
+        ...noEnvOverride,
+        windowOrigin: "http://192.168.0.154",
+      }),
+    ).toBe("http://192.168.0.154/s/demo");
   });
 });

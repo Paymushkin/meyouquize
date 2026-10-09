@@ -331,6 +331,13 @@ export function useAdminQuestionEditor({
   async function cloneQuestionAtIndex(globalIndex: number) {
     const source = questionForms[globalIndex];
     if (!source) return;
+    if (isDebatePollPreset(source)) {
+      const seriesId = source.debateSeriesId?.trim();
+      if (seriesId) {
+        await cloneDebateSeries(seriesId);
+        return;
+      }
+    }
     if (!source.id) {
       setMessage("Сначала сохраните голосование");
       return;
@@ -360,6 +367,61 @@ export function useAdminQuestionEditor({
     questionDialogTargetSubQuizIdRef.current = source.subQuizId ?? null;
     setIsQuestionDialogOpen(true);
     setMessage("Голосование скопировано");
+  }
+
+  async function cloneDebateSeries(seriesId: string) {
+    const trimmedSeriesId = seriesId.trim();
+    if (!trimmedSeriesId) return;
+    const members = questionForms
+      .map((q, index) => ({ q, index }))
+      .filter(
+        ({ q }) =>
+          q.subQuizId == null &&
+          isDebatePollPreset(q) &&
+          q.debateSeriesId?.trim() === trimmedSeriesId,
+      )
+      .sort(
+        (a, b) => (a.q.debateRoundIndex ?? 0) - (b.q.debateRoundIndex ?? 0) || a.index - b.index,
+      );
+    if (members.length === 0) return;
+    if (members.some(({ q }) => !q.id)) {
+      setMessage("Сначала сохраните все раунды серии");
+      return;
+    }
+    const newSeriesId = `dbs_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`;
+    const clones = members.map(({ q }) => {
+      const cloned = cloneQuestionForm(q);
+      return {
+        ...cloned,
+        debateSeriesId: newSeriesId,
+        debateRoundIndex: q.debateRoundIndex ?? 0,
+        debateSeriesResultTitle: q.debateSeriesResultTitle?.trim() || null,
+        options: cloned.options.map(({ id: _optionId, ...option }) => option),
+      };
+    });
+    const insertAt = members[members.length - 1]!.index + 1;
+    const next = [...questionForms];
+    next.splice(insertAt, 0, ...clones);
+    const formErr = validateQuestionsForm(next);
+    if (formErr) {
+      setMessage(formErr);
+      return;
+    }
+    setQuestionForms(next);
+    const merged = await persistQuestions(next, subQuizSheets, { suppressToast: true });
+    if (merged === false) {
+      setQuestionForms(questionForms);
+      return;
+    }
+    const firstCloneIndex = merged.questions.findIndex(
+      (q) => isDebatePollPreset(q) && q.debateSeriesId?.trim() === newSeriesId,
+    );
+    if (firstCloneIndex >= 0) {
+      setSelectedQuestionIndex(firstCloneIndex);
+    }
+    questionDialogSnapshotRef.current = cloneQuestionForms(merged.questions);
+    questionDialogTargetSubQuizIdRef.current = null;
+    setMessage("Дебаты скопированы");
   }
 
   async function addDebateSeriesRoundAtIndex(globalIndex: number) {
@@ -474,6 +536,99 @@ export function useAdminQuestionEditor({
     const merged = await persistQuestions(next, subQuizSheets, { suppressToast: true });
     if (merged === false) {
       setQuestionForms(questionForms);
+    }
+  }
+
+  async function updateDebateSeries(
+    seriesId: string,
+    patch: {
+      resultTitle: string;
+      options: Array<{ text: string; color?: string | null; isCorrect?: boolean }>;
+      rounds: Array<{ formIndex: number; text: string }>;
+    },
+  ) {
+    const trimmedSeriesId = seriesId.trim();
+    if (!trimmedSeriesId) return;
+    const coloredOptions = withDebateOptionColors(
+      patch.options.map((option) => ({
+        text: option.text,
+        isCorrect: Boolean(option.isCorrect),
+        color: option.color,
+      })),
+    );
+    if (coloredOptions.length < 2) {
+      setMessage("В дебатах должно быть не меньше 2 вариантов");
+      return;
+    }
+    const nextTitle = patch.resultTitle.trim() || null;
+    const roundTextByIndex = new Map(
+      patch.rounds.map((round) => [round.formIndex, round.text] as const),
+    );
+    const next = questionForms.map((q, index) => {
+      if (!isDebatePollPreset(q) || q.debateSeriesId?.trim() !== trimmedSeriesId) return q;
+      const roundText = roundTextByIndex.get(index);
+      return {
+        ...q,
+        debateSeriesResultTitle: nextTitle,
+        ...(roundText !== undefined ? { text: roundText } : {}),
+        options: coloredOptions.map((src, optionIndex) => {
+          const existing = q.options[optionIndex];
+          return {
+            id: existing?.id,
+            text: src.text,
+            isCorrect: Boolean(src.isCorrect),
+            color: src.color,
+            ...(existing?.imageUrl ? { imageUrl: existing.imageUrl } : {}),
+          };
+        }),
+      };
+    });
+    const err = validateQuestionsForm(next);
+    if (err) {
+      setMessage(err);
+      return;
+    }
+    setQuestionForms(next);
+    const merged = await persistQuestions(next, subQuizSheets, { suppressToast: true });
+    if (merged === false) {
+      setQuestionForms(questionForms);
+      return;
+    }
+    setMessage("Дебаты сохранены");
+  }
+
+  async function removeDebateSeries(seriesId: string) {
+    const trimmedSeriesId = seriesId.trim();
+    if (!trimmedSeriesId) return;
+    const removedIndices = new Set(
+      questionForms
+        .map((q, index) =>
+          isDebatePollPreset(q) && q.debateSeriesId?.trim() === trimmedSeriesId ? index : -1,
+        )
+        .filter((index) => index >= 0),
+    );
+    if (removedIndices.size === 0) return;
+    const next = questionForms.filter((_, index) => !removedIndices.has(index));
+    const err = validateQuestionsForm(next);
+    if (err) {
+      setMessage(err);
+      return;
+    }
+    setQuestionForms(next);
+    setSelectedQuestionIndex((current) => {
+      if (next.length === 0) return 0;
+      const removedBefore = [...removedIndices].filter((index) => index < current).length;
+      const adjusted = current - removedBefore;
+      if (removedIndices.has(current)) return Math.max(0, Math.min(adjusted, next.length - 1));
+      return Math.max(0, Math.min(adjusted, next.length - 1));
+    });
+    questionDialogSnapshotRef.current = null;
+    questionDialogTargetSubQuizIdRef.current = null;
+    closeQuestionDialog();
+    const persisted = await persistQuestions(next, subQuizSheets);
+    if (persisted !== false) {
+      setMessage("Дебаты удалены");
+      if (next.length === 0) setQuestionId("");
     }
   }
 
@@ -1283,6 +1438,11 @@ export function useAdminQuestionEditor({
   }
 
   function openQuestionDialog(index: number) {
+    const q = questionForms[index];
+    if (q && isDebatePollPreset(q)) {
+      setMessage("Редактируйте дебаты через заголовок серии");
+      return;
+    }
     setQuestionDialogError("");
     setQuestionForms((prev) => {
       const next = prev.map((item, i) =>
@@ -1291,7 +1451,6 @@ export function useAdminQuestionEditor({
       questionDialogSnapshotRef.current = cloneQuestionForms(next);
       return next;
     });
-    const q = questionForms[index];
     const sid = q?.subQuizId;
     questionDialogTargetSubQuizIdRef.current =
       sid != null && String(sid).trim() !== "" ? String(sid) : null;
@@ -1509,8 +1668,12 @@ export function useAdminQuestionEditor({
     runConfirmedRemoveSubQuiz,
     addQuestionToSubQuiz,
     cloneQuestionAtIndex,
+    cloneDebateSeries,
     addDebateSeriesRoundAtIndex,
     updateDebateSeriesResultTitle,
+    updateDebateSeries,
+    removeDebateSeries,
+    removeQuestion,
     requestRemoveQuestion,
     closeDeleteQuestionDialog,
     runConfirmedRemoveQuestion,

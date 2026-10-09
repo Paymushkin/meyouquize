@@ -1,6 +1,15 @@
 const HEX6_RE = /^#[0-9a-fA-F]{6}$/;
 
-export const DEBATE_DEFAULT_OPTION_COLORS = ["#1976d2", "#c62828", "#90a4ae"] as const;
+export const DEBATE_DEFAULT_OPTION_COLORS = [
+  "#1976d2",
+  "#c62828",
+  "#90a4ae",
+  "#2e7d32",
+  "#ed6c02",
+  "#6a1b9a",
+  "#00838f",
+  "#ad1457",
+] as const;
 
 /** Нормализует hex-цвет варианта (#rrggbb) или возвращает fallback/null. */
 export function sanitizeOptionColor(
@@ -14,9 +23,8 @@ export function sanitizeOptionColor(
 }
 
 export function debateDefaultOptionColor(index: number): string {
-  return DEBATE_DEFAULT_OPTION_COLORS[
-    Math.max(0, Math.min(index, DEBATE_DEFAULT_OPTION_COLORS.length - 1))
-  ]!;
+  const safeIndex = Number.isFinite(index) ? Math.max(0, Math.trunc(index)) : 0;
+  return DEBATE_DEFAULT_OPTION_COLORS[safeIndex % DEBATE_DEFAULT_OPTION_COLORS.length]!;
 }
 
 /** Контрастный цвет текста на сплошной заливке (#rrggbb). */

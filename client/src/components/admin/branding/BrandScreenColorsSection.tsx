@@ -42,7 +42,7 @@ export function BrandScreenColorsSection(props: Props) {
   } = props;
 
   return (
-    <Accordion defaultExpanded>
+    <Accordion>
       <AccordionSummary expandIcon={<ExpandMoreIcon />}>
         <Typography variant="subtitle2">Проектор</Typography>
       </AccordionSummary>

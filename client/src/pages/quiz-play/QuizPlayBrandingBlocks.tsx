@@ -856,6 +856,17 @@ export function ReactionsDock(props: ReactionsDockProps) {
                 borderWidth: 2,
                 borderColor: brandPrimaryColor,
               },
+              "&:active": {
+                bgcolor: brandPrimaryColor,
+                borderColor: brandPrimaryColor,
+              },
+              "&.Mui-focusVisible": {
+                bgcolor: "rgba(0, 0, 0, 0.52)",
+                borderColor: brandPrimaryColor,
+              },
+              ".MuiTouchRipple-child": {
+                backgroundColor: brandPrimaryColor,
+              },
               textTransform: "none",
               width: pcq(76, 86),
               minWidth: pcq(76, 86),

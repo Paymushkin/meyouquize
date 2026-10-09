@@ -15,7 +15,10 @@ describe("optionColor", () => {
 
   it("returns default debate colors by index", () => {
     expect(debateDefaultOptionColor(0)).toBe(DEBATE_DEFAULT_OPTION_COLORS[0]);
-    expect(debateDefaultOptionColor(99)).toBe(DEBATE_DEFAULT_OPTION_COLORS[2]);
+    expect(debateDefaultOptionColor(3)).toBe(DEBATE_DEFAULT_OPTION_COLORS[3]);
+    expect(debateDefaultOptionColor(99)).toBe(
+      DEBATE_DEFAULT_OPTION_COLORS[99 % DEBATE_DEFAULT_OPTION_COLORS.length],
+    );
   });
 
   it("picks contrasting text for light and dark fills", () => {

@@ -865,6 +865,11 @@ export const stopReactionSessionSchema = z.object({
   quizId: z.string().min(1),
 });
 
+export const resetReactionWidgetSchema = z.object({
+  quizId: z.string().min(1),
+  widgetId: z.string().trim().min(1).max(120),
+});
+
 export const toggleReactionSchema = z.object({
   quizId: z.string().min(1),
   reactionType: z.string().trim().min(1).max(16),

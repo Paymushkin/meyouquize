@@ -7,6 +7,7 @@ import { socket } from "../../socket";
 import { randomUuid } from "../../utils/randomUuid";
 import { applyAdminReactionsFromPublicView } from "./applyAdminReactionsFromPublicView";
 import {
+  findReactionWidgetMatch,
   getReactionWidgetsOrNull,
   parseReactionLines,
   readReactionWidgetsFromStorage,
@@ -53,6 +54,9 @@ export function useAdminReactions({
   const [projectorWidgetId, setProjectorWidgetId] = useState<string | null>(null);
 
   const widgetsResyncDoneRef = useRef<string | null>(null);
+  /** Один раз за период активности — не перезаписывать после явного Stop/toggle. */
+  const hydratedActiveWidgetRef = useRef(false);
+  const hydratedProjectorWidgetRef = useRef(false);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -87,6 +91,48 @@ export function useAdminReactions({
     widgetsResyncDoneRef.current = quizId;
     setMessage("Виджеты реакций восстановлены после перезапуска");
   }, [emitPublicViewPatch, quizId, widgets, roomPublicView, setMessage]);
+
+  // После reload activeWidgetId/projectorWidgetId живут только в React state —
+  // восстанавливаем из reactionSession и publicViewMode + overlay.
+  useEffect(() => {
+    if (!reactionSession?.isActive) {
+      hydratedActiveWidgetRef.current = false;
+      setActiveWidgetId(null);
+      return;
+    }
+    setActiveWidgetId((current) => {
+      if (current && widgets.some((widget) => widget.id === current)) {
+        hydratedActiveWidgetRef.current = true;
+        return current;
+      }
+      if (hydratedActiveWidgetRef.current) return current;
+      const matched =
+        findReactionWidgetMatch(widgets, {
+          overlayText,
+          sessionReactions: reactionSession.reactions,
+        })?.id ?? null;
+      if (matched) hydratedActiveWidgetRef.current = true;
+      return matched;
+    });
+  }, [overlayText, reactionSession?.isActive, reactionSession?.reactions, widgets]);
+
+  useEffect(() => {
+    if (publicViewMode !== "reactions") {
+      hydratedProjectorWidgetRef.current = false;
+      setProjectorWidgetId(null);
+      return;
+    }
+    setProjectorWidgetId((current) => {
+      if (current && widgets.some((widget) => widget.id === current)) {
+        hydratedProjectorWidgetRef.current = true;
+        return current;
+      }
+      if (hydratedProjectorWidgetRef.current) return current;
+      const matched = findReactionWidgetMatch(widgets, { overlayText })?.id ?? null;
+      if (matched) hydratedProjectorWidgetRef.current = true;
+      return matched;
+    });
+  }, [overlayText, publicViewMode, widgets]);
 
   const applyFromPublicView = useCallback((payload: PublicViewPayload) => {
     applyAdminReactionsFromPublicView(payload, {
@@ -226,6 +272,25 @@ export function useAdminReactions({
     setMessage("Реакции остановлены");
   }, [quizId, setMessage]);
 
+  const resetWidget = useCallback(
+    (widget: ReactionWidget) => {
+      if (!quizId) return;
+      socket.emit("reactions:widget-reset", { quizId, widgetId: widget.id });
+      setWidgetStats((prev) => {
+        const zeroCounts = widget.reactions.reduce<Record<string, number>>((acc, reaction) => {
+          acc[reaction] = 0;
+          return acc;
+        }, {});
+        return [
+          ...prev.filter((row) => row.widgetId !== widget.id),
+          { widgetId: widget.id, counts: zeroCounts },
+        ];
+      });
+      setMessage("Итоги виджета сброшены");
+    },
+    [quizId, setMessage],
+  );
+
   const toggleProjector = useCallback(
     (widget: ReactionWidget) => {
       const isSameWidgetOnProjector =
@@ -266,6 +331,7 @@ export function useAdminReactions({
     deleteWidget,
     startWidget,
     stopWidget,
+    resetWidget,
     toggleProjector,
   };
 }

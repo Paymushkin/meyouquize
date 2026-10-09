@@ -31,11 +31,11 @@ export function AdminEventNavSidebar({
       sx={{
         width: { xs: 72, md: 256 },
         flexShrink: 0,
-        alignSelf: "flex-start",
-        position: "sticky",
-        top: 0,
-        maxHeight: "calc(100vh - 32px)",
-        overflowY: "auto",
+        alignSelf: "stretch",
+        height: "100%",
+        display: "flex",
+        flexDirection: "column",
+        overflow: "hidden",
         borderTopLeftRadius: 0,
         borderBottomLeftRadius: 0,
         borderTopRightRadius: 0,
@@ -44,12 +44,16 @@ export function AdminEventNavSidebar({
     >
       <CardContent
         sx={{
+          flex: 1,
+          minHeight: 0,
+          display: "flex",
+          flexDirection: "column",
           px: { xs: 0.25, md: 1.5 },
           py: { xs: 1, md: 2 },
           "&:last-child": { pb: { xs: 1, md: 2 } },
         }}
       >
-        <List dense sx={{ py: 0, display: "block" }}>
+        <List dense sx={{ py: 0, display: "block", overflowY: "auto", minHeight: 0 }}>
           {ADMIN_EVENT_NAV.map(({ id, label, icon }) => {
             const showBadge = sectionBadges?.[id] === true;
             return (
@@ -107,6 +111,7 @@ export function AdminEventNavSidebar({
             );
           })}
         </List>
+        <Box sx={{ flex: 1, minHeight: 8 }} />
         <AdminColorModeSwitcher />
       </CardContent>
     </Card>

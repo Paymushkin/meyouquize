@@ -66,6 +66,15 @@ describe("interactivePresets", () => {
         type: "single",
         subQuizId: null,
         editorQuizMode: false,
+        projectorDebateLayout: true,
+        options: [{ text: "A" }, { text: "B" }, { text: "C" }, { text: "D" }],
+      }),
+    ).toBe(true);
+    expect(
+      isDebatePollPreset({
+        type: "single",
+        subQuizId: null,
+        editorQuizMode: false,
         projectorDebateLayout: false,
         options: debatePollOptions(),
       }),
