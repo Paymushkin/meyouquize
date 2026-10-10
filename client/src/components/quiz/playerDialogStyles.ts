@@ -163,6 +163,8 @@ export function buildPlayerDialogSelectMenuProps(
   return {
     PaperProps: {
       sx: {
+        // Не шире диалога игрока (PLAYER_DIALOG_PAPER_SX maxWidth = 576).
+        maxWidth: "min(576px, calc(100vw - 32px))",
         bgcolor: "rgba(38, 38, 38, 0.96)",
         color: "#fff",
         fontFamily: brandFontFamily,
@@ -170,6 +172,11 @@ export function buildPlayerDialogSelectMenuProps(
           fontFamily: brandFontFamily,
           fontStyle: "normal",
           color: "#fff",
+          whiteSpace: "normal",
+          wordBreak: "break-word",
+          lineHeight: 1.35,
+          alignItems: "flex-start",
+          py: 1,
           transition: "background-color 160ms ease, color 160ms ease",
           "&:hover": {
             bgcolor: alpha(brandColor, 0.18),

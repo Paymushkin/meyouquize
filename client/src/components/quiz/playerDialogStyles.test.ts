@@ -35,8 +35,11 @@ describe("buildPlayerDialogSelectMenuProps", () => {
       "#000000",
     );
     const paperSx = menuProps.PaperProps?.sx as Record<string, unknown>;
+    expect(paperSx.maxWidth).toBe("min(576px, calc(100vw - 32px))");
     const menuItemSx = (paperSx["& .MuiMenuItem-root"] ?? {}) as Record<string, unknown>;
     expect(menuItemSx).toMatchObject({
+      whiteSpace: "normal",
+      wordBreak: "break-word",
       "&:hover": {
         color: "#F3F722",
       },
