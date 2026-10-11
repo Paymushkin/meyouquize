@@ -791,6 +791,7 @@ async function createDemoAnswersAndSpeakerQuestions(input: {
           speakerName: s.speakerName,
           text: s.text,
           isVisibleToUsers: true,
+          isVisibleToModerator: true,
           status: "APPROVED",
           isOnScreen: s.isOnScreen,
           createdAt: new Date(Date.now() - idx * 1000 * 60),

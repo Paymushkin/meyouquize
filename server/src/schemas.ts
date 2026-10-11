@@ -403,6 +403,7 @@ export const setPublicViewSchema = z.object({
       "reactions",
       "randomizer",
       "photo_wall",
+      "video_wall",
       "report",
       "debate_compare",
       "debate_series",
@@ -587,6 +588,7 @@ export const setPublicViewSchema = z.object({
   programTileLinkUrl: optionalExternalHttpUrlSchema,
   programTileVisible: z.boolean().optional(),
   photoWallTileVisible: z.boolean().optional(),
+  videoWallTileVisible: z.boolean().optional(),
   playerQuizResultsTileVisible: z.boolean().optional(),
   playerQuizResultsTileText: z.string().trim().max(120).optional(),
   playerQuizResultsTileBackgroundColor: z
@@ -670,6 +672,34 @@ export const setPublicViewSchema = z.object({
   photoWallGridColumns: z.number().int().min(0).max(12).optional(),
   photoWallAnimate: z.boolean().optional(),
   photoWallKenBurns: z.boolean().optional(),
+  videoWallHorizontalItems: z
+    .array(
+      z.object({
+        id: z.string().trim().min(1).max(80),
+        url: z.string().trim().url().max(1000),
+        title: z.string().trim().max(120),
+      }),
+    )
+    .max(200)
+    .optional(),
+  videoWallHorizontalPosterUrl: z.string().trim().max(1000).optional(),
+  videoWallTileCoverUrl: z.string().trim().max(1000).optional(),
+  videoWallProjectorShowHorizontal: z.boolean().optional(),
+  videoWallProjectorShowVertical: z.boolean().optional(),
+  videoWallProjectorMaxVideos: z.number().int().min(1).max(40).optional(),
+  videoWallProjectorActiveSeconds: z.number().int().min(2).max(120).optional(),
+  videoWallProjectorFreezeSeconds: z.number().int().min(0).max(600).optional(),
+  videoWallVerticalItems: z
+    .array(
+      z.object({
+        id: z.string().trim().min(1).max(80),
+        url: z.string().trim().url().max(1000),
+        title: z.string().trim().max(120),
+      }),
+    )
+    .max(200)
+    .optional(),
+  videoWallVerticalPosterUrl: z.string().trim().max(1000).optional(),
   reportTitle: z.string().trim().max(120).optional(),
   reportModules: z
     .array(
@@ -793,6 +823,12 @@ export const adminSpeakerQuestionUserVisibleSchema = z.object({
   quizId: z.string().min(1),
   speakerQuestionId: z.string().min(1),
   isVisibleToUsers: z.boolean(),
+});
+
+export const adminSpeakerQuestionModeratorVisibleSchema = z.object({
+  quizId: z.string().min(1),
+  speakerQuestionId: z.string().min(1),
+  isVisibleToModerator: z.boolean(),
 });
 
 export const adminSpeakerQuestionUpdateSchema = z.object({

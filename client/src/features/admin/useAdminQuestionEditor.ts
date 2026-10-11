@@ -888,6 +888,7 @@ export function useAdminQuestionEditor({
         | "reactions"
         | "randomizer"
         | "photo_wall"
+        | "video_wall"
         | "debate_compare"
         | "debate_series",
       questionIdForMode?: string,

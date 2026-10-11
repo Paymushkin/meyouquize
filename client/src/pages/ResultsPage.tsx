@@ -9,6 +9,7 @@ import { ProjectorQuestionSection } from "../components/projector/ProjectorQuest
 import { ProjectorDebateCompareSection } from "../components/projector/ProjectorDebateCompareSection";
 import { ProjectorRandomizerSection } from "../components/projector/ProjectorRandomizerSection";
 import { ProjectorPhotoWallSection } from "../components/projector/ProjectorPhotoWallSection";
+import { ProjectorVideoWallSection } from "../components/projector/ProjectorVideoWallSection";
 import { useResultsProjectorSession } from "../hooks/useResultsProjectorSession";
 import { useProjectorJoinQr } from "../hooks/useProjectorJoinQr";
 import { ProjectorViewportBackground } from "../components/projector/ProjectorViewportBackground";
@@ -255,7 +256,8 @@ export function ResultsPage() {
     view.mode === "speaker_questions" ||
     view.mode === "reactions" ||
     view.mode === "randomizer" ||
-    view.mode === "photo_wall";
+    view.mode === "photo_wall" ||
+    view.mode === "video_wall";
   const brandProjectorBackgroundImageUrl = view.brandProjectorBackgroundImageUrl?.trim()
     ? resolveClientAssetUrl(view.brandProjectorBackgroundImageUrl)
     : undefined;
@@ -791,6 +793,7 @@ export function ResultsPage() {
         )}
         {view.mode === "randomizer" && <ProjectorRandomizerSection view={view} />}
         {view.mode === "photo_wall" && <ProjectorPhotoWallSection view={view} />}
+        {view.mode === "video_wall" && <ProjectorVideoWallSection view={view} />}
       </Container>
     </>
   );

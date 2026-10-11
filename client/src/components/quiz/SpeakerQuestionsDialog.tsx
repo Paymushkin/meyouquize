@@ -25,8 +25,6 @@ import {
 } from "../../features/speakerQuestions/playerSpeakerQuestionsLists";
 import {
   SPEAKER_ALL_TARGET_LABEL,
-  SPEAKER_SELECT_PLACEHOLDER_LABEL,
-  SPEAKER_UI_UNSELECTED,
   normalizeSpeakerUiSelection,
   speakerQuestionRecipientLabelForAudience,
 } from "../../features/speakerQuestions/speakerTargetUi";
@@ -154,8 +152,10 @@ export function SpeakerQuestionsDialog({
     () => filterMySpeakerQuestions(speakerQuestions?.items ?? []),
     [speakerQuestions?.items],
   );
+  const showActualTab = actualItems.length > 0;
   const showMineTab = mineItems.length > 0;
-  const showQuestionsSection = actualItems.length > 0 || mineItems.length > 0;
+  const showBothTabs = showActualTab && showMineTab;
+  const showQuestionsSection = showActualTab || showMineTab;
   const [tab, setTab] = useState<QuestionsTab>("actual");
   const textFieldSx = buildPlayerDialogTextFieldSx(
     formBackgroundColor,
@@ -179,18 +179,20 @@ export function SpeakerQuestionsDialog({
 
   useEffect(() => {
     if (!open) return;
-    if (actualItems.length > 0) {
+    if (showActualTab) {
       setTab("actual");
       return;
     }
-    if (mineItems.length > 0) setTab("mine");
-  }, [open, actualItems.length, mineItems.length]);
+    if (showMineTab) setTab("mine");
+  }, [open, showActualTab, showMineTab]);
 
   useEffect(() => {
-    if (!showMineTab && tab === "mine") setTab("actual");
-  }, [showMineTab, tab]);
+    if (tab === "mine" && !showMineTab && showActualTab) setTab("actual");
+    if (tab === "actual" && !showActualTab && showMineTab) setTab("mine");
+  }, [showActualTab, showMineTab, tab]);
 
-  const visibleItems = tab === "mine" ? mineItems : actualItems;
+  const activeTab: QuestionsTab = showBothTabs ? tab : showMineTab ? "mine" : "actual";
+  const visibleItems = activeTab === "mine" ? mineItems : actualItems;
 
   return (
     <Dialog
@@ -223,12 +225,8 @@ export function SpeakerQuestionsDialog({
               sx={textFieldSx}
               slotProps={{
                 select: {
-                  displayEmpty: !allowAllSpeakersTarget,
                   renderValue: (selected) => {
                     const value = String(selected ?? "");
-                    if (!allowAllSpeakersTarget && value === SPEAKER_UI_UNSELECTED) {
-                      return SPEAKER_SELECT_PLACEHOLDER_LABEL;
-                    }
                     if (value === SPEAKER_ALL_TARGET) return SPEAKER_ALL_TARGET_LABEL;
                     return value;
                   },
@@ -238,11 +236,7 @@ export function SpeakerQuestionsDialog({
             >
               {allowAllSpeakersTarget ? (
                 <MenuItem value={SPEAKER_ALL_TARGET}>{SPEAKER_ALL_TARGET_LABEL}</MenuItem>
-              ) : (
-                <MenuItem value={SPEAKER_UI_UNSELECTED}>
-                  {SPEAKER_SELECT_PLACEHOLDER_LABEL}
-                </MenuItem>
-              )}
+              ) : null}
               {speakers.map((name) => (
                 <MenuItem key={name} value={name}>
                   {name}
@@ -276,9 +270,9 @@ export function SpeakerQuestionsDialog({
           {showQuestionsSection ? (
             <>
               <Divider />
-              {showMineTab ? (
+              {showBothTabs ? (
                 <Tabs
-                  value={tab}
+                  value={activeTab}
                   onChange={(_, next: QuestionsTab) => setTab(next)}
                   variant="fullWidth"
                   sx={buildPlayerDialogTabsSx(formBackgroundColor, brandFontFamily)}
@@ -288,31 +282,23 @@ export function SpeakerQuestionsDialog({
                 </Tabs>
               ) : (
                 <Typography variant="subtitle2" sx={{ color: formBackgroundColor }}>
-                  Актуальные вопросы
+                  {showMineTab ? "Мои вопросы" : "Актуальные вопросы"}
                 </Typography>
               )}
               <Stack spacing={0.75}>
-                {visibleItems.length === 0 ? (
-                  <Typography variant="body2" sx={{ color: alpha("#fff", 0.65), py: 0.5 }}>
-                    {tab === "actual"
-                      ? "Пока нет одобренных вопросов."
-                      : "У вас пока нет вопросов."}
-                  </Typography>
-                ) : (
-                  visibleItems.map((item, idx, arr) => (
-                    <Box key={item.id}>
-                      <SpeakerQuestionRow
-                        item={item}
-                        reactions={reactions}
-                        showReactions={tab === "actual"}
-                        showDelete={tab === "mine" && Boolean(item.isMine)}
-                        onReact={onReact}
-                        onDelete={onDelete}
-                      />
-                      {idx < arr.length - 1 ? <Divider sx={{ mt: 1.5 }} /> : null}
-                    </Box>
-                  ))
-                )}
+                {visibleItems.map((item, idx, arr) => (
+                  <Box key={item.id}>
+                    <SpeakerQuestionRow
+                      item={item}
+                      reactions={reactions}
+                      showReactions={activeTab === "actual"}
+                      showDelete={activeTab === "mine" && Boolean(item.isMine)}
+                      onReact={onReact}
+                      onDelete={onDelete}
+                    />
+                    {idx < arr.length - 1 ? <Divider sx={{ mt: 1.5 }} /> : null}
+                  </Box>
+                ))}
               </Stack>
             </>
           ) : null}

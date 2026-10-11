@@ -34,6 +34,7 @@ type Params = {
   brandPrimaryColor: string;
   playerVoteOptionTextColor: string;
   photoWallCollageSrcs: string[];
+  videoWallTileCoverUrl: string;
   playerTilesGridColumns: 2 | 3;
   onChangePlayerTilesGridColumns: (value: 2 | 3) => void;
   onCreate: (input: BannerWriteInput) => void;
@@ -66,6 +67,7 @@ export function useAdminBannersSectionState(params: Params) {
     brandPrimaryColor,
     playerVoteOptionTextColor,
     photoWallCollageSrcs,
+    videoWallTileCoverUrl,
     playerTilesGridColumns,
     onChangePlayerTilesGridColumns,
     onCreate,
@@ -150,6 +152,7 @@ export function useAdminBannersSectionState(params: Params) {
         brandPrimaryColor,
         playerVoteOptionTextColor,
         photoWallCollageSrcs,
+        videoWallTileCoverUrl,
       ),
     [
       tilesOrder,
@@ -167,6 +170,7 @@ export function useAdminBannersSectionState(params: Params) {
       brandPrimaryColor,
       playerVoteOptionTextColor,
       photoWallCollageSrcs,
+      videoWallTileCoverUrl,
     ],
   );
 

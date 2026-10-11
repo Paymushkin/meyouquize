@@ -14,6 +14,7 @@ function item(
     authorNickname: "Анна",
     status: "PENDING",
     userVisible: false,
+    moderatorVisible: false,
     isOnScreen: false,
     createdAt: "2026-01-01T00:00:00.000Z",
     ...partial,

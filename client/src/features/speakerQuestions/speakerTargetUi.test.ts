@@ -17,12 +17,23 @@ describe("speakerTargetUi", () => {
   });
 
   it("normalizes ui selection when all-speakers option is disabled", () => {
-    const speakers = ["Иванов"];
-    expect(normalizeSpeakerUiSelection(SPEAKER_ALL_TARGET, false, speakers)).toBe(
-      SPEAKER_UI_UNSELECTED,
-    );
+    const speakers = ["Иванов", "Петров"];
+    expect(normalizeSpeakerUiSelection(SPEAKER_ALL_TARGET, false, speakers)).toBe("Иванов");
+    expect(normalizeSpeakerUiSelection("", false, speakers)).toBe("Иванов");
     expect(normalizeSpeakerUiSelection("Иванов", false, speakers)).toBe("Иванов");
-    expect(normalizeSpeakerUiSelection("Петров", false, speakers)).toBe(SPEAKER_UI_UNSELECTED);
+    expect(normalizeSpeakerUiSelection("Петров", false, speakers)).toBe("Петров");
+    expect(normalizeSpeakerUiSelection("Сидоров", false, speakers)).toBe("Иванов");
+    expect(normalizeSpeakerUiSelection("", false, [])).toBe(SPEAKER_UI_UNSELECTED);
+  });
+
+  it("normalizes ui selection when all-speakers option is enabled", () => {
+    const speakers = ["Иванов", "Петров"];
+    expect(normalizeSpeakerUiSelection("", true, speakers)).toBe(SPEAKER_ALL_TARGET);
+    expect(normalizeSpeakerUiSelection(SPEAKER_ALL_TARGET, true, speakers)).toBe(
+      SPEAKER_ALL_TARGET,
+    );
+    expect(normalizeSpeakerUiSelection("Иванов", true, speakers)).toBe("Иванов");
+    expect(normalizeSpeakerUiSelection("Сидоров", true, speakers)).toBe(SPEAKER_ALL_TARGET);
   });
 
   it("hides recipient label for audience when not selected", () => {

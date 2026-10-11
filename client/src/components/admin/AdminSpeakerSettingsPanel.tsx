@@ -306,7 +306,7 @@ export function AdminSpeakerSettingsPanel({ settings, actions }: Props) {
                     onChange={(_, v) => onToggleModeratorShowAll(v)}
                   />
                 }
-                label="На странице модератора — все вопросы (иначе только одобренные)"
+                label="На странице модератора — все вопросы (иначе только с включённым «Мод.»)"
               />
             </Stack>
             <TextField

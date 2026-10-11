@@ -10,11 +10,11 @@ describe("photoWallAlbumMosaicGridSx", () => {
       gridColumn: "span 1",
       gridRow: "span 1",
     });
-    expect(photoWallAlbumMosaicGridSx["& > .pw-mosaic-cell:nth-child(10n + 1)"]).toEqual({
+    expect(photoWallAlbumMosaicGridSx["& > .pw-mosaic-cell:nth-of-type(10n + 1)"]).toEqual({
       gridColumn: "1 / span 2",
       gridRow: "span 2",
     });
-    expect(photoWallAlbumMosaicGridSx["& > .pw-mosaic-cell:nth-child(10n + 6)"]).toEqual({
+    expect(photoWallAlbumMosaicGridSx["& > .pw-mosaic-cell:nth-of-type(10n + 6)"]).toEqual({
       gridColumn: "2 / span 2",
       gridRow: "span 2",
     });
@@ -23,11 +23,11 @@ describe("photoWallAlbumMosaicGridSx", () => {
   it("alternates large tiles left/right on wide containers", () => {
     const wide = photoWallAlbumMosaicGridSx["@container (min-width: 420px)"];
     expect(wide.gridTemplateColumns).toBe("repeat(4, minmax(0, 1fr))");
-    expect(wide["& > .pw-mosaic-cell:nth-child(10n + 1)"]).toEqual({
+    expect(wide["& > .pw-mosaic-cell:nth-of-type(10n + 1)"]).toEqual({
       gridColumn: "1 / span 2",
       gridRow: "span 2",
     });
-    expect(wide["& > .pw-mosaic-cell:nth-child(10n + 6)"]).toEqual({
+    expect(wide["& > .pw-mosaic-cell:nth-of-type(10n + 6)"]).toEqual({
       gridColumn: "3 / span 2",
       gridRow: "span 2",
     });

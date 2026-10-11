@@ -31,9 +31,10 @@ export function normalizeSpeakerUiSelection(
     if (uiValue === SPEAKER_ALL_TARGET || speakers.includes(uiValue)) return uiValue;
     return SPEAKER_ALL_TARGET;
   }
-  if (uiValue === SPEAKER_ALL_TARGET) return SPEAKER_UI_UNSELECTED;
-  if (!uiValue || speakers.includes(uiValue)) return uiValue;
-  return SPEAKER_UI_UNSELECTED;
+  const first = speakers[0] ?? SPEAKER_UI_UNSELECTED;
+  if (uiValue === SPEAKER_ALL_TARGET || !uiValue) return first;
+  if (speakers.includes(uiValue)) return uiValue;
+  return first;
 }
 
 export function speakerQuestionRecipientLabel(speakerName: string): string {

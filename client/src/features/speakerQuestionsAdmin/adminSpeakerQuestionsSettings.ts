@@ -15,7 +15,7 @@ export type AdminSpeakerQuestionsSettingsValues = {
   showRecipientOnScreen: boolean;
   showReactionsOnScreen: boolean;
   allowAllSpeakersTarget: boolean;
-  /** false = на /s только APPROVED; true = все вопросы */
+  /** false = на /s только с флагом модератора; true = все вопросы */
   moderatorShowAll: boolean;
   sessions: AdminSpeakerSessionDraft[];
   activeSpeakerSessionId: string | null;

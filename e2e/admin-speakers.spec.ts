@@ -51,6 +51,7 @@ test("админка: секция спикеров и колонки табли
 
   await expect(page.getByText("Вопросы спикерам")).toBeVisible();
   await expect(page.getByRole("columnheader", { name: "UI" }).first()).toBeVisible();
+  await expect(page.getByRole("columnheader", { name: "Мод." }).first()).toBeVisible();
   await expect(page.getByRole("columnheader", { name: "Экран" })).toBeVisible();
   await expect(page.getByRole("columnheader", { name: "Скрыть" })).toBeVisible();
   await expect(page.getByRole("columnheader", { name: "Вернуть" })).toBeVisible();

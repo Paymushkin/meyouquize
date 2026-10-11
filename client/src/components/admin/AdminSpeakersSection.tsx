@@ -29,6 +29,7 @@ type Props = {
   onHide: (id: string) => void;
   onRestore: (id: string) => void;
   onSetUserVisible: (id: string, next: boolean) => void;
+  onSetModeratorVisible: (id: string, next: boolean) => void;
   onSetOnScreen: (id: string, next: boolean) => void;
   onUpdateQuestionText: (id: string, text: string) => void;
   onDeleteQuestion: (id: string) => void;
@@ -48,6 +49,7 @@ export function AdminSpeakersSection(props: Props) {
     onHide,
     onRestore,
     onSetUserVisible,
+    onSetModeratorVisible,
     onSetOnScreen,
     onUpdateQuestionText,
     onDeleteQuestion,
@@ -145,6 +147,7 @@ export function AdminSpeakersSection(props: Props) {
             actionIcon={<VisibilityOffOutlinedIcon fontSize="small" />}
             showScreenColumn
             onSetUserVisible={onSetUserVisible}
+            onSetModeratorVisible={onSetModeratorVisible}
             onSetOnScreen={onSetOnScreen}
             onUpdateQuestionText={onUpdateQuestionText}
             onAction={onHide}
@@ -163,6 +166,7 @@ export function AdminSpeakersSection(props: Props) {
             actionIcon={<UndoOutlinedIcon fontSize="small" />}
             showScreenColumn={false}
             onSetUserVisible={onSetUserVisible}
+            onSetModeratorVisible={onSetModeratorVisible}
             onUpdateQuestionText={onUpdateQuestionText}
             onAction={onRestore}
             onDelete={onDeleteQuestion}

@@ -7,6 +7,7 @@ export type SortKey =
   | "rating"
   | "question"
   | "ui"
+  | "moderator"
   | "screen"
   | "action";
 export type SortState<T extends SortKey> = { key: T; dir: "asc" | "desc" };
@@ -32,6 +33,8 @@ export function compareRows(
   if (key === "speaker") return mul * a.speakerName.localeCompare(b.speakerName, "ru");
   if (key === "question") return mul * a.text.localeCompare(b.text, "ru");
   if (key === "ui") return mul * ((a.userVisible ? 1 : 0) - (b.userVisible ? 1 : 0));
+  if (key === "moderator")
+    return mul * ((a.moderatorVisible ? 1 : 0) - (b.moderatorVisible ? 1 : 0));
   if (key === "screen") return mul * ((a.isOnScreen ? 1 : 0) - (b.isOnScreen ? 1 : 0));
   if (key === "action") return mul * a.id.localeCompare(b.id);
   const scoreA = ratingValue(a);

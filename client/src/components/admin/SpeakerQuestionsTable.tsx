@@ -37,6 +37,7 @@ type Props = {
   actionIcon: ReactNode;
   showScreenColumn: boolean;
   onSetUserVisible: (id: string, next: boolean) => void;
+  onSetModeratorVisible: (id: string, next: boolean) => void;
   onSetOnScreen?: (id: string, next: boolean) => void;
   onUpdateQuestionText: (id: string, text: string) => void;
   onAction: (id: string) => void;
@@ -77,6 +78,7 @@ export function SpeakerQuestionsTable({
   actionIcon,
   showScreenColumn,
   onSetUserVisible,
+  onSetModeratorVisible,
   onSetOnScreen,
   onUpdateQuestionText,
   onAction,
@@ -123,6 +125,9 @@ export function SpeakerQuestionsTable({
               </TableCell>
               <TableCell width={72}>
                 <SortableHeader label="UI" sort={sort} sortKey="ui" onChange={setSort} />
+              </TableCell>
+              <TableCell width={72}>
+                <SortableHeader label="Мод." sort={sort} sortKey="moderator" onChange={setSort} />
               </TableCell>
               {showScreenColumn ? (
                 <TableCell width={72}>
@@ -192,6 +197,20 @@ export function SpeakerQuestionsTable({
                       <Switch
                         checked={q.userVisible}
                         onChange={(_, next) => onSetUserVisible(q.id, next)}
+                        inputProps={{ "aria-label": "Видимость у игроков" }}
+                      />
+                    }
+                  />
+                </TableCell>
+                <TableCell>
+                  <FormControlLabel
+                    sx={{ m: 0 }}
+                    label=""
+                    control={
+                      <Switch
+                        checked={q.moderatorVisible === true}
+                        onChange={(_, next) => onSetModeratorVisible(q.id, next)}
+                        inputProps={{ "aria-label": "Видимость на странице модератора" }}
                       />
                     }
                   />
@@ -205,6 +224,7 @@ export function SpeakerQuestionsTable({
                         <Switch
                           checked={q.isOnScreen}
                           onChange={(_, next) => onSetOnScreen?.(q.id, next)}
+                          inputProps={{ "aria-label": "Показать на экране" }}
                         />
                       }
                     />
@@ -236,7 +256,7 @@ export function SpeakerQuestionsTable({
             <TableFooter>
               <TableRow>
                 <TablePagination
-                  colSpan={showScreenColumn ? 9 : 8}
+                  colSpan={showScreenColumn ? 10 : 9}
                   count={sortedRows.length}
                   page={page}
                   onPageChange={(_, nextPage) => setPage(nextPage)}

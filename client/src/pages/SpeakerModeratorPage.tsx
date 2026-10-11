@@ -182,7 +182,7 @@ export function SpeakerModeratorPage() {
   const items = payload?.items ?? [];
   const visiblePool = useMemo(() => {
     const showAll = payload?.settings.moderatorShowAll === true;
-    return items.filter((q) => (showAll ? true : q.status === "APPROVED"));
+    return items.filter((q) => (showAll ? true : q.moderatorVisible));
   }, [items, payload?.settings.moderatorShowAll]);
 
   const tabs = useMemo(() => {

@@ -129,6 +129,12 @@ export type QuizState = {
   photoWallImageCount?: number;
   photoWallImageExt?: "jpeg" | "jpg" | "png" | "webp";
   photoWallTileVisible?: boolean;
+  videoWallHorizontalItems?: Array<{ id: string; url: string; title: string }>;
+  videoWallHorizontalPosterUrl?: string;
+  videoWallVerticalItems?: Array<{ id: string; url: string; title: string }>;
+  videoWallVerticalPosterUrl?: string;
+  videoWallTileVisible?: boolean;
+  videoWallTileCoverUrl?: string;
   playerQuizResultsTileVisible?: boolean;
   playerQuizResultsTileText?: string;
   playerQuizResultsTileBackgroundColor?: string;

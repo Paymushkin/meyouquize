@@ -23,6 +23,7 @@ type SetPublicResultsView = (
     | "reactions"
     | "randomizer"
     | "photo_wall"
+    | "video_wall"
     | "debate_compare"
     | "debate_series",
   questionId?: string,

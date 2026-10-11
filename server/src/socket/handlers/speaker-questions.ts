@@ -8,6 +8,7 @@ import {
   adminSpeakerQuestionScreenSchema,
   adminSpeakerQuestionUpdateSchema,
   adminSpeakerQuestionUserVisibleSchema,
+  adminSpeakerQuestionModeratorVisibleSchema,
   adminSpeakerQuestionStatusSchema,
   createSpeakerQuestionSchema,
   speakerQuestionReactSchema,
@@ -45,6 +46,7 @@ type SpeakerQuestionWire = {
   authorNickname: string;
   status: "PENDING" | "APPROVED" | "REJECTED";
   userVisible: boolean;
+  moderatorVisible: boolean;
   isOnScreen: boolean;
   isMine: boolean;
   reactionCounts: Record<string, number>;
@@ -131,7 +133,7 @@ async function buildSpeakerQuestionsPayload(
     .filter((row) => {
       if (adminView) return true;
       if (moderatorView) {
-        return moderatorShowAll || row.status === "APPROVED";
+        return moderatorShowAll || row.isVisibleToModerator;
       }
       if (projectorView) return row.isOnScreen;
       return row.isVisibleToUsers || (participantId != null && row.participantId === participantId);
@@ -145,6 +147,7 @@ async function buildSpeakerQuestionsPayload(
       authorNickname: row.participant.nickname,
       status: row.status,
       userVisible: row.isVisibleToUsers,
+      moderatorVisible: row.isVisibleToModerator,
       isOnScreen: row.isOnScreen,
       isMine: participantId != null && row.participantId === participantId,
       reactionCounts: reactionCountsByQuestion.get(row.id) ?? {},
@@ -346,6 +349,7 @@ export function registerSpeakerQuestionsHandlers(socket: EnrichedSocket, io: Ser
           speakerName: payload.speakerName,
           text: payload.text,
           isVisibleToUsers: false,
+          isVisibleToModerator: false,
           status: SpeakerQuestionStatus.PENDING,
         },
       });
@@ -469,9 +473,9 @@ export function registerSpeakerQuestionsHandlers(socket: EnrichedSocket, io: Ser
         where: { id: payload.speakerQuestionId },
         data: {
           status,
-          // Скрыть → снимаем UI; Вернуть → APPROVED = UI вкл.
+          // Скрыть → снимаем UI/экран/модератора; Вернуть → UI вкл. (модератор отдельно).
           ...(status === SpeakerQuestionStatus.REJECTED
-            ? { isVisibleToUsers: false, isOnScreen: false }
+            ? { isVisibleToUsers: false, isVisibleToModerator: false, isOnScreen: false }
             : status === SpeakerQuestionStatus.APPROVED
               ? { isVisibleToUsers: true }
               : {}),
@@ -555,7 +559,7 @@ export function registerSpeakerQuestionsHandlers(socket: EnrichedSocket, io: Ser
         select: { status: true, quizId: true },
       });
       if (!current || current.quizId !== payload.quizId) throw new Error("Question not found");
-      // UI вкл. ↔ APPROVED; UI выкл. ↔ PENDING (скрытые REJECTED не трогаем статусом через UI).
+      // UI только для игроков; статус APPROVED/PENDING для админ-разбиения, не для /s.
       if (current.status === SpeakerQuestionStatus.REJECTED && payload.isVisibleToUsers) {
         throw new Error("Сначала верните вопрос из скрытых");
       }
@@ -577,6 +581,26 @@ export function registerSpeakerQuestionsHandlers(socket: EnrichedSocket, io: Ser
       fail(
         socket,
         error instanceof Error ? error.message : "Update speaker question user visibility failed",
+      );
+    }
+  });
+
+  socket.on("admin:speaker:question:moderator-visible", async (raw: unknown) => {
+    try {
+      await assertAdmin(socket);
+      const payload = adminSpeakerQuestionModeratorVisibleSchema.parse(raw);
+      await ensureQuestionInQuiz(payload.speakerQuestionId, payload.quizId);
+      await prisma.speakerQuestion.update({
+        where: { id: payload.speakerQuestionId },
+        data: { isVisibleToModerator: payload.isVisibleToModerator },
+      });
+      await broadcastSpeakerQuestions(io, payload.quizId);
+    } catch (error) {
+      fail(
+        socket,
+        error instanceof Error
+          ? error.message
+          : "Update speaker question moderator visibility failed",
       );
     }
   });

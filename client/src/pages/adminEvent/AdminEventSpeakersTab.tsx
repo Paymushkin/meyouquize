@@ -13,6 +13,7 @@ export type AdminEventSpeakersTabProps = {
   onHide: (id: string) => void;
   onRestore: (id: string) => void;
   onSetUserVisible: (id: string, next: boolean) => void;
+  onSetModeratorVisible: (id: string, next: boolean) => void;
   onSetOnScreen: (id: string, next: boolean) => void;
   onUpdateQuestionText: (id: string, text: string) => void;
   onDeleteQuestion: (id: string) => void;
@@ -25,6 +26,7 @@ export function AdminEventSpeakersTab({
   onHide,
   onRestore,
   onSetUserVisible,
+  onSetModeratorVisible,
   onSetOnScreen,
   onUpdateQuestionText,
   onDeleteQuestion,
@@ -41,6 +43,7 @@ export function AdminEventSpeakersTab({
       onHide={onHide}
       onRestore={onRestore}
       onSetUserVisible={onSetUserVisible}
+      onSetModeratorVisible={onSetModeratorVisible}
       onSetOnScreen={onSetOnScreen}
       onUpdateQuestionText={onUpdateQuestionText}
       onDeleteQuestion={onDeleteQuestion}

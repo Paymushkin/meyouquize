@@ -36,6 +36,12 @@ export type OrderedTile =
     }
   | {
       id: string;
+      kind: "video_wall";
+      label: string;
+      coverUrl: string;
+    }
+  | {
+      id: string;
       kind: "banner";
       label: string;
       previewUrl: string;

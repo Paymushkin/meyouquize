@@ -106,6 +106,34 @@ export async function collectQuizMediaUrls(quizId: string): Promise<string[]> {
   return urls;
 }
 
+export function collectLocalMediaUrlsFromValue(value: unknown): string[] {
+  const urls: string[] = [];
+  walkJsonStrings(value, (entry) => {
+    if (entry.includes("/media/") && extractLocalMediaFilename(entry)) {
+      urls.push(entry);
+    }
+  });
+  return urls;
+}
+
+/** URL из prev, которых больше нет в next (после очистки/замены картинки). */
+export function findRemovedLocalMediaUrls(prev: unknown, next: unknown): string[] {
+  const nextNames = new Set(
+    collectLocalMediaUrlsFromValue(next)
+      .map((url) => extractLocalMediaFilename(url))
+      .filter((name): name is string => Boolean(name)),
+  );
+  const removed: string[] = [];
+  const seen = new Set<string>();
+  for (const url of collectLocalMediaUrlsFromValue(prev)) {
+    const filename = extractLocalMediaFilename(url);
+    if (!filename || nextNames.has(filename) || seen.has(filename)) continue;
+    seen.add(filename);
+    removed.push(url);
+  }
+  return removed;
+}
+
 /** Удаляет локальные файлы из `/media`, если они больше нигде не используются. */
 export async function cleanupUnusedQuestionMedia(previousUrls: Iterable<string>) {
   const candidates = new Set<string>();

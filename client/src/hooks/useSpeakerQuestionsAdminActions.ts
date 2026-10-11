@@ -139,6 +139,18 @@ export function useSpeakerQuestionsAdminActions({ quizId, speakerSettings, setMe
     [quizId],
   );
 
+  const setSpeakerQuestionModeratorVisible = useCallback(
+    (id: string, next: boolean) => {
+      if (!quizId) return;
+      socket.emit("admin:speaker:question:moderator-visible", {
+        quizId,
+        speakerQuestionId: id,
+        isVisibleToModerator: next,
+      });
+    },
+    [quizId],
+  );
+
   const updateSpeakerQuestionText = useCallback(
     (id: string, text: string) => {
       if (!quizId) return;
@@ -180,6 +192,7 @@ export function useSpeakerQuestionsAdminActions({ quizId, speakerSettings, setMe
     hideSpeakerQuestion,
     restoreSpeakerQuestion,
     setSpeakerQuestionUserVisible,
+    setSpeakerQuestionModeratorVisible,
     updateSpeakerQuestionText,
     deleteSpeakerQuestion,
   };

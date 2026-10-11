@@ -10,12 +10,12 @@ export const photoWallAlbumMosaicGridSx = {
     gridRow: "span 1",
   },
   /** Крупный слева: колонки 1–2 */
-  "& > .pw-mosaic-cell:nth-child(10n + 1)": {
+  "& > .pw-mosaic-cell:nth-of-type(10n + 1)": {
     gridColumn: "1 / span 2",
     gridRow: "span 2",
   },
   /** Крупный справа: колонки 2–3 */
-  "& > .pw-mosaic-cell:nth-child(10n + 6)": {
+  "& > .pw-mosaic-cell:nth-of-type(10n + 6)": {
     gridColumn: "2 / span 2",
     gridRow: "span 2",
   },
@@ -28,12 +28,12 @@ export const photoWallAlbumMosaicGridSx = {
       gridRow: "span 1",
     },
     /** Крупный слева: колонки 1–2 */
-    "& > .pw-mosaic-cell:nth-child(10n + 1)": {
+    "& > .pw-mosaic-cell:nth-of-type(10n + 1)": {
       gridColumn: "1 / span 2",
       gridRow: "span 2",
     },
     /** Крупный справа: колонки 3–4 */
-    "& > .pw-mosaic-cell:nth-child(10n + 6)": {
+    "& > .pw-mosaic-cell:nth-of-type(10n + 6)": {
       gridColumn: "3 / span 2",
       gridRow: "span 2",
     },

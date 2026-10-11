@@ -62,6 +62,7 @@ type Props = {
   brandPrimaryColor: string;
   playerVoteOptionTextColor: string;
   photoWallCollageSrcs: string[];
+  videoWallTileCoverUrl: string;
   playerTilesGridColumns: 2 | 3;
   onChangePlayerTilesGridColumns: (value: 2 | 3) => void;
   bannerClickCounts: Record<string, number>;
@@ -71,6 +72,8 @@ type Props = {
   onToggleVisible: (bannerId: string, next: boolean) => void;
   photoWallTileVisible: boolean;
   onTogglePhotoWallTileVisible: (next: boolean) => void;
+  videoWallTileVisible: boolean;
+  onToggleVideoWallTileVisible: (next: boolean) => void;
   onDelete: (bannerId: string) => void;
 };
 
@@ -99,6 +102,7 @@ export function AdminBannersSection({
   brandPrimaryColor,
   playerVoteOptionTextColor,
   photoWallCollageSrcs,
+  videoWallTileCoverUrl,
   playerTilesGridColumns,
   onChangePlayerTilesGridColumns,
   bannerClickCounts,
@@ -108,6 +112,8 @@ export function AdminBannersSection({
   onToggleVisible,
   photoWallTileVisible,
   onTogglePhotoWallTileVisible,
+  videoWallTileVisible,
+  onToggleVideoWallTileVisible,
   onDelete,
 }: Props) {
   const state = useAdminBannersSectionState({
@@ -127,6 +133,7 @@ export function AdminBannersSection({
     brandPrimaryColor,
     playerVoteOptionTextColor,
     photoWallCollageSrcs,
+    videoWallTileCoverUrl,
     playerTilesGridColumns,
     onChangePlayerTilesGridColumns,
     onCreate,
@@ -219,6 +226,8 @@ export function AdminBannersSection({
         onToggleBannerVisible={onToggleVisible}
         photoWallTileVisible={photoWallTileVisible}
         onTogglePhotoWallTileVisible={onTogglePhotoWallTileVisible}
+        videoWallTileVisible={videoWallTileVisible}
+        onToggleVideoWallTileVisible={onToggleVideoWallTileVisible}
         onDeleteBanner={onDelete}
         onStartEdit={(tile) => state.startEdit(tile.banner)}
         onCancelEdit={state.cancelEdit}

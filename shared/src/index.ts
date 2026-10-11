@@ -5,6 +5,14 @@ import {
   sanitizePhotoWallImageExt,
   type PhotoWallImageExt,
 } from "./photoWall.js";
+import {
+  clampVideoWallProjectorActiveSeconds,
+  clampVideoWallProjectorFreezeSeconds,
+  clampVideoWallProjectorMaxVideos,
+  sanitizeVideoWallItems,
+  sanitizeVideoWallPosterUrl,
+  type VideoWallItem,
+} from "./videoWall.js";
 import type { BrandThemeId } from "./brandThemes.js";
 import type { EventThemeBranding } from "./eventThemeBranding.js";
 import {
@@ -46,6 +54,7 @@ export type QuizStatus = "draft" | "live" | "finished";
 export const SPEAKER_TILE_ID = "speaker_tile";
 export const PROGRAM_TILE_ID = "program_tile";
 export const PHOTO_WALL_TILE_ID = "photo_wall_tile";
+export const VIDEO_WALL_TILE_ID = "video_wall_tile";
 /** Плитка 1×1 «Мой квиз» с личным отчётом по сабквизу в интерфейсе игрока */
 export const QUIZ_RESULTS_TILE_ID = "quiz_results_tile";
 
@@ -136,6 +145,7 @@ export type PublicViewMode =
   | "reactions"
   | "randomizer"
   | "photo_wall"
+  | "video_wall"
   | "report"
   | "debate_compare"
   | "debate_series";
@@ -255,6 +265,37 @@ export {
   sanitizePhotoWallBaseUrl,
   sanitizePhotoWallImageExt,
 } from "./photoWall.js";
+export type {
+  VideoWallAlbumVideo,
+  VideoWallCollageLayout,
+  VideoWallItem,
+  VideoWallOrientation,
+} from "./videoWall.js";
+export {
+  VIDEO_WALL_MAX_ITEM_COUNT,
+  VIDEO_WALL_PROJECTOR_MAX_VIDEOS,
+  VIDEO_WALL_PROJECTOR_DEFAULT_MAX_VIDEOS,
+  VIDEO_WALL_PROJECTOR_DEFAULT_ACTIVE_SECONDS,
+  VIDEO_WALL_PROJECTOR_MAX_ACTIVE_SECONDS,
+  VIDEO_WALL_PROJECTOR_DEFAULT_FREEZE_SECONDS,
+  VIDEO_WALL_PROJECTOR_MAX_FREEZE_SECONDS,
+  VIDEO_WALL_COLLAGE_VIDEO_COUNT,
+  VIDEO_WALL_COLLAGE_GAP_PX,
+  buildVideoWallAlbumVideos,
+  clampVideoWallProjectorActiveSeconds,
+  clampVideoWallProjectorFreezeSeconds,
+  clampVideoWallProjectorMaxVideos,
+  pickVideoWallProjectorVideos,
+  resolveVideoWallCollageLayout,
+  resolveVideoWallTileCoverUrl,
+  sanitizeVideoWallItemTitle,
+  sanitizeVideoWallItemUrl,
+  sanitizeVideoWallItems,
+  sanitizeVideoWallPosterUrl,
+  videoWallCollageVideoIndices,
+  videoWallMimeTypeForUrl,
+  withVideoWallPlaybackContentType,
+} from "./videoWall.js";
 export type PublicBannerVisualStyle = "image" | "tile";
 
 export type PublicBanner = {
@@ -397,6 +438,10 @@ export interface PublicViewState {
   programTileVisible: boolean;
   /** Показывать плитку фотостены (коллаж) у пользователя */
   photoWallTileVisible: boolean;
+  /** Показывать плитку видеосцены у пользователя */
+  videoWallTileVisible: boolean;
+  /** Обложка плитки 1×1 видеосцены у участников */
+  videoWallTileCoverUrl: string;
   /** Плитка 1×1 с личным отчётом по квизу (сабквиз) */
   playerQuizResultsTileVisible: boolean;
   playerQuizResultsTileText: string;
@@ -485,6 +530,24 @@ export interface PublicViewState {
   photoWallGridColumns: number;
   photoWallAnimate: boolean;
   photoWallKenBurns: boolean;
+  /** Видеостена: горизонтальные ролики (полный HTTPS URL + название) */
+  videoWallHorizontalItems: VideoWallItem[];
+  /** Видеостена: общий постер для горизонтальных */
+  videoWallHorizontalPosterUrl: string;
+  /** Видеостена: вертикальные ролики (полный HTTPS URL + название) */
+  videoWallVerticalItems: VideoWallItem[];
+  /** Видеостена: общий постер для вертикальных */
+  videoWallVerticalPosterUrl: string;
+  /** Проектор: показывать горизонтальные ролики */
+  videoWallProjectorShowHorizontal: boolean;
+  /** Проектор: показывать вертикальные ролики */
+  videoWallProjectorShowVertical: boolean;
+  /** Проектор: сколько роликов участвует в сцене */
+  videoWallProjectorMaxVideos: number;
+  /** Проектор: сколько секунд активно центральное видео */
+  videoWallProjectorActiveSeconds: number;
+  /** Проектор: секунда стоп-кадра в полосе и старт центрального ролика */
+  videoWallProjectorFreezeSeconds: number;
   /** Отчет: заголовок публичной страницы */
   reportTitle: string;
   /** Отчет: включенные блоки и их порядок */
@@ -705,13 +768,15 @@ export const DEFAULT_PUBLIC_VIEW_STATE: PublicViewState = {
   programTileLinkUrl: "",
   programTileVisible: false,
   photoWallTileVisible: false,
+  videoWallTileVisible: false,
+  videoWallTileCoverUrl: "",
   playerQuizResultsTileVisible: false,
   playerQuizResultsTileText: "Мой квиз",
   playerQuizResultsTileBackgroundColor: "#2e7d32",
   playerQuizResultsTileTextColor: "#ffffff",
   playerQuizResultsSubQuizId: "",
   playerQuizResultsSubQuizIds: [],
-  playerTilesOrder: [PROGRAM_TILE_ID, SPEAKER_TILE_ID, PHOTO_WALL_TILE_ID],
+  playerTilesOrder: [PROGRAM_TILE_ID, SPEAKER_TILE_ID, PHOTO_WALL_TILE_ID, VIDEO_WALL_TILE_ID],
   playerTilesGridColumns: 3,
   reactionsOverlayText: "Реакции аудитории",
   reactionsWidgets: [],
@@ -751,6 +816,15 @@ export const DEFAULT_PUBLIC_VIEW_STATE: PublicViewState = {
   photoWallGridColumns: 0,
   photoWallAnimate: true,
   photoWallKenBurns: true,
+  videoWallHorizontalItems: [],
+  videoWallHorizontalPosterUrl: "",
+  videoWallVerticalItems: [],
+  videoWallVerticalPosterUrl: "",
+  videoWallProjectorShowHorizontal: true,
+  videoWallProjectorShowVertical: true,
+  videoWallProjectorMaxVideos: 12,
+  videoWallProjectorActiveSeconds: 8,
+  videoWallProjectorFreezeSeconds: 10,
   reportTitle: "Отчет мероприятия",
   reportModules: [
     "event_header",
@@ -1331,6 +1405,7 @@ export function normalizePublicViewState(
     value?.mode === "reactions" ||
     value?.mode === "randomizer" ||
     value?.mode === "photo_wall" ||
+    value?.mode === "video_wall" ||
     value?.mode === "report" ||
     value?.mode === "debate_compare" ||
     value?.mode === "debate_series"
@@ -1383,6 +1458,7 @@ export function normalizePublicViewState(
     id === SPEAKER_TILE_ID ||
     id === PROGRAM_TILE_ID ||
     id === PHOTO_WALL_TILE_ID ||
+    id === VIDEO_WALL_TILE_ID ||
     id === QUIZ_RESULTS_TILE_ID ||
     isQuizResultsTileId(id) ||
     playerBanners.some((x) => x.id === id);
@@ -1407,6 +1483,7 @@ export function normalizePublicViewState(
   if (!deduped.includes(PROGRAM_TILE_ID)) deduped.push(PROGRAM_TILE_ID);
   if (!deduped.includes(SPEAKER_TILE_ID)) deduped.push(SPEAKER_TILE_ID);
   if (!deduped.includes(PHOTO_WALL_TILE_ID)) deduped.push(PHOTO_WALL_TILE_ID);
+  if (!deduped.includes(VIDEO_WALL_TILE_ID)) deduped.push(VIDEO_WALL_TILE_ID);
   let playerQuizResultsSubQuizIds = sanitizeSubQuizIdList(value?.playerQuizResultsSubQuizIds, 20);
   const legacyReportVisible =
     typeof value?.playerQuizResultsTileVisible === "boolean"
@@ -1626,6 +1703,11 @@ export function normalizePublicViewState(
       typeof value?.photoWallTileVisible === "boolean"
         ? value.photoWallTileVisible
         : base.photoWallTileVisible,
+    videoWallTileVisible:
+      typeof value?.videoWallTileVisible === "boolean"
+        ? value.videoWallTileVisible
+        : base.videoWallTileVisible,
+    videoWallTileCoverUrl: sanitizeVideoWallPosterUrl(value?.videoWallTileCoverUrl),
     playerQuizResultsTileText:
       typeof value?.playerQuizResultsTileText === "string"
         ? value.playerQuizResultsTileText.trim().slice(0, 120)
@@ -1814,6 +1896,27 @@ export function normalizePublicViewState(
       typeof value?.photoWallKenBurns === "boolean"
         ? value.photoWallKenBurns
         : base.photoWallKenBurns,
+    videoWallHorizontalItems: sanitizeVideoWallItems(value?.videoWallHorizontalItems),
+    videoWallHorizontalPosterUrl: sanitizeVideoWallPosterUrl(value?.videoWallHorizontalPosterUrl),
+    videoWallVerticalItems: sanitizeVideoWallItems(value?.videoWallVerticalItems),
+    videoWallVerticalPosterUrl: sanitizeVideoWallPosterUrl(value?.videoWallVerticalPosterUrl),
+    videoWallProjectorShowHorizontal:
+      typeof value?.videoWallProjectorShowHorizontal === "boolean"
+        ? value.videoWallProjectorShowHorizontal
+        : base.videoWallProjectorShowHorizontal,
+    videoWallProjectorShowVertical:
+      typeof value?.videoWallProjectorShowVertical === "boolean"
+        ? value.videoWallProjectorShowVertical
+        : base.videoWallProjectorShowVertical,
+    videoWallProjectorMaxVideos: clampVideoWallProjectorMaxVideos(
+      value?.videoWallProjectorMaxVideos ?? base.videoWallProjectorMaxVideos,
+    ),
+    videoWallProjectorActiveSeconds: clampVideoWallProjectorActiveSeconds(
+      value?.videoWallProjectorActiveSeconds ?? base.videoWallProjectorActiveSeconds,
+    ),
+    videoWallProjectorFreezeSeconds: clampVideoWallProjectorFreezeSeconds(
+      value?.videoWallProjectorFreezeSeconds ?? base.videoWallProjectorFreezeSeconds,
+    ),
     reportTitle:
       typeof value?.reportTitle === "string"
         ? value.reportTitle.trim().slice(0, 120)

@@ -25,6 +25,7 @@ import VisibilityOffIcon from "@mui/icons-material/VisibilityOff";
 import { isQuizResultsTileId } from "../../../publicViewContract";
 import { PlayerPhotoWallCollageTile } from "../../quiz/PlayerPhotoWallCollageTile";
 import { PlayerQuizResultsTile } from "../../quiz/PlayerQuizResultsTile";
+import { PlayerVideoWallCollageTile } from "../../quiz/PlayerVideoWallCollageTile";
 import type { BannerEditorState, OrderedTile } from "./types";
 
 const PREVIEW_TILE_SIZE = 100;
@@ -55,6 +56,8 @@ type Props = {
   onToggleBannerVisible: (bannerId: string, next: boolean) => void;
   photoWallTileVisible: boolean;
   onTogglePhotoWallTileVisible: (next: boolean) => void;
+  videoWallTileVisible: boolean;
+  onToggleVideoWallTileVisible: (next: boolean) => void;
   onDeleteBanner: (bannerId: string) => void;
   onStartEdit: (tile: Extract<OrderedTile, { kind: "banner" }>) => void;
   onCancelEdit: () => void;
@@ -78,6 +81,8 @@ export function TilesOrderList({
   onToggleBannerVisible,
   photoWallTileVisible,
   onTogglePhotoWallTileVisible,
+  videoWallTileVisible,
+  onToggleVideoWallTileVisible,
   onDeleteBanner,
   onStartEdit,
   onCancelEdit,
@@ -144,7 +149,9 @@ export function TilesOrderList({
                               tile.banner.backgroundColor || "#1976d2",
                               tile.banner.textColor || "#fff",
                             )
-                          : tile.kind === "quiz_results" || tile.kind === "photo_wall"
+                          : tile.kind === "quiz_results" ||
+                              tile.kind === "photo_wall" ||
+                              tile.kind === "video_wall"
                             ? {
                                 width: PREVIEW_TILE_SIZE,
                                 height: PREVIEW_TILE_SIZE,
@@ -226,6 +233,13 @@ export function TilesOrderList({
                         preview
                         previewWidth={PREVIEW_TILE_SIZE}
                         photoSrcs={tile.photoSrcs}
+                      />
+                    ) : null}
+                    {tile.kind === "video_wall" ? (
+                      <PlayerVideoWallCollageTile
+                        preview
+                        previewWidth={PREVIEW_TILE_SIZE}
+                        coverUrl={tile.coverUrl}
                       />
                     ) : null}
                   </Box>
@@ -517,6 +531,33 @@ export function TilesOrderList({
                             onClick={() => onTogglePhotoWallTileVisible(!photoWallTileVisible)}
                           >
                             {photoWallTileVisible ? (
+                              <VisibilityIcon fontSize="small" />
+                            ) : (
+                              <VisibilityOffIcon fontSize="small" />
+                            )}
+                          </IconButton>
+                        </Tooltip>
+                      ) : null}
+                      {tile.kind === "video_wall" ? (
+                        <Tooltip
+                          title={
+                            videoWallTileVisible
+                              ? "Скрыть плитку видеостены у пользователя"
+                              : "Показать плитку видеостены пользователю"
+                          }
+                        >
+                          <IconButton
+                            size="small"
+                            aria-label={
+                              videoWallTileVisible
+                                ? "Скрыть плитку видеостены у пользователя"
+                                : "Показать плитку видеостены пользователю"
+                            }
+                            aria-pressed={videoWallTileVisible}
+                            color={videoWallTileVisible ? "primary" : "default"}
+                            onClick={() => onToggleVideoWallTileVisible(!videoWallTileVisible)}
+                          >
+                            {videoWallTileVisible ? (
                               <VisibilityIcon fontSize="small" />
                             ) : (
                               <VisibilityOffIcon fontSize="small" />

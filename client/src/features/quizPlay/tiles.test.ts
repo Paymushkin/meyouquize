@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { PHOTO_WALL_TILE_ID, PROGRAM_TILE_ID, SPEAKER_TILE_ID } from "../../publicViewContract";
+import {
+  PHOTO_WALL_TILE_ID,
+  PROGRAM_TILE_ID,
+  SPEAKER_TILE_ID,
+  VIDEO_WALL_TILE_ID,
+} from "../../publicViewContract";
 import { buildPlayerTilesOrder, getVisiblePlayerBanners } from "./tiles";
 
 describe("getVisiblePlayerBanners", () => {
@@ -31,13 +36,14 @@ describe("buildPlayerTilesOrder", () => {
       SPEAKER_TILE_ID,
       PROGRAM_TILE_ID,
       PHOTO_WALL_TILE_ID,
+      VIDEO_WALL_TILE_ID,
     ]);
   });
 
   it("appends new banners without moving existing system tiles", () => {
     expect(
       buildPlayerTilesOrder(
-        [PROGRAM_TILE_ID, SPEAKER_TILE_ID, PHOTO_WALL_TILE_ID],
+        [PROGRAM_TILE_ID, SPEAKER_TILE_ID, PHOTO_WALL_TILE_ID, VIDEO_WALL_TILE_ID],
         [
           {
             id: "banner-1",
@@ -48,7 +54,13 @@ describe("buildPlayerTilesOrder", () => {
           },
         ],
       ),
-    ).toEqual([PROGRAM_TILE_ID, SPEAKER_TILE_ID, PHOTO_WALL_TILE_ID, "banner-1"]);
+    ).toEqual([
+      PROGRAM_TILE_ID,
+      SPEAKER_TILE_ID,
+      PHOTO_WALL_TILE_ID,
+      VIDEO_WALL_TILE_ID,
+      "banner-1",
+    ]);
   });
 
   it("moves quiz result tiles to the end", () => {
@@ -70,6 +82,7 @@ describe("buildPlayerTilesOrder", () => {
       "banner-1",
       PROGRAM_TILE_ID,
       PHOTO_WALL_TILE_ID,
+      VIDEO_WALL_TILE_ID,
       "quiz_results_tile:sq-1",
     ]);
   });

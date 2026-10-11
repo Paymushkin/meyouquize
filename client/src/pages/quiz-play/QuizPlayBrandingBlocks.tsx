@@ -3,12 +3,14 @@ import {
   PHOTO_WALL_TILE_ID,
   PROGRAM_TILE_ID,
   SPEAKER_TILE_ID,
+  VIDEO_WALL_TILE_ID,
   contrastingTextOnColor,
   ruBallLabel,
 } from "@meyouquize/shared";
 import { isQuizResultsTileId } from "../../publicViewContract";
 import { PlayerPhotoWallCollageTile } from "../../components/quiz/PlayerPhotoWallCollageTile";
 import { PlayerQuizResultsTile } from "../../components/quiz/PlayerQuizResultsTile";
+import { PlayerVideoWallCollageTile } from "../../components/quiz/PlayerVideoWallCollageTile";
 import type { PlayerQuizResultsTileModel } from "../../features/quizPlay/playerQuizResults";
 import {
   playerEventTitleSx,
@@ -240,6 +242,9 @@ type PlayerTilesGridProps = {
   photoWallTileVisible: boolean;
   photoWallCollageSrcs: string[];
   onOpenPhotoWall: () => void;
+  videoWallTileVisible: boolean;
+  videoWallTileCoverUrl: string;
+  onOpenVideoWall: () => void;
   playerQuizResultsTilesBySubQuizId: Map<string, PlayerQuizResultsTileModel>;
   onOpenQuizReport: (subQuizId: string) => void;
   playerVoteOptionTextColor: string;
@@ -268,6 +273,9 @@ export function PlayerTilesGrid(props: PlayerTilesGridProps) {
     photoWallTileVisible,
     photoWallCollageSrcs,
     onOpenPhotoWall,
+    videoWallTileVisible,
+    videoWallTileCoverUrl,
+    onOpenVideoWall,
     playerQuizResultsTilesBySubQuizId,
     onOpenQuizReport,
     playerVoteOptionTextColor,
@@ -353,6 +361,16 @@ export function PlayerTilesGrid(props: PlayerTilesGridProps) {
               key={PHOTO_WALL_TILE_ID}
               photoSrcs={photoWallCollageSrcs}
               onClick={onOpenPhotoWall}
+            />
+          );
+        }
+        if (tileId === VIDEO_WALL_TILE_ID) {
+          if (!videoWallTileVisible || !videoWallTileCoverUrl.trim()) return null;
+          return (
+            <PlayerVideoWallCollageTile
+              key={VIDEO_WALL_TILE_ID}
+              coverUrl={videoWallTileCoverUrl}
+              onClick={onOpenVideoWall}
             />
           );
         }

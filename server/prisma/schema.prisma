@@ -148,6 +148,8 @@ model SpeakerQuestion {
   speakerName    String
   text           String
   isVisibleToUsers Boolean              @default(true)
+  /** Виден ли вопрос на странице модератора (/s). Не зависит от UI у игроков. */
+  isVisibleToModerator Boolean          @default(false)
   status         SpeakerQuestionStatus @default(PENDING)
   isOnScreen     Boolean               @default(false)
   createdAt      DateTime              @default(now())

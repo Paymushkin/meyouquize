@@ -19,6 +19,11 @@ const PLAYER_ONLY_PUBLIC_VIEW_KEYS = [
   "programTileLinkUrl",
   "programTileVisible",
   "photoWallTileVisible",
+  "videoWallTileVisible",
+  "videoWallTileCoverUrl",
+  /** Постеры ориентаций — только UI игрока, не проектор. */
+  "videoWallHorizontalPosterUrl",
+  "videoWallVerticalPosterUrl",
   "playerQuizResultsTileVisible",
   "playerQuizResultsTileText",
   "playerQuizResultsTileBackgroundColor",
@@ -172,6 +177,16 @@ const PHOTO_WALL_MODE_KEYS = [
   "photoWallKenBurns",
 ] as const satisfies ReadonlyArray<keyof PublicViewState>;
 
+const VIDEO_WALL_MODE_KEYS = [
+  "videoWallHorizontalItems",
+  "videoWallVerticalItems",
+  "videoWallProjectorShowHorizontal",
+  "videoWallProjectorShowVertical",
+  "videoWallProjectorMaxVideos",
+  "videoWallProjectorActiveSeconds",
+  "videoWallProjectorFreezeSeconds",
+] as const satisfies ReadonlyArray<keyof PublicViewState>;
+
 const REPORT_MODE_KEYS = [
   "reportTitle",
   "reportModules",
@@ -266,6 +281,12 @@ export function pickProjectorPublicViewState(view: PublicViewState): PublicViewS
         mode,
         ...branding,
         ...pickViewKeys(resolved, PHOTO_WALL_MODE_KEYS),
+      } as PublicViewState;
+    case "video_wall":
+      return {
+        mode,
+        ...branding,
+        ...pickViewKeys(resolved, VIDEO_WALL_MODE_KEYS),
       } as PublicViewState;
     case "report":
       return {

@@ -14,7 +14,13 @@ import {
 } from "../helpers/integrationFixtures.js";
 
 type SpeakerQuestionsUpdate = {
-  items: Array<{ id: string; text: string; isMine?: boolean; userVisible?: boolean }>;
+  items: Array<{
+    id: string;
+    text: string;
+    isMine?: boolean;
+    userVisible?: boolean;
+    moderatorVisible?: boolean;
+  }>;
 };
 
 function waitForEvent<T>(socket: Socket, event: string, timeoutMs = 5000): Promise<T> {
@@ -175,7 +181,7 @@ describe("speaker questions integration", () => {
     expect(stored.speakerQuestionsAllowAllSpeakersTarget).toBe(false);
   });
 
-  it("stamps sessionId on create and moderator sees approved questions", async () => {
+  it("stamps sessionId on create and moderator sees only moderator-visible questions", async () => {
     const { eventName, quizId } = await seedSingleChoiceQuiz(uniqueSlug("speaker-sess"));
     await enableSpeakerQuestions(quizId);
     server = await createTestServer();
@@ -197,6 +203,7 @@ describe("speaker questions integration", () => {
     });
     expect(row?.sessionId).toBe("test-session");
     expect(row?.status).toBe("PENDING");
+    expect(row?.isVisibleToModerator).toBe(false);
 
     const moderator = await connectSocket(server.baseUrl);
     sockets.push(moderator);
@@ -205,17 +212,35 @@ describe("speaker questions integration", () => {
     const pendingPayload = await pendingWait;
     expect(pendingPayload.items.some((i) => i.id === row!.id)).toBe(false);
 
+    // UI/APPROVED без флага модератора — на /s не видно.
     await prisma.speakerQuestion.update({
       where: { id: row!.id },
-      data: { status: "APPROVED" },
+      data: { status: "APPROVED", isVisibleToUsers: true },
     });
-
     const approvedWait = waitForEvent<SpeakerQuestionsUpdate>(
       moderator,
       "speaker:questions:update",
     );
     moderator.emit("speaker:questions:subscribe", { slug: eventName, viewer: "moderator" });
     const approvedPayload = await approvedWait;
-    expect(approvedPayload.items.some((i) => i.id === row!.id)).toBe(true);
+    expect(approvedPayload.items.some((i) => i.id === row!.id)).toBe(false);
+
+    const admin = await connectAdmin(server);
+    sockets.push(admin);
+    const modVisibleWait = waitForEvent<SpeakerQuestionsUpdate>(
+      moderator,
+      "speaker:questions:update",
+    );
+    admin.emit("admin:speaker:question:moderator-visible", {
+      quizId,
+      speakerQuestionId: row!.id,
+      isVisibleToModerator: true,
+    });
+    const modVisiblePayload = await modVisibleWait;
+    expect(modVisiblePayload.items.some((i) => i.id === row!.id && i.moderatorVisible)).toBe(true);
+
+    const stored = await prisma.speakerQuestion.findUnique({ where: { id: row!.id } });
+    expect(stored?.isVisibleToModerator).toBe(true);
+    expect(stored?.isVisibleToUsers).toBe(true);
   });
 });

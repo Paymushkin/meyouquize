@@ -108,6 +108,13 @@ type UsePublicViewEmitterParams = {
   programTileLinkUrl: string;
   programTileVisible: boolean;
   photoWallTileVisible: boolean;
+  videoWallTileVisible: boolean;
+  videoWallTileCoverUrl: string;
+  videoWallProjectorShowHorizontal: boolean;
+  videoWallProjectorShowVertical: boolean;
+  videoWallProjectorMaxVideos: number;
+  videoWallProjectorActiveSeconds: number;
+  videoWallProjectorFreezeSeconds: number;
   playerQuizResultsTileVisible: boolean;
   playerQuizResultsTileText: string;
   playerQuizResultsTileBackgroundColor: string;
@@ -143,6 +150,10 @@ type UsePublicViewEmitterParams = {
   photoWallGridColumns: number;
   photoWallAnimate: boolean;
   photoWallKenBurns: boolean;
+  videoWallHorizontalItems: import("@meyouquize/shared").VideoWallItem[];
+  videoWallHorizontalPosterUrl: string;
+  videoWallVerticalItems: import("@meyouquize/shared").VideoWallItem[];
+  videoWallVerticalPosterUrl: string;
   reportTitle: string;
   reportModules: ReportModuleId[];
   reportVoteQuestionIds: string[];
@@ -220,6 +231,7 @@ export function usePublicViewEmitter(params: UsePublicViewEmitterParams) {
     programTileLinkUrl,
     programTileVisible,
     photoWallTileVisible,
+    videoWallTileVisible,
     playerQuizResultsTileVisible,
     playerQuizResultsTileText,
     playerQuizResultsTileBackgroundColor,
@@ -255,6 +267,16 @@ export function usePublicViewEmitter(params: UsePublicViewEmitterParams) {
     photoWallGridColumns,
     photoWallAnimate,
     photoWallKenBurns,
+    videoWallHorizontalItems,
+    videoWallHorizontalPosterUrl,
+    videoWallVerticalItems,
+    videoWallVerticalPosterUrl,
+    videoWallTileCoverUrl,
+    videoWallProjectorShowHorizontal,
+    videoWallProjectorShowVertical,
+    videoWallProjectorMaxVideos,
+    videoWallProjectorActiveSeconds,
+    videoWallProjectorFreezeSeconds,
     reportTitle,
     reportModules,
     reportVoteQuestionIds,
@@ -405,6 +427,18 @@ export function usePublicViewEmitter(params: UsePublicViewEmitterParams) {
         programTileLinkUrl: sanitizeExternalHttpUrl(patch.programTileLinkUrl ?? programTileLinkUrl),
         programTileVisible: patch.programTileVisible ?? programTileVisible,
         photoWallTileVisible: patch.photoWallTileVisible ?? photoWallTileVisible,
+        videoWallTileVisible: patch.videoWallTileVisible ?? videoWallTileVisible,
+        videoWallTileCoverUrl: patch.videoWallTileCoverUrl ?? videoWallTileCoverUrl,
+        videoWallProjectorShowHorizontal:
+          patch.videoWallProjectorShowHorizontal ?? videoWallProjectorShowHorizontal,
+        videoWallProjectorShowVertical:
+          patch.videoWallProjectorShowVertical ?? videoWallProjectorShowVertical,
+        videoWallProjectorMaxVideos:
+          patch.videoWallProjectorMaxVideos ?? videoWallProjectorMaxVideos,
+        videoWallProjectorActiveSeconds:
+          patch.videoWallProjectorActiveSeconds ?? videoWallProjectorActiveSeconds,
+        videoWallProjectorFreezeSeconds:
+          patch.videoWallProjectorFreezeSeconds ?? videoWallProjectorFreezeSeconds,
         playerQuizResultsTileVisible:
           patch.playerQuizResultsTileVisible ?? playerQuizResultsTileVisible,
         playerQuizResultsTileText: patch.playerQuizResultsTileText ?? playerQuizResultsTileText,
@@ -450,6 +484,11 @@ export function usePublicViewEmitter(params: UsePublicViewEmitterParams) {
         photoWallGridColumns: patch.photoWallGridColumns ?? photoWallGridColumns,
         photoWallAnimate: patch.photoWallAnimate ?? photoWallAnimate,
         photoWallKenBurns: patch.photoWallKenBurns ?? photoWallKenBurns,
+        videoWallHorizontalItems: patch.videoWallHorizontalItems ?? videoWallHorizontalItems,
+        videoWallHorizontalPosterUrl:
+          patch.videoWallHorizontalPosterUrl ?? videoWallHorizontalPosterUrl,
+        videoWallVerticalItems: patch.videoWallVerticalItems ?? videoWallVerticalItems,
+        videoWallVerticalPosterUrl: patch.videoWallVerticalPosterUrl ?? videoWallVerticalPosterUrl,
         reportTitle: patch.reportTitle ?? reportTitle,
         reportModules: patch.reportModules ?? reportModules,
         reportVoteQuestionIds: patch.reportVoteQuestionIds ?? reportVoteQuestionIds,
@@ -550,6 +589,7 @@ export function usePublicViewEmitter(params: UsePublicViewEmitterParams) {
       programTileLinkUrl,
       programTileVisible,
       photoWallTileVisible,
+      videoWallTileVisible,
       playerQuizResultsTileVisible,
       playerQuizResultsTileText,
       playerQuizResultsTileBackgroundColor,
@@ -584,6 +624,16 @@ export function usePublicViewEmitter(params: UsePublicViewEmitterParams) {
       photoWallGridColumns,
       photoWallAnimate,
       photoWallKenBurns,
+      videoWallHorizontalItems,
+      videoWallHorizontalPosterUrl,
+      videoWallVerticalItems,
+      videoWallVerticalPosterUrl,
+      videoWallTileCoverUrl,
+      videoWallProjectorShowHorizontal,
+      videoWallProjectorShowVertical,
+      videoWallProjectorMaxVideos,
+      videoWallProjectorActiveSeconds,
+      videoWallProjectorFreezeSeconds,
       reportTitle,
       reportModules,
       reportVoteQuestionIds,

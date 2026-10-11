@@ -51,6 +51,7 @@ describe("SpeakerQuestionsDialog", () => {
           authorNickname: "Анна",
           status: "PENDING",
           userVisible: true,
+          moderatorVisible: false,
           isOnScreen: false,
           isMine: false,
           createdAt: "2026-01-01T00:00:00.000Z",
@@ -73,6 +74,7 @@ describe("SpeakerQuestionsDialog", () => {
           authorNickname: "Борис",
           status: "PENDING",
           userVisible: false,
+          moderatorVisible: false,
           isOnScreen: false,
           isMine: true,
           createdAt: "2026-01-01T00:00:00.000Z",
@@ -84,6 +86,7 @@ describe("SpeakerQuestionsDialog", () => {
           authorNickname: "Анна",
           status: "PENDING",
           userVisible: true,
+          moderatorVisible: false,
           isOnScreen: false,
           isMine: false,
           createdAt: "2026-01-01T00:00:00.000Z",
@@ -97,7 +100,7 @@ describe("SpeakerQuestionsDialog", () => {
     expect(screen.queryByText("Мой черновик")).toBeNull();
   });
 
-  it("shows delete control in mine tab and calls onDelete", () => {
+  it("hides actual tab and shows mine subtitle when only own questions exist", () => {
     const props = renderDialog(undefined, {
       items: [
         {
@@ -107,6 +110,7 @@ describe("SpeakerQuestionsDialog", () => {
           authorNickname: "Борис",
           status: "PENDING",
           userVisible: false,
+          moderatorVisible: false,
           isOnScreen: false,
           isMine: true,
           createdAt: "2026-01-01T00:00:00.000Z",
@@ -114,12 +118,14 @@ describe("SpeakerQuestionsDialog", () => {
       ],
     });
 
-    fireEvent.click(screen.getByRole("tab", { name: "Мои вопросы" }));
+    expect(screen.queryByRole("tab", { name: "Актуальные вопросы" })).toBeNull();
+    expect(screen.queryByRole("tab", { name: "Мои вопросы" })).toBeNull();
+    expect(screen.getByText("Мои вопросы")).toBeTruthy();
     fireEvent.click(screen.getByLabelText("Удалить вопрос"));
     expect(props.onDelete).toHaveBeenCalledWith("mine");
   });
 
-  it("hides «Всем спикерам» when allowAllSpeakersTarget is false", () => {
+  it("defaults to first speaker when allowAllSpeakersTarget is false", () => {
     const props = renderDialog(
       { speakerName: "" },
       {
@@ -132,8 +138,12 @@ describe("SpeakerQuestionsDialog", () => {
     );
 
     expect(screen.queryByText("Всем спикерам")).toBeNull();
-    expect(screen.getByText("Выбрать спикера")).toBeTruthy();
-    expect(props.onSubmit).toBeDefined();
+    expect(screen.queryByText("Выбрать спикера")).toBeNull();
+    expect(screen.getByRole("combobox").textContent).toContain("Иванов");
+    expect(props.onSpeakerNameChange).toHaveBeenCalledWith("Иванов");
+    fireEvent.mouseDown(screen.getByRole("combobox"));
+    const options = screen.getAllByRole("option").map((el) => el.textContent);
+    expect(options).toEqual(["Иванов", "Петров"]);
   });
 
   it("allows submit without selected speaker when all-speakers option is disabled", () => {
@@ -162,6 +172,7 @@ describe("SpeakerQuestionsDialog", () => {
           authorNickname: "Борис",
           status: "PENDING",
           userVisible: true,
+          moderatorVisible: false,
           isOnScreen: false,
           isMine: true,
           createdAt: "2026-01-01T00:00:00.000Z",
@@ -173,6 +184,7 @@ describe("SpeakerQuestionsDialog", () => {
           authorNickname: "Анна",
           status: "APPROVED",
           userVisible: true,
+          moderatorVisible: false,
           isOnScreen: false,
           isMine: false,
           createdAt: "2026-01-01T00:00:00.000Z",
@@ -182,5 +194,12 @@ describe("SpeakerQuestionsDialog", () => {
 
     expect(screen.getByText("Мой опубликованный")).toBeTruthy();
     expect(screen.getByText("Чужой опубликованный")).toBeTruthy();
+  });
+
+  it("hides questions section entirely when there are no questions", () => {
+    renderDialog(undefined, { items: [] });
+    expect(screen.queryByText("Актуальные вопросы")).toBeNull();
+    expect(screen.queryByText("Мои вопросы")).toBeNull();
+    expect(screen.queryByRole("tab")).toBeNull();
   });
 });

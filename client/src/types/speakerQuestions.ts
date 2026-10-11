@@ -13,7 +13,7 @@ export type SpeakerQuestionsSettings = {
   showReactionsOnScreen?: boolean;
   /** Показывать в форме вариант «Всем спикерам» */
   allowAllSpeakersTarget?: boolean;
-  /** true = на /s все вопросы; false = только APPROVED */
+  /** true = на /s все вопросы; false = только с включённым «Модератор» */
   moderatorShowAll?: boolean;
 };
 
@@ -26,6 +26,8 @@ export type SpeakerQuestionItem = {
   authorNickname: string;
   status: "PENDING" | "APPROVED" | "REJECTED";
   userVisible: boolean;
+  /** Виден на странице модератора (/s) */
+  moderatorVisible: boolean;
   isOnScreen: boolean;
   isMine?: boolean;
   reactionCounts?: Record<string, number>;
