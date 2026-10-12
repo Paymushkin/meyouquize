@@ -10,8 +10,8 @@ export function SessionTabLabel({ name, count }: { name: string; count: number }
         alignItems: "flex-start",
         justifyContent: "flex-start",
         maxWidth: 200,
-        width: "100%",
-        pr: 1.75,
+        width: "auto",
+        pr: count > 0 ? 1.75 : 0,
         textAlign: "left",
       }}
     >
@@ -32,27 +32,29 @@ export function SessionTabLabel({ name, count }: { name: string; count: number }
       >
         {name}
       </Box>
-      <Box
-        component="span"
-        sx={{
-          position: "absolute",
-          top: -8,
-          right: -6,
-          minWidth: 14,
-          height: 14,
-          px: 0.35,
-          borderRadius: 7,
-          bgcolor: "primary.main",
-          color: "primary.contrastText",
-          fontSize: 10,
-          fontWeight: 800,
-          lineHeight: "14px",
-          textAlign: "center",
-          boxShadow: "0 1px 3px rgba(0,0,0,0.25)",
-        }}
-      >
-        {count}
-      </Box>
+      {count > 0 ? (
+        <Box
+          component="span"
+          sx={{
+            position: "absolute",
+            top: -8,
+            right: -6,
+            minWidth: 14,
+            height: 14,
+            px: 0.35,
+            borderRadius: 7,
+            bgcolor: "primary.main",
+            color: "primary.contrastText",
+            fontSize: 10,
+            fontWeight: 800,
+            lineHeight: "14px",
+            textAlign: "center",
+            boxShadow: "0 1px 3px rgba(0,0,0,0.25)",
+          }}
+        >
+          {count}
+        </Box>
+      ) : null}
     </Box>
   );
 }
@@ -65,6 +67,8 @@ export const SPEAKER_SESSION_TABS_SX = {
   "& .MuiTab-root": {
     color: "rgba(255,255,255,0.72)",
     minHeight: 40,
+    // MUI default minWidth=90 — ширина только по контенту («Все» и короткие сессии).
+    minWidth: "auto",
     maxWidth: 232,
     px: 1.25,
     overflow: "visible",

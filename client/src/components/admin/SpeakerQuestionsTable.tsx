@@ -16,6 +16,7 @@ import {
   TextField,
   Typography,
 } from "@mui/material";
+import ContentCopyOutlinedIcon from "@mui/icons-material/ContentCopyOutlined";
 import SaveOutlinedIcon from "@mui/icons-material/SaveOutlined";
 import DeleteOutlineOutlinedIcon from "@mui/icons-material/DeleteOutlineOutlined";
 import type { SpeakerQuestionItem } from "../../types/speakerQuestions";
@@ -28,6 +29,33 @@ import {
 import { useSpeakerQuestionsTableState } from "../../features/speakerQuestionsAdmin/useSpeakerQuestionsTableState";
 
 const PAGE_SIZE = 50;
+
+function speakerRecipientDisplayName(speakerName: string): string {
+  if (speakerName === SPEAKER_ALL_TARGET) return "Все спикеры";
+  if (speakerName === SPEAKER_NOT_SELECTED) return "Не выбрано";
+  return speakerName;
+}
+
+/** Текст для буфера: «Кому: …» + текст вопроса из поля редактирования. */
+export function buildSpeakerQuestionClipboardText(
+  speakerName: string,
+  questionText: string,
+): string {
+  return `Кому: ${speakerRecipientDisplayName(speakerName)}\n${questionText}`;
+}
+
+async function copySpeakerQuestionToClipboard(
+  speakerName: string,
+  questionText: string,
+): Promise<void> {
+  const value = buildSpeakerQuestionClipboardText(speakerName, questionText);
+  if (!value.trim()) return;
+  try {
+    await navigator.clipboard.writeText(value);
+  } catch {
+    // unsupported browser / denied permission
+  }
+}
 
 type Props = {
   rows: SpeakerQuestionItem[];
@@ -156,11 +184,7 @@ export function SpeakerQuestionsTable({
                 </TableCell>
                 <TableCell>
                   <Typography variant="body2">
-                    {q.speakerName === SPEAKER_ALL_TARGET
-                      ? "Все спикеры"
-                      : q.speakerName === SPEAKER_NOT_SELECTED
-                        ? "Не выбрано"
-                        : q.speakerName}
+                    {speakerRecipientDisplayName(q.speakerName)}
                   </Typography>
                 </TableCell>
                 <TableCell align="center">
@@ -179,14 +203,25 @@ export function SpeakerQuestionsTable({
                       maxRows={6}
                       fullWidth
                     />
-                    <IconButton
-                      size="small"
-                      aria-label="Сохранить вопрос"
-                      onClick={() => onUpdateQuestionText(q.id, getTrimmedDraft(q))}
-                      disabled={!canSaveDraft(q)}
-                    >
-                      <SaveOutlinedIcon fontSize="small" />
-                    </IconButton>
+                    <Stack spacing={0.25}>
+                      <IconButton
+                        size="small"
+                        aria-label="Скопировать вопрос"
+                        onClick={() =>
+                          void copySpeakerQuestionToClipboard(q.speakerName, getDraftValue(q))
+                        }
+                      >
+                        <ContentCopyOutlinedIcon fontSize="small" />
+                      </IconButton>
+                      <IconButton
+                        size="small"
+                        aria-label="Сохранить вопрос"
+                        onClick={() => onUpdateQuestionText(q.id, getTrimmedDraft(q))}
+                        disabled={!canSaveDraft(q)}
+                      >
+                        <SaveOutlinedIcon fontSize="small" />
+                      </IconButton>
+                    </Stack>
                   </Stack>
                 </TableCell>
                 <TableCell>

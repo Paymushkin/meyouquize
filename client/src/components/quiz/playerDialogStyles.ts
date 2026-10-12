@@ -1,4 +1,5 @@
 /** Общий вид модалок игрока (вопросы спикерам, отчёт по квизу). */
+import type { MouseEvent, TouchEvent } from "react";
 import type { MenuProps } from "@mui/material/Menu";
 import { alpha, type SxProps, type Theme } from "@mui/material/styles";
 import { buildJoinNicknameInputSx } from "../../pages/quiz-play/QuizPlayBrandingBlocks";
@@ -161,7 +162,32 @@ export function buildPlayerDialogSelectMenuProps(
   selectedItemTextColor: string,
 ): Partial<MenuProps> {
   return {
+    // Portal оставляем: disablePortal ломает вёрстку (Dialog + backdropFilter
+    // создаёт containing block, backdrop меню сжимается до paper).
+    // Тач: disableScrollLock + stopPropagation на paper + крупные hit-area;
+    // у Dialog — disableEnforceFocus (см. SpeakerQuestionsDialog).
+    disableScrollLock: true,
+    sx: {
+      // Выше Dialog (modal=1300), чтобы пункты принимали pointer/touch.
+      zIndex: 1400,
+    },
+    slotProps: {
+      root: {
+        // Меню-модалка не должна уводить focus-trap Dialog'а в тупик на таче.
+        disableEnforceFocus: true,
+        disableAutoFocus: true,
+      },
+    },
     PaperProps: {
+      // Chrome Translate на Android портит подписи MenuItem (Select).
+      className: "notranslate",
+      // Не даём Dialog перехватить pointerdown до MenuItem (iOS/Android).
+      onMouseDown: (event: MouseEvent) => {
+        event.stopPropagation();
+      },
+      onTouchStart: (event: TouchEvent) => {
+        event.stopPropagation();
+      },
       sx: {
         // Не шире диалога игрока (PLAYER_DIALOG_PAPER_SX maxWidth = 576).
         maxWidth: "min(576px, calc(100vw - 32px))",
@@ -176,7 +202,10 @@ export function buildPlayerDialogSelectMenuProps(
           wordBreak: "break-word",
           lineHeight: 1.35,
           alignItems: "flex-start",
-          py: 1,
+          minHeight: 48,
+          py: 1.25,
+          touchAction: "manipulation",
+          WebkitTapHighlightColor: "transparent",
           transition: "background-color 160ms ease, color 160ms ease",
           "&:hover": {
             bgcolor: alpha(brandColor, 0.18),

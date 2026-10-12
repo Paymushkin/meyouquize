@@ -267,7 +267,15 @@ export function QuizPlayPage() {
 
   useQuizPlayScrollLock({
     joined,
-    hasPlayerOverlay: showQuestionPopup || shouldShowFeedbackPopup,
+    hasPlayerOverlay:
+      showQuestionPopup ||
+      shouldShowFeedbackPopup ||
+      speakerDialogOpen ||
+      nicknameDialogOpen ||
+      photoWallDialogOpen ||
+      videoWallDialogOpen ||
+      quizReportOpen ||
+      Boolean(resultsDialogQuestionId),
   });
 
   useEffect(() => {

@@ -200,7 +200,19 @@ export function SpeakerQuestionsDialog({
       onClose={onClose}
       fullWidth
       maxWidth="sm"
+      // Select в portal: иначе focus-trap Dialog на части iOS/Android
+      // блокирует tap по MenuItem.
+      disableEnforceFocus
+      disableRestoreFocus
+      className="notranslate"
+      slotProps={{
+        root: {
+          // Chrome Translate на Android ломает текст Select/MenuItem.
+          translate: "no",
+        },
+      }}
       PaperProps={{
+        className: "notranslate",
         sx: buildPlayerDialogPaperSx(brandFontFamily),
       }}
     >
@@ -223,23 +235,31 @@ export function SpeakerQuestionsDialog({
               value={selectValue}
               onChange={(e) => onSpeakerNameChange(e.target.value)}
               sx={textFieldSx}
+              className="notranslate"
               slotProps={{
                 select: {
+                  // Обёртка в span: Chrome Translate не должен подменять text node React.
                   renderValue: (selected) => {
                     const value = String(selected ?? "");
-                    if (value === SPEAKER_ALL_TARGET) return SPEAKER_ALL_TARGET_LABEL;
-                    return value;
+                    const label = value === SPEAKER_ALL_TARGET ? SPEAKER_ALL_TARGET_LABEL : value;
+                    return <span className="notranslate">{label}</span>;
                   },
                   MenuProps: selectMenuProps,
+                },
+                htmlInput: {
+                  className: "notranslate",
+                  translate: "no",
                 },
               }}
             >
               {allowAllSpeakersTarget ? (
-                <MenuItem value={SPEAKER_ALL_TARGET}>{SPEAKER_ALL_TARGET_LABEL}</MenuItem>
+                <MenuItem value={SPEAKER_ALL_TARGET} className="notranslate" translate="no">
+                  <span>{SPEAKER_ALL_TARGET_LABEL}</span>
+                </MenuItem>
               ) : null}
               {speakers.map((name) => (
-                <MenuItem key={name} value={name}>
-                  {name}
+                <MenuItem key={name} value={name} className="notranslate" translate="no">
+                  <span>{name}</span>
                 </MenuItem>
               ))}
             </TextField>
