@@ -163,76 +163,76 @@ function ItemsEditDialog({
       <DialogTitle>{title}</DialogTitle>
       <DialogContent dividers>
         <Stack spacing={1.25} sx={{ pt: 0.5 }}>
-          <Stack direction="row" justifyContent="flex-end">
-            <Button
-              size="small"
-              startIcon={<AddIcon />}
-              onClick={() =>
-                onChange([
-                  ...items,
-                  { id: newItemId(), url: "", title: `Видео ${items.length + 1}` },
-                ])
-              }
-              disabled={items.length >= VIDEO_WALL_MAX_ITEM_COUNT}
-            >
-              Добавить
-            </Button>
-          </Stack>
           {items.length === 0 ? (
             <Typography variant="body2" color="text.secondary">
               Список пуст
             </Typography>
           ) : (
-            items.map((item, index) => (
-              <Stack
-                key={item.id}
-                direction={{ xs: "column", sm: "row" }}
-                spacing={1}
-                alignItems={{ sm: "flex-start" }}
-              >
-                <TextField
-                  size="small"
-                  label="Название"
-                  value={item.title}
-                  onChange={(e) => {
-                    const next = [...items];
-                    next[index] = { ...item, title: e.target.value };
-                    onChange(next);
-                  }}
-                  onBlur={onCommit}
-                  sx={{ minWidth: { sm: 160 }, flex: { sm: "0 0 180px" } }}
-                />
-                <TextField
-                  size="small"
-                  label="HTTPS-ссылка на видео"
-                  placeholder="https://storage.yandexcloud.net/.../clip.mp4"
-                  value={item.url}
-                  onChange={(e) => {
-                    const next = [...items];
-                    next[index] = { ...item, url: e.target.value };
-                    onChange(next);
-                  }}
-                  onBlur={onCommit}
-                  fullWidth
-                />
-                <IconButton
-                  size="small"
-                  aria-label="Удалить видео"
-                  onClick={() => {
-                    // Не вызывать onCommit здесь: он читает ещё не обновлённый state
-                    // и затирает удаление полным снимком со старым списком.
-                    onChange(items.filter((x) => x.id !== item.id));
-                  }}
-                  sx={{ mt: { sm: 0.5 } }}
+            // В данных порядок хронологический; показываем новые сверху, как у игрока.
+            items
+              .map((item, index) => ({ item, index }))
+              .reverse()
+              .map(({ item, index }) => (
+                <Stack
+                  key={item.id}
+                  direction={{ xs: "column", sm: "row" }}
+                  spacing={1}
+                  alignItems={{ sm: "flex-start" }}
                 >
-                  <DeleteOutlineIcon fontSize="small" />
-                </IconButton>
-              </Stack>
-            ))
+                  <TextField
+                    size="small"
+                    label="Название"
+                    value={item.title}
+                    onChange={(e) => {
+                      const next = [...items];
+                      next[index] = { ...item, title: e.target.value };
+                      onChange(next);
+                    }}
+                    onBlur={onCommit}
+                    sx={{ minWidth: { sm: 160 }, flex: { sm: "0 0 180px" } }}
+                  />
+                  <TextField
+                    size="small"
+                    label="HTTPS-ссылка на видео"
+                    placeholder="https://storage.yandexcloud.net/.../clip.mp4"
+                    value={item.url}
+                    onChange={(e) => {
+                      const next = [...items];
+                      next[index] = { ...item, url: e.target.value };
+                      onChange(next);
+                    }}
+                    onBlur={onCommit}
+                    fullWidth
+                  />
+                  <IconButton
+                    size="small"
+                    color="error"
+                    aria-label="Удалить видео"
+                    onClick={() => {
+                      // Не вызывать onCommit здесь: он читает ещё не обновлённый state
+                      // и затирает удаление полным снимком со старым списком.
+                      onChange(items.filter((x) => x.id !== item.id));
+                    }}
+                    sx={{ mt: { sm: 0.5 } }}
+                  >
+                    <DeleteOutlineIcon fontSize="small" />
+                  </IconButton>
+                </Stack>
+              ))
           )}
         </Stack>
       </DialogContent>
-      <DialogActions>
+      <DialogActions sx={{ justifyContent: "space-between" }}>
+        <Button
+          size="small"
+          startIcon={<AddIcon />}
+          onClick={() =>
+            onChange([...items, { id: newItemId(), url: "", title: `Видео ${items.length + 1}` }])
+          }
+          disabled={items.length >= VIDEO_WALL_MAX_ITEM_COUNT}
+        >
+          Добавить
+        </Button>
         <Button onClick={onClose}>Готово</Button>
       </DialogActions>
     </Dialog>

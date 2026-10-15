@@ -54,6 +54,32 @@ type Props = {
   onClose: () => void;
 };
 
+function VideoWallTabLabel({ text, count }: { text: string; count: number }) {
+  return (
+    <Box component="span" sx={{ display: "inline-flex", alignItems: "center", gap: 0.75 }}>
+      {text}
+      <Box
+        component="span"
+        sx={{
+          minWidth: 22,
+          height: 22,
+          px: 0.75,
+          borderRadius: 11,
+          bgcolor: "rgba(255,255,255,0.16)",
+          color: "inherit",
+          fontSize: "0.8125rem",
+          fontWeight: 700,
+          lineHeight: "22px",
+          textAlign: "center",
+          letterSpacing: 0,
+        }}
+      >
+        {count}
+      </Box>
+    </Box>
+  );
+}
+
 export function PlayerVideoWallDialog({
   open,
   horizontalVideos,
@@ -81,7 +107,11 @@ export function PlayerVideoWallDialog({
     setLightboxIndex(-1);
   }, [open, hasHorizontal]);
 
-  const activeVideos = tab === "horizontal" ? horizontalVideos : verticalVideos;
+  // Видео хранятся в порядке добавления — новые показываем первыми.
+  const activeVideos = useMemo(
+    () => [...(tab === "horizontal" ? horizontalVideos : verticalVideos)].reverse(),
+    [horizontalVideos, tab, verticalVideos],
+  );
   const gridSx = tab === "horizontal" ? videoWallHorizontalGridSx : videoWallVerticalGridSx;
   const cellAspect = tab === "horizontal" ? "16 / 9" : "9 / 16";
 
@@ -169,8 +199,14 @@ export function PlayerVideoWallDialog({
                 },
               }}
             >
-              <Tab value="horizontal" label="Горизонтальные" />
-              <Tab value="vertical" label="Вертикальные" />
+              <Tab
+                value="horizontal"
+                label={<VideoWallTabLabel text="Горизонтальные" count={horizontalVideos.length} />}
+              />
+              <Tab
+                value="vertical"
+                label={<VideoWallTabLabel text="Вертикальные" count={verticalVideos.length} />}
+              />
             </Tabs>
           </Box>
         ) : (
@@ -238,7 +274,7 @@ export function PlayerVideoWallDialog({
                     sx={{ position: "absolute", right: 6, top: 6, zIndex: 1 }}
                     onClick={(event) => event.stopPropagation()}
                   >
-                    <VideoDownloadButton video={video} size={28} />
+                    <VideoDownloadButton video={video} size={38} />
                   </Box>
                   {video.title ? (
                     <Typography

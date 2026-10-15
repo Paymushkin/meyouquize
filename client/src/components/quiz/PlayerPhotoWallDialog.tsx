@@ -1,4 +1,4 @@
-import { lazy, Suspense, useCallback, useState } from "react";
+import { lazy, Suspense, useCallback, useMemo, useState } from "react";
 import CloseIcon from "@mui/icons-material/Close";
 import DownloadIcon from "@mui/icons-material/Download";
 import { Box, Dialog, DialogContent, IconButton, Typography } from "@mui/material";
@@ -56,8 +56,15 @@ type Props = {
   onClose: () => void;
 };
 
-export function PlayerPhotoWallDialog({ open, photos, brandFontFamily, onClose }: Props) {
+export function PlayerPhotoWallDialog({
+  open,
+  photos: albumPhotos,
+  brandFontFamily,
+  onClose,
+}: Props) {
   const [lightboxIndex, setLightboxIndex] = useState(-1);
+  // Фото пронумерованы 1..N в порядке загрузки — новые показываем первыми.
+  const photos = useMemo(() => [...albumPhotos].reverse(), [albumPhotos]);
 
   const handleCloseDialog = useCallback(() => {
     setLightboxIndex(-1);
@@ -114,44 +121,52 @@ export function PlayerPhotoWallDialog({ open, photos, brandFontFamily, onClose }
               Фотографии недоступны
             </Typography>
           ) : (
-            <Box sx={photoWallAlbumMosaicGridSx}>
-              {photos.map((photo, index) => (
-                <Box
-                  key={photo.key}
-                  className="pw-mosaic-cell"
-                  sx={{
-                    position: "relative",
-                    minWidth: 0,
-                    minHeight: 0,
-                    overflow: "hidden",
-                    borderRadius: 0,
-                    cursor: "pointer",
-                    bgcolor: "rgba(255, 255, 255, 0.06)",
-                  }}
-                  onClick={() => setLightboxIndex(index)}
-                >
+            <>
+              <Typography
+                variant="body2"
+                sx={{ ...PLAYER_DIALOG_SECONDARY_TEXT, fontWeight: 600, mb: 1 }}
+              >
+                {photos.length} фото
+              </Typography>
+              <Box sx={photoWallAlbumMosaicGridSx}>
+                {photos.map((photo, index) => (
                   <Box
-                    component="img"
-                    src={photo.src}
-                    alt={`Фото ${photo.index}`}
-                    loading="lazy"
+                    key={photo.key}
+                    className="pw-mosaic-cell"
                     sx={{
-                      width: "100%",
-                      height: "100%",
-                      display: "block",
-                      objectFit: "cover",
-                      objectPosition: "center",
+                      position: "relative",
+                      minWidth: 0,
+                      minHeight: 0,
+                      overflow: "hidden",
+                      borderRadius: 0,
+                      cursor: "pointer",
+                      bgcolor: "rgba(255, 255, 255, 0.06)",
                     }}
-                  />
-                  <Box
-                    sx={{ position: "absolute", right: 4, bottom: 4 }}
-                    onClick={(event) => event.stopPropagation()}
+                    onClick={() => setLightboxIndex(index)}
                   >
-                    <PhotoDownloadButton photo={photo} size={28} />
+                    <Box
+                      component="img"
+                      src={photo.src}
+                      alt={`Фото ${photo.index}`}
+                      loading="lazy"
+                      sx={{
+                        width: "100%",
+                        height: "100%",
+                        display: "block",
+                        objectFit: "cover",
+                        objectPosition: "center",
+                      }}
+                    />
+                    <Box
+                      sx={{ position: "absolute", right: 6, bottom: 6 }}
+                      onClick={(event) => event.stopPropagation()}
+                    >
+                      <PhotoDownloadButton photo={photo} size={38} />
+                    </Box>
                   </Box>
-                </Box>
-              ))}
-            </Box>
+                ))}
+              </Box>
+            </>
           )}
         </DialogContent>
       </Dialog>
