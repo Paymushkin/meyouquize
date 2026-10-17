@@ -6,6 +6,10 @@ export const BRAND_TEXT = "#ffffff";
 export const BRAND_TEXT_MUTED = "rgba(255,255,255,0.72)";
 export const BRAND_SURFACE = "rgba(255,255,255,0.04)";
 export const BRAND_BORDER = "rgba(255,255,255,0.12)";
+export const BRAND_BUTTON_BORDER_RADIUS = 10;
+export const BRAND_SURFACE_BORDER_RADIUS = 12;
+/** Высота шапки поверх hero: py 1.5 × 2 + логотип */
+export const BRAND_HEADER_OVER_HERO_HEIGHT_PX = 60;
 
 export const brandTheme = createTheme({
   palette: {
@@ -38,10 +42,21 @@ export const brandTheme = createTheme({
     button: { textTransform: "none", fontWeight: 600 },
   },
   components: {
+    MuiCssBaseline: {
+      styleOverrides: {
+        body: {
+          backgroundColor: BRAND_BG,
+          color: BRAND_TEXT,
+        },
+        "#root": {
+          minHeight: "100vh",
+        },
+      },
+    },
     MuiButton: {
       styleOverrides: {
         root: {
-          borderRadius: 999,
+          borderRadius: BRAND_BUTTON_BORDER_RADIUS,
           paddingInline: 24,
           paddingBlock: 10,
         },

@@ -3,7 +3,9 @@ import {
   adminAuthSchema,
   joinQuizSchema,
   replaceRoomContentSchema,
+  setPublicViewSchema,
   submitAnswerSchema,
+  upsertFeedbackFormSchema,
 } from "../src/schemas.js";
 
 const baseQuestion = {
@@ -268,5 +270,171 @@ describe("replaceRoomContentSchema ranking", () => {
       ],
     });
     expect(parsed.success).toBe(false);
+  });
+});
+
+describe("replaceRoomContentSchema geo poll", () => {
+  it("accepts geo poll with dictionary and empty options", () => {
+    const parsed = replaceRoomContentSchema.safeParse({
+      subQuizzes: [],
+      standaloneQuestions: [
+        {
+          text: "Откуда вы?",
+          type: "single",
+          points: 1,
+          scoringMode: "poll",
+          geoPollDictionary: "world_cities",
+          options: [],
+        },
+      ],
+    });
+    expect(parsed.success).toBe(true);
+  });
+
+  it("rejects geo poll on non-single type", () => {
+    const parsed = replaceRoomContentSchema.safeParse({
+      subQuizzes: [],
+      standaloneQuestions: [
+        {
+          text: "Откуда вы?",
+          type: "multi",
+          points: 1,
+          scoringMode: "poll",
+          geoPollDictionary: "world_cities",
+          options: [],
+        },
+      ],
+    });
+    expect(parsed.success).toBe(false);
+  });
+
+  it("rejects geo poll and debates inside sub-quizzes", () => {
+    const geoInQuiz = replaceRoomContentSchema.safeParse({
+      subQuizzes: [
+        {
+          title: "Квиз",
+          questions: [
+            {
+              text: "Откуда вы?",
+              type: "single",
+              points: 1,
+              scoringMode: "quiz",
+              geoPollDictionary: "world_cities",
+              options: [],
+            },
+          ],
+        },
+      ],
+      standaloneQuestions: [],
+    });
+    expect(geoInQuiz.success).toBe(false);
+
+    const debateInQuiz = replaceRoomContentSchema.safeParse({
+      subQuizzes: [
+        {
+          title: "Квиз",
+          questions: [
+            {
+              text: "Тезис",
+              type: "single",
+              points: 1,
+              scoringMode: "quiz",
+              projectorDebateLayout: true,
+              debateSeriesId: "dbs_1",
+              options: [
+                { text: "A", isCorrect: false },
+                { text: "B", isCorrect: false },
+              ],
+            },
+          ],
+        },
+      ],
+      standaloneQuestions: [],
+    });
+    expect(debateInQuiz.success).toBe(false);
+  });
+
+  it("rejects temperature inside sub-quizzes", () => {
+    const parsed = replaceRoomContentSchema.safeParse({
+      subQuizzes: [
+        {
+          title: "Квиз",
+          questions: [
+            {
+              text: "Насколько вам понравилось?",
+              type: "temperature",
+              points: 1,
+              options: [
+                { text: "Холодно", isCorrect: false, weight: 25 },
+                { text: "Тепло", isCorrect: false, weight: 75 },
+              ],
+            },
+          ],
+        },
+      ],
+      standaloneQuestions: [],
+    });
+    expect(parsed.success).toBe(false);
+  });
+});
+
+describe("upsertFeedbackFormSchema multi scales", () => {
+  it("accepts multi question with option texts up to 120 chars", () => {
+    const option = "Цифровая трансформация и новые технологии на практике";
+    expect(option.length).toBeGreaterThan(40);
+    expect(option.length).toBeLessThanOrEqual(120);
+    const parsed = upsertFeedbackFormSchema.safeParse({
+      title: "Обратная связь",
+      scales: [
+        {
+          id: "s1",
+          label: "Что интересно?",
+          selection: "multi",
+          maxAnswers: 2,
+          options: [option, "Другое"],
+        },
+      ],
+      openFields: [],
+    });
+    expect(parsed.success).toBe(true);
+  });
+
+  it("rejects empty maxAnswers null after preprocess as unlimited multi", () => {
+    const parsed = upsertFeedbackFormSchema.safeParse({
+      title: "Обратная связь",
+      scales: [
+        {
+          id: "s1",
+          label: "Что интересно?",
+          selection: "multi",
+          maxAnswers: null,
+          options: ["A", "B", "C"],
+        },
+      ],
+    });
+    expect(parsed.success).toBe(true);
+    if (parsed.success) {
+      expect(parsed.data.scales[0]?.maxAnswers).toBeUndefined();
+    }
+  });
+});
+
+describe("setPublicViewSchema playerTilesGridColumns", () => {
+  it("accepts 2 and 3", () => {
+    expect(setPublicViewSchema.safeParse({ quizId: "q1", playerTilesGridColumns: 2 }).success).toBe(
+      true,
+    );
+    expect(setPublicViewSchema.safeParse({ quizId: "q1", playerTilesGridColumns: 3 }).success).toBe(
+      true,
+    );
+  });
+
+  it("rejects other values", () => {
+    expect(setPublicViewSchema.safeParse({ quizId: "q1", playerTilesGridColumns: 4 }).success).toBe(
+      false,
+    );
+    expect(setPublicViewSchema.safeParse({ quizId: "q1", playerTilesGridColumns: 1 }).success).toBe(
+      false,
+    );
   });
 });

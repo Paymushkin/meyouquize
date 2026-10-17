@@ -49,3 +49,11 @@ export function buildProjectorScreenUrl(slug: string, params?: ResolveParams): s
   const origin = resolvePlayerFacingOrigin(params);
   return origin ? `${origin}/p/${trimmed}` : "";
 }
+
+/** Публичная страница модератора вопросов спикерам (read-only). */
+export function buildSpeakerModeratorUrl(slug: string, params?: ResolveParams): string {
+  const trimmed = slug.trim();
+  if (!trimmed) return "";
+  const origin = resolvePlayerFacingOrigin(params);
+  return origin ? `${origin}/s/${trimmed}` : "";
+}

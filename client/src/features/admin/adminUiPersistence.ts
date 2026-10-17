@@ -4,6 +4,7 @@ export type AdminSection =
   | "speakers"
   | "banners"
   | "photo_wall"
+  | "video_wall"
   | "branding"
   | "report"
   | "results"
@@ -15,6 +16,7 @@ export const ADMIN_SECTION_IDS: AdminSection[] = [
   "speakers",
   "banners",
   "photo_wall",
+  "video_wall",
   "branding",
   "report",
   "results",

@@ -1,5 +1,6 @@
 import { lazy, Suspense } from "react";
 import { useParams } from "react-router-dom";
+import { RouteLoadingFallback } from "../components/RouteLoadingFallback";
 import { isReservedAdminEventName } from "../features/admin/reservedAdminSegments";
 import { AdminFontsPage } from "./AdminFontsPage";
 import { AdminThemesPage } from "./AdminThemesPage";
@@ -22,7 +23,7 @@ export function AdminEventRoute() {
   }
 
   return (
-    <Suspense fallback={null}>
+    <Suspense fallback={<RouteLoadingFallback />}>
       <AdminEventPage />
     </Suspense>
   );

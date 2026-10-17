@@ -35,6 +35,8 @@ type Params = {
   setSubmittedQuestionIds: Dispatch<SetStateAction<string[]>>;
   setPlayerAnswersHydrated: Dispatch<SetStateAction<boolean>>;
   onQuestionSubmitted?: (questionId: string) => void;
+  /** Снять in-flight lock после ошибки submit (кроме ALREADY_ANSWERED). */
+  clearSubmitInFlight?: (questionId?: string) => void;
   setError: Dispatch<SetStateAction<string>>;
   setJoined: Dispatch<SetStateAction<boolean>>;
   setConnectionStatus: Dispatch<SetStateAction<"online" | "reconnecting" | "offline">>;
@@ -65,6 +67,7 @@ export function useQuizPlaySocket({
   setSubmittedQuestionIds,
   setPlayerAnswersHydrated,
   onQuestionSubmitted,
+  clearSubmitInFlight,
   setError,
   setJoined,
   setConnectionStatus,
@@ -145,13 +148,22 @@ export function useQuizPlaySocket({
       const message = parseSocketErrorMessage(evt);
       const code = parseSocketErrorCode(evt);
       if (code === "ALREADY_ANSWERED" || message === "Already answered this question") {
-        const activeQuestionId = activeQuestionIdRef.current;
+        const pendingQuestionId = pendingSubmitPayloadRef?.current?.questionId ?? null;
+        const activeQuestionId = pendingQuestionId ?? activeQuestionIdRef.current;
         if (activeQuestionId) {
           setSubmittedQuestionIds((prev) =>
             prev.includes(activeQuestionId) ? prev : [...prev, activeQuestionId],
           );
+          onQuestionSubmitted?.(activeQuestionId);
+        } else {
+          clearSubmitInFlight?.();
         }
         return;
+      }
+      // Снимаем in-flight только если была незавершённая отправка ответа.
+      const pendingQuestionId = pendingSubmitPayloadRef?.current?.questionId;
+      if (pendingQuestionId) {
+        clearSubmitInFlight?.(pendingQuestionId);
       }
       if (message === "Participant not found" || code === "NOT_JOINED") {
         onParticipantMissing?.();
@@ -169,6 +181,10 @@ export function useQuizPlaySocket({
       }
       if (message.startsWith("Too many tags:")) {
         setError("Слишком много тегов для этого вопроса. Уберите лишние ответы.");
+        return;
+      }
+      if (joinedRef.current && message.includes("Слишком много попыток подключения")) {
+        onJoinSettled?.();
         return;
       }
       const displayMessage =
@@ -301,6 +317,7 @@ export function useQuizPlaySocket({
     setSubmittedQuestionIds,
     setPlayerAnswersHydrated,
     onQuestionSubmitted,
+    clearSubmitInFlight,
     setTagAnswers,
     activeQuestionIdRef,
     activeQuestionTypeRef,

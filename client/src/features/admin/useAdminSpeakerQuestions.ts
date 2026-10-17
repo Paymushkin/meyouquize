@@ -1,11 +1,12 @@
 import { useCallback, useMemo, useState } from "react";
-import type { PublicViewPayload } from "@meyouquize/shared";
+import { normalizeSpeakerQuestionSessions, type PublicViewPayload } from "@meyouquize/shared";
 import {
   applySpeakerQuestionsAdminFieldsFromPublicView,
   applySpeakerQuestionsScreenVisibilityFromView,
+  sessionsToDrafts,
   type AdminSpeakerQuestionsSettingsValues,
+  type AdminSpeakerSessionDraft,
 } from "../speakerQuestionsAdmin/adminSpeakerQuestionsSettings";
-import { getStringArrayOrNull } from "../../utils/unknownGuards";
 import type { SpeakerQuestionsPayload } from "../../types/speakerQuestions";
 
 type EmitPatch = (patch: { reportSpeakerQuestionIds: string[] }) => void;
@@ -18,7 +19,9 @@ export function useAdminSpeakerQuestions(emitPublicViewPatch: EmitPatch) {
   const [showRecipientOnScreen, setShowRecipientOnScreen] = useState(true);
   const [showReactionsOnScreen, setShowReactionsOnScreen] = useState(true);
   const [allowAllSpeakersTarget, setAllowAllSpeakersTarget] = useState(true);
-  const [speakersText, setSpeakersText] = useState("");
+  const [moderatorShowAll, setModeratorShowAll] = useState(false);
+  const [sessions, setSessions] = useState<AdminSpeakerSessionDraft[]>([]);
+  const [activeSpeakerSessionId, setActiveSpeakerSessionId] = useState<string | null>(null);
   const [reportSpeakerQuestionIds, setReportSpeakerQuestionIds] = useState<string[]>([]);
 
   const applyAdminFieldsFromPublicView = useCallback((view: PublicViewPayload) => {
@@ -29,6 +32,7 @@ export function useAdminSpeakerQuestions(emitPublicViewPatch: EmitPatch) {
       setShowRecipientOnScreen,
       setShowReactionsOnScreen,
       setAllowAllSpeakersTarget,
+      setModeratorShowAll,
     });
   }, []);
 
@@ -41,6 +45,9 @@ export function useAdminSpeakerQuestions(emitPublicViewPatch: EmitPatch) {
     if (typeof view.speakerQuestionsAllowAllSpeakersTarget === "boolean") {
       setAllowAllSpeakersTarget(view.speakerQuestionsAllowAllSpeakersTarget);
     }
+    if (typeof view.speakerQuestionsModeratorShowAll === "boolean") {
+      setModeratorShowAll(view.speakerQuestionsModeratorShowAll);
+    }
   }, []);
 
   const applyReportSpeakerQuestionIds = useCallback((ids: unknown) => {
@@ -48,16 +55,23 @@ export function useAdminSpeakerQuestions(emitPublicViewPatch: EmitPatch) {
     setReportSpeakerQuestionIds(ids.filter((item): item is string => typeof item === "string"));
   }, []);
 
+  const applySessionsFromPublicView = useCallback((pv: PublicViewPayload) => {
+    const normalized = normalizeSpeakerQuestionSessions({
+      sessions: pv.speakerQuestionSessions,
+      activeSpeakerSessionId: pv.activeSpeakerSessionId,
+      speakers: pv.speakerQuestionsSpeakers,
+    });
+    setSessions(sessionsToDrafts(normalized.sessions));
+    setActiveSpeakerSessionId(normalized.activeSpeakerSessionId);
+  }, []);
+
   const applyRoomPublicViewSlice = useCallback(
     (pv: PublicViewPayload) => {
       applyAdminFieldsFromPublicView(pv);
       applyReportSpeakerQuestionIds(pv.reportSpeakerQuestionIds);
-      const speakerList = getStringArrayOrNull(pv.speakerQuestionsSpeakers);
-      if (speakerList) {
-        setSpeakersText(speakerList.join("\n"));
-      }
+      applySessionsFromPublicView(pv);
     },
-    [applyAdminFieldsFromPublicView, applyReportSpeakerQuestionIds],
+    [applyAdminFieldsFromPublicView, applyReportSpeakerQuestionIds, applySessionsFromPublicView],
   );
 
   const settings = useMemo(
@@ -68,7 +82,9 @@ export function useAdminSpeakerQuestions(emitPublicViewPatch: EmitPatch) {
       showRecipientOnScreen,
       showReactionsOnScreen,
       allowAllSpeakersTarget,
-      speakersText,
+      moderatorShowAll,
+      sessions,
+      activeSpeakerSessionId,
     }),
     [
       enabled,
@@ -77,7 +93,9 @@ export function useAdminSpeakerQuestions(emitPublicViewPatch: EmitPatch) {
       showRecipientOnScreen,
       showReactionsOnScreen,
       allowAllSpeakersTarget,
-      speakersText,
+      moderatorShowAll,
+      sessions,
+      activeSpeakerSessionId,
     ],
   );
 
@@ -104,7 +122,6 @@ export function useAdminSpeakerQuestions(emitPublicViewPatch: EmitPatch) {
     setEnabled,
     settings,
     reportSpeakerQuestionIds,
-    setSpeakersText,
     applyAdminFieldsFromPublicView,
     applyScreenVisibilityFromPublicView,
     applyReportSpeakerQuestionIds,
@@ -117,7 +134,9 @@ export function useAdminSpeakerQuestions(emitPublicViewPatch: EmitPatch) {
       setShowRecipientOnScreen,
       setShowReactionsOnScreen,
       setAllowAllSpeakersTarget,
-      setSpeakersText,
+      setModeratorShowAll,
+      setSessions,
+      setActiveSpeakerSessionId,
     },
   };
 }

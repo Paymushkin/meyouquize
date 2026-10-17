@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import type { Prisma } from "@prisma/client";
+import { resolveMultiMaxAnswers } from "@meyouquize/shared";
 import { prisma } from "./prisma.js";
 
 export const FEEDBACK_SCALE_MIN_OPTIONS = 2;
@@ -8,11 +9,35 @@ export const FEEDBACK_OPEN_FIELD_MAX = 10;
 /** Стабильный id для legacy-форм с commentEnabled и пустым openFields в БД. */
 export const LEGACY_FEEDBACK_OPEN_FIELD_ID = "legacy-comment";
 
+export type FeedbackScaleSelection = "single" | "multi";
+
 export type FeedbackScale = {
   id: string;
   label: string;
   options: string[];
+  selection?: FeedbackScaleSelection;
+  maxAnswers?: number;
 };
+
+export type FeedbackScaleAnswerValue = number | number[];
+export type FeedbackScaleAnswers = Record<string, FeedbackScaleAnswerValue>;
+
+export function isFeedbackScaleMulti(scale: Pick<FeedbackScale, "selection">): boolean {
+  return scale.selection === "multi";
+}
+
+export function resolveFeedbackMultiMaxAnswers(scale: FeedbackScale): number {
+  return resolveMultiMaxAnswers(scale.maxAnswers, scale.options.length, FEEDBACK_SCALE_MAX_OPTIONS);
+}
+
+export function normalizeFeedbackScaleAnswer(value: unknown): number | number[] | undefined {
+  if (typeof value === "number" && Number.isInteger(value)) return value;
+  if (!Array.isArray(value)) return undefined;
+  const indexes = value
+    .filter((item): item is number => typeof item === "number" && Number.isInteger(item))
+    .map((item) => Math.trunc(item));
+  return indexes.length > 0 ? indexes : undefined;
+}
 
 export type FeedbackOpenField = {
   id: string;
@@ -62,13 +87,24 @@ export type FeedbackInjectedResponse = {
 
 export type FeedbackResultResponseRow = {
   nickname: string;
-  scaleAnswers: Record<string, number>;
+  scaleAnswers: FeedbackScaleAnswers;
   openFieldAnswers: Record<string, string>;
   comment: string | null;
   submittedAt: string;
   isInjected?: boolean;
   injectedId?: string;
 };
+
+function parseResponseScaleAnswers(json: unknown): FeedbackScaleAnswers {
+  if (!json || typeof json !== "object" || Array.isArray(json)) return {};
+  const out: FeedbackScaleAnswers = {};
+  for (const [key, value] of Object.entries(json as Record<string, unknown>)) {
+    const normalized = normalizeFeedbackScaleAnswer(value);
+    if (normalized === undefined) continue;
+    out[key] = normalized;
+  }
+  return out;
+}
 
 export function feedbackScaleOverrideKey(scaleId: string, optionIndex: number): string {
   return `${scaleId}:${optionIndex}`;
@@ -157,10 +193,7 @@ function mapResponseRowFromDb(
     openFields.length === 1 ? (openFieldAnswers[openFields[0]!.id] ?? null) : r.comment;
   return {
     nickname: r.participant.nickname,
-    scaleAnswers:
-      r.scaleAnswers && typeof r.scaleAnswers === "object"
-        ? (r.scaleAnswers as Record<string, number>)
-        : {},
+    scaleAnswers: parseResponseScaleAnswers(r.scaleAnswers),
     openFieldAnswers,
     comment: legacyComment,
     submittedAt: r.submittedAt.toISOString(),
@@ -223,12 +256,22 @@ function computeRawScaleCounts(
   let sum = 0;
   let count = 0;
   const maxIdx = scale.options.length - 1;
+  const multi = isFeedbackScaleMulti(scale);
   for (const response of responses) {
-    const answers =
-      response.scaleAnswers && typeof response.scaleAnswers === "object"
-        ? (response.scaleAnswers as Record<string, number>)
-        : {};
-    const idx = answers[scale.id];
+    const answers = parseResponseScaleAnswers(response.scaleAnswers);
+    const raw = answers[scale.id];
+    if (raw === undefined) continue;
+    if (multi) {
+      const indexes = Array.isArray(raw) ? raw : [raw];
+      const unique = [...new Set(indexes)].filter((idx) => idx >= 0 && idx <= maxIdx);
+      if (unique.length === 0) continue;
+      for (const idx of unique) {
+        counts[idx] += 1;
+      }
+      count += 1;
+      continue;
+    }
+    const idx = typeof raw === "number" ? raw : raw[0];
     if (typeof idx !== "number" || idx < 0 || idx > maxIdx) continue;
     counts[idx] += 1;
     sum += idx + 1;
@@ -236,7 +279,7 @@ function computeRawScaleCounts(
   }
   return {
     counts,
-    average: count > 0 ? Math.round((sum / count) * 100) / 100 : null,
+    average: multi ? null : count > 0 ? Math.round((sum / count) * 100) / 100 : null,
     responseCount: count,
   };
 }
@@ -261,7 +304,13 @@ export function parseFeedbackScales(json: unknown): FeedbackScale[] {
   const scales: FeedbackScale[] = [];
   for (const item of json) {
     if (!item || typeof item !== "object") continue;
-    const row = item as { id?: unknown; label?: unknown; options?: unknown };
+    const row = item as {
+      id?: unknown;
+      label?: unknown;
+      options?: unknown;
+      selection?: unknown;
+      maxAnswers?: unknown;
+    };
     if (typeof row.id !== "string" || !row.id.trim()) continue;
     if (typeof row.label !== "string" || !row.label.trim()) continue;
     if (
@@ -273,11 +322,23 @@ export function parseFeedbackScales(json: unknown): FeedbackScale[] {
     }
     const options = row.options.map((o) => (typeof o === "string" ? o.trim() : ""));
     if (options.some((o) => !o)) continue;
-    scales.push({
+    const selection: FeedbackScaleSelection = row.selection === "multi" ? "multi" : "single";
+    const scale: FeedbackScale = {
       id: row.id.trim().slice(0, 80),
       label: row.label.trim().slice(0, 200),
       options: options as FeedbackScale["options"],
-    });
+      selection,
+    };
+    if (selection === "multi") {
+      const optionCount = options.length;
+      const raw = Math.trunc(Number(row.maxAnswers)) || 0;
+      if (raw <= 1 || raw >= optionCount) {
+        scale.maxAnswers = optionCount;
+      } else {
+        scale.maxAnswers = Math.min(FEEDBACK_SCALE_MAX_OPTIONS, optionCount, raw);
+      }
+    }
+    scales.push(scale);
   }
   return scales;
 }
@@ -441,13 +502,15 @@ export async function createFeedbackForm(
   quizId: string,
   input: FeedbackFormInput,
 ): Promise<FeedbackFormConfig> {
+  const scales = parseFeedbackScales(input.scales);
+  if (scales.length < 1) throw new Error("Добавьте хотя бы один вопрос");
   const openFields = resolveFeedbackOpenFields(input);
   const legacy = legacyCommentFieldsFromOpenFields(openFields);
   const form = await prisma.feedbackForm.create({
     data: {
       quizId,
       title: input.title.trim().slice(0, 200),
-      scales: input.scales as unknown as Prisma.InputJsonValue,
+      scales: scales as unknown as Prisma.InputJsonValue,
       openFields: openFields as unknown as Prisma.InputJsonValue,
       commentEnabled: legacy.commentEnabled,
       commentPlaceholder: legacy.commentPlaceholder,
@@ -467,13 +530,15 @@ export async function updateFeedbackFormConfig(
   if (existing.isActive && !existing.isClosed) {
     throw new Error("Нельзя редактировать форму, пока идёт сбор ответов");
   }
+  const scales = parseFeedbackScales(input.scales);
+  if (scales.length < 1) throw new Error("Добавьте хотя бы один вопрос");
   const openFields = resolveFeedbackOpenFields(input);
   const legacy = legacyCommentFieldsFromOpenFields(openFields);
   const form = await prisma.feedbackForm.update({
     where: { id: formId },
     data: {
       title: input.title.trim().slice(0, 200),
-      scales: input.scales as unknown as Prisma.InputJsonValue,
+      scales: scales as unknown as Prisma.InputJsonValue,
       openFields: openFields as unknown as Prisma.InputJsonValue,
       commentEnabled: legacy.commentEnabled,
       commentPlaceholder: legacy.commentPlaceholder,
@@ -579,10 +644,26 @@ export async function hasParticipantSubmittedFeedback(
   return hasParticipantSubmittedFeedbackForForm(form.id, participantId);
 }
 
-function validateScaleAnswers(scales: FeedbackScale[], scaleAnswers: Record<string, number>): void {
+function validateScaleAnswers(scales: FeedbackScale[], scaleAnswers: FeedbackScaleAnswers): void {
   for (const scale of scales) {
-    const idx = scaleAnswers[scale.id];
+    const raw = scaleAnswers[scale.id];
     const maxIdx = scale.options.length - 1;
+    if (isFeedbackScaleMulti(scale)) {
+      const indexes = Array.isArray(raw) ? raw : typeof raw === "number" ? [raw] : null;
+      if (!indexes || indexes.length < 1) {
+        throw new Error(`Выберите ответ для «${scale.label}»`);
+      }
+      const unique = [...new Set(indexes.map((idx) => Math.trunc(idx)))];
+      if (unique.some((idx) => !Number.isInteger(idx) || idx < 0 || idx > maxIdx)) {
+        throw new Error(`Выберите ответ для «${scale.label}»`);
+      }
+      const maxAnswers = resolveFeedbackMultiMaxAnswers(scale);
+      if (unique.length > maxAnswers) {
+        throw new Error(`Для «${scale.label}» можно выбрать не больше ${maxAnswers}`);
+      }
+      continue;
+    }
+    const idx = typeof raw === "number" ? raw : Array.isArray(raw) ? raw[0] : undefined;
     if (typeof idx !== "number" || !Number.isInteger(idx) || idx < 0 || idx > maxIdx) {
       throw new Error(`Выберите ответ для «${scale.label}»`);
     }
@@ -598,13 +679,26 @@ function validateScaleAnswers(scales: FeedbackScale[], scaleAnswers: Record<stri
 export async function submitFeedbackResponse(input: {
   quizId: string;
   participantId: string;
-  scaleAnswers: Record<string, number>;
+  scaleAnswers: FeedbackScaleAnswers;
   openFieldAnswers?: Record<string, string>;
   comment?: string;
 }): Promise<string | null> {
   const form = await getActiveFeedbackFormConfig(input.quizId);
   if (!form) throw new Error("Сбор обратной связи сейчас не активен");
   validateScaleAnswers(form.scales, input.scaleAnswers);
+  const normalizedScaleAnswers: FeedbackScaleAnswers = {};
+  for (const scale of form.scales) {
+    const raw = input.scaleAnswers[scale.id];
+    if (isFeedbackScaleMulti(scale)) {
+      const indexes = Array.isArray(raw) ? raw : typeof raw === "number" ? [raw] : [];
+      normalizedScaleAnswers[scale.id] = [...new Set(indexes.map((idx) => Math.trunc(idx)))].sort(
+        (a, b) => a - b,
+      );
+    } else {
+      const idx = typeof raw === "number" ? raw : Array.isArray(raw) ? raw[0] : undefined;
+      if (typeof idx === "number") normalizedScaleAnswers[scale.id] = Math.trunc(idx);
+    }
+  }
   const openFieldAnswers = resolveSubmitOpenFieldAnswers(form.openFields, input.openFieldAnswers);
   if (
     input.comment &&
@@ -621,7 +715,7 @@ export async function submitFeedbackResponse(input: {
       data: {
         feedbackFormId: form.id,
         participantId: input.participantId,
-        scaleAnswers: input.scaleAnswers as unknown as Prisma.InputJsonValue,
+        scaleAnswers: normalizedScaleAnswers as unknown as Prisma.InputJsonValue,
         openFieldAnswers: openFieldAnswers as unknown as Prisma.InputJsonValue,
         comment: legacyComment,
       },
@@ -705,7 +799,7 @@ export type FeedbackReportItem = {
   }>;
   responses: Array<{
     nickname: string;
-    scaleAnswers: Record<string, number>;
+    scaleAnswers: FeedbackScaleAnswers;
     openFieldAnswers: Record<string, string>;
     comment: string | null;
     submittedAt: string;

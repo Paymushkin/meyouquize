@@ -1,6 +1,6 @@
 /** Сообщение при connect_error — LAN и интернет-прод различаются. */
 export function socketConnectErrorMessage(hostname: string = getHostname()): string {
-  if (import.meta.env.DEV && isLocalDevHost(hostname)) {
+  if (isLocalDevHost(hostname)) {
     return "Нет соединения с сервером. Убедитесь, что backend запущен (порт 4000).";
   }
   if (isPrivateLanHost(hostname)) {
@@ -29,7 +29,6 @@ function isLocalDevHost(hostname: string): boolean {
 
 function isPrivateLanHost(hostname: string): boolean {
   if (!hostname) return false;
-  if (isLocalDevHost(hostname)) return true;
   if (/^10\./.test(hostname)) return true;
   if (/^192\.168\./.test(hostname)) return true;
   if (/^172\.(1[6-9]|2\d|3[0-1])\./.test(hostname)) return true;

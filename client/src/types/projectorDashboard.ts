@@ -2,7 +2,8 @@
 
 export type ProjectorOptionStat = {
   optionId: string;
-  text: string;
+  /** Image-only варианты могут прийти без текста. */
+  text?: string;
   imageUrl?: string;
   count: number;
   isCorrect: boolean;
@@ -14,6 +15,11 @@ export type ProjectorOptionStat = {
   totalScore?: number;
   /** Для temperature: вес варианта 0–100 */
   weight?: number;
+  /** Hex-цвет сегмента (дебаты / side-by-side) */
+  color?: string;
+  /** Geo poll: координаты для карты */
+  lat?: number;
+  lon?: number;
 };
 
 export type ProjectorTagCloudWord = { text: string; count: number };
@@ -43,6 +49,18 @@ export type ProjectorQuestionResult = {
   temperatureValue?: number | null;
   /** Для temperature: подзаголовок над шкалой на проекторе */
   temperatureSubtitle?: string;
+  /** Для дебатов: id baseline-опроса «до». */
+  debateBaselineQuestionId?: string;
+  /** Side-by-side layout на проекторе (дебаты, от 2 вариантов). */
+  projectorDebateLayout?: boolean;
+  /** Серия многораундовых дебатов. */
+  debateSeriesId?: string;
+  /** Индекс раунда в серии (0-based). */
+  debateRoundIndex?: number;
+  /** Заголовок накопительного итога серии. */
+  debateSeriesResultTitle?: string;
+  /** Geo poll: id словаря автодополнения. */
+  geoPollDictionary?: string;
   optionStats: ProjectorOptionStat[];
   tagCloud?: ProjectorTagCloudWord[];
   /** Все синонимы эталонов (квиз); для подсветки облака на проекторе */

@@ -1,11 +1,12 @@
 import AddIcon from "@mui/icons-material/Add";
-import LeaderboardIcon from "@mui/icons-material/Leaderboard";
-import RestoreIcon from "@mui/icons-material/Restore";
+import PieChartIcon from "@mui/icons-material/PieChart";
 import RestartAltIcon from "@mui/icons-material/RestartAlt";
+import RestoreIcon from "@mui/icons-material/Restore";
 import TaskAltIcon from "@mui/icons-material/TaskAlt";
 import TuneIcon from "@mui/icons-material/Tune";
 import VisibilityIcon from "@mui/icons-material/Visibility";
 import VisibilityOffIcon from "@mui/icons-material/VisibilityOff";
+import { isDebatePollPreset, isGeoPollPreset } from "@meyouquize/shared";
 import { IconButton, Stack, Tooltip } from "@mui/material";
 import type { QuestionForm } from "../../../admin/adminEventForm";
 
@@ -45,6 +46,9 @@ export function QuestionSettingsToolbar(props: Props) {
     onToggleVoteAdjustEdit,
   } = props;
 
+  const isGeoPoll = isGeoPollPreset(question);
+  const isDebatePoll = isDebatePollPreset(question);
+
   return (
     <Stack direction="row" justifyContent="space-between" alignItems="center">
       <Stack direction="row" alignItems="center" spacing={0.5}>
@@ -74,7 +78,7 @@ export function QuestionSettingsToolbar(props: Props) {
         ) : null}
       </Stack>
       <Stack direction="row" alignItems="center" spacing={0.5}>
-        {question.type !== "tag_cloud" && (
+        {question.type !== "tag_cloud" && !isGeoPoll && !isDebatePoll ? (
           <Tooltip
             title={
               (question.showVoteCount ?? false)
@@ -96,8 +100,11 @@ export function QuestionSettingsToolbar(props: Props) {
               )}
             </IconButton>
           </Tooltip>
-        )}
-        {question.type !== "tag_cloud" && question.type !== "ranking" && (
+        ) : null}
+        {question.type !== "tag_cloud" &&
+        question.type !== "ranking" &&
+        !isGeoPoll &&
+        !isDebatePoll ? (
           <Tooltip
             title={
               (question.showCorrectOption ?? false)
@@ -118,7 +125,7 @@ export function QuestionSettingsToolbar(props: Props) {
               />
             </IconButton>
           </Tooltip>
-        )}
+        ) : null}
         {question.type === "tag_cloud" && (
           <Tooltip title="Добавить ответы списком">
             <IconButton
@@ -156,7 +163,7 @@ export function QuestionSettingsToolbar(props: Props) {
                   : undefined
               }
             >
-              <LeaderboardIcon fontSize="small" />
+              <PieChartIcon fontSize="small" />
             </IconButton>
           </Tooltip>
         ) : null}

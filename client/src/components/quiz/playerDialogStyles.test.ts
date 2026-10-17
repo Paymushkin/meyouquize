@@ -28,6 +28,22 @@ describe("buildPlayerDialogTabsSx", () => {
 });
 
 describe("buildPlayerDialogSelectMenuProps", () => {
+  it("keeps menu portaled with touch-friendly modal props", () => {
+    const menuProps = buildPlayerDialogSelectMenuProps(
+      "Jost, Arial, sans-serif",
+      "#F3F722",
+      "#000000",
+    );
+    expect(menuProps.disablePortal).toBeUndefined();
+    expect(menuProps.disableScrollLock).toBe(true);
+    expect(menuProps.PaperProps?.className).toBe("notranslate");
+    expect(menuProps.sx).toMatchObject({ zIndex: 1400 });
+    expect(menuProps.slotProps?.root).toMatchObject({
+      disableEnforceFocus: true,
+      disableAutoFocus: true,
+    });
+  });
+
   it("uses brand color for menu item hover and selected states", () => {
     const menuProps = buildPlayerDialogSelectMenuProps(
       "Jost, Arial, sans-serif",
@@ -35,8 +51,13 @@ describe("buildPlayerDialogSelectMenuProps", () => {
       "#000000",
     );
     const paperSx = menuProps.PaperProps?.sx as Record<string, unknown>;
+    expect(paperSx.maxWidth).toBe("min(576px, calc(100vw - 32px))");
     const menuItemSx = (paperSx["& .MuiMenuItem-root"] ?? {}) as Record<string, unknown>;
     expect(menuItemSx).toMatchObject({
+      whiteSpace: "normal",
+      wordBreak: "break-word",
+      minHeight: 48,
+      touchAction: "manipulation",
       "&:hover": {
         color: "#F3F722",
       },

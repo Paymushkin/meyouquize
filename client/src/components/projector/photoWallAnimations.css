@@ -126,20 +126,6 @@
   }
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .photo-wall-waterfall-column__track--scroll {
-    animation: none;
-  }
-
-  .photo-wall-waterfall-tile__frame--clip {
-    transition: none !important;
-  }
-
-  .photo-wall-waterfall-tile__layer--ken-burns-1,
-  .photo-wall-waterfall-tile__layer--ken-burns-2,
-  .photo-wall-waterfall-tile__layer--ken-burns-3,
-  .photo-wall-waterfall-tile__layer--ken-burns-4 {
-    animation: none;
-    transform: scale(1.06);
-  }
-}
+/* Проектор — экран показа: не глушим scroll/Ken Burns при
+   prefers-reduced-motion (Windows «Эффекты анимации» / RDP).
+   Этот CSS подключается только в ProjectorPhotoWallSection. */

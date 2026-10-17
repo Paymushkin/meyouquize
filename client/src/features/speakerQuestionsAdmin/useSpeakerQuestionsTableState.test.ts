@@ -12,6 +12,7 @@ function makeItem(overrides: Partial<SpeakerQuestionItem>): SpeakerQuestionItem 
     authorNickname: "Автор",
     status: "PENDING",
     userVisible: true,
+    moderatorVisible: false,
     isOnScreen: false,
     createdAt: "2026-01-01T00:00:00.000Z",
     ...overrides,

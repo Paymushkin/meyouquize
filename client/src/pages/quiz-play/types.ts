@@ -14,8 +14,12 @@ export type ActiveQuestion = {
   rankingPlayerHint?: string;
   /** Подсказка игроку для облака тегов (если пусто — не показывать). */
   tagCloudPlayerHint?: string;
+  /** Geo poll: id словаря автодополнения. */
+  geoPollDictionary?: string;
+  /** Side-by-side дебаты на проекторе. */
+  projectorDebateLayout?: boolean;
   maxAnswers?: number;
-  options: Array<{ id: string; text: string; imageUrl?: string }>;
+  options: Array<{ id: string; text: string; imageUrl?: string; color?: string }>;
   isClosed: boolean;
   /** Порядковый номер вопроса в сабквизе (1-based), с сервера. */
   stepIndex?: number;
@@ -52,7 +56,8 @@ export type ReactionSession = {
 
 export type PlayerVisibleResultOptionStat = {
   optionId: string;
-  text: string;
+  /** Image-only варианты / ручные override могут прийти без текста. */
+  text?: string;
   imageUrl?: string;
   count: number;
   isCorrect: boolean;
@@ -105,6 +110,10 @@ export type QuizState = {
     backgroundUrl: string;
     size: "2x1" | "1x1" | "full";
     isVisible: boolean;
+    visualStyle?: "image" | "tile";
+    text?: string;
+    backgroundColor?: string;
+    textColor?: string;
   }>;
   activePlayerBannerId?: string;
   speakerTileText?: string;
@@ -120,6 +129,12 @@ export type QuizState = {
   photoWallImageCount?: number;
   photoWallImageExt?: "jpeg" | "jpg" | "png" | "webp";
   photoWallTileVisible?: boolean;
+  videoWallHorizontalItems?: Array<{ id: string; url: string; title: string }>;
+  videoWallHorizontalPosterUrl?: string;
+  videoWallVerticalItems?: Array<{ id: string; url: string; title: string }>;
+  videoWallVerticalPosterUrl?: string;
+  videoWallTileVisible?: boolean;
+  videoWallTileCoverUrl?: string;
   playerQuizResultsTileVisible?: boolean;
   playerQuizResultsTileText?: string;
   playerQuizResultsTileBackgroundColor?: string;
@@ -133,6 +148,7 @@ export type QuizState = {
   playerVoteProgressBarColor?: string;
   playerVisibleResults?: PlayerVisibleResultTile[];
   playerTilesOrder?: string[];
+  playerTilesGridColumns?: 2 | 3;
   brandPrimaryColor?: string;
   brandAccentColor?: string;
   brandSurfaceColor?: string;

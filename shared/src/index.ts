@@ -5,6 +5,14 @@ import {
   sanitizePhotoWallImageExt,
   type PhotoWallImageExt,
 } from "./photoWall.js";
+import {
+  clampVideoWallProjectorActiveSeconds,
+  clampVideoWallProjectorFreezeSeconds,
+  clampVideoWallProjectorMaxVideos,
+  sanitizeVideoWallItems,
+  sanitizeVideoWallPosterUrl,
+  type VideoWallItem,
+} from "./videoWall.js";
 import type { BrandThemeId } from "./brandThemes.js";
 import type { EventThemeBranding } from "./eventThemeBranding.js";
 import {
@@ -28,12 +36,25 @@ import {
 } from "./brandFontFaces.js";
 import { sanitizeVoteOptionBorderColor } from "./voteOptionBorderColor.js";
 import { sanitizeVoteFillColor, sanitizeVoteQuestionTextColor } from "./voteQuestionTextStyle.js";
+import type { SpeakerQuestionSession } from "./speakerQuestionSessions.js";
+import { normalizeSpeakerQuestionSessions } from "./speakerQuestionSessions.js";
+export type { SpeakerQuestionSession } from "./speakerQuestionSessions.js";
+export {
+  DEFAULT_SPEAKER_SESSION_NAME,
+  LEGACY_DEFAULT_SPEAKER_SESSION_ID,
+  createSpeakerSessionId,
+  findSpeakerSessionName,
+  groupSpeakerQuestionsBySession,
+  normalizeSpeakerQuestionSessions,
+} from "./speakerQuestionSessions.js";
+export type { SpeakerQuestionSessionGroup } from "./speakerQuestionSessions.js";
 
 export type QuestionType = "single" | "multi" | "tag_cloud" | "ranking" | "temperature";
 export type QuizStatus = "draft" | "live" | "finished";
 export const SPEAKER_TILE_ID = "speaker_tile";
 export const PROGRAM_TILE_ID = "program_tile";
 export const PHOTO_WALL_TILE_ID = "photo_wall_tile";
+export const VIDEO_WALL_TILE_ID = "video_wall_tile";
 /** Плитка 1×1 «Мой квиз» с личным отчётом по сабквизу в интерфейсе игрока */
 export const QUIZ_RESULTS_TILE_ID = "quiz_results_tile";
 
@@ -124,7 +145,10 @@ export type PublicViewMode =
   | "reactions"
   | "randomizer"
   | "photo_wall"
-  | "report";
+  | "video_wall"
+  | "report"
+  | "debate_compare"
+  | "debate_series";
 export type QuestionRevealStage = "options" | "results";
 export type RandomizerMode = "names" | "numbers";
 export type RandomizerListMode = "participants_only" | "free_list";
@@ -159,6 +183,55 @@ export {
 } from "./tagCloudManual.js";
 export { buildCloudWordsForDisplay, aggregateTagCloudWordCounts } from "./tagCloudMerge.js";
 export type {
+  DebateCompareRow,
+  DebateOptionStat,
+  DebateSeriesOptionStat,
+} from "./debateCompare.js";
+export {
+  buildDebateCompareRows,
+  DEFAULT_DEBATE_SERIES_RESULT_TITLE,
+  debateOptionPercents,
+  formatDebateSwingLabel,
+  groupDebateSeriesQuestionIds,
+  isDebateUndecidedOption,
+  resolveDebateSeriesResultTitle,
+  singlePollDebateSideBySideEligible,
+  sumDebateSeriesOptionStats,
+} from "./debateCompare.js";
+export type { GeoPollDictionaryId } from "./geoPollDictionaries.js";
+export {
+  GEO_POLL_DICTIONARY_WORLD_CITIES,
+  GEO_POLL_DICTIONARY_WORLD_COUNTRIES,
+  geoPollDictionaryInputLabel,
+  geoPollDictionaryLabel,
+  isGeoPollDictionary,
+} from "./geoPollDictionaries.js";
+export type { GeoPollMapKind, GeoPollMapPoint } from "./geoPollMapLayout.js";
+export {
+  buildGeoPollMapMarkers,
+  geoPollMapKind,
+  geoPollMapViewBox,
+  projectGeoLatLon,
+} from "./geoPollMapLayout.js";
+export {
+  DEBATE_POLL_DEFAULT_QUESTION_TEXT,
+  GEO_POLL_DEFAULT_QUESTION_TEXT,
+  buildDebatePollQuestionPatch,
+  buildDebateSeriesNextRoundPatch,
+  buildGeoPollQuestionPatch,
+  debatePollOptions,
+  isDebatePollPreset,
+  isGeoPollPreset,
+  withDebateOptionColors,
+} from "./interactivePresets.js";
+export { resolveMultiMaxAnswers } from "./multiMaxAnswers.js";
+export {
+  DEBATE_DEFAULT_OPTION_COLORS,
+  contrastingTextOnColor,
+  debateDefaultOptionColor,
+  sanitizeOptionColor,
+} from "./optionColor.js";
+export type {
   PhotoWallImageExt,
   PhotoWallAlbumPhoto,
   PhotoWallCollageLayout,
@@ -192,12 +265,54 @@ export {
   sanitizePhotoWallBaseUrl,
   sanitizePhotoWallImageExt,
 } from "./photoWall.js";
+export type {
+  VideoWallAlbumVideo,
+  VideoWallCollageLayout,
+  VideoWallItem,
+  VideoWallOrientation,
+} from "./videoWall.js";
+export {
+  VIDEO_WALL_MAX_ITEM_COUNT,
+  VIDEO_WALL_PROJECTOR_MAX_VIDEOS,
+  VIDEO_WALL_PROJECTOR_DEFAULT_MAX_VIDEOS,
+  VIDEO_WALL_PROJECTOR_DEFAULT_ACTIVE_SECONDS,
+  VIDEO_WALL_PROJECTOR_MAX_ACTIVE_SECONDS,
+  VIDEO_WALL_PROJECTOR_DEFAULT_FREEZE_SECONDS,
+  VIDEO_WALL_PROJECTOR_MAX_FREEZE_SECONDS,
+  VIDEO_WALL_COLLAGE_VIDEO_COUNT,
+  VIDEO_WALL_COLLAGE_GAP_PX,
+  buildVideoWallAlbumVideos,
+  clampVideoWallProjectorActiveSeconds,
+  clampVideoWallProjectorFreezeSeconds,
+  clampVideoWallProjectorMaxVideos,
+  pickVideoWallProjectorVideos,
+  resolveVideoWallCollageLayout,
+  resolveVideoWallTileCoverUrl,
+  sanitizeVideoWallItemTitle,
+  sanitizeVideoWallItemUrl,
+  sanitizeVideoWallItems,
+  sanitizeVideoWallPosterUrl,
+  videoWallCollageVideoIndices,
+  videoWallMimeTypeForUrl,
+  withVideoWallPlaybackContentType,
+} from "./videoWall.js";
+export type PublicBannerVisualStyle = "image" | "tile";
+
 export type PublicBanner = {
   id: string;
   linkUrl: string;
+  /** Для visualStyle=image; для tile может быть пустым. */
   backgroundUrl: string;
   size: "2x1" | "1x1" | "full";
   isVisible: boolean;
+  /** image (по умолчанию) — картинка; tile — как плитка спикеров (цвет + текст). */
+  visualStyle?: PublicBannerVisualStyle;
+  /** Текст для visualStyle=tile */
+  text?: string;
+  /** Фон для visualStyle=tile */
+  backgroundColor?: string;
+  /** Цвет текста для visualStyle=tile */
+  textColor?: string;
 };
 export type PublicReactionWidget = {
   id: string;
@@ -221,6 +336,16 @@ export type RandomizerHistoryEntry = {
 export interface PublicViewState {
   mode: PublicViewMode;
   questionId?: string;
+  /** Финальный вопрос дебатов для режима `debate_compare`. */
+  debateCompareQuestionId?: string;
+  /** Серия дебатов для накопительного итога (`debate_series`). */
+  debateSeriesId?: string;
+  /** В режиме серии: cumulative (по умолчанию) или текущий раунд. */
+  debateSeriesView?: "cumulative" | "round";
+  /** Явный набор раундов для накопительного итога (прошедшие). Пусто = все раунды серии. */
+  debateSeriesQuestionIds?: string[];
+  /** Под накопительным итогом серии показывать шкалы по каждому раунду (мельче). */
+  debateSeriesShowRounds: boolean;
   questionRevealStage: QuestionRevealStage;
   highlightedLeadersCount: number;
   /** Сабквиз для режима `leaderboard` на проекторе (пусто = первый по sortOrder). */
@@ -257,7 +382,14 @@ export interface PublicViewState {
   firstCorrectWinnersCount: number;
   /** Секция «Вопросы спикерам»: показывать кнопку у игроков */
   speakerQuestionsEnabled: boolean;
-  /** Секция «Вопросы спикерам»: список спикеров (можно выбрать конкретного или "всем") */
+  /** Сессии вопросов спикерам (спикеры внутри каждой сессии). */
+  speakerQuestionSessions: SpeakerQuestionSession[];
+  /** Активная сессия: её спикеры доступны игроку при создании вопроса. */
+  activeSpeakerSessionId: string | null;
+  /**
+   * Секция «Вопросы спикерам»: список спикеров активной сессии
+   * (derived; для обратной совместимости player/projector).
+   */
   speakerQuestionsSpeakers: string[];
   /** Секция «Вопросы спикерам»: список доступных реакций */
   speakerQuestionsReactions: string[];
@@ -269,6 +401,11 @@ export interface PublicViewState {
   speakerQuestionsShowReactionsOnScreen: boolean;
   /** Разрешить в форме игрока вариант «Всем спикерам» */
   speakerQuestionsAllowAllSpeakersTarget: boolean;
+  /**
+   * Страница модератора `/s/:slug`: показывать все вопросы (true)
+   * или только со статусом APPROVED (false, по умолчанию).
+   */
+  speakerQuestionsModeratorShowAll: boolean;
   /** Показывать название ивента в интерфейсе игрока */
   showEventTitleOnPlayer: boolean;
   /** Вход в ивент без формы: сразу случайный ник (пользователь может сменить позже). */
@@ -301,6 +438,10 @@ export interface PublicViewState {
   programTileVisible: boolean;
   /** Показывать плитку фотостены (коллаж) у пользователя */
   photoWallTileVisible: boolean;
+  /** Показывать плитку видеосцены у пользователя */
+  videoWallTileVisible: boolean;
+  /** Обложка плитки 1×1 видеосцены у участников */
+  videoWallTileCoverUrl: string;
   /** Плитка 1×1 с личным отчётом по квизу (сабквиз) */
   playerQuizResultsTileVisible: boolean;
   playerQuizResultsTileText: string;
@@ -312,6 +453,8 @@ export interface PublicViewState {
   playerQuizResultsSubQuizIds: string[];
   /** Порядок плиток в пользовательском интерфейсе (баннеры + speaker_tile + program_tile) */
   playerTilesOrder: string[];
+  /** Число колонок сетки плиток у игрока (2 или 3). */
+  playerTilesGridColumns: 2 | 3;
   /** Крупный текст в режиме реакций на проекторе (по центру экрана) */
   reactionsOverlayText: string;
   /** Набор сохраненных виджетов реакций для админки */
@@ -320,6 +463,8 @@ export interface PublicViewState {
   reactionsWidgetStats: PublicReactionWidgetStats[];
   /** Список questionId, для которых у пользователя показываются плитки результатов */
   playerVisibleResultQuestionIds: string[];
+  /** Список debateSeriesId, для которых у пользователя показывается накопительный итог серии */
+  playerVisibleDebateSeriesIds: string[];
   /** Интерфейс пользователя: цвет текста ответов в карточках результатов */
   playerVoteOptionTextColor: string;
   /** Интерфейс пользователя: цвет трека прогресс-бара в карточках результатов */
@@ -328,6 +473,10 @@ export interface PublicViewState {
   playerVoteProgressBarColor: string;
   /** Проектор: крупный QR на экране ивента (title) */
   projectorJoinQrVisible: boolean;
+  /** Проектор: масштаб браузера (CSS zoom), коэффициент 0.5–5.0 */
+  projectorBrowserZoom: number;
+  /** Проектор: макс. ширина контейнера контента (px) */
+  projectorContentMaxWidthPx: number;
   /** Проектор: компактный QR в углу на голосованиях и других экранах */
   projectorJoinQrOverlayVisible: boolean;
   /** Проектор: подпись рядом с QR-кодом входа */
@@ -381,6 +530,24 @@ export interface PublicViewState {
   photoWallGridColumns: number;
   photoWallAnimate: boolean;
   photoWallKenBurns: boolean;
+  /** Видеостена: горизонтальные ролики (полный HTTPS URL + название) */
+  videoWallHorizontalItems: VideoWallItem[];
+  /** Видеостена: общий постер для горизонтальных */
+  videoWallHorizontalPosterUrl: string;
+  /** Видеостена: вертикальные ролики (полный HTTPS URL + название) */
+  videoWallVerticalItems: VideoWallItem[];
+  /** Видеостена: общий постер для вертикальных */
+  videoWallVerticalPosterUrl: string;
+  /** Проектор: показывать горизонтальные ролики */
+  videoWallProjectorShowHorizontal: boolean;
+  /** Проектор: показывать вертикальные ролики */
+  videoWallProjectorShowVertical: boolean;
+  /** Проектор: сколько роликов участвует в сцене */
+  videoWallProjectorMaxVideos: number;
+  /** Проектор: сколько секунд активно центральное видео */
+  videoWallProjectorActiveSeconds: number;
+  /** Проектор: секунда стоп-кадра в полосе и старт центрального ролика */
+  videoWallProjectorFreezeSeconds: number;
   /** Отчет: заголовок публичной страницы */
   reportTitle: string;
   /** Отчет: включенные блоки и их порядок */
@@ -458,6 +625,59 @@ export const PROJECTOR_JOIN_QR_TEXT_MAX_LENGTH = 200;
 export const DEFAULT_PROJECTOR_JOIN_QR_TEXT = "Сканируйте QR-код, чтобы войти в ивент";
 export const DEFAULT_PROJECTOR_JOIN_QR_TEXT_COLOR = "#ffffff";
 
+export const PROJECTOR_BROWSER_ZOOM_MIN = 0.5;
+export const PROJECTOR_BROWSER_ZOOM_MAX = 5;
+export const PROJECTOR_BROWSER_ZOOM_STEP = 0.1;
+export const DEFAULT_PROJECTOR_BROWSER_ZOOM = 1;
+
+/** Макс. ширина контента проектора (px). */
+export const PROJECTOR_CONTENT_MAX_WIDTH_PX_MIN = 800;
+export const PROJECTOR_CONTENT_MAX_WIDTH_PX_MAX = 7680;
+export const DEFAULT_PROJECTOR_CONTENT_MAX_WIDTH_PX = 1920;
+
+export function clampProjectorContentMaxWidthPx(
+  value: unknown,
+  fallback: number = DEFAULT_PROJECTOR_CONTENT_MAX_WIDTH_PX,
+): number {
+  const n =
+    typeof value === "number" && Number.isFinite(value)
+      ? value
+      : typeof value === "string" && value.trim() !== ""
+        ? Number(value)
+        : NaN;
+  if (!Number.isFinite(n)) return fallback;
+  return Math.min(
+    PROJECTOR_CONTENT_MAX_WIDTH_PX_MAX,
+    Math.max(PROJECTOR_CONTENT_MAX_WIDTH_PX_MIN, Math.round(n)),
+  );
+}
+
+/** Старый формат (проценты 75–150) → коэффициент. */
+function coerceProjectorBrowserZoomInput(value: unknown): number | null {
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  if (typeof value === "string" && value.trim() !== "") {
+    const n = Number(value);
+    if (Number.isFinite(n)) return n;
+  }
+  return null;
+}
+
+export function clampProjectorBrowserZoom(
+  value: unknown,
+  fallback: number = DEFAULT_PROJECTOR_BROWSER_ZOOM,
+): number {
+  let n = coerceProjectorBrowserZoomInput(value);
+  if (n == null) return fallback;
+  // Миграция: ранее хранили проценты (75–150).
+  if (n >= 10) n = n / 100;
+  const stepped = Math.round(n / PROJECTOR_BROWSER_ZOOM_STEP) * PROJECTOR_BROWSER_ZOOM_STEP;
+  const clamped = Math.min(
+    PROJECTOR_BROWSER_ZOOM_MAX,
+    Math.max(PROJECTOR_BROWSER_ZOOM_MIN, stepped),
+  );
+  return Math.round(clamped * 10) / 10;
+}
+
 export type ProjectorJoinQrOverlayCorner =
   | "top_right"
   | "top_left"
@@ -495,6 +715,7 @@ function sanitizeProjectorJoinQrOverlayCorner(
 
 export const DEFAULT_PUBLIC_VIEW_STATE: PublicViewState = {
   mode: "title",
+  debateSeriesShowRounds: false,
   questionRevealStage: "options",
   highlightedLeadersCount: 3,
   leaderboardSubQuizId: "",
@@ -522,12 +743,15 @@ export const DEFAULT_PUBLIC_VIEW_STATE: PublicViewState = {
   showFirstCorrectAnswerer: false,
   firstCorrectWinnersCount: 1,
   speakerQuestionsEnabled: false,
+  speakerQuestionSessions: [],
+  activeSpeakerSessionId: null,
   speakerQuestionsSpeakers: [],
   speakerQuestionsReactions: ["👍", "🔥", "👏", "❤️"],
   speakerQuestionsShowAuthorOnScreen: false,
   speakerQuestionsShowRecipientOnScreen: true,
   speakerQuestionsShowReactionsOnScreen: true,
   speakerQuestionsAllowAllSpeakersTarget: true,
+  speakerQuestionsModeratorShowAll: false,
   showEventTitleOnPlayer: true,
   playerAutoJoinRandomNickname: false,
   playerBanners: [],
@@ -544,21 +768,27 @@ export const DEFAULT_PUBLIC_VIEW_STATE: PublicViewState = {
   programTileLinkUrl: "",
   programTileVisible: false,
   photoWallTileVisible: false,
+  videoWallTileVisible: false,
+  videoWallTileCoverUrl: "",
   playerQuizResultsTileVisible: false,
   playerQuizResultsTileText: "Мой квиз",
   playerQuizResultsTileBackgroundColor: "#2e7d32",
   playerQuizResultsTileTextColor: "#ffffff",
   playerQuizResultsSubQuizId: "",
   playerQuizResultsSubQuizIds: [],
-  playerTilesOrder: [SPEAKER_TILE_ID, PROGRAM_TILE_ID, PHOTO_WALL_TILE_ID],
+  playerTilesOrder: [PROGRAM_TILE_ID, SPEAKER_TILE_ID, PHOTO_WALL_TILE_ID, VIDEO_WALL_TILE_ID],
+  playerTilesGridColumns: 3,
   reactionsOverlayText: "Реакции аудитории",
   reactionsWidgets: [],
   reactionsWidgetStats: [],
   playerVisibleResultQuestionIds: [],
+  playerVisibleDebateSeriesIds: [],
   playerVoteOptionTextColor: "#ffffff",
   playerVoteProgressTrackColor: "#6a5600",
   playerVoteProgressBarColor: "#F3F722",
   projectorJoinQrVisible: DEFAULT_PROJECTOR_JOIN_QR_VISIBLE,
+  projectorBrowserZoom: DEFAULT_PROJECTOR_BROWSER_ZOOM,
+  projectorContentMaxWidthPx: DEFAULT_PROJECTOR_CONTENT_MAX_WIDTH_PX,
   projectorJoinQrOverlayVisible: DEFAULT_PROJECTOR_JOIN_QR_OVERLAY_VISIBLE,
   projectorJoinQrText: DEFAULT_PROJECTOR_JOIN_QR_TEXT,
   projectorJoinQrTextColor: DEFAULT_PROJECTOR_JOIN_QR_TEXT_COLOR,
@@ -586,6 +816,15 @@ export const DEFAULT_PUBLIC_VIEW_STATE: PublicViewState = {
   photoWallGridColumns: 0,
   photoWallAnimate: true,
   photoWallKenBurns: true,
+  videoWallHorizontalItems: [],
+  videoWallHorizontalPosterUrl: "",
+  videoWallVerticalItems: [],
+  videoWallVerticalPosterUrl: "",
+  videoWallProjectorShowHorizontal: true,
+  videoWallProjectorShowVertical: true,
+  videoWallProjectorMaxVideos: 12,
+  videoWallProjectorActiveSeconds: 8,
+  videoWallProjectorFreezeSeconds: 10,
   reportTitle: "Отчет мероприятия",
   reportModules: [
     "event_header",
@@ -718,12 +957,15 @@ export function collectTagCloudCorrectAliases(
 }
 
 /** Все эталонные строки квиза: каждый непустой вариант — отдельный эталон. */
-export function collectTagCloudQuizReferenceAliases(options: Array<{ text: string }>): string[] {
+export function collectTagCloudQuizReferenceAliases(
+  options: Array<{ text?: string | null }>,
+): string[] {
   const out: string[] = [];
   const seen = new Set<string>();
   for (const o of options) {
-    if (!o.text.trim()) continue;
-    for (const alias of parseTagCloudReferenceAliases(o.text)) {
+    const text = typeof o.text === "string" ? o.text.trim() : "";
+    if (!text) continue;
+    for (const alias of parseTagCloudReferenceAliases(text)) {
       if (!seen.has(alias)) {
         seen.add(alias);
         out.push(alias);
@@ -735,18 +977,19 @@ export function collectTagCloudQuizReferenceAliases(options: Array<{ text: strin
 
 /** Текст «верного ответа» для отчёта участника. */
 export function formatTagCloudReferenceAnswer(
-  options: Array<{ text: string; isCorrect: boolean }>,
+  options: Array<{ text?: string | null; isCorrect: boolean }>,
   mode: "quiz" | "poll",
 ): string {
   const reference =
     mode === "quiz"
-      ? options.filter((o) => o.text.trim())
-      : options.filter((o) => o.isCorrect && o.text.trim());
+      ? options.filter((o) => typeof o.text === "string" && o.text.trim())
+      : options.filter((o) => o.isCorrect && typeof o.text === "string" && o.text.trim());
   if (reference.length === 0) return "—";
   return reference
     .map((o) => {
-      const aliases = parseTagCloudReferenceAliases(o.text);
-      return aliases.length > 0 ? aliases.join(" / ") : o.text.trim();
+      const text = typeof o.text === "string" ? o.text : "";
+      const aliases = parseTagCloudReferenceAliases(text);
+      return aliases.length > 0 ? aliases.join(" / ") : text.trim();
     })
     .join(" · ");
 }
@@ -916,18 +1159,43 @@ function sanitizeBanners(items: PublicBanner[] | undefined): PublicBanner[] {
     .map((item) => {
       const size: PublicBanner["size"] =
         item.size === "1x1" ? "1x1" : item.size === "full" ? "full" : "2x1";
-      return {
+      const visualStyle: PublicBannerVisualStyle = item.visualStyle === "tile" ? "tile" : "image";
+      const text = typeof item.text === "string" ? item.text.trim().slice(0, 120) : "";
+      const backgroundColor =
+        typeof item.backgroundColor === "string" && /^#([0-9a-fA-F]{6})$/.test(item.backgroundColor)
+          ? item.backgroundColor
+          : "#1976d2";
+      const textColor =
+        typeof item.textColor === "string" && /^#([0-9a-fA-F]{6})$/.test(item.textColor)
+          ? item.textColor
+          : "#ffffff";
+      const base = {
         id: item.id.trim().slice(0, 80),
         linkUrl: sanitizeBannerLinkUrl(typeof item.linkUrl === "string" ? item.linkUrl : undefined),
         backgroundUrl:
           typeof item.backgroundUrl === "string" ? item.backgroundUrl.trim().slice(0, 1000) : "",
-        size,
+        size: visualStyle === "tile" ? ("full" as const) : size,
         isVisible: typeof item.isVisible === "boolean" ? item.isVisible : false,
       };
+      if (visualStyle === "tile") {
+        return {
+          ...base,
+          visualStyle,
+          text: text || "Баннер",
+          backgroundColor,
+          textColor,
+        };
+      }
+      return {
+        ...base,
+        visualStyle: "image" as const,
+      };
     })
-    .filter(
-      (item) => item.id.length > 0 && item.linkUrl.length > 0 && item.backgroundUrl.length > 0,
-    )
+    .filter((item) => {
+      if (!item.id || !item.linkUrl) return false;
+      if (item.visualStyle === "tile") return Boolean(item.text?.trim());
+      return item.backgroundUrl.length > 0;
+    })
     .slice(0, 50);
 }
 
@@ -1086,19 +1354,12 @@ function sanitizeRandomizerHistory(
     .slice(0, 200);
 }
 
-/** Новые модули отчёта для событий, сохранённых до их появления в дефолте. */
-const REPORT_MODULE_BACKFILL: ReportModuleId[] = ["banners_summary"];
-
+/** Сохраняем явный список модулей как есть (без авто-добавления выключенных). */
 export function backfillReportModules(
   modules: ReportModuleId[],
-  fallback: ReportModuleId[],
+  _fallback?: ReportModuleId[],
 ): ReportModuleId[] {
-  let result = [...modules];
-  for (const moduleId of REPORT_MODULE_BACKFILL) {
-    if (!fallback.includes(moduleId) || result.includes(moduleId)) continue;
-    result = [...result, moduleId];
-  }
-  return result.slice(0, 20);
+  return modules.slice(0, 20);
 }
 
 function sanitizeReportModules(
@@ -1129,7 +1390,7 @@ function sanitizeReportModules(
     if (!next.includes(item)) next.push(item);
   }
   if (next.length === 0) return [...fallback];
-  return backfillReportModules(next, fallback);
+  return next.slice(0, 20);
 }
 
 export function normalizePublicViewState(
@@ -1144,14 +1405,37 @@ export function normalizePublicViewState(
     value?.mode === "reactions" ||
     value?.mode === "randomizer" ||
     value?.mode === "photo_wall" ||
-    value?.mode === "report"
+    value?.mode === "video_wall" ||
+    value?.mode === "report" ||
+    value?.mode === "debate_compare" ||
+    value?.mode === "debate_series"
       ? value.mode
       : base.mode;
   const rawQuestionId =
     typeof value?.questionId === "string" && value.questionId.trim()
       ? value.questionId.trim()
       : undefined;
-  const questionId = mode === "question" ? rawQuestionId : undefined;
+  const questionId = mode === "question" || mode === "debate_series" ? rawQuestionId : undefined;
+  const rawDebateCompareQuestionId =
+    typeof value?.debateCompareQuestionId === "string" && value.debateCompareQuestionId.trim()
+      ? value.debateCompareQuestionId.trim()
+      : undefined;
+  const debateCompareQuestionId =
+    mode === "debate_compare" ? rawDebateCompareQuestionId : undefined;
+  const rawDebateSeriesId =
+    typeof value?.debateSeriesId === "string" && value.debateSeriesId.trim()
+      ? value.debateSeriesId.trim().slice(0, 80)
+      : undefined;
+  const debateSeriesId = mode === "debate_series" ? rawDebateSeriesId : undefined;
+  const debateSeriesView: "cumulative" | "round" =
+    value?.debateSeriesView === "round" ? "round" : "cumulative";
+  const debateSeriesQuestionIds =
+    mode === "debate_series" && Array.isArray(value?.debateSeriesQuestionIds)
+      ? value.debateSeriesQuestionIds
+          .filter((id): id is string => typeof id === "string" && id.trim().length > 0)
+          .map((id) => id.trim().slice(0, 80))
+          .slice(0, 40)
+      : undefined;
   const questionRevealStage: QuestionRevealStage =
     value?.questionRevealStage === "results" || value?.questionRevealStage === "options"
       ? value.questionRevealStage
@@ -1174,6 +1458,7 @@ export function normalizePublicViewState(
     id === SPEAKER_TILE_ID ||
     id === PROGRAM_TILE_ID ||
     id === PHOTO_WALL_TILE_ID ||
+    id === VIDEO_WALL_TILE_ID ||
     id === QUIZ_RESULTS_TILE_ID ||
     isQuizResultsTileId(id) ||
     playerBanners.some((x) => x.id === id);
@@ -1195,9 +1480,10 @@ export function normalizePublicViewState(
   for (const banner of playerBanners) {
     if (!deduped.includes(banner.id)) deduped.push(banner.id);
   }
-  if (!deduped.includes(SPEAKER_TILE_ID)) deduped.push(SPEAKER_TILE_ID);
   if (!deduped.includes(PROGRAM_TILE_ID)) deduped.push(PROGRAM_TILE_ID);
+  if (!deduped.includes(SPEAKER_TILE_ID)) deduped.push(SPEAKER_TILE_ID);
   if (!deduped.includes(PHOTO_WALL_TILE_ID)) deduped.push(PHOTO_WALL_TILE_ID);
+  if (!deduped.includes(VIDEO_WALL_TILE_ID)) deduped.push(VIDEO_WALL_TILE_ID);
   let playerQuizResultsSubQuizIds = sanitizeSubQuizIdList(value?.playerQuizResultsSubQuizIds, 20);
   const legacyReportVisible =
     typeof value?.playerQuizResultsTileVisible === "boolean"
@@ -1226,6 +1512,17 @@ export function normalizePublicViewState(
   return {
     mode,
     questionId,
+    debateCompareQuestionId,
+    debateSeriesId,
+    debateSeriesView: mode === "debate_series" ? debateSeriesView : undefined,
+    debateSeriesQuestionIds:
+      mode === "debate_series" && debateSeriesQuestionIds && debateSeriesQuestionIds.length > 0
+        ? debateSeriesQuestionIds
+        : undefined,
+    debateSeriesShowRounds:
+      typeof value?.debateSeriesShowRounds === "boolean"
+        ? value.debateSeriesShowRounds
+        : base.debateSeriesShowRounds,
     questionRevealStage,
     highlightedLeadersCount: clampInt(
       value?.highlightedLeadersCount ?? base.highlightedLeadersCount,
@@ -1314,12 +1611,24 @@ export function normalizePublicViewState(
       typeof value?.speakerQuestionsEnabled === "boolean"
         ? value.speakerQuestionsEnabled
         : base.speakerQuestionsEnabled,
-    speakerQuestionsSpeakers: Array.isArray(value?.speakerQuestionsSpeakers)
-      ? value.speakerQuestionsSpeakers
-          .filter((item) => typeof item === "string" && item.trim().length > 0)
-          .map((item) => item.trim().slice(0, 80))
-          .slice(0, 100)
-      : [...base.speakerQuestionsSpeakers],
+    ...(() => {
+      const normalizedSessions = normalizeSpeakerQuestionSessions({
+        sessions: value?.speakerQuestionSessions ?? base.speakerQuestionSessions,
+        activeSpeakerSessionId:
+          value?.activeSpeakerSessionId !== undefined
+            ? value.activeSpeakerSessionId
+            : base.activeSpeakerSessionId,
+        speakers:
+          value?.speakerQuestionsSpeakers !== undefined
+            ? value.speakerQuestionsSpeakers
+            : base.speakerQuestionsSpeakers,
+      });
+      return {
+        speakerQuestionSessions: normalizedSessions.sessions,
+        activeSpeakerSessionId: normalizedSessions.activeSpeakerSessionId,
+        speakerQuestionsSpeakers: normalizedSessions.speakers,
+      };
+    })(),
     speakerQuestionsReactions: Array.isArray(value?.speakerQuestionsReactions)
       ? value.speakerQuestionsReactions
           .filter((item) => typeof item === "string")
@@ -1343,6 +1652,10 @@ export function normalizePublicViewState(
       typeof value?.speakerQuestionsAllowAllSpeakersTarget === "boolean"
         ? value.speakerQuestionsAllowAllSpeakersTarget
         : base.speakerQuestionsAllowAllSpeakersTarget,
+    speakerQuestionsModeratorShowAll:
+      typeof value?.speakerQuestionsModeratorShowAll === "boolean"
+        ? value.speakerQuestionsModeratorShowAll
+        : base.speakerQuestionsModeratorShowAll,
     showEventTitleOnPlayer:
       typeof value?.showEventTitleOnPlayer === "boolean"
         ? value.showEventTitleOnPlayer
@@ -1390,6 +1703,11 @@ export function normalizePublicViewState(
       typeof value?.photoWallTileVisible === "boolean"
         ? value.photoWallTileVisible
         : base.photoWallTileVisible,
+    videoWallTileVisible:
+      typeof value?.videoWallTileVisible === "boolean"
+        ? value.videoWallTileVisible
+        : base.videoWallTileVisible,
+    videoWallTileCoverUrl: sanitizeVideoWallPosterUrl(value?.videoWallTileCoverUrl),
     playerQuizResultsTileText:
       typeof value?.playerQuizResultsTileText === "string"
         ? value.playerQuizResultsTileText.trim().slice(0, 120)
@@ -1414,6 +1732,10 @@ export function normalizePublicViewState(
         ? value.playerQuizResultsTileVisible
         : base.playerQuizResultsTileVisible),
     playerTilesOrder: dedupedTilesOrder,
+    playerTilesGridColumns:
+      value?.playerTilesGridColumns === 2 || value?.playerTilesGridColumns === 3
+        ? value.playerTilesGridColumns
+        : base.playerTilesGridColumns,
     reactionsOverlayText:
       typeof value?.reactionsOverlayText === "string"
         ? value.reactionsOverlayText.trim().slice(0, 120)
@@ -1427,6 +1749,13 @@ export function normalizePublicViewState(
           .filter((item) => item.length > 0)
           .slice(0, 200)
       : [...base.playerVisibleResultQuestionIds],
+    playerVisibleDebateSeriesIds: Array.isArray(value?.playerVisibleDebateSeriesIds)
+      ? value.playerVisibleDebateSeriesIds
+          .filter((item): item is string => typeof item === "string")
+          .map((item) => item.trim())
+          .filter((item) => item.length > 0)
+          .slice(0, 50)
+      : [...base.playerVisibleDebateSeriesIds],
     playerVoteOptionTextColor: sanitizeHex6(
       value?.playerVoteOptionTextColor,
       base.playerVoteOptionTextColor,
@@ -1443,6 +1772,16 @@ export function normalizePublicViewState(
       typeof value?.projectorJoinQrVisible === "boolean"
         ? value.projectorJoinQrVisible
         : base.projectorJoinQrVisible,
+    projectorBrowserZoom: clampProjectorBrowserZoom(
+      value?.projectorBrowserZoom ??
+        (value as { projectorBrowserZoomPercent?: unknown } | undefined)
+          ?.projectorBrowserZoomPercent,
+      base.projectorBrowserZoom,
+    ),
+    projectorContentMaxWidthPx: clampProjectorContentMaxWidthPx(
+      value?.projectorContentMaxWidthPx,
+      base.projectorContentMaxWidthPx,
+    ),
     projectorJoinQrOverlayVisible:
       typeof value?.projectorJoinQrOverlayVisible === "boolean"
         ? value.projectorJoinQrOverlayVisible
@@ -1557,6 +1896,27 @@ export function normalizePublicViewState(
       typeof value?.photoWallKenBurns === "boolean"
         ? value.photoWallKenBurns
         : base.photoWallKenBurns,
+    videoWallHorizontalItems: sanitizeVideoWallItems(value?.videoWallHorizontalItems),
+    videoWallHorizontalPosterUrl: sanitizeVideoWallPosterUrl(value?.videoWallHorizontalPosterUrl),
+    videoWallVerticalItems: sanitizeVideoWallItems(value?.videoWallVerticalItems),
+    videoWallVerticalPosterUrl: sanitizeVideoWallPosterUrl(value?.videoWallVerticalPosterUrl),
+    videoWallProjectorShowHorizontal:
+      typeof value?.videoWallProjectorShowHorizontal === "boolean"
+        ? value.videoWallProjectorShowHorizontal
+        : base.videoWallProjectorShowHorizontal,
+    videoWallProjectorShowVertical:
+      typeof value?.videoWallProjectorShowVertical === "boolean"
+        ? value.videoWallProjectorShowVertical
+        : base.videoWallProjectorShowVertical,
+    videoWallProjectorMaxVideos: clampVideoWallProjectorMaxVideos(
+      value?.videoWallProjectorMaxVideos ?? base.videoWallProjectorMaxVideos,
+    ),
+    videoWallProjectorActiveSeconds: clampVideoWallProjectorActiveSeconds(
+      value?.videoWallProjectorActiveSeconds ?? base.videoWallProjectorActiveSeconds,
+    ),
+    videoWallProjectorFreezeSeconds: clampVideoWallProjectorFreezeSeconds(
+      value?.videoWallProjectorFreezeSeconds ?? base.videoWallProjectorFreezeSeconds,
+    ),
     reportTitle:
       typeof value?.reportTitle === "string"
         ? value.reportTitle.trim().slice(0, 120)
@@ -1727,6 +2087,8 @@ export {
   optionHasImage,
   optionHasTextOrImage,
   optionImageUrl,
+  optionText,
+  optionTextTrimmed,
   questionHasOptionImages,
 } from "./voteOptionContent.js";
 
@@ -1761,6 +2123,17 @@ export function mergePublicViewState(
 ): PublicViewState {
   const merged = normalizePublicViewState({ ...prev, ...patch });
   const nextMode = merged.mode;
+
+  /** Накопительный итог серии держит seed `questionId`; патч вроде `debateSeriesShowRounds` не должен его сбрасывать. */
+  if (nextMode === "debate_series") {
+    if (typeof patch.questionId === "string" && patch.questionId.trim()) {
+      merged.questionId = patch.questionId.trim();
+    }
+    if (patch.questionRevealStage === undefined) {
+      merged.questionRevealStage = "results";
+    }
+    return withProjectorTagCloudFields(merged);
+  }
 
   if (nextMode !== "question") {
     merged.questionId = undefined;

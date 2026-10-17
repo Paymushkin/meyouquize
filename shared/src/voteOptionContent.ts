@@ -2,12 +2,21 @@ export function optionImageUrl(value?: string | null): string {
   return value?.trim() ?? "";
 }
 
+/** Текст варианта с провода: null/undefined → "". */
+export function optionText(value?: string | null): string {
+  return typeof value === "string" ? value : "";
+}
+
+export function optionTextTrimmed(value?: string | null): string {
+  return optionText(value).trim();
+}
+
 export function optionHasImage(value?: string | null): boolean {
   return optionImageUrl(value).length > 0;
 }
 
-export function optionHasTextOrImage(text: string, imageUrl?: string | null): boolean {
-  return Boolean(text.trim() || optionImageUrl(imageUrl));
+export function optionHasTextOrImage(text?: string | null, imageUrl?: string | null): boolean {
+  return Boolean(optionTextTrimmed(text) || optionImageUrl(imageUrl));
 }
 
 export function questionHasOptionImages<T extends { imageUrl?: string | null }>(

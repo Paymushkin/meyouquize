@@ -27,6 +27,7 @@ export type PlayerUiRefsSlice = {
   playerQuizResultsTileVisible: boolean;
   playerTilesOrder: string[];
   playerVisibleResultQuestionIds: string[];
+  playerVisibleDebateSeriesIds: string[];
   leaderboardSubQuizId: string;
   reportVoteQuestionIds: string[];
   reportQuizQuestionIds: string[];
@@ -48,6 +49,7 @@ export function prunePlayerUiRefsForRoom(
   refs: PlayerUiRefsSlice,
   validSubQuizIds: ReadonlySet<string>,
   validQuestionIds: ReadonlySet<string>,
+  validDebateSeriesIds?: ReadonlySet<string>,
 ): PlayerUiRefsSlice {
   const playerQuizResultsSubQuizIds = refs.playerQuizResultsSubQuizIds.filter((id) =>
     subQuizOk(id, validSubQuizIds),
@@ -64,6 +66,13 @@ export function prunePlayerUiRefsForRoom(
   const playerVisibleResultQuestionIds = refs.playerVisibleResultQuestionIds.filter((id) =>
     questionOk(id, validQuestionIds),
   );
+
+  const playerVisibleDebateSeriesIds = (refs.playerVisibleDebateSeriesIds ?? []).filter((id) => {
+    const trimmed = id.trim();
+    if (!trimmed) return false;
+    if (!validDebateSeriesIds) return true;
+    return validDebateSeriesIds.has(trimmed);
+  });
 
   const firstSubQuizId = playerQuizResultsSubQuizIds[0] ?? "";
   const fallbackLeaderboardId = validSubQuizIds.size > 0 ? [...validSubQuizIds][0]! : "";
@@ -85,6 +94,7 @@ export function prunePlayerUiRefsForRoom(
     playerQuizResultsTileVisible: playerQuizResultsSubQuizIds.length > 0,
     playerTilesOrder,
     playerVisibleResultQuestionIds,
+    playerVisibleDebateSeriesIds,
     leaderboardSubQuizId,
     reportVoteQuestionIds: refs.reportVoteQuestionIds.filter((id) =>
       questionOk(id, validQuestionIds),
@@ -101,6 +111,9 @@ export type PublicViewWithPlayerUi = PlayerUiRefsSlice & Record<string, unknown>
 export type PublicViewRoomPruneSlice = PlayerUiRefsSlice & {
   mode?: string;
   questionId?: string;
+  debateCompareQuestionId?: string;
+  debateSeriesId?: string;
+  debateSeriesView?: string;
   questionRevealStage?: string;
   tagCloudManualByQuestionId?: TagCloudManualByQuestionId;
 };
@@ -122,10 +135,11 @@ export function prunePublicViewForRoomContent<T extends PublicViewRoomPruneSlice
   view: T,
   validSubQuizIds: ReadonlySet<string>,
   validQuestionIds: ReadonlySet<string>,
+  validDebateSeriesIds?: ReadonlySet<string>,
 ): T {
   const pruned: T = {
     ...view,
-    ...prunePlayerUiRefsForRoom(view, validSubQuizIds, validQuestionIds),
+    ...prunePlayerUiRefsForRoom(view, validSubQuizIds, validQuestionIds, validDebateSeriesIds),
     tagCloudManualByQuestionId: pruneTagCloudManualByQuestionId(
       view.tagCloudManualByQuestionId,
       validQuestionIds,
@@ -137,6 +151,30 @@ export function prunePublicViewForRoomContent<T extends PublicViewRoomPruneSlice
       ...pruned,
       mode: "title",
       questionId: undefined,
+      questionRevealStage: "options",
+    };
+  }
+  const debateCompareQuestionId =
+    typeof pruned.debateCompareQuestionId === "string" ? pruned.debateCompareQuestionId.trim() : "";
+  if (
+    pruned.mode === "debate_compare" &&
+    debateCompareQuestionId &&
+    !validQuestionIds.has(debateCompareQuestionId)
+  ) {
+    return {
+      ...pruned,
+      mode: "title",
+      debateCompareQuestionId: undefined,
+      questionRevealStage: "options",
+    };
+  }
+  if (pruned.mode === "debate_series" && questionId && !validQuestionIds.has(questionId)) {
+    return {
+      ...pruned,
+      mode: "title",
+      questionId: undefined,
+      debateSeriesId: undefined,
+      debateSeriesView: undefined,
       questionRevealStage: "options",
     };
   }

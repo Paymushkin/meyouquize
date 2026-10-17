@@ -12,11 +12,39 @@ export default defineConfig({
       "@meyouquize/shared": path.resolve(__dirname, "../shared/src/index.ts"),
     },
   },
+  optimizeDeps: {
+    // Monorepo alias: не держим битый prebundle после `npm run build -w shared`.
+    exclude: ["@meyouquize/shared"],
+  },
+  build: {
+    rollupOptions: {
+      // russia-map-calibrate.html — только локальный dev, в production-сборку не входит.
+      output: {
+        manualChunks(id) {
+          if (id.includes("russia-svg-paths.json") || id.includes("russia-boundary.json")) {
+            return "russia-map";
+          }
+        },
+      },
+    },
+  },
   server: {
+    watch: {
+      ignored: ["!**/shared/src/**"],
+    },
     host: true,
     proxy: {
+      "/api": {
+        target: "http://127.0.0.1:4000",
+        changeOrigin: true,
+      },
+      "/socket.io": {
+        target: "http://127.0.0.1:4000",
+        changeOrigin: true,
+        ws: true,
+      },
       "/media": {
-        target: "http://localhost:4000",
+        target: "http://127.0.0.1:4000",
         changeOrigin: true,
       },
     },

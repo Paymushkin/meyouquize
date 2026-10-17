@@ -1,6 +1,5 @@
 import { flushSync } from "react-dom";
 import {
-  useCallback,
   useEffect,
   useRef,
   useState,
@@ -10,16 +9,7 @@ import {
 } from "react";
 import { randomUuid } from "../../utils/randomUuid";
 import { socket } from "../../socket";
-import {
-  buildTagResultsDisplayOrder,
-  clearCountOverrideRow,
-  clearQuestionManualFields,
-  mergeInjectedTagWords,
-  parseInjectedTagLines,
-  setTagCountOverrideRow,
-  setOptionVoteCountOverrideRow,
-  toggleHiddenTagText,
-} from "../tagCloudAdmin";
+import { clearQuestionManualFields } from "../tagCloudAdmin";
 import {
   cloneQuestionForm,
   createEmptyQuestion,
@@ -31,6 +21,11 @@ import {
   type QuestionForm,
   type SubQuizSheet,
 } from "../../admin/adminEventForm";
+import {
+  debateDefaultOptionColor,
+  isDebatePollPreset,
+  withDebateOptionColors,
+} from "@meyouquize/shared";
 import type { QuestionResult } from "../../admin/adminEventTypes";
 import type { useAdminPlayerTiles } from "./useAdminPlayerTiles";
 import type { useAdminReport } from "./useAdminReport";
@@ -40,6 +35,9 @@ import {
   patchOptionAtIndex,
   patchQuestionAtIndex,
 } from "./adminQuestionFormPatch";
+import { createAdminQuestionEditorDebateSeriesMutations } from "./adminQuestionEditorDebateSeries";
+import { createAdminQuestionEditorProjectorSync } from "./adminQuestionEditorProjectorSync";
+import { createAdminQuestionEditorTagCloudMutations } from "./adminQuestionEditorTagCloud";
 import { prunePlayerUiRefsForRoom, type PublicViewSetPatch } from "../../publicViewContract";
 import type { PublicViewMode } from "../../publicViewContract";
 
@@ -83,6 +81,7 @@ export type UseAdminQuestionEditorParams = {
   publicViewQuestionId: string | undefined;
   setPublicViewMode: Dispatch<SetStateAction<PublicViewMode>>;
   setPublicViewQuestionId: Dispatch<SetStateAction<string | undefined>>;
+  setPublicDebateCompareQuestionId: Dispatch<SetStateAction<string | undefined>>;
   setQuestionRevealStage: Dispatch<SetStateAction<"options" | "results">>;
   emitPublicViewSet: (patch: PublicViewSetPatch) => void;
   emitPublicViewPatch: (patch: PublicViewSetPatch) => void;
@@ -90,6 +89,8 @@ export type UseAdminQuestionEditorParams = {
   setResultsSubQuizId: Dispatch<SetStateAction<string>>;
   playerVisibleResultQuestionIds: string[];
   setPlayerVisibleResultQuestionIds: Dispatch<SetStateAction<string[]>>;
+  playerVisibleDebateSeriesIds: string[];
+  setPlayerVisibleDebateSeriesIds: Dispatch<SetStateAction<string[]>>;
   playerTiles: ReturnType<typeof useAdminPlayerTiles>;
   adminReport: ReturnType<typeof useAdminReport>;
   showFirstCorrectAnswerer: boolean;
@@ -121,6 +122,7 @@ export function useAdminQuestionEditor({
   publicViewQuestionId,
   setPublicViewMode,
   setPublicViewQuestionId,
+  setPublicDebateCompareQuestionId,
   setQuestionRevealStage,
   emitPublicViewSet,
   emitPublicViewPatch,
@@ -128,6 +130,8 @@ export function useAdminQuestionEditor({
   setResultsSubQuizId,
   playerVisibleResultQuestionIds,
   setPlayerVisibleResultQuestionIds,
+  playerVisibleDebateSeriesIds,
+  setPlayerVisibleDebateSeriesIds,
   playerTiles,
   adminReport,
   showFirstCorrectAnswerer,
@@ -163,6 +167,25 @@ export function useAdminQuestionEditor({
   );
 
   const rankingHints = { quiz: defaultRankingQuizHint, jury: defaultRankingJuryHint };
+
+  const {
+    cloneDebateSeries,
+    addDebateSeriesRoundAtIndex,
+    updateDebateSeriesResultTitle,
+    updateDebateSeries,
+    removeDebateSeries,
+  } = createAdminQuestionEditorDebateSeriesMutations({
+    questionForms,
+    subQuizSheets,
+    setQuestionForms,
+    setSelectedQuestionIndex,
+    setQuestionId,
+    setMessage,
+    persistQuestions,
+    questionDialogSnapshotRef,
+    questionDialogTargetSubQuizIdRef,
+    setIsQuestionDialogOpen,
+  });
 
   function addSubQuizSheet() {
     const id = `new-${randomUuid()}`;
@@ -220,6 +243,11 @@ export function useAdminQuestionEditor({
           .map((q) => q.id)
           .filter((id): id is string => typeof id === "string" && id.trim().length > 0),
       );
+      const validDebateSeriesIds = new Set(
+        nextForms
+          .map((q) => q.debateSeriesId?.trim())
+          .filter((id): id is string => typeof id === "string" && id.length > 0),
+      );
       const prunedPlayerUi = prunePlayerUiRefsForRoom(
         {
           playerQuizResultsSubQuizIds: playerTiles.playerQuizResultsSubQuizIds,
@@ -227,6 +255,7 @@ export function useAdminQuestionEditor({
           playerQuizResultsTileVisible: playerTiles.playerQuizResultsTileVisible,
           playerTilesOrder: playerTiles.playerTilesOrder,
           playerVisibleResultQuestionIds,
+          playerVisibleDebateSeriesIds,
           leaderboardSubQuizId: resultsSubQuizId,
           reportVoteQuestionIds: adminReport.reportVoteQuestionIds,
           reportQuizQuestionIds: adminReport.reportQuizQuestionIds,
@@ -234,9 +263,11 @@ export function useAdminQuestionEditor({
         },
         validSubQuizIds,
         validQuestionIds,
+        validDebateSeriesIds,
       );
       const nextTilesOrder = playerTiles.applyPrunedPlayerUi(prunedPlayerUi);
       setPlayerVisibleResultQuestionIds(prunedPlayerUi.playerVisibleResultQuestionIds);
+      setPlayerVisibleDebateSeriesIds(prunedPlayerUi.playerVisibleDebateSeriesIds);
       if (resultsSubQuizId !== prunedPlayerUi.leaderboardSubQuizId) {
         setResultsSubQuizId(prunedPlayerUi.leaderboardSubQuizId);
       }
@@ -308,6 +339,13 @@ export function useAdminQuestionEditor({
   async function cloneQuestionAtIndex(globalIndex: number) {
     const source = questionForms[globalIndex];
     if (!source) return;
+    if (isDebatePollPreset(source)) {
+      const seriesId = source.debateSeriesId?.trim();
+      if (seriesId) {
+        await cloneDebateSeries(seriesId);
+        return;
+      }
+    }
     if (!source.id) {
       setMessage("Сначала сохраните голосование");
       return;
@@ -394,7 +432,11 @@ export function useAdminQuestionEditor({
         if (i !== questionIndex) return q;
         const nextOpts = [
           ...q.options,
-          { text: "", isCorrect: q.type === "tag_cloud" && isEditorQuizMode(q) },
+          {
+            text: "",
+            isCorrect: q.type === "tag_cloud" && isEditorQuizMode(q),
+            ...(isDebatePollPreset(q) ? { color: debateDefaultOptionColor(q.options.length) } : {}),
+          },
         ];
         if (q.type === "tag_cloud" && isEditorQuizMode(q)) {
           const n = nextOpts.length;
@@ -557,10 +599,17 @@ export function useAdminQuestionEditor({
     if (enabled) {
       setQuestionId(question.id);
       const isStandaloneVote = question.subQuizId == null;
+      const debateSeriesId = question.debateSeriesId?.trim() || "";
       setQuestionForms((prev) =>
         prev.map((q, idx) => {
           if (idx === questionIndex) return { ...q, isActive: true };
-          if (isStandaloneVote && q.subQuizId == null) return q;
+          if (isStandaloneVote && q.subQuizId == null) {
+            // Серия дебатов: одновременно активен только один раунд.
+            if (debateSeriesId && q.debateSeriesId?.trim() === debateSeriesId) {
+              return { ...q, isActive: false };
+            }
+            return q;
+          }
           return { ...q, isActive: false };
         }),
       );
@@ -574,452 +623,71 @@ export function useAdminQuestionEditor({
     }
   }
 
-  const setPublicResultsView = useCallback(
-    (
-      mode:
-        | "title"
-        | "question"
-        | "leaderboard"
-        | "speaker_questions"
-        | "reactions"
-        | "randomizer"
-        | "photo_wall",
-      questionIdForMode?: string,
-      extraPatch?: PublicViewSetPatch,
-    ) => {
-      if (!quizId) {
-        setMessage("Quiz ID не найден");
-        return;
-      }
-      const nextQuestionId = mode === "question" ? questionIdForMode : undefined;
-      if (mode === "question" && !nextQuestionId) {
-        setMessage("Не выбран вопрос для экрана");
-        return;
-      }
-      const targetQuestion =
-        mode === "question" && nextQuestionId
-          ? questionForms.find((q) => q.id === nextQuestionId)
-          : undefined;
-      const nextQuestionRevealStage =
-        mode === "question" && targetQuestion?.type !== "tag_cloud" ? "options" : "results";
-      const leaderboardSubQuizIdForEmit =
-        mode === "leaderboard"
-          ? (extraPatch?.leaderboardSubQuizId ?? resultsSubQuizId ?? "").trim() || undefined
-          : undefined;
-      if (mode === "leaderboard" && leaderboardSubQuizIdForEmit) {
-        setResultsSubQuizId(leaderboardSubQuizIdForEmit);
-      }
-      setShowFirstCorrectAnswerer(false);
-      setPublicViewMode(mode);
-      setPublicViewQuestionId(nextQuestionId);
-      setQuestionRevealStage(nextQuestionRevealStage);
-      emitPublicViewSet({
-        mode,
-        questionId: nextQuestionId,
-        questionRevealStage: nextQuestionRevealStage,
-        showCorrectOption: targetQuestion?.showCorrectOption ?? false,
-        showFirstCorrectAnswerer: false,
-        ...(leaderboardSubQuizIdForEmit
-          ? { leaderboardSubQuizId: leaderboardSubQuizIdForEmit }
-          : {}),
-        ...extraPatch,
-      });
-    },
-    [
-      emitPublicViewSet,
-      questionForms,
-      quizId,
-      resultsSubQuizId,
-      setPublicViewMode,
-      setPublicViewQuestionId,
-      setQuestionRevealStage,
-      setShowFirstCorrectAnswerer,
-      setResultsSubQuizId,
-      setMessage,
-    ],
-  );
+  const {
+    setPublicResultsView,
+    setQuestionRevealStageForQuestion,
+    updateQuestionShowVoteCount,
+    updateQuestionShowCorrectOption,
+    updateQuestionShowTitle,
+    toggleQuestionAdminDone,
+    setQuestionsAdminDone,
+    reorderVoteInList,
+    reorderVoteDisplayBlocks,
+    updateQuestionProjectorShowFirstCorrect,
+    updateQuestionRankingProjectorMetric,
+    patchQuestionProjectorFirstCorrectWinnersCount,
+    commitQuestionProjectorFirstCorrectWinnersCount,
+  } = createAdminQuestionEditorProjectorSync({
+    quizId,
+    questionForms,
+    subQuizSheets,
+    setQuestionForms,
+    setMessage,
+    persistQuestions,
+    patchQuestionProjectorSettings,
+    patchQuestionAdminDone,
+    publicViewMode,
+    publicViewQuestionId,
+    setPublicViewMode,
+    setPublicViewQuestionId,
+    setPublicDebateCompareQuestionId,
+    setQuestionRevealStage,
+    emitPublicViewSet,
+    resultsSubQuizId,
+    setResultsSubQuizId,
+    setShowFirstCorrectAnswerer,
+  });
 
-  function setQuestionRevealStageForQuestion(
-    questionIdForProjector: string,
-    stage: "options" | "results",
-  ) {
-    if (!quizId) {
-      setMessage("Quiz ID не найден");
-      return;
-    }
-    setPublicViewMode("question");
-    setPublicViewQuestionId(questionIdForProjector);
-    setQuestionRevealStage(stage);
-    emitPublicViewSet({
-      mode: "question",
-      questionId: questionIdForProjector,
-      questionRevealStage: stage,
-      showFirstCorrectAnswerer: false,
-    });
-  }
-  function updateQuestionShowVoteCount(questionIndex: number, next: boolean) {
-    setQuestionForms((prev) =>
-      prev.map((q, idx) => (idx === questionIndex ? { ...q, showVoteCount: next } : q)),
-    );
-    const question = questionForms[questionIndex];
-    if (
-      !quizId ||
-      publicViewMode !== "question" ||
-      !question?.id ||
-      publicViewQuestionId !== question.id
-    )
-      return;
-    emitPublicViewSet({
-      mode: "question",
-      questionId: question.id,
-      showVoteCount: next,
-      showCorrectOption: question.showCorrectOption ?? false,
-      showQuestionTitle: question.showQuestionTitle ?? true,
-    });
-  }
-
-  function updateQuestionShowCorrectOption(questionIndex: number, next: boolean) {
-    setQuestionForms((prev) =>
-      prev.map((q, idx) => (idx === questionIndex ? { ...q, showCorrectOption: next } : q)),
-    );
-    const question = questionForms[questionIndex];
-    if (
-      !quizId ||
-      publicViewMode !== "question" ||
-      !question?.id ||
-      publicViewQuestionId !== question.id
-    )
-      return;
-    emitPublicViewSet({
-      mode: "question",
-      questionId: question.id,
-      showVoteCount: question.showVoteCount ?? false,
-      showCorrectOption: next,
-      showQuestionTitle: question.showQuestionTitle ?? true,
-    });
-  }
-
-  function updateQuestionShowTitle(questionIndex: number, next: boolean) {
-    setQuestionForms((prev) =>
-      prev.map((q, idx) => (idx === questionIndex ? { ...q, showQuestionTitle: next } : q)),
-    );
-    const question = questionForms[questionIndex];
-    if (
-      !quizId ||
-      publicViewMode !== "question" ||
-      !question?.id ||
-      publicViewQuestionId !== question.id
-    )
-      return;
-    emitPublicViewSet({
-      mode: "question",
-      questionId: question.id,
-      showVoteCount: question.showVoteCount ?? false,
-      showCorrectOption: question.showCorrectOption ?? false,
-      showQuestionTitle: next,
-    });
-  }
-
-  async function toggleQuestionAdminDone(globalIndex: number) {
-    const prev = questionForms[globalIndex];
-    if (!prev?.id) {
-      setMessage("Сначала сохраните вопрос");
-      return;
-    }
-    const nextDone = !prev.adminDone;
-    const nextForms = questionForms.map((q, idx) =>
-      idx === globalIndex ? { ...q, adminDone: nextDone } : q,
-    );
-    setQuestionForms(nextForms);
-    const ok = await patchQuestionAdminDone(prev.id, nextDone, subQuizSheets, nextForms, quizId);
-    if (!ok) {
-      setQuestionForms((forms) =>
-        forms.map((q, idx) => (idx === globalIndex ? { ...q, adminDone: prev.adminDone } : q)),
-      );
-    }
-  }
-
-  async function reorderVoteInList(
-    fromLocalIndex: number,
-    toLocalIndex: number,
-    scopeIndices: number[],
-  ) {
-    if (fromLocalIndex === toLocalIndex) return;
-    if (
-      fromLocalIndex < 0 ||
-      toLocalIndex < 0 ||
-      fromLocalIndex >= scopeIndices.length ||
-      toLocalIndex >= scopeIndices.length
-    ) {
-      return;
-    }
-
-    const orderedGlobals = [...scopeIndices];
-    const [removed] = orderedGlobals.splice(fromLocalIndex, 1);
-    if (removed === undefined) return;
-    orderedGlobals.splice(toLocalIndex, 0, removed);
-
-    const scopePositions = [...scopeIndices].sort((a, b) => a - b);
-    const reorderedQuestions = orderedGlobals.map((globalIndex) => questionForms[globalIndex]!);
-
-    const snapshot = questionForms;
-    const next = [...questionForms];
-    scopePositions.forEach((position, index) => {
-      next[position] = reorderedQuestions[index]!;
-    });
-    setQuestionForms(next);
-
-    const merged = await persistQuestions(next, subQuizSheets, { suppressToast: true });
-    if (!merged) {
-      setQuestionForms(snapshot);
-      setMessage("Не удалось изменить порядок");
-    }
-  }
-
-  async function updateQuestionProjectorShowFirstCorrect(questionIndex: number, next: boolean) {
-    const prev = questionForms[questionIndex];
-    if (!prev?.id) {
-      setMessage("Сначала сохраните вопрос");
-      return;
-    }
-    const previousSwitch = prev.projectorShowFirstCorrect ?? true;
-    const nextForms = questionForms.map((q, idx) =>
-      idx === questionIndex ? { ...q, projectorShowFirstCorrect: next } : q,
-    );
-    setQuestionForms(nextForms);
-    const ok = await patchQuestionProjectorSettings(
-      prev.id,
-      { projectorShowFirstCorrect: next },
-      subQuizSheets,
-      nextForms,
-      quizId,
-    );
-    if (!ok) {
-      setQuestionForms((forms) =>
-        forms.map((q, idx) =>
-          idx === questionIndex ? { ...q, projectorShowFirstCorrect: previousSwitch } : q,
-        ),
-      );
-    }
-  }
-
-  async function updateQuestionRankingProjectorMetric(
-    questionIndex: number,
-    value: "avg_rank" | "avg_score" | "total_score",
-  ) {
-    const prev = questionForms[questionIndex];
-    if (!prev?.id) {
-      setMessage("Сначала сохраните вопрос");
-      return;
-    }
-    if (prev.type !== "ranking") return;
-    const previousMetric = prev.rankingProjectorMetric ?? "avg_score";
-    const nextForms = questionForms.map((q, idx) =>
-      idx === questionIndex ? { ...q, rankingProjectorMetric: value } : q,
-    );
-    setQuestionForms(nextForms);
-    const ok = await patchQuestionProjectorSettings(
-      prev.id,
-      { rankingProjectorMetric: value },
-      subQuizSheets,
-      nextForms,
-      quizId,
-    );
-    if (!ok) {
-      setQuestionForms((forms) =>
-        forms.map((q, idx) =>
-          idx === questionIndex ? { ...q, rankingProjectorMetric: previousMetric } : q,
-        ),
-      );
-    }
-  }
-
-  function patchQuestionProjectorFirstCorrectWinnersCount(questionIndex: number, next: number) {
-    const safe = Math.max(1, Math.min(20, Math.trunc(Number.isFinite(next) ? next : 1)));
-    setQuestionForms((prev) =>
-      prev.map((q, idx) =>
-        idx === questionIndex ? { ...q, projectorFirstCorrectWinnersCount: safe } : q,
-      ),
-    );
-  }
-
-  function commitQuestionProjectorFirstCorrectWinnersCount(questionIndex: number, raw: number) {
-    const safe = Math.max(1, Math.min(20, Math.trunc(Number.isFinite(raw) ? raw : 1)));
-    setQuestionForms((prev) => {
-      const previousCount = prev[questionIndex]?.projectorFirstCorrectWinnersCount ?? 1;
-      const qid = prev[questionIndex]?.id;
-      const nextForms = prev.map((q, idx) =>
-        idx === questionIndex ? { ...q, projectorFirstCorrectWinnersCount: safe } : q,
-      );
-      queueMicrotask(() => {
-        void (async () => {
-          if (!qid) {
-            setMessage("Сначала сохраните вопрос");
-            setQuestionForms((p) =>
-              p.map((q, idx) =>
-                idx === questionIndex
-                  ? { ...q, projectorFirstCorrectWinnersCount: previousCount }
-                  : q,
-              ),
-            );
-            return;
-          }
-          const ok = await patchQuestionProjectorSettings(
-            qid,
-            { projectorFirstCorrectWinnersCount: safe },
-            subQuizSheets,
-            nextForms,
-            quizId,
-          );
-          if (!ok) {
-            setQuestionForms((p) =>
-              p.map((q, idx) =>
-                idx === questionIndex
-                  ? { ...q, projectorFirstCorrectWinnersCount: previousCount }
-                  : q,
-              ),
-            );
-          }
-        })();
-      });
-      return nextForms;
-    });
-  }
-
-  function toggleTagVisibility(questionIndex: number, tagText: string) {
-    const question = questionForms[questionIndex];
-    const nextHidden = toggleHiddenTagText(question.hiddenTagTexts ?? [], tagText);
-    setQuestionForms((prev) => {
-      const next = prev.map((q, idx) =>
-        idx === questionIndex ? { ...q, hiddenTagTexts: nextHidden } : q,
-      );
-      persistCloudManualSnapshot(next);
-      return next;
-    });
-  }
-
-  function applyInjectedTagList(questionIndex: number) {
-    const question = questionForms[questionIndex];
-    const parsed = parseInjectedTagLines(question.injectedTagsInput ?? "");
-    if (parsed.length === 0) {
-      setMessage("Список пустой или формат неверный. Используйте строки вида: слово 10");
-      return;
-    }
-    const nextWords = mergeInjectedTagWords(question.injectedTagWords ?? [], parsed);
-    setQuestionForms((prev) => {
-      const next = prev.map((q, idx) =>
-        idx === questionIndex ? { ...q, injectedTagWords: nextWords, injectedTagsInput: "" } : q,
-      );
-      persistCloudManualSnapshot(next);
-      return next;
-    });
-    setMessage("Список ответов добавлен");
-  }
-
-  function updateTagCountOverride(questionIndex: number, tagText: string, nextCount: number) {
-    const question = questionForms[questionIndex];
-    const nextOverrides = setTagCountOverrideRow(
-      question.tagCountOverrides ?? [],
-      tagText,
-      nextCount,
-    );
-    setQuestionForms((prev) => {
-      const next = prev.map((q, idx) =>
-        idx === questionIndex ? { ...q, tagCountOverrides: nextOverrides } : q,
-      );
-      persistCloudManualSnapshot(next);
-      return next;
-    });
-  }
-
-  function clearTagCountOverride(questionIndex: number, tagText: string) {
-    const question = questionForms[questionIndex];
-    const nextOverrides = clearCountOverrideRow(question.tagCountOverrides ?? [], tagText);
-    setQuestionForms((prev) => {
-      const next = prev.map((q, idx) =>
-        idx === questionIndex ? { ...q, tagCountOverrides: nextOverrides } : q,
-      );
-      persistCloudManualSnapshot(next);
-      return next;
-    });
-  }
-
-  function updateOptionVoteCountOverride(
-    questionIndex: number,
-    optionId: string,
-    liveCount: number,
-    nextDisplayCount: number,
-  ) {
-    const question = questionForms[questionIndex];
-    const nextOverrides = setOptionVoteCountOverrideRow(
-      question.optionVoteCountOverrides ?? [],
-      optionId,
-      liveCount,
-      nextDisplayCount,
-    );
-    setQuestionForms((prev) => {
-      const next = prev.map((q, idx) =>
-        idx === questionIndex ? { ...q, optionVoteCountOverrides: nextOverrides } : q,
-      );
-      persistCloudManualSnapshot(next);
-      return next;
-    });
-  }
-
-  function clearOptionVoteCountOverride(questionIndex: number, optionId: string) {
-    const question = questionForms[questionIndex];
-    const nextOverrides = clearCountOverrideRow(question.optionVoteCountOverrides ?? [], optionId);
-    setQuestionForms((prev) => {
-      const next = prev.map((q, idx) =>
-        idx === questionIndex ? { ...q, optionVoteCountOverrides: nextOverrides } : q,
-      );
-      persistCloudManualSnapshot(next);
-      return next;
-    });
-  }
-
-  function resetOptionVoteCountOverrides(questionIndex: number) {
-    setQuestionForms((prev) => {
-      const next = prev.map((q, idx) =>
-        idx === questionIndex ? { ...q, optionVoteCountOverrides: [] } : q,
-      );
-      persistCloudManualSnapshot(next);
-      return next;
-    });
-  }
-
-  function openTagInputDialog(questionIndex: number) {
-    setTagInputDialogQuestionIndex(questionIndex);
-  }
-
-  function closeTagInputDialog() {
-    setTagInputDialogQuestionIndex(null);
-  }
-
-  function applyInjectedTagListFromDialog() {
-    if (tagInputDialogQuestionIndex === null) return;
-    applyInjectedTagList(tagInputDialogQuestionIndex);
-    closeTagInputDialog();
-  }
-
-  function openTagResultsDialog(questionIndex: number) {
-    const question = questionForms[questionIndex];
-    const result = question?.id
-      ? questionResults.find((item) => item.questionId === question.id)
-      : undefined;
-    const tags = result?.tagCloud ?? [];
-    const injected = question?.injectedTagWords ?? [];
-    const overrides = question?.tagCountOverrides ?? [];
-    setTagResultsOrder(buildTagResultsDisplayOrder({ liveTags: tags, injected, overrides }));
-    setTagResultsDialogQuestionIndex(questionIndex);
-  }
-
-  function closeTagResultsDialog() {
-    setTagResultsDialogQuestionIndex(null);
-    setTagResultsOrder([]);
-  }
+  const {
+    toggleTagVisibility,
+    updateTagCountOverride,
+    clearTagCountOverride,
+    updateOptionVoteCountOverride,
+    clearOptionVoteCountOverride,
+    resetOptionVoteCountOverrides,
+    openTagInputDialog,
+    closeTagInputDialog,
+    applyInjectedTagListFromDialog,
+    openTagResultsDialog,
+    closeTagResultsDialog,
+  } = createAdminQuestionEditorTagCloudMutations({
+    questionForms,
+    questionResults,
+    setQuestionForms,
+    setMessage,
+    persistCloudManualSnapshot,
+    tagInputDialogQuestionIndex,
+    setTagInputDialogQuestionIndex,
+    setTagResultsDialogQuestionIndex,
+    setTagResultsOrder,
+  });
 
   function openQuestionDialog(index: number) {
+    const q = questionForms[index];
+    if (q && isDebatePollPreset(q)) {
+      setMessage("Редактируйте дебаты через заголовок серии");
+      return;
+    }
     setQuestionDialogError("");
     setQuestionForms((prev) => {
       const next = prev.map((item, i) =>
@@ -1028,7 +696,6 @@ export function useAdminQuestionEditor({
       questionDialogSnapshotRef.current = cloneQuestionForms(next);
       return next;
     });
-    const q = questionForms[index];
     const sid = q?.subQuizId;
     questionDialogTargetSubQuizIdRef.current =
       sid != null && String(sid).trim() !== "" ? String(sid) : null;
@@ -1053,9 +720,12 @@ export function useAdminQuestionEditor({
   async function saveQuestionDialogAndClose() {
     const idx = selectedQuestionIndex;
     const current = questionForms[idx];
-    const formsForSave = questionForms.map((q) =>
-      q.type === "tag_cloud" ? normalizeTagCloudQuestionPoints(q) : q,
-    );
+    const formsForSave = questionForms.map((q) => {
+      const next = q.type === "tag_cloud" ? normalizeTagCloudQuestionPoints(q) : q;
+      return isDebatePollPreset(next)
+        ? { ...next, options: withDebateOptionColors(next.options) }
+        : next;
+    });
     const listErr = validateQuestionsForm(formsForSave);
     if (listErr) {
       setQuestionDialogError(listErr);
@@ -1111,6 +781,9 @@ export function useAdminQuestionEditor({
           {
             text: value,
             isCorrect: question.type === "tag_cloud" && isEditorQuizMode(question),
+            ...(isDebatePollPreset(question)
+              ? { color: debateDefaultOptionColor(question.options.length) }
+              : {}),
           },
         ];
         if (question.type === "tag_cloud" && isEditorQuizMode(question)) {
@@ -1140,6 +813,18 @@ export function useAdminQuestionEditor({
         ? prev.filter((x) => x !== questionIdForTile)
         : [...prev, questionIdForTile];
       emitPublicViewPatch({ playerVisibleResultQuestionIds: next });
+      return next;
+    });
+  }
+
+  function togglePlayerVisibleDebateSeriesId(seriesIdForTile: string) {
+    const seriesId = seriesIdForTile.trim();
+    if (!seriesId) return;
+    setPlayerVisibleDebateSeriesIds((prev) => {
+      const next = prev.includes(seriesId)
+        ? prev.filter((x) => x !== seriesId)
+        : [...prev, seriesId];
+      emitPublicViewPatch({ playerVisibleDebateSeriesIds: next });
       return next;
     });
   }
@@ -1228,6 +913,12 @@ export function useAdminQuestionEditor({
     runConfirmedRemoveSubQuiz,
     addQuestionToSubQuiz,
     cloneQuestionAtIndex,
+    cloneDebateSeries,
+    addDebateSeriesRoundAtIndex,
+    updateDebateSeriesResultTitle,
+    updateDebateSeries,
+    removeDebateSeries,
+    removeQuestion,
     requestRemoveQuestion,
     closeDeleteQuestionDialog,
     runConfirmedRemoveQuestion,
@@ -1247,7 +938,9 @@ export function useAdminQuestionEditor({
     updateQuestionShowVoteCount,
     updateQuestionShowCorrectOption,
     toggleQuestionAdminDone,
+    setQuestionsAdminDone,
     reorderVoteInList,
+    reorderVoteDisplayBlocks,
     updateQuestionProjectorShowFirstCorrect,
     updateQuestionRankingProjectorMetric,
     patchQuestionProjectorFirstCorrectWinnersCount,
@@ -1268,5 +961,6 @@ export function useAdminQuestionEditor({
     clearOptionVoteCountOverride,
     resetOptionVoteCountOverrides,
     togglePlayerVisibleResultQuestionId,
+    togglePlayerVisibleDebateSeriesId,
   };
 }

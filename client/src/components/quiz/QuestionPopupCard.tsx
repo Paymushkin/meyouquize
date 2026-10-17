@@ -22,6 +22,7 @@ import {
 import { playerPopupQuestionTitleSx } from "../../features/voteUi/voteQuestionLayout";
 import { getQuestionTypeLabel } from "../../pages/quiz-play/getQuestionTypeLabel";
 import type { ActiveQuestion, QuizState } from "../../pages/quiz-play/types";
+import { PlayerGeoPollAutocomplete, type GeoPollOption } from "./PlayerGeoPollAutocomplete";
 import { PlayerRankingOptionsList } from "./PlayerRankingOptionsList";
 import { PlayerVoteOptionsGrid } from "./PlayerVoteOptionsGrid";
 import { QuestionAssetImage } from "./QuestionAssetImage";
@@ -41,6 +42,8 @@ export type QuestionPopupCardProps = {
   closeQuestionPopup: () => void;
   tagAnswers: string[];
   setTagAnswers: Dispatch<SetStateAction<string[]>>;
+  geoAnswer: GeoPollOption | null;
+  setGeoAnswer: Dispatch<SetStateAction<GeoPollOption | null>>;
   canSubmit: boolean;
   submit: () => void;
   ruBallLabel: (n: number) => string;
@@ -62,6 +65,8 @@ export function QuestionPopupCard(props: QuestionPopupCardProps) {
     closeQuestionPopup,
     tagAnswers,
     setTagAnswers,
+    geoAnswer,
+    setGeoAnswer,
     canSubmit,
     submit,
     ruBallLabel,
@@ -95,6 +100,7 @@ export function QuestionPopupCard(props: QuestionPopupCardProps) {
     height: "auto",
     borderRadius: 999,
     bgcolor: brandPrimaryColor,
+    backgroundColor: brandPrimaryColor,
     color: playerVoteOptionTextColor,
     border: "none",
     "& .MuiChip-label": {
@@ -160,16 +166,37 @@ export function QuestionPopupCard(props: QuestionPopupCardProps) {
                     />
                   ) : null}
                 </Stack>
-                {question.type !== "tag_cloud" && question.type !== "ranking" && (
-                  <PlayerVoteOptionsGrid
-                    options={question.options}
-                    displayedSelected={displayedSelected}
-                    answeredCurrentQuestion={answeredCurrentQuestion}
+                {question.geoPollDictionary ? (
+                  <PlayerGeoPollAutocomplete
+                    dictionaryId={question.geoPollDictionary}
+                    value={
+                      answeredCurrentQuestion && submittedAnswers[question.id]?.[0]
+                        ? {
+                            key: submittedAnswers[question.id]![0]!,
+                            label: submittedAnswers[question.id]![0]!,
+                            lat: 0,
+                            lon: 0,
+                          }
+                        : geoAnswer
+                    }
+                    disabled={answeredCurrentQuestion}
                     brandPrimaryColor={brandPrimaryColor}
-                    playerVoteOptionTextColor={playerVoteOptionTextColor}
-                    onToggleOption={toggleOption}
+                    onChange={setGeoAnswer}
                   />
-                )}
+                ) : null}
+                {!question.geoPollDictionary &&
+                  question.type !== "tag_cloud" &&
+                  question.type !== "ranking" && (
+                    <PlayerVoteOptionsGrid
+                      options={question.options}
+                      coloredByOption={Boolean(question.projectorDebateLayout)}
+                      displayedSelected={displayedSelected}
+                      answeredCurrentQuestion={answeredCurrentQuestion}
+                      brandPrimaryColor={brandPrimaryColor}
+                      playerVoteOptionTextColor={playerVoteOptionTextColor}
+                      onToggleOption={toggleOption}
+                    />
+                  )}
                 {question.type === "ranking" && (
                   <PlayerRankingOptionsList
                     question={question}

@@ -8,7 +8,9 @@
     "build": "tsc --noEmit && vite build",
     "lint": "tsc --noEmit",
     "test": "vitest run",
-    "test:coverage": "vitest run --coverage"
+    "test:coverage": "vitest run --coverage",
+    "geo:russia-boundary": "node scripts/build-russia-boundary.mjs",
+    "geo:russia-svg": "node scripts/build-russia-svg.mjs"
   },
   "dependencies": {
     "@emotion/react": "^11.14.0",
@@ -21,6 +23,7 @@
     "@visx/text": "^3.12.0",
     "@visx/wordcloud": "^3.12.0",
     "d3-cloud": "^1.2.9",
+    "d3-geo": "^3.1.1",
     "echarts": "^5.6.0",
     "echarts-wordcloud": "^2.1.0",
     "qrcode": "^1.5.4",
@@ -29,13 +32,18 @@
     "react-router-dom": "^7.5.0",
     "react-wordcloud": "^1.2.7",
     "socket.io-client": "^4.8.1",
+    "topojson-client": "^3.1.0",
+    "world-atlas": "^2.0.2",
     "yet-another-react-lightbox": "^3.32.0"
   },
   "devDependencies": {
     "@testing-library/react": "^16.3.2",
+    "@types/d3-geo": "^3.1.1",
+    "@types/geojson": "^7946.0.16",
     "@types/qrcode": "^1.5.5",
     "@types/react": "^19.1.2",
     "@types/react-dom": "^19.1.2",
+    "@types/topojson-client": "^3.1.5",
     "@vitejs/plugin-react": "^4.3.4",
     "@vitest/coverage-v8": "^3.2.6",
     "jsdom": "^29.0.2",

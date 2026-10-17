@@ -42,6 +42,7 @@ type Params = {
   setLeaderboardsBySubQuiz: (rows: SubQuizLeaderboardPayload[]) => void;
   setPublicViewMode: (mode: PublicViewMode) => void;
   setPublicViewQuestionId: (id: string | undefined) => void;
+  setPublicDebateCompareQuestionId?: (id: string | undefined) => void;
   setQuestionRevealStage: (value: "options" | "results") => void;
   setHighlightedLeadersCount: (value: number) => void;
   setQuestionForms: Dispatch<SetStateAction<QuestionFormPatchable[]>>;
@@ -82,6 +83,8 @@ type Params = {
   setPlayerVoteProgressTrackColor: (value: string) => void;
   setPlayerVoteProgressBarColor: (value: string) => void;
   setProjectorJoinQrVisible: (value: boolean) => void;
+  setProjectorBrowserZoom: (value: number) => void;
+  setProjectorContentMaxWidthPx: (value: number) => void;
   setProjectorJoinQrOverlayVisible: (value: boolean) => void;
   setProjectorJoinQrText: (value: string) => void;
   setProjectorJoinQrTextColor: (value: string) => void;
@@ -115,6 +118,7 @@ export function useAdminEventSocket<TQuestion extends QuestionFormPatchable>(
     setLeaderboardsBySubQuiz,
     setPublicViewMode,
     setPublicViewQuestionId,
+    setPublicDebateCompareQuestionId,
     setQuestionRevealStage,
     setHighlightedLeadersCount,
     setQuestionForms,
@@ -155,6 +159,8 @@ export function useAdminEventSocket<TQuestion extends QuestionFormPatchable>(
     setPlayerVoteProgressTrackColor,
     setPlayerVoteProgressBarColor,
     setProjectorJoinQrVisible,
+    setProjectorBrowserZoom,
+    setProjectorContentMaxWidthPx,
     setProjectorJoinQrOverlayVisible,
     setProjectorJoinQrText,
     setProjectorJoinQrTextColor,
@@ -235,6 +241,8 @@ export function useAdminEventSocket<TQuestion extends QuestionFormPatchable>(
       setPlayerVoteProgressTrackColor(nextBranding.playerVoteProgressTrackColor);
       setPlayerVoteProgressBarColor(nextBranding.playerVoteProgressBarColor);
       setProjectorJoinQrVisible(nextBranding.projectorJoinQrVisible);
+      setProjectorBrowserZoom(nextBranding.projectorBrowserZoom);
+      setProjectorContentMaxWidthPx(nextBranding.projectorContentMaxWidthPx);
       setProjectorJoinQrOverlayVisible(nextBranding.projectorJoinQrOverlayVisible);
       setProjectorJoinQrText(nextBranding.projectorJoinQrText);
       setProjectorJoinQrTextColor(nextBranding.projectorJoinQrTextColor);
@@ -282,6 +290,8 @@ export function useAdminEventSocket<TQuestion extends QuestionFormPatchable>(
       setPlayerVoteProgressTrackColor,
       setPlayerVoteProgressBarColor,
       setProjectorJoinQrVisible,
+      setProjectorBrowserZoom,
+      setProjectorContentMaxWidthPx,
       setProjectorJoinQrText,
       setProjectorJoinQrTextColor,
       setProjectorJoinQrOverlaySizePx,
@@ -354,6 +364,9 @@ export function useAdminEventSocket<TQuestion extends QuestionFormPatchable>(
       const view = normalizePublicViewState(payload);
       setPublicViewMode(view.mode);
       setPublicViewQuestionId(view.questionId);
+      if (setPublicDebateCompareQuestionId) {
+        setPublicDebateCompareQuestionId(view.debateCompareQuestionId);
+      }
       setQuestionRevealStage(view.questionRevealStage);
       setShowFirstCorrectAnswerer(view.showFirstCorrectAnswerer);
       setFirstCorrectWinnersCount(view.firstCorrectWinnersCount);

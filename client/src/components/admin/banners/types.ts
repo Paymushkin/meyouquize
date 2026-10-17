@@ -36,6 +36,12 @@ export type OrderedTile =
     }
   | {
       id: string;
+      kind: "video_wall";
+      label: string;
+      coverUrl: string;
+    }
+  | {
+      id: string;
       kind: "banner";
       label: string;
       previewUrl: string;
@@ -48,4 +54,8 @@ export type BannerEditorState = {
   editLinkUrl: string;
   editBackgroundUrl: string;
   editSize: BannerSize;
+  editVisualStyle: "image" | "tile";
+  editTileText: string;
+  editTileBackgroundColor: string;
+  editTileTextColor: string;
 };

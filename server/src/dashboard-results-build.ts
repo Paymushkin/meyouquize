@@ -36,3 +36,36 @@ export function isDashboardDebounceTokenCurrent(
 ): boolean {
   return redisToken === scheduledToken;
 }
+
+/**
+ * Trailing debounce, но не дольше maxWait от первого submit во всплеске.
+ * maxWaitMs <= 0 — только debounce (старое поведение).
+ */
+export function dashboardBroadcastDelayMs(
+  debounceMs: number,
+  maxWaitMs: number,
+  burstElapsedMs: number,
+): number {
+  const debounce = Math.max(0, debounceMs);
+  const maxWait = Math.max(0, maxWaitMs);
+  if (maxWait <= 0) return debounce;
+  const remaining = maxWait - Math.max(0, burstElapsedMs);
+  if (remaining <= 0) return 0;
+  return Math.min(debounce, remaining);
+}
+
+/** Пора слать кадр сразу: прошло maxWait с последнего emit или с начала всплеска. */
+export function shouldFlushDashboardForMaxWait(
+  maxWaitMs: number,
+  elapsedSinceLastEmitOrBurstMs: number,
+): boolean {
+  return maxWaitMs > 0 && elapsedSinceLastEmitOrBurstMs >= maxWaitMs;
+}
+
+/**
+ * Redis-токен отменяет только trailing-таймер.
+ * Max-wait flush нельзя отменять — на кластере каждый submit переписывает токен.
+ */
+export function shouldHonorRedisDebounceToken(isMaxWaitFlush: boolean): boolean {
+  return !isMaxWaitFlush;
+}

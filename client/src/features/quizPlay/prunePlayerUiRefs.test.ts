@@ -20,6 +20,7 @@ describe("prunePlayerUiRefsForRoom", () => {
           `quiz_results_tile:${keptSq}`,
         ],
         playerVisibleResultQuestionIds: [deletedQ, keptQ],
+        playerVisibleDebateSeriesIds: ["series-gone", "series-kept"],
         leaderboardSubQuizId: deletedSq,
         reportVoteQuestionIds: [deletedQ],
         reportQuizQuestionIds: [deletedQ],
@@ -27,12 +28,14 @@ describe("prunePlayerUiRefsForRoom", () => {
       },
       new Set([keptSq]),
       new Set([keptQ]),
+      new Set(["series-kept"]),
     );
 
     expect(pruned.playerQuizResultsSubQuizIds).toEqual([keptSq]);
     expect(pruned.playerQuizResultsSubQuizId).toBe(keptSq);
     expect(pruned.playerTilesOrder).toEqual(["speaker_tile", `quiz_results_tile:${keptSq}`]);
     expect(pruned.playerVisibleResultQuestionIds).toEqual([keptQ]);
+    expect(pruned.playerVisibleDebateSeriesIds).toEqual(["series-kept"]);
     expect(pruned.leaderboardSubQuizId).toBe(keptSq);
     expect(pruned.reportQuizSubQuizIds).toEqual([keptSq]);
   });
@@ -50,6 +53,7 @@ describe("prunePublicViewForRoomContent", () => {
         playerQuizResultsTileVisible: false,
         playerTilesOrder: [],
         playerVisibleResultQuestionIds: [],
+        playerVisibleDebateSeriesIds: [],
         leaderboardSubQuizId: "",
         reportVoteQuestionIds: [],
         reportQuizQuestionIds: [],

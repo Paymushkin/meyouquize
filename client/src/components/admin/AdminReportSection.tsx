@@ -19,6 +19,7 @@ import {
 import { useMemo } from "react";
 import { buildReportModuleDisplayOrder } from "../../features/admin/adminReportModules";
 import type { ReportModuleId } from "@meyouquize/shared";
+import { groupSpeakerQuestionsBySession } from "@meyouquize/shared";
 import type { RandomizerHistoryEntry } from "../../features/randomizer/randomizerLogic";
 import type { SpeakerQuestionItem } from "../../types/speakerQuestions";
 
@@ -151,6 +152,20 @@ export function AdminReportSection(props: Props) {
     reportSpeakerQuestionIds.length === 0
       ? speakerAllIds
       : reportSpeakerQuestionIds.filter((id) => speakerAllIds.includes(id));
+  const speakerGroups = useMemo(() => {
+    const sessions: { id: string; name: string; speakers: string[] }[] = [];
+    const seen = new Set<string>();
+    for (const q of speakerQuestionsForReport) {
+      if (!q.sessionId || seen.has(q.sessionId)) continue;
+      seen.add(q.sessionId);
+      sessions.push({
+        id: q.sessionId,
+        name: q.sessionName?.trim() || q.sessionId,
+        speakers: [],
+      });
+    }
+    return groupSpeakerQuestionsBySession(speakerQuestionsForReport, sessions);
+  }, [speakerQuestionsForReport]);
 
   const feedbackAllIds = availableFeedbackForms.map((form) => form.id);
   const feedbackEffective =
@@ -511,30 +526,39 @@ export function AdminReportSection(props: Props) {
                         <Typography variant="subtitle2">Какие вопросы показывать</Typography>
                         {speakerQuestionsForReport.length === 0 ? (
                           <Typography variant="body2" color="text.secondary">
-                            Вопросов спикерам пока нет — откройте секцию «Вопросы спикерам», чтобы
-                            подгрузить список
+                            Вопросов спикерам пока нет — откройте секцию «Q&A», чтобы подгрузить
+                            список
                           </Typography>
                         ) : (
-                          speakerQuestionsForReport.map((q) => {
-                            const qChecked = speakerEffective.includes(q.id);
-                            const short =
-                              (q.text || "").replace(/\s+/g, " ").trim().slice(0, 100) +
-                              ((q.text || "").length > 100 ? "…" : "");
-                            return (
-                              <FormControlLabel
-                                key={q.id}
-                                control={
-                                  <Checkbox
-                                    checked={qChecked}
-                                    onChange={(e) =>
-                                      onToggleSpeakerQuestion(q.id, e.target.checked)
+                          speakerGroups.map((group) => (
+                            <Stack key={group.sessionId ?? "__none__"} spacing={0.5}>
+                              {speakerGroups.length > 1 ? (
+                                <Typography variant="caption" color="text.secondary">
+                                  {group.sessionName}
+                                </Typography>
+                              ) : null}
+                              {group.items.map((q) => {
+                                const qChecked = speakerEffective.includes(q.id);
+                                const short =
+                                  (q.text || "").replace(/\s+/g, " ").trim().slice(0, 100) +
+                                  ((q.text || "").length > 100 ? "…" : "");
+                                return (
+                                  <FormControlLabel
+                                    key={q.id}
+                                    control={
+                                      <Checkbox
+                                        checked={qChecked}
+                                        onChange={(e) =>
+                                          onToggleSpeakerQuestion(q.id, e.target.checked)
+                                        }
+                                      />
                                     }
+                                    label={`[${q.speakerName}] ${short}`}
                                   />
-                                }
-                                label={`[${q.speakerName}] ${short}`}
-                              />
-                            );
-                          })
+                                );
+                              })}
+                            </Stack>
+                          ))
                         )}
                       </Stack>
                     </Box>

@@ -18,8 +18,11 @@ export function ProjectorRandomizerSection({ view }: Props) {
     <Stack
       spacing={3}
       sx={{
-        minHeight: "100dvh",
+        // Не 100dvh: при projectorBrowserZoom (CSS zoom на body) dvh ≠ высота layout-бокса.
+        height: "100%",
         width: "100%",
+        maxHeight: "100%",
+        boxSizing: "border-box",
         px: { xs: 3, md: 6 },
         py: 0,
         alignItems: "center",

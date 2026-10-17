@@ -10,6 +10,7 @@ function makeItem(overrides: Partial<SpeakerQuestionItem>): SpeakerQuestionItem 
     authorNickname: "Автор",
     status: "PENDING",
     userVisible: true,
+    moderatorVisible: false,
     isOnScreen: false,
     createdAt: "2026-01-01T00:00:00.000Z",
     ...overrides,
@@ -57,6 +58,20 @@ describe("speakerQuestionsSort", () => {
     expect(asc.map((x) => x.id)).toEqual(["b", "a", "c"]);
 
     const desc = sortRows(rows, { key: "ui", dir: "desc" });
+    expect(desc.map((x) => x.id)).toEqual(["a", "c", "b"]);
+  });
+
+  it("сортирует по флагу модератора", () => {
+    const rows = [
+      makeItem({ id: "a", moderatorVisible: true }),
+      makeItem({ id: "b", moderatorVisible: false }),
+      makeItem({ id: "c", moderatorVisible: true }),
+    ];
+
+    const asc = sortRows(rows, { key: "moderator", dir: "asc" });
+    expect(asc.map((x) => x.id)).toEqual(["b", "a", "c"]);
+
+    const desc = sortRows(rows, { key: "moderator", dir: "desc" });
     expect(desc.map((x) => x.id)).toEqual(["a", "c", "b"]);
   });
 

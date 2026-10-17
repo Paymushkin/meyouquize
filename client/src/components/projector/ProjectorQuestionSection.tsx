@@ -1,12 +1,21 @@
 import { useMemo } from "react";
 import { Fade, Stack, Typography } from "@mui/material";
-import { voteQuestionTextTypographyStyle, type PublicViewState } from "@meyouquize/shared";
+import {
+  isGeoPollDictionary,
+  optionTextTrimmed,
+  voteQuestionTextTypographyStyle,
+  type PublicViewState,
+} from "@meyouquize/shared";
 import {
   buildProjectorQuestionTitleTypographySx,
   projectorQuestionTitleFontSizeSx,
 } from "../../features/voteUi/voteQuestionLayout";
 import type { ProjectorQuestionResult } from "../../types/projectorDashboard";
 import { ProjectorFirstCorrectHero } from "./ProjectorFirstCorrectHero";
+import {
+  buildDebateSideBySideRows,
+  ProjectorDebateSideBySideChart,
+} from "./ProjectorDebateSideBySideChart";
 import { ProjectorSideBySideContent } from "./ProjectorSideBySideContent";
 import { QuestionChart } from "./QuestionChart";
 
@@ -17,7 +26,17 @@ export type ProjectorQuestionSectionProps = {
   fullScreenCloud: boolean;
   isTagCloudQuestion: boolean;
   firstCorrectWinnersShown: string[];
+  /** Компактные шкалы раундов под накопительным итогом серии. */
+  debateSeriesRounds?: ProjectorQuestionResult[];
 };
+
+/** Подпись раунда слева от компактной шкалы на проекторе. */
+export function formatDebateSeriesRoundLabel(
+  round: Pick<ProjectorQuestionResult, "debateRoundIndex">,
+  index: number,
+): string {
+  return `Раунд ${(round.debateRoundIndex ?? index) + 1}`;
+}
 
 export function ProjectorQuestionSection(props: ProjectorQuestionSectionProps) {
   const {
@@ -27,8 +46,12 @@ export function ProjectorQuestionSection(props: ProjectorQuestionSectionProps) {
     fullScreenCloud,
     isTagCloudQuestion,
     firstCorrectWinnersShown,
+    debateSeriesRounds = [],
   } = props;
-  const questionLength = selectedQuestion.text.trim().length;
+  const questionLength = optionTextTrimmed(selectedQuestion.text).length;
+  const isGeoPoll = isGeoPollDictionary(selectedQuestion.geoPollDictionary);
+  /** Для geo-poll города в optionStats растут — не должны сжимать заголовок. */
+  const titleOptionsCount = isGeoPoll ? 0 : (selectedQuestion.optionStats?.length ?? 0);
   const waitingForFirstWinner =
     view.showFirstCorrectAnswerer &&
     !showProjectorWinnersHero &&
@@ -44,14 +67,11 @@ export function ProjectorQuestionSection(props: ProjectorQuestionSectionProps) {
   const questionTitleTypographySx = useMemo(
     () =>
       buildProjectorQuestionTitleTypographySx({
-        fontSize: projectorQuestionTitleFontSizeSx(
-          questionLength,
-          selectedQuestion.optionStats.length,
-        ),
+        fontSize: projectorQuestionTitleFontSizeSx(questionLength, titleOptionsCount),
         questionColorSx: questionTextSx,
         fontFamily: view.brandFontFamily,
       }),
-    [questionLength, questionTextSx, selectedQuestion.optionStats.length, view.brandFontFamily],
+    [questionLength, questionTextSx, titleOptionsCount, view.brandFontFamily],
   );
 
   const projectorQuestionImageSx = {
@@ -60,14 +80,15 @@ export function ProjectorQuestionSection(props: ProjectorQuestionSectionProps) {
     maxHeight: { xs: "38vh", md: "52vh" },
   } as const;
 
+  const questionTitle = optionTextTrimmed(selectedQuestion.text);
   const questionTitleBlock = (
     <ProjectorSideBySideContent
       imageUrl={selectedQuestion.imageUrl}
-      alt={selectedQuestion.text.trim() || "Вопрос"}
+      alt={questionTitle || "Вопрос"}
       spacing={3}
       imageSx={projectorQuestionImageSx}
     >
-      {selectedQuestion.text.trim() ? (
+      {questionTitle ? (
         <Typography
           variant="h3"
           align="left"
@@ -90,11 +111,11 @@ export function ProjectorQuestionSection(props: ProjectorQuestionSectionProps) {
       <Stack spacing={1.5} sx={{ width: "100%" }}>
         <ProjectorSideBySideContent
           imageUrl={selectedQuestion.imageUrl}
-          alt={selectedQuestion.text.trim() || "Вопрос"}
+          alt={questionTitle || "Вопрос"}
           spacing={3}
           imageSx={projectorQuestionImageSx}
         >
-          {selectedQuestion.text.trim() ? (
+          {questionTitle ? (
             <Typography
               variant="h3"
               align="left"
@@ -114,6 +135,7 @@ export function ProjectorQuestionSection(props: ProjectorQuestionSectionProps) {
   }, [
     fullScreenCloud,
     isTagCloudQuestion,
+    questionTitle,
     questionTitleTypographySx,
     selectedQuestion.imageUrl,
     selectedQuestion.text,
@@ -232,6 +254,50 @@ export function ProjectorQuestionSection(props: ProjectorQuestionSectionProps) {
                 brandFontFamily={view.brandFontFamily}
                 cloudHeader={tagCloudHeader}
               />
+              {view.mode === "debate_series" && debateSeriesRounds.length > 0 ? (
+                <Stack spacing={0.75} sx={{ width: "100%", mt: { xs: 1.5, md: 2 } }}>
+                  {debateSeriesRounds.map((round, index) => {
+                    const rows = buildDebateSideBySideRows(round.optionStats, false);
+                    const roundLabel = formatDebateSeriesRoundLabel(round, index);
+                    return (
+                      <Stack
+                        key={round.questionId}
+                        direction="row"
+                        alignItems="center"
+                        spacing={{ xs: 1, md: 1.5 }}
+                        sx={{ width: "100%" }}
+                      >
+                        <Typography
+                          component="span"
+                          sx={{
+                            flexShrink: 0,
+                            minWidth: { xs: 64, md: 88 },
+                            fontWeight: 700,
+                            fontSize: { xs: "0.85rem", md: "1rem" },
+                            lineHeight: 1.2,
+                            color: view.voteOptionTextColor,
+                            opacity: 0.9,
+                            fontFamily: view.brandFontFamily || undefined,
+                          }}
+                        >
+                          {roundLabel}
+                        </Typography>
+                        <Stack sx={{ flex: 1, minWidth: 0 }}>
+                          <ProjectorDebateSideBySideChart
+                            rows={rows}
+                            questionRevealStage="results"
+                            density="bar"
+                            voteOptionTextColor={view.voteOptionTextColor}
+                            voteOptionBorderColor={view.voteOptionBorderColor}
+                            voteProgressTrackColor={view.voteProgressTrackColor}
+                            voteProgressBarColor={view.voteProgressBarColor}
+                          />
+                        </Stack>
+                      </Stack>
+                    );
+                  })}
+                </Stack>
+              ) : null}
             </Stack>
           </Fade>
         </>

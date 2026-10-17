@@ -5,7 +5,7 @@ import { ErrorMessage } from "./brand/ErrorMessage";
 
 export function NotFoundPage() {
   return (
-    <BrandPageLayout documentTitle="404 — Страница не найдена · Meyouquize">
+    <BrandPageLayout documentTitle="404 — Страница не найдена · МИЮ">
       <BrandHeader />
       <ErrorMessage
         code="404"

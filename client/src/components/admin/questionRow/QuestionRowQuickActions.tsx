@@ -1,3 +1,4 @@
+import CompareArrowsIcon from "@mui/icons-material/CompareArrows";
 import EmojiEventsIcon from "@mui/icons-material/EmojiEvents";
 import EmojiEventsOutlinedIcon from "@mui/icons-material/EmojiEventsOutlined";
 import BarChartIcon from "@mui/icons-material/BarChart";
@@ -18,9 +19,12 @@ type Props = {
   revealButtonVisible: boolean;
   revealResultsOnProjector: boolean;
   showTrophyButton: boolean;
+  showDebateCompareButton: boolean;
+  debateCompareOnProjector: boolean;
   questionActive: boolean;
   settingsExpanded: boolean;
   onSlideshow: (e: MouseEvent<HTMLButtonElement>) => void;
+  onDebateCompare: (e: MouseEvent<HTMLButtonElement>) => void;
   onTrophy: (e: MouseEvent<HTMLButtonElement>) => void;
   onToggleActive: (e: MouseEvent<HTMLButtonElement>) => void;
   onToggleSettings: (e: MouseEvent<HTMLButtonElement>) => void;
@@ -37,9 +41,12 @@ export function QuestionRowQuickActions(props: Props) {
     revealButtonVisible,
     revealResultsOnProjector,
     showTrophyButton,
+    showDebateCompareButton,
+    debateCompareOnProjector,
     questionActive,
     settingsExpanded,
     onSlideshow,
+    onDebateCompare,
     onTrophy,
     onToggleActive,
     onToggleSettings,
@@ -96,6 +103,31 @@ export function QuestionRowQuickActions(props: Props) {
               aria-pressed={revealResultsOnProjector}
             >
               <BarChartIcon fontSize="small" />
+            </IconButton>
+          </span>
+        </Tooltip>
+      ) : null}
+      {showDebateCompareButton ? (
+        <Tooltip
+          title={
+            debateCompareOnProjector
+              ? "Скрыть сравнение дебатов"
+              : "Показать сравнение до/после на проекторе"
+          }
+        >
+          <span>
+            <IconButton
+              size="small"
+              color={debateCompareOnProjector ? "secondary" : "default"}
+              onClick={onDebateCompare}
+              aria-label={
+                debateCompareOnProjector
+                  ? "Скрыть сравнение дебатов"
+                  : "Показать сравнение до/после на проекторе"
+              }
+              aria-pressed={debateCompareOnProjector}
+            >
+              <CompareArrowsIcon fontSize="small" />
             </IconButton>
           </span>
         </Tooltip>

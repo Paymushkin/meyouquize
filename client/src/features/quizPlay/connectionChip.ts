@@ -1,19 +1,30 @@
+export type QuizPlayConnectionStatus = "online" | "reconnecting" | "offline";
+
+export type QuizPlayConnectionIndicator = {
+  /** Состояние для цвета точки. */
+  tone: "online" | "reconnecting" | "offline";
+  /** Текст для aria/tooltip. */
+  label: string;
+};
+
 export function buildQuizPlayConnectionChip(
-  status: "online" | "reconnecting" | "offline",
+  status: QuizPlayConnectionStatus,
   quizSessionReady: boolean,
-) {
+): QuizPlayConnectionIndicator {
   if (!quizSessionReady && status !== "offline") {
-    return {
-      label: "Переподключаемся…",
-      color: "warning" as const,
-      variant: "outlined" as const,
-    };
+    return { tone: "reconnecting", label: "Переподключаемся…" };
   }
   if (status === "online") {
-    return { label: "Онлайн", variant: "filled" as const, accentFill: true as const };
+    return { tone: "online", label: "Онлайн" };
   }
   if (status === "reconnecting") {
-    return { label: "Переподключение", color: "warning" as const, variant: "outlined" as const };
+    return { tone: "reconnecting", label: "Переподключение" };
   }
-  return { label: "Нет соединения", color: "error" as const, variant: "outlined" as const };
+  return { tone: "offline", label: "Нет соединения" };
+}
+
+export function quizPlayConnectionDotColor(tone: QuizPlayConnectionIndicator["tone"]): string {
+  if (tone === "online") return "#2e7d32";
+  if (tone === "reconnecting") return "#f9a825";
+  return "#c62828";
 }

@@ -261,6 +261,57 @@ describe("submitAnswer", () => {
     };
 
     await submitAnswer(payload);
-    await expect(submitAnswer(payload)).rejects.toThrow("Already answered this question");
+    // Повторный submit того же ответа — идемпотентный успех (двойной тап / reconnect).
+    await expect(submitAnswer(payload)).resolves.toBeUndefined();
+    const answers = await prisma.answer.findMany({
+      where: { questionId: question.id, participantId: player.participantId },
+    });
+    expect(answers).toHaveLength(1);
+  });
+
+  it("treats parallel duplicate submits as a single answer (race)", async () => {
+    const slug = uniqueSlug("race");
+    await createRoom({ eventName: slug, title: `Room ${slug}` });
+    await replaceRoomContent(slug, {
+      subQuizzes: [
+        {
+          title: "Quiz",
+          sortOrder: 0,
+          questions: [
+            {
+              text: "Race",
+              type: "single",
+              points: 1,
+              scoringMode: "quiz",
+              options: [
+                { text: "A", isCorrect: true },
+                { text: "B", isCorrect: false },
+              ],
+            },
+          ],
+        },
+      ],
+      standaloneQuestions: [],
+    });
+    const room = await getRoomByEventName(slug);
+    const question = room!.questions[0]!;
+    const aId = question.options.find((o) => o.text === "A")!.id;
+    await activateQuestion(room!.id, question.id);
+    const player = await joinPlayer(slug, "Race", "dev-race");
+    const payload = {
+      quizId: room!.id,
+      questionId: question.id,
+      optionIds: [aId],
+      participantId: player.participantId,
+    };
+
+    await expect(Promise.all([submitAnswer(payload), submitAnswer(payload)])).resolves.toEqual([
+      undefined,
+      undefined,
+    ]);
+    const answers = await prisma.answer.findMany({
+      where: { questionId: question.id, participantId: player.participantId },
+    });
+    expect(answers).toHaveLength(1);
   });
 });

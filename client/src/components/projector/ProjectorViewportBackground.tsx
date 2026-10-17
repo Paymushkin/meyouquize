@@ -5,15 +5,18 @@ import { buildBrandBackground } from "../../features/branding/brandVisual";
 type ProjectorViewportBackgroundProps = {
   backgroundColor: string;
   backgroundImageUrl?: string;
+  /** CSS zoom на body (имитация Ctrl+/−). Фон компенсирует масштаб и остаётся на весь экран. */
+  contentZoom?: number;
 };
 
 /**
- * Фон проектора на весь viewport (`cover`). При зуме браузера компенсирует масштаб через
- * Visual Viewport API — картинка остаётся «прибитой» к экрану, масштабируется только контент.
+ * Фон проектора на весь viewport (`cover`). При зуме браузера / CSS zoom на body
+ * компенсирует масштаб — картинка остаётся «прибитой» к экрану.
  */
 export function ProjectorViewportBackground({
   backgroundColor,
   backgroundImageUrl,
+  contentZoom = 1,
 }: ProjectorViewportBackgroundProps) {
   const layerRef = useRef<HTMLDivElement>(null);
   const normalizedImageUrl = backgroundImageUrl?.trim() ?? "";
@@ -28,7 +31,11 @@ export function ProjectorViewportBackground({
 
     const syncViewport = () => {
       const vv = window.visualViewport;
-      if (!vv || Math.abs(vv.scale - 1) < 0.001) {
+      const browserScale = vv?.scale && Number.isFinite(vv.scale) ? vv.scale : 1;
+      const cssZoom = Number.isFinite(contentZoom) && contentZoom > 0 ? contentZoom : 1;
+      const scale = browserScale * cssZoom;
+
+      if (Math.abs(scale - 1) < 0.001) {
         layer.style.top = "0";
         layer.style.left = "0";
         layer.style.width = "100%";
@@ -36,11 +43,24 @@ export function ProjectorViewportBackground({
         layer.style.transform = "none";
         return;
       }
-      layer.style.top = `${vv.offsetTop}px`;
-      layer.style.left = `${vv.offsetLeft}px`;
-      layer.style.width = `${vv.width * vv.scale}px`;
-      layer.style.height = `${vv.height * vv.scale}px`;
-      layer.style.transform = `scale(${1 / vv.scale})`;
+
+      // Браузерный pinch/Ctrl-zoom: координаты visualViewport.
+      if (vv && Math.abs(browserScale - 1) >= 0.001) {
+        layer.style.top = `${vv.offsetTop}px`;
+        layer.style.left = `${vv.offsetLeft}px`;
+        layer.style.width = `${vv.width * browserScale}px`;
+        layer.style.height = `${vv.height * browserScale}px`;
+        layer.style.transform = `scale(${1 / scale})`;
+        layer.style.transformOrigin = "top left";
+        return;
+      }
+
+      // CSS zoom на body: отменяем масштаб у fixed-фона, чтобы он закрывал экран.
+      layer.style.top = "0";
+      layer.style.left = "0";
+      layer.style.width = "100vw";
+      layer.style.height = "100vh";
+      layer.style.transform = `scale(${1 / cssZoom})`;
       layer.style.transformOrigin = "top left";
     };
 
@@ -54,7 +74,7 @@ export function ProjectorViewportBackground({
       vv?.removeEventListener("scroll", syncViewport);
       window.removeEventListener("resize", syncViewport);
     };
-  }, []);
+  }, [contentZoom]);
 
   return (
     <Box

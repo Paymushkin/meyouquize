@@ -41,7 +41,11 @@ function playerBannersForEmit(banners: PublicBanner[]): PublicBanner[] {
       ...item,
       linkUrl: sanitizeBannerLinkUrl(item.linkUrl),
     }))
-    .filter((item) => item.id && item.linkUrl && item.backgroundUrl);
+    .filter((item) => {
+      if (!item.id || !item.linkUrl) return false;
+      if (item.visualStyle === "tile") return Boolean(item.text?.trim());
+      return Boolean(item.backgroundUrl);
+    });
 }
 
 /** Явное значение из patch, в т.ч. `""` для сброса (в отличие от `??`). */
@@ -104,6 +108,13 @@ type UsePublicViewEmitterParams = {
   programTileLinkUrl: string;
   programTileVisible: boolean;
   photoWallTileVisible: boolean;
+  videoWallTileVisible: boolean;
+  videoWallTileCoverUrl: string;
+  videoWallProjectorShowHorizontal: boolean;
+  videoWallProjectorShowVertical: boolean;
+  videoWallProjectorMaxVideos: number;
+  videoWallProjectorActiveSeconds: number;
+  videoWallProjectorFreezeSeconds: number;
   playerQuizResultsTileVisible: boolean;
   playerQuizResultsTileText: string;
   playerQuizResultsTileBackgroundColor: string;
@@ -111,9 +122,12 @@ type UsePublicViewEmitterParams = {
   playerQuizResultsSubQuizId: string;
   playerQuizResultsSubQuizIds: string[];
   playerTilesOrder: string[];
+  playerTilesGridColumns: 2 | 3;
   reactionsOverlayText: string;
   reactionsWidgets: ReactionWidget[];
   playerVisibleResultQuestionIds: string[];
+  playerVisibleDebateSeriesIds: string[];
+  debateSeriesShowRounds: boolean;
   playerVoteOptionTextColor: string;
   playerVoteProgressTrackColor: string;
   playerVoteProgressBarColor: string;
@@ -136,6 +150,10 @@ type UsePublicViewEmitterParams = {
   photoWallGridColumns: number;
   photoWallAnimate: boolean;
   photoWallKenBurns: boolean;
+  videoWallHorizontalItems: import("@meyouquize/shared").VideoWallItem[];
+  videoWallHorizontalPosterUrl: string;
+  videoWallVerticalItems: import("@meyouquize/shared").VideoWallItem[];
+  videoWallVerticalPosterUrl: string;
   reportTitle: string;
   reportModules: ReportModuleId[];
   reportVoteQuestionIds: string[];
@@ -163,6 +181,8 @@ type UsePublicViewEmitterParams = {
   appliedEventThemeName?: string;
   appliedEventThemeKey?: string;
   projectorJoinQrVisible: boolean;
+  projectorBrowserZoom: number;
+  projectorContentMaxWidthPx: number;
   projectorJoinQrOverlayVisible: boolean;
   projectorJoinQrText: string;
   projectorJoinQrTextColor: string;
@@ -211,6 +231,7 @@ export function usePublicViewEmitter(params: UsePublicViewEmitterParams) {
     programTileLinkUrl,
     programTileVisible,
     photoWallTileVisible,
+    videoWallTileVisible,
     playerQuizResultsTileVisible,
     playerQuizResultsTileText,
     playerQuizResultsTileBackgroundColor,
@@ -218,9 +239,12 @@ export function usePublicViewEmitter(params: UsePublicViewEmitterParams) {
     playerQuizResultsSubQuizId,
     playerQuizResultsSubQuizIds,
     playerTilesOrder,
+    playerTilesGridColumns,
     reactionsOverlayText,
     reactionsWidgets,
     playerVisibleResultQuestionIds,
+    playerVisibleDebateSeriesIds,
+    debateSeriesShowRounds,
     playerVoteOptionTextColor,
     playerVoteProgressTrackColor,
     playerVoteProgressBarColor,
@@ -243,6 +267,16 @@ export function usePublicViewEmitter(params: UsePublicViewEmitterParams) {
     photoWallGridColumns,
     photoWallAnimate,
     photoWallKenBurns,
+    videoWallHorizontalItems,
+    videoWallHorizontalPosterUrl,
+    videoWallVerticalItems,
+    videoWallVerticalPosterUrl,
+    videoWallTileCoverUrl,
+    videoWallProjectorShowHorizontal,
+    videoWallProjectorShowVertical,
+    videoWallProjectorMaxVideos,
+    videoWallProjectorActiveSeconds,
+    videoWallProjectorFreezeSeconds,
     reportTitle,
     reportModules,
     reportVoteQuestionIds,
@@ -270,6 +304,8 @@ export function usePublicViewEmitter(params: UsePublicViewEmitterParams) {
     appliedEventThemeName,
     appliedEventThemeKey,
     projectorJoinQrVisible,
+    projectorBrowserZoom,
+    projectorContentMaxWidthPx,
     projectorJoinQrOverlayVisible,
     projectorJoinQrText,
     projectorJoinQrTextColor,
@@ -299,7 +335,23 @@ export function usePublicViewEmitter(params: UsePublicViewEmitterParams) {
       if (!quizId) return;
       const nextMode = patch.mode ?? publicViewMode;
       const nextQuestionId =
-        nextMode === "question" ? (patch.questionId ?? publicViewQuestionId) : undefined;
+        nextMode === "question" || nextMode === "debate_series"
+          ? (patch.questionId ?? publicViewQuestionId)
+          : undefined;
+      const nextDebateCompareQuestionId =
+        nextMode === "debate_compare" ? (patch.debateCompareQuestionId ?? undefined) : undefined;
+      const nextDebateSeriesId =
+        nextMode === "debate_series" ? (patch.debateSeriesId ?? undefined) : undefined;
+      const nextDebateSeriesView =
+        nextMode === "debate_series"
+          ? patch.debateSeriesView === "round"
+            ? "round"
+            : "cumulative"
+          : undefined;
+      const nextDebateSeriesQuestionIds =
+        nextMode === "debate_series" && Array.isArray(patch.debateSeriesQuestionIds)
+          ? patch.debateSeriesQuestionIds
+          : undefined;
       const questionState = getQuestionViewState(nextQuestionId);
       const leaderboardSubQuizIdRaw =
         patch.leaderboardSubQuizId !== undefined
@@ -323,6 +375,14 @@ export function usePublicViewEmitter(params: UsePublicViewEmitterParams) {
         quizId,
         mode: nextMode,
         questionId: nextQuestionId,
+        ...(nextDebateCompareQuestionId
+          ? { debateCompareQuestionId: nextDebateCompareQuestionId }
+          : {}),
+        ...(nextDebateSeriesId ? { debateSeriesId: nextDebateSeriesId } : {}),
+        ...(nextDebateSeriesView ? { debateSeriesView: nextDebateSeriesView } : {}),
+        ...(nextDebateSeriesQuestionIds && nextDebateSeriesQuestionIds.length > 0
+          ? { debateSeriesQuestionIds: nextDebateSeriesQuestionIds }
+          : {}),
         questionRevealStage: patch.questionRevealStage ?? questionRevealStage,
         highlightedLeadersCount: patch.highlightedLeadersCount ?? highlightedLeadersCount,
         ...(nextMode === "leaderboard" && leaderboardSubQuizIdForEmit
@@ -367,6 +427,18 @@ export function usePublicViewEmitter(params: UsePublicViewEmitterParams) {
         programTileLinkUrl: sanitizeExternalHttpUrl(patch.programTileLinkUrl ?? programTileLinkUrl),
         programTileVisible: patch.programTileVisible ?? programTileVisible,
         photoWallTileVisible: patch.photoWallTileVisible ?? photoWallTileVisible,
+        videoWallTileVisible: patch.videoWallTileVisible ?? videoWallTileVisible,
+        videoWallTileCoverUrl: patch.videoWallTileCoverUrl ?? videoWallTileCoverUrl,
+        videoWallProjectorShowHorizontal:
+          patch.videoWallProjectorShowHorizontal ?? videoWallProjectorShowHorizontal,
+        videoWallProjectorShowVertical:
+          patch.videoWallProjectorShowVertical ?? videoWallProjectorShowVertical,
+        videoWallProjectorMaxVideos:
+          patch.videoWallProjectorMaxVideos ?? videoWallProjectorMaxVideos,
+        videoWallProjectorActiveSeconds:
+          patch.videoWallProjectorActiveSeconds ?? videoWallProjectorActiveSeconds,
+        videoWallProjectorFreezeSeconds:
+          patch.videoWallProjectorFreezeSeconds ?? videoWallProjectorFreezeSeconds,
         playerQuizResultsTileVisible:
           patch.playerQuizResultsTileVisible ?? playerQuizResultsTileVisible,
         playerQuizResultsTileText: patch.playerQuizResultsTileText ?? playerQuizResultsTileText,
@@ -378,10 +450,14 @@ export function usePublicViewEmitter(params: UsePublicViewEmitterParams) {
         playerQuizResultsSubQuizIds:
           patch.playerQuizResultsSubQuizIds ?? playerQuizResultsSubQuizIds,
         playerTilesOrder: patch.playerTilesOrder ?? playerTilesOrder,
+        playerTilesGridColumns: patch.playerTilesGridColumns ?? playerTilesGridColumns,
         reactionsOverlayText: patch.reactionsOverlayText ?? reactionsOverlayText,
         reactionsWidgets: patch.reactionsWidgets ?? reactionsWidgets,
         playerVisibleResultQuestionIds:
           patch.playerVisibleResultQuestionIds ?? playerVisibleResultQuestionIds,
+        playerVisibleDebateSeriesIds:
+          patch.playerVisibleDebateSeriesIds ?? playerVisibleDebateSeriesIds,
+        debateSeriesShowRounds: patch.debateSeriesShowRounds ?? debateSeriesShowRounds,
         playerVoteOptionTextColor: patch.playerVoteOptionTextColor ?? playerVoteOptionTextColor,
         playerVoteProgressTrackColor:
           patch.playerVoteProgressTrackColor ?? playerVoteProgressTrackColor,
@@ -408,6 +484,11 @@ export function usePublicViewEmitter(params: UsePublicViewEmitterParams) {
         photoWallGridColumns: patch.photoWallGridColumns ?? photoWallGridColumns,
         photoWallAnimate: patch.photoWallAnimate ?? photoWallAnimate,
         photoWallKenBurns: patch.photoWallKenBurns ?? photoWallKenBurns,
+        videoWallHorizontalItems: patch.videoWallHorizontalItems ?? videoWallHorizontalItems,
+        videoWallHorizontalPosterUrl:
+          patch.videoWallHorizontalPosterUrl ?? videoWallHorizontalPosterUrl,
+        videoWallVerticalItems: patch.videoWallVerticalItems ?? videoWallVerticalItems,
+        videoWallVerticalPosterUrl: patch.videoWallVerticalPosterUrl ?? videoWallVerticalPosterUrl,
         reportTitle: patch.reportTitle ?? reportTitle,
         reportModules: patch.reportModules ?? reportModules,
         reportVoteQuestionIds: patch.reportVoteQuestionIds ?? reportVoteQuestionIds,
@@ -453,6 +534,8 @@ export function usePublicViewEmitter(params: UsePublicViewEmitterParams) {
           ? { appliedEventThemeKey: nextAppliedEventThemeKey }
           : {}),
         projectorJoinQrVisible: patch.projectorJoinQrVisible ?? projectorJoinQrVisible,
+        projectorBrowserZoom: patch.projectorBrowserZoom ?? projectorBrowserZoom,
+        projectorContentMaxWidthPx: patch.projectorContentMaxWidthPx ?? projectorContentMaxWidthPx,
         projectorJoinQrOverlayVisible:
           patch.projectorJoinQrOverlayVisible ?? projectorJoinQrOverlayVisible,
         projectorJoinQrText: patch.projectorJoinQrText ?? projectorJoinQrText,
@@ -506,15 +589,19 @@ export function usePublicViewEmitter(params: UsePublicViewEmitterParams) {
       programTileLinkUrl,
       programTileVisible,
       photoWallTileVisible,
+      videoWallTileVisible,
       playerQuizResultsTileVisible,
       playerQuizResultsTileText,
       playerQuizResultsTileBackgroundColor,
       playerQuizResultsTileTextColor,
       playerQuizResultsSubQuizId,
       playerTilesOrder,
+      playerTilesGridColumns,
       reactionsOverlayText,
       reactionsWidgets,
       playerVisibleResultQuestionIds,
+      playerVisibleDebateSeriesIds,
+      debateSeriesShowRounds,
       playerVoteOptionTextColor,
       playerVoteProgressTrackColor,
       playerVoteProgressBarColor,
@@ -537,6 +624,16 @@ export function usePublicViewEmitter(params: UsePublicViewEmitterParams) {
       photoWallGridColumns,
       photoWallAnimate,
       photoWallKenBurns,
+      videoWallHorizontalItems,
+      videoWallHorizontalPosterUrl,
+      videoWallVerticalItems,
+      videoWallVerticalPosterUrl,
+      videoWallTileCoverUrl,
+      videoWallProjectorShowHorizontal,
+      videoWallProjectorShowVertical,
+      videoWallProjectorMaxVideos,
+      videoWallProjectorActiveSeconds,
+      videoWallProjectorFreezeSeconds,
       reportTitle,
       reportModules,
       reportVoteQuestionIds,
@@ -563,6 +660,8 @@ export function usePublicViewEmitter(params: UsePublicViewEmitterParams) {
       appliedEventThemeName,
       appliedEventThemeKey,
       projectorJoinQrVisible,
+      projectorBrowserZoom,
+      projectorContentMaxWidthPx,
       projectorJoinQrOverlayVisible,
       projectorJoinQrText,
       projectorJoinQrTextColor,

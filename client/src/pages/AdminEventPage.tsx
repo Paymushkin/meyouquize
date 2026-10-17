@@ -1,11 +1,15 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { flushSync } from "react-dom";
 import { useParams } from "react-router-dom";
-import { Alert, Box, Container, Snackbar, Stack } from "@mui/material";
+import { Alert, Box, Button, Container, Snackbar, Stack } from "@mui/material";
 import { resolveClientAssetUrl } from "../utils/resolveClientAssetUrl";
 import { AdminLoginForm } from "../components/AdminLoginForm";
 import { API_BASE } from "../config";
-import { buildPlayerJoinUrl, buildProjectorScreenUrl } from "../publicAppOrigin";
+import {
+  buildPlayerJoinUrl,
+  buildProjectorScreenUrl,
+  buildSpeakerModeratorUrl,
+} from "../publicAppOrigin";
 import { useAdminPlayerTiles } from "../features/admin/useAdminPlayerTiles";
 import { useAdminEventBootstrap } from "../features/admin/useAdminEventBootstrap";
 import { useAdminFeedbackCatalog } from "../features/admin/useAdminFeedbackCatalog";
@@ -17,6 +21,7 @@ import {
   type AdminSetPublicResultsView,
 } from "../features/admin/useAdminRandomizer";
 import { useAdminPhotoWall } from "../features/admin/useAdminPhotoWall";
+import { useAdminVideoWall } from "../features/admin/useAdminVideoWall";
 import { useAdminReport } from "../features/admin/useAdminReport";
 import { useAdminReactions } from "../features/admin/useAdminReactions";
 import { useAdminBrandingVisual } from "../features/admin/useAdminBrandingVisual";
@@ -41,16 +46,26 @@ import {
   applyCloudManualToQuestions,
   readCloudManualFromPublicView,
 } from "../features/tagCloudAdmin";
-import { buildPhotoWallAlbumPhotos, photoWallCollagePhotoIndices } from "@meyouquize/shared";
+import {
+  buildPhotoWallAlbumPhotos,
+  photoWallCollagePhotoIndices,
+  resolveVideoWallTileCoverUrl,
+} from "@meyouquize/shared";
 import { useAdminEventSocket } from "../hooks/useAdminEventSocket";
 import { useAdminEventApi } from "../hooks/useAdminEventApi";
 import { useAdminBrandingProps } from "../hooks/useAdminBrandingProps";
+import { RouteLoadingFallback } from "../components/RouteLoadingFallback";
 import { useBodyBrandBackground } from "../hooks/useBodyBrandBackground";
 import { buildBrandFontFacesForFamily, useBrandFont } from "../hooks/useBrandFont";
 import { usePublicViewEmitter } from "../hooks/usePublicViewEmitter";
 import { recordServerPublicView } from "../features/publicView/publicViewEmitCoordination";
 import { useSpeakerQuestionsAdminActions } from "../hooks/useSpeakerQuestionsAdminActions";
 import { shouldFallbackProjectorToTitleAfterSpeakerOff } from "../features/speakerQuestionsAdmin/speakerOnScreenProjectorFallback";
+import {
+  acknowledgeSpeakerQuestionIds,
+  shouldShowSpeakersNavBadge,
+  syncKnownSpeakerQuestionIds,
+} from "../features/speakerQuestions/adminSpeakerNavBadge";
 import { useAdminColorMode } from "../theme/AdminColorModeProvider";
 import { socket } from "../socket";
 import {
@@ -98,31 +113,58 @@ function isSupportedPublicMode(mode: unknown): mode is PublicViewMode {
     mode === "reactions" ||
     mode === "randomizer" ||
     mode === "photo_wall" ||
-    mode === "report"
+    mode === "video_wall" ||
+    mode === "report" ||
+    mode === "debate_compare" ||
+    mode === "debate_series"
   );
 }
 
 function getPublicBanners(value: unknown): PublicBanner[] {
   if (!Array.isArray(value)) return [];
-  return value.flatMap((item) => {
+  return value.flatMap((item): PublicBanner[] => {
     if (!item || typeof item !== "object") return [];
     const row = item as Record<string, unknown>;
-    if (
-      typeof row.id !== "string" ||
-      typeof row.linkUrl !== "string" ||
-      typeof row.backgroundUrl !== "string"
-    )
-      return [];
+    if (typeof row.id !== "string" || typeof row.linkUrl !== "string") return [];
+    const visualStyle = row.visualStyle === "tile" ? ("tile" as const) : ("image" as const);
+    const backgroundUrl = typeof row.backgroundUrl === "string" ? row.backgroundUrl : "";
+    if (visualStyle === "image" && !backgroundUrl) return [];
+    const text = typeof row.text === "string" ? row.text.trim() : "";
+    if (visualStyle === "tile" && !text) return [];
     const size: PublicBanner["size"] =
-      row.size === "1x1" ? "1x1" : row.size === "full" ? "full" : "2x1";
+      visualStyle === "tile"
+        ? "full"
+        : row.size === "1x1"
+          ? "1x1"
+          : row.size === "full"
+            ? "full"
+            : "2x1";
+    const hex6 = (v: unknown, fallback: string) =>
+      typeof v === "string" && /^#([0-9a-fA-F]{6})$/.test(v) ? v : fallback;
+    if (visualStyle === "tile") {
+      return [
+        {
+          id: row.id,
+          linkUrl: row.linkUrl,
+          backgroundUrl: "",
+          size,
+          isVisible: Boolean(row.isVisible),
+          visualStyle: "tile",
+          text,
+          backgroundColor: hex6(row.backgroundColor, "#1976d2"),
+          textColor: hex6(row.textColor, "#ffffff"),
+        },
+      ];
+    }
     return [
       {
         id: row.id,
         linkUrl: row.linkUrl,
-        backgroundUrl: row.backgroundUrl,
+        backgroundUrl,
         size,
         isVisible: Boolean(row.isVisible),
-      } satisfies PublicBanner,
+        visualStyle: "image",
+      },
     ];
   });
 }
@@ -199,7 +241,8 @@ export function AdminEventPage() {
         parsed.publicViewMode === "speaker_questions" ||
         parsed.publicViewMode === "reactions" ||
         parsed.publicViewMode === "randomizer" ||
-        parsed.publicViewMode === "photo_wall"
+        parsed.publicViewMode === "photo_wall" ||
+        parsed.publicViewMode === "video_wall"
         ? parsed.publicViewMode
         : "title";
     } catch {
@@ -207,9 +250,14 @@ export function AdminEventPage() {
     }
   });
   const [publicViewQuestionId, setPublicViewQuestionId] = useState<string | undefined>(undefined);
+  const [publicDebateCompareQuestionId, setPublicDebateCompareQuestionId] = useState<
+    string | undefined
+  >(undefined);
   const [playerVisibleResultQuestionIds, setPlayerVisibleResultQuestionIds] = useState<string[]>(
     [],
   );
+  const [playerVisibleDebateSeriesIds, setPlayerVisibleDebateSeriesIds] = useState<string[]>([]);
+  const [debateSeriesShowRounds, setDebateSeriesShowRounds] = useState(false);
   const [questionRevealStage, setQuestionRevealStage] = useState<"options" | "results">("options");
   const [highlightedLeadersCount, setHighlightedLeadersCount] = useState(() => {
     if (typeof window === "undefined") return 3;
@@ -273,6 +321,8 @@ export function AdminEventPage() {
   const {
     authChecked,
     adminLogin,
+    roomLoading,
+    roomLoadError,
     checkSession,
     loadRoom,
     persistQuestions,
@@ -301,7 +351,7 @@ export function AdminEventPage() {
   speakerReportIdsApplierRef.current = speakerQuestions.applyReportSpeakerQuestionIds;
 
   const adminReport = useAdminReport({
-    emitPublicViewPatch: (patch) => emitPublicViewPatchRef.current(patch),
+    quizId,
     onSpeakerQuestionIdsFromView: (ids) => speakerReportIdsApplierRef.current(ids),
   });
 
@@ -327,6 +377,12 @@ export function AdminEventPage() {
       setPublicResultsViewRef.current(mode, questionId, patch),
   });
 
+  const videoWall = useAdminVideoWall({
+    emitPublicViewPatch: (patch) => emitPublicViewPatchRef.current(patch),
+    setPublicResultsView: (mode, questionId, patch) =>
+      setPublicResultsViewRef.current(mode, questionId, patch),
+  });
+
   const photoWallCollageSrcs = useMemo(() => {
     const photos = buildPhotoWallAlbumPhotos({
       baseUrl: photoWall.baseUrl,
@@ -335,6 +391,16 @@ export function AdminEventPage() {
     });
     return photoWallCollagePhotoIndices(photos.length).map((index) => photos[index]!.src);
   }, [photoWall.baseUrl, photoWall.imageCount, photoWall.imageExt]);
+
+  const videoWallTileCoverUrl = useMemo(
+    () =>
+      resolveVideoWallTileCoverUrl(
+        videoWall.tileCoverUrl,
+        videoWall.horizontalPosterUrl,
+        videoWall.verticalPosterUrl,
+      ),
+    [videoWall.tileCoverUrl, videoWall.horizontalPosterUrl, videoWall.verticalPosterUrl],
+  );
 
   const adminReactions = useAdminReactions({
     eventName,
@@ -360,6 +426,7 @@ export function AdminEventPage() {
   applyPublicViewReportRandomizerRef.current = (payload) => {
     randomizer.applyFromPublicView(payload);
     photoWall.applyFromPublicView(payload);
+    videoWall.applyFromPublicView(payload);
     adminReport.applyFromPublicView(payload);
   };
   onPublicViewSocketExtrasRef.current = (payload) => {
@@ -554,6 +621,36 @@ export function AdminEventPage() {
     writeAdminUiSection(eventName, activeSection);
   }, [eventName, activeSection]);
 
+  const knownSpeakerQuestionIdsRef = useRef<Set<string> | null>(null);
+  const [speakersNavBadge, setSpeakersNavBadge] = useState(false);
+
+  useEffect(() => {
+    knownSpeakerQuestionIdsRef.current = null;
+    setSpeakersNavBadge(false);
+  }, [eventName]);
+
+  useEffect(() => {
+    const items = speakerQuestions.payload?.items;
+    if (activeSection === "speakers") {
+      // Админ смотрит актуальный Q&A — точка не нужна, текущий список «просмотрен».
+      setSpeakersNavBadge(false);
+      if (items) {
+        knownSpeakerQuestionIdsRef.current = acknowledgeSpeakerQuestionIds(
+          items.map((item) => item.id),
+        );
+      }
+      return;
+    }
+    // Не фиксируем baseline по null-payload (иначе все id после первой загрузки станут «новыми»).
+    if (!items) return;
+    const nextIds = items.map((item) => item.id);
+    const synced = syncKnownSpeakerQuestionIds(knownSpeakerQuestionIdsRef.current, nextIds);
+    knownSpeakerQuestionIdsRef.current = synced.knownIds;
+    if (shouldShowSpeakersNavBadge(synced.hasNew, activeSection)) {
+      setSpeakersNavBadge(true);
+    }
+  }, [speakerQuestions.payload?.items, activeSection]);
+
   useEffect(() => {
     if (!eventName) return;
     writeAdminUiQuestionsTab(eventName, roomQuestionsTab);
@@ -652,6 +749,7 @@ export function AdminEventPage() {
     setLeaderboardsBySubQuiz,
     setPublicViewMode,
     setPublicViewQuestionId,
+    setPublicDebateCompareQuestionId,
     setQuestionRevealStage,
     setHighlightedLeadersCount,
     setQuestionForms,
@@ -673,6 +771,8 @@ export function AdminEventPage() {
     setPlayerVoteProgressTrackColor: branding.setPlayerVoteProgressTrackColor,
     setPlayerVoteProgressBarColor: branding.setPlayerVoteProgressBarColor,
     setProjectorJoinQrVisible: branding.setProjectorJoinQrVisible,
+    setProjectorBrowserZoom: branding.setProjectorBrowserZoom,
+    setProjectorContentMaxWidthPx: branding.setProjectorContentMaxWidthPx,
     setProjectorJoinQrOverlayVisible: branding.setProjectorJoinQrOverlayVisible,
     setProjectorJoinQrText: branding.setProjectorJoinQrText,
     setProjectorJoinQrTextColor: branding.setProjectorJoinQrTextColor,
@@ -733,6 +833,8 @@ export function AdminEventPage() {
     playerVoteProgressTrackColor: branding.playerVoteProgressTrackColor,
     playerVoteProgressBarColor: branding.playerVoteProgressBarColor,
     projectorJoinQrVisible: branding.projectorJoinQrVisible,
+    projectorBrowserZoom: branding.projectorBrowserZoom,
+    projectorContentMaxWidthPx: branding.projectorContentMaxWidthPx,
     projectorJoinQrOverlayVisible: branding.projectorJoinQrOverlayVisible,
     projectorJoinQrText: branding.projectorJoinQrText,
     projectorJoinQrTextColor: branding.projectorJoinQrTextColor,
@@ -762,7 +864,10 @@ export function AdminEventPage() {
     playerQuizResultsSubQuizId: playerTiles.playerQuizResultsSubQuizId,
     playerQuizResultsSubQuizIds: playerTiles.playerQuizResultsSubQuizIds,
     playerVisibleResultQuestionIds,
+    playerVisibleDebateSeriesIds,
+    debateSeriesShowRounds,
     playerTilesOrder: playerTiles.playerTilesOrder,
+    playerTilesGridColumns: playerTiles.playerTilesGridColumns,
     reactionsOverlayText: adminReactions.overlayText,
     reactionsWidgets: adminReactions.widgets,
     randomizerMode: randomizer.mode,
@@ -785,6 +890,17 @@ export function AdminEventPage() {
     photoWallAnimate: photoWall.animate,
     photoWallKenBurns: photoWall.kenBurns,
     photoWallTileVisible: photoWall.tileVisible,
+    videoWallHorizontalItems: videoWall.horizontalItems,
+    videoWallHorizontalPosterUrl: videoWall.horizontalPosterUrl,
+    videoWallVerticalItems: videoWall.verticalItems,
+    videoWallVerticalPosterUrl: videoWall.verticalPosterUrl,
+    videoWallTileVisible: videoWall.tileVisible,
+    videoWallTileCoverUrl: videoWall.tileCoverUrl,
+    videoWallProjectorShowHorizontal: videoWall.projectorShowHorizontal,
+    videoWallProjectorShowVertical: videoWall.projectorShowVertical,
+    videoWallProjectorMaxVideos: videoWall.projectorMaxVideos,
+    videoWallProjectorActiveSeconds: videoWall.projectorActiveSeconds,
+    videoWallProjectorFreezeSeconds: videoWall.projectorFreezeSeconds,
     reportTitle: adminReport.reportTitle,
     reportModules: adminReport.reportModules,
     reportVoteQuestionIds: adminReport.reportVoteQuestionIds,
@@ -878,6 +994,7 @@ export function AdminEventPage() {
     publicViewQuestionId,
     setPublicViewMode,
     setPublicViewQuestionId,
+    setPublicDebateCompareQuestionId,
     setQuestionRevealStage,
     emitPublicViewSet,
     emitPublicViewPatch,
@@ -885,6 +1002,8 @@ export function AdminEventPage() {
     setResultsSubQuizId,
     playerVisibleResultQuestionIds,
     setPlayerVisibleResultQuestionIds,
+    playerVisibleDebateSeriesIds,
+    setPlayerVisibleDebateSeriesIds,
     playerTiles,
     adminReport,
     showFirstCorrectAnswerer,
@@ -986,6 +1105,9 @@ export function AdminEventPage() {
       setPublicViewMode(pv.mode);
     }
     setPublicViewQuestionId(typeof pv.questionId === "string" ? pv.questionId : undefined);
+    setPublicDebateCompareQuestionId(
+      typeof pv.debateCompareQuestionId === "string" ? pv.debateCompareQuestionId : undefined,
+    );
     setQuestionRevealStage(pv.questionRevealStage === "results" ? "results" : "options");
     if (typeof pv.highlightedLeadersCount === "number") {
       setHighlightedLeadersCount(pv.highlightedLeadersCount);
@@ -1017,6 +1139,7 @@ export function AdminEventPage() {
     speakerQuestions.applyRoomPublicViewSlice(pv);
     randomizer.applyFromPublicView(pv, { roomLoad: true });
     photoWall.applyFromPublicView(pv);
+    videoWall.applyFromPublicView(pv);
     adminReport.applyFromPublicView(pv);
     adminReactions.applyFromPublicView(pv);
     const nextBanners = getPublicBanners(pv.playerBanners);
@@ -1026,6 +1149,14 @@ export function AdminEventPage() {
         pv.playerVisibleResultQuestionIds.filter((x): x is string => typeof x === "string"),
       );
     }
+    if (Array.isArray(pv.playerVisibleDebateSeriesIds)) {
+      setPlayerVisibleDebateSeriesIds(
+        pv.playerVisibleDebateSeriesIds.filter((x): x is string => typeof x === "string"),
+      );
+    }
+    if (typeof pv.debateSeriesShowRounds === "boolean") {
+      setDebateSeriesShowRounds(pv.debateSeriesShowRounds);
+    }
   };
 
   useEffect(() => {
@@ -1034,8 +1165,9 @@ export function AdminEventPage() {
   }, [room?.id, room?.publicView]);
 
   useEffect(() => {
-    document.title = "Админ";
-  }, []);
+    const title = editableTitle.trim() || room?.title?.trim();
+    document.title = title || "МИЮ";
+  }, [editableTitle, room?.title]);
 
   useEffect(() => {
     setEditableTitle(room?.title ?? "");
@@ -1239,10 +1371,14 @@ export function AdminEventPage() {
 
   const {
     saveSpeakerSettings,
+    persistActiveSpeakerSession,
+    persistSpeakerSessions,
+    persistModeratorShowAll,
     setSpeakerQuestionOnScreen,
     hideSpeakerQuestion,
     restoreSpeakerQuestion,
     setSpeakerQuestionUserVisible,
+    setSpeakerQuestionModeratorVisible,
     updateSpeakerQuestionText,
     deleteSpeakerQuestion,
   } = useSpeakerQuestionsAdminActions({
@@ -1335,6 +1471,11 @@ export function AdminEventPage() {
     runConfirmedRemoveSubQuiz,
     addQuestionToSubQuiz,
     cloneQuestionAtIndex,
+    cloneDebateSeries,
+    addDebateSeriesRoundAtIndex,
+    updateDebateSeries,
+    removeDebateSeries,
+    removeQuestion,
     requestRemoveQuestion,
     closeDeleteQuestionDialog,
     runConfirmedRemoveQuestion,
@@ -1354,7 +1495,9 @@ export function AdminEventPage() {
     updateQuestionShowVoteCount,
     updateQuestionShowCorrectOption,
     toggleQuestionAdminDone,
+    setQuestionsAdminDone,
     reorderVoteInList,
+    reorderVoteDisplayBlocks,
     updateQuestionProjectorShowFirstCorrect,
     updateQuestionRankingProjectorMetric,
     patchQuestionProjectorFirstCorrectWinnersCount,
@@ -1375,6 +1518,7 @@ export function AdminEventPage() {
     clearOptionVoteCountOverride,
     resetOptionVoteCountOverrides,
     togglePlayerVisibleResultQuestionId,
+    togglePlayerVisibleDebateSeriesId,
   } = questionEditor;
 
   const questionsSectionBindings = useMemo(
@@ -1386,6 +1530,7 @@ export function AdminEventPage() {
         questionResults,
         publicViewMode,
         publicViewQuestionId,
+        publicDebateCompareQuestionId,
         setMessage,
         openQuestionDialog,
         setPublicResultsView,
@@ -1408,6 +1553,8 @@ export function AdminEventPage() {
         setQuestionRevealStageForQuestion,
         playerVisibleResultQuestionIds,
         togglePlayerVisibleResultQuestionId,
+        playerVisibleDebateSeriesIds,
+        togglePlayerVisibleDebateSeriesId,
       }),
     [
       eventName,
@@ -1415,6 +1562,7 @@ export function AdminEventPage() {
       questionResults,
       publicViewMode,
       publicViewQuestionId,
+      publicDebateCompareQuestionId,
       openQuestionDialog,
       setPublicResultsView,
       updateQuestionShowVoteCount,
@@ -1435,6 +1583,8 @@ export function AdminEventPage() {
       setQuestionRevealStageForQuestion,
       playerVisibleResultQuestionIds,
       togglePlayerVisibleResultQuestionId,
+      playerVisibleDebateSeriesIds,
+      togglePlayerVisibleDebateSeriesId,
     ],
   );
 
@@ -1446,10 +1596,37 @@ export function AdminEventPage() {
       onToggleShowRecipientOnScreen: speakerQuestions.panelSetters.setShowRecipientOnScreen,
       onToggleShowReactionsOnScreen: speakerQuestions.panelSetters.setShowReactionsOnScreen,
       onToggleAllowAllSpeakersTarget: speakerQuestions.panelSetters.setAllowAllSpeakersTarget,
-      onSpeakersTextChange: speakerQuestions.panelSetters.setSpeakersText,
+      onToggleModeratorShowAll: (next: boolean) => {
+        speakerQuestions.panelSetters.setModeratorShowAll(next);
+        persistModeratorShowAll(next);
+      },
+      onSessionsChange: speakerQuestions.panelSetters.setSessions,
+      onPersistSessions: (
+        next: typeof speakerQuestions.settings.sessions,
+        activeSpeakerSessionId?: string | null,
+      ) => {
+        speakerQuestions.panelSetters.setSessions(next);
+        if (activeSpeakerSessionId !== undefined) {
+          speakerQuestions.panelSetters.setActiveSpeakerSessionId(activeSpeakerSessionId);
+        }
+        persistSpeakerSessions(next, activeSpeakerSessionId);
+      },
+      onActiveSpeakerSessionIdChange: (next: string | null) => {
+        speakerQuestions.panelSetters.setActiveSpeakerSessionId(next);
+        persistActiveSpeakerSession(next);
+      },
       onSaveSettings: saveSpeakerSettings,
+      moderatorPageUrl: room?.slug ? buildSpeakerModeratorUrl(room.slug) : undefined,
     }),
-    [speakerQuestions.panelSetters, saveSpeakerSettings],
+    [
+      speakerQuestions.panelSetters,
+      speakerQuestions.settings.sessions,
+      saveSpeakerSettings,
+      persistActiveSpeakerSession,
+      persistSpeakerSessions,
+      persistModeratorShowAll,
+      room?.slug,
+    ],
   );
 
   const onSelectResultsSubQuiz = useCallback(
@@ -1466,7 +1643,20 @@ export function AdminEventPage() {
   );
 
   return (
-    <Container maxWidth={false} disableGutters sx={{ p: 0, m: 0, maxWidth: "none" }}>
+    <Container
+      maxWidth={false}
+      disableGutters
+      sx={{
+        p: 0,
+        m: 0,
+        maxWidth: "none",
+        minHeight: "100dvh",
+        height: isAuth && room ? "100dvh" : "auto",
+        display: "flex",
+        flexDirection: "column",
+        overflow: isAuth && room ? "hidden" : "visible",
+      }}
+    >
       <Snackbar
         key={message || "_closed"}
         open={!!message}
@@ -1495,15 +1685,8 @@ export function AdminEventPage() {
           {message}
         </Alert>
       </Snackbar>
-      {isAuth && room ? (
-        <AdminEventStatusBar
-          currentPublicScreenText={currentPublicScreenText}
-          adminSocketStatus={adminSocketStatus}
-          onlineUsersCount={onlineUsersCount}
-          adminLogin={adminLogin}
-        />
-      ) : null}
-      {!authChecked ? null : !isAuth ? (
+      {!authChecked || (isAuth && roomLoading && !room) ? <RouteLoadingFallback /> : null}
+      {authChecked && !isAuth ? (
         <Box
           sx={{
             minHeight: "100dvh",
@@ -1524,137 +1707,227 @@ export function AdminEventPage() {
           />
         </Box>
       ) : null}
+      {authChecked && isAuth && !room && !roomLoading && roomLoadError ? (
+        <Box
+          sx={{
+            minHeight: "100dvh",
+            width: "100%",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            px: 2,
+          }}
+        >
+          <Stack spacing={2} sx={{ maxWidth: 520, width: "100%" }}>
+            <Alert severity="error">{roomLoadError}</Alert>
+            <Button variant="contained" onClick={() => void loadRoom()}>
+              Повторить
+            </Button>
+          </Stack>
+        </Box>
+      ) : null}
       {isAuth && room && (
-        <Stack direction="row" spacing={0} alignItems="stretch">
-          <AdminEventNavSidebar activeSection={activeSection} onSectionChange={setActiveSection} />
-          <Box sx={{ flex: 1, minWidth: 0, mt: 0 }}>
-            <Stack spacing={3}>
-              <AdminEventSectionRouter
-                activeSection={activeSection}
-                general={{
-                  editableTitle,
-                  setEditableTitle,
-                  saveQuizTitle,
-                  eventSlug: room.slug,
-                  showEventTitleOnPlayer: playerTiles.showEventTitleOnPlayer,
-                  onToggleShowEventTitleOnPlayer: playerTiles.updateShowEventTitleOnPlayer,
-                  playerAutoJoinRandomNickname: playerTiles.playerAutoJoinRandomNickname,
-                  onTogglePlayerAutoJoinRandomNickname:
-                    playerTiles.updatePlayerAutoJoinRandomNickname,
-                  projectorJoinQrVisible: branding.projectorJoinQrVisible,
-                  setProjectorJoinQrVisible: branding.setProjectorJoinQrVisible,
-                  projectorJoinQrText: branding.projectorJoinQrText,
-                  setProjectorJoinQrText: branding.setProjectorJoinQrText,
-                  projectorJoinQrTextColor: branding.projectorJoinQrTextColor,
-                  setProjectorJoinQrTextColor: branding.setProjectorJoinQrTextColor,
-                  emitBrandingPatch,
+        <Box
+          sx={{
+            flex: 1,
+            minHeight: 0,
+            display: "flex",
+            flexDirection: "column",
+            overflow: "hidden",
+          }}
+        >
+          <AdminEventStatusBar
+            currentPublicScreenText={currentPublicScreenText}
+            adminSocketStatus={adminSocketStatus}
+            onlineUsersCount={onlineUsersCount}
+            adminLogin={adminLogin}
+          />
+          <Stack direction="row" spacing={0} alignItems="stretch" sx={{ flex: 1, minHeight: 0 }}>
+            <AdminEventNavSidebar
+              activeSection={activeSection}
+              onSectionChange={setActiveSection}
+              sectionBadges={{ speakers: speakersNavBadge }}
+            />
+            <Box
+              sx={{
+                flex: 1,
+                minWidth: 0,
+                minHeight: 0,
+                mt: 0,
+                overflowX: "hidden",
+                overflowY: "auto",
+                display: "flex",
+                flexDirection: "column",
+              }}
+            >
+              <Stack
+                spacing={0}
+                sx={{
+                  width: "100%",
+                  minWidth: 0,
+                  // Questions tab scrolls internally; other sections need content height so the
+                  // outer panel's overflowY:auto can scroll (flex:1 + minHeight:0 would clip).
+                  ...(activeSection === "questions"
+                    ? { flex: 1, minHeight: 0 }
+                    : { flex: "0 0 auto", pb: 2 }),
                 }}
-                questions={{
-                  roomQuestionsTab,
-                  onRoomQuestionsTabChange: setRoomQuestionsTab,
-                  eventName,
-                  quizId,
-                  onlineUsersCount,
-                  eventParticipantNicknames,
-                  refreshEventParticipantNicknames,
-                  feedbackForms: feedbackCatalog.feedbackForms,
-                  setFeedbackForms: feedbackCatalog.setFeedbackForms,
-                  syncFeedbackCatalogToReport: feedbackCatalog.syncCatalogToReport,
-                  feedbackCatalogLoading: feedbackCatalog.catalogLoading,
-                  subQuizSheets,
-                  setSubQuizSheets,
-                  questionForms,
-                  selectedQuestionIndex,
-                  expandedSubQuizId,
-                  setExpandedSubQuizId,
-                  votesIndexMap,
-                  activeVoteIndices,
-                  doneVoteIndices,
-                  activeVotesSelectedListIndex,
-                  doneVotesSelectedListIndex,
-                  voteListManageMode,
-                  setVoteListManageMode,
-                  publicViewMode,
-                  resultsSubQuizId,
-                  firstCorrectWinnersCount,
-                  setFirstCorrectWinnersCount,
-                  highlightedLeadersCount,
-                  setHighlightedLeadersCount,
-                  questionsSectionBindings,
-                  playerTiles,
-                  randomizer,
-                  adminReactions,
-                  emitPublicViewPatch,
-                  setPublicResultsView,
-                  addSubQuizSheet,
-                  addQuestionToSubQuiz,
-                  saveSubQuizTitle: saveSubQuizTitleApi,
-                  requestRemoveSubQuizSheet,
-                  toggleQuestion,
-                  updateFirstCorrectWinnersCount,
-                  updateHighlightedLeaders,
-                  confirmResetSubQuizAnswersById,
-                  toggleQuestionAdminDone,
-                  reorderVoteInList,
-                  cloneQuestionAtIndex,
-                }}
-                speakers={{
-                  speakerQuestions,
-                  panelActions: speakerPanelActions,
-                  onHide: hideSpeakerQuestion,
-                  onRestore: restoreSpeakerQuestion,
-                  onSetUserVisible: setSpeakerQuestionUserVisible,
-                  onSetOnScreen: setSpeakerQuestionOnScreenAndOpenProjector,
-                  onUpdateQuestionText: updateSpeakerQuestionText,
-                  onDeleteQuestion: deleteSpeakerQuestion,
-                }}
-                banners={{
-                  eventName,
-                  playerTiles,
-                  subQuizzesForReport,
-                  brandPrimaryColor: branding.brandPrimaryColor,
-                  playerVoteOptionTextColor: branding.playerVoteOptionTextColor,
-                  photoWallCollageSrcs,
-                  uploadBannerMedia,
-                  onUploadError: setMessage,
-                }}
-                photoWall={{
-                  publicViewMode,
-                  ...photoWall,
-                }}
-                branding={brandingProps}
-                results={{
-                  leaderboardSort,
-                  setLeaderboardSort,
-                  displayedLeaderboard,
-                  exportLeaderboardCsv,
-                  leaderboardsBySubQuiz: leaderboardsBySubQuiz.map((x) => ({
-                    subQuizId: x.subQuizId,
-                    title: x.title,
-                  })),
-                  resultsSubQuizId,
-                  onSelectResultsSubQuiz,
-                }}
-                report={{
-                  roomSlug: room.slug,
-                  adminReport,
-                  randomizer,
-                  adminReactions,
-                  speakerQuestions,
-                  availableQuizQuestions,
-                  availableVoteQuestions,
-                  emitPublicViewPatch,
-                  setMessage,
-                }}
-                danger={{
-                  eventName,
-                  onResetAllAnswers: resetAllAnswers,
-                  onRequestResetDemo: () => setConfirmResetDemoOpen(true),
-                }}
-              />
-            </Stack>
-          </Box>
-        </Stack>
+              >
+                <AdminEventSectionRouter
+                  activeSection={activeSection}
+                  general={{
+                    editableTitle,
+                    setEditableTitle,
+                    saveQuizTitle,
+                    eventSlug: room.slug,
+                    showEventTitleOnPlayer: playerTiles.showEventTitleOnPlayer,
+                    onToggleShowEventTitleOnPlayer: playerTiles.updateShowEventTitleOnPlayer,
+                    playerAutoJoinRandomNickname: playerTiles.playerAutoJoinRandomNickname,
+                    onTogglePlayerAutoJoinRandomNickname:
+                      playerTiles.updatePlayerAutoJoinRandomNickname,
+                    projectorJoinQrVisible: branding.projectorJoinQrVisible,
+                    setProjectorJoinQrVisible: branding.setProjectorJoinQrVisible,
+                    projectorBrowserZoom: branding.projectorBrowserZoom,
+                    setProjectorBrowserZoom: branding.setProjectorBrowserZoom,
+                    projectorContentMaxWidthPx: branding.projectorContentMaxWidthPx,
+                    setProjectorContentMaxWidthPx: branding.setProjectorContentMaxWidthPx,
+                    projectorJoinQrText: branding.projectorJoinQrText,
+                    setProjectorJoinQrText: branding.setProjectorJoinQrText,
+                    projectorJoinQrTextColor: branding.projectorJoinQrTextColor,
+                    setProjectorJoinQrTextColor: branding.setProjectorJoinQrTextColor,
+                    emitBrandingPatch,
+                  }}
+                  questions={{
+                    roomQuestionsTab,
+                    onRoomQuestionsTabChange: setRoomQuestionsTab,
+                    eventName,
+                    quizId,
+                    onlineUsersCount,
+                    eventParticipantNicknames,
+                    refreshEventParticipantNicknames,
+                    feedbackForms: feedbackCatalog.feedbackForms,
+                    setFeedbackForms: feedbackCatalog.setFeedbackForms,
+                    syncFeedbackCatalogToReport: feedbackCatalog.syncCatalogToReport,
+                    feedbackCatalogLoading: feedbackCatalog.catalogLoading,
+                    subQuizSheets,
+                    setSubQuizSheets,
+                    questionForms,
+                    selectedQuestionIndex,
+                    expandedSubQuizId,
+                    setExpandedSubQuizId,
+                    votesIndexMap,
+                    activeVoteIndices,
+                    doneVoteIndices,
+                    activeVotesSelectedListIndex,
+                    doneVotesSelectedListIndex,
+                    voteListManageMode,
+                    setVoteListManageMode,
+                    publicViewMode,
+                    resultsSubQuizId,
+                    firstCorrectWinnersCount,
+                    setFirstCorrectWinnersCount,
+                    highlightedLeadersCount,
+                    setHighlightedLeadersCount,
+                    questionsSectionBindings,
+                    playerTiles,
+                    randomizer,
+                    adminReactions,
+                    emitPublicViewPatch,
+                    setPublicResultsView,
+                    addSubQuizSheet,
+                    addQuestionToSubQuiz,
+                    saveSubQuizTitle: saveSubQuizTitleApi,
+                    requestRemoveSubQuizSheet,
+                    toggleQuestion,
+                    updateFirstCorrectWinnersCount,
+                    updateHighlightedLeaders,
+                    confirmResetSubQuizAnswersById,
+                    toggleQuestionAdminDone,
+                    setQuestionsAdminDone,
+                    reorderVoteInList,
+                    reorderVoteDisplayBlocks,
+                    cloneQuestionAtIndex,
+                    cloneDebateSeries,
+                    addDebateSeriesRoundAtIndex,
+                    updateDebateSeries,
+                    removeDebateSeries,
+                    removeQuestion,
+                    debateSeriesShowRounds,
+                    onToggleDebateSeriesShowRounds: () => {
+                      setDebateSeriesShowRounds((prev) => {
+                        const next = !prev;
+                        emitPublicViewPatch({ debateSeriesShowRounds: next });
+                        return next;
+                      });
+                    },
+                  }}
+                  speakers={{
+                    eventName,
+                    speakerQuestions,
+                    panelActions: speakerPanelActions,
+                    onHide: hideSpeakerQuestion,
+                    onRestore: restoreSpeakerQuestion,
+                    onSetUserVisible: setSpeakerQuestionUserVisible,
+                    onSetModeratorVisible: setSpeakerQuestionModeratorVisible,
+                    onSetOnScreen: setSpeakerQuestionOnScreenAndOpenProjector,
+                    onUpdateQuestionText: updateSpeakerQuestionText,
+                    onDeleteQuestion: deleteSpeakerQuestion,
+                  }}
+                  banners={{
+                    eventName,
+                    playerTiles,
+                    photoWall,
+                    videoWall,
+                    subQuizzesForReport,
+                    brandPrimaryColor: branding.brandPrimaryColor,
+                    playerVoteOptionTextColor: branding.playerVoteOptionTextColor,
+                    photoWallCollageSrcs,
+                    videoWallTileCoverUrl,
+                    uploadBannerMedia,
+                    onUploadError: setMessage,
+                  }}
+                  photoWall={{
+                    publicViewMode,
+                    ...photoWall,
+                  }}
+                  videoWall={{
+                    publicViewMode,
+                    ...videoWall,
+                    uploadMedia: uploadBannerMedia,
+                    onUploadError: setMessage,
+                  }}
+                  branding={brandingProps}
+                  results={{
+                    leaderboardSort,
+                    setLeaderboardSort,
+                    displayedLeaderboard,
+                    exportLeaderboardCsv,
+                    leaderboardsBySubQuiz: leaderboardsBySubQuiz.map((x) => ({
+                      subQuizId: x.subQuizId,
+                      title: x.title,
+                    })),
+                    resultsSubQuizId,
+                    onSelectResultsSubQuiz,
+                  }}
+                  report={{
+                    roomSlug: room.slug,
+                    adminReport,
+                    randomizer,
+                    adminReactions,
+                    speakerQuestions,
+                    availableQuizQuestions,
+                    availableVoteQuestions,
+                    setMessage,
+                  }}
+                  danger={{
+                    eventName,
+                    onResetAllAnswers: resetAllAnswers,
+                    onRequestResetDemo: () => setConfirmResetDemoOpen(true),
+                  }}
+                />
+              </Stack>
+            </Box>
+          </Stack>
+        </Box>
       )}
       {isAuth && !room && <Alert severity="warning">Комната не найдена.</Alert>}
       <AdminEventQuestionOverlays

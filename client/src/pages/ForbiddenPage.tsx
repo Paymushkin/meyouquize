@@ -5,7 +5,7 @@ import { ErrorMessage } from "./brand/ErrorMessage";
 
 export function ForbiddenPage() {
   return (
-    <BrandPageLayout documentTitle="403 — Доступ запрещён · Meyouquize">
+    <BrandPageLayout documentTitle="403 — Доступ запрещён · МИЮ">
       <BrandHeader />
       <ErrorMessage
         code="403"

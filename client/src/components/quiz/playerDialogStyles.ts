@@ -1,4 +1,5 @@
 /** Общий вид модалок игрока (вопросы спикерам, отчёт по квизу). */
+import type { MouseEvent, TouchEvent } from "react";
 import type { MenuProps } from "@mui/material/Menu";
 import { alpha, type SxProps, type Theme } from "@mui/material/styles";
 import { buildJoinNicknameInputSx } from "../../pages/quiz-play/QuizPlayBrandingBlocks";
@@ -7,6 +8,9 @@ export const PLAYER_DIALOG_PAPER_SX = {
   bgcolor: "rgba(0, 0, 0, 0.9)",
   color: "#fff",
   backdropFilter: "blur(4px)",
+  width: "100%",
+  maxWidth: "576px !important",
+  containerType: "inline-size",
 } as const;
 
 /** Фиксированный оверлей попапа голосования/обратной связи — скролл на всём слое, не на flex-ребёнке. */
@@ -16,7 +20,7 @@ export const PLAYER_POPUP_OVERLAY_SX = {
   overflowY: "auto",
   WebkitOverflowScrolling: "touch",
   overscrollBehaviorY: "contain",
-  p: { xs: 1.5, sm: 2.5 },
+  p: { "@": 1.5, "@sm": 2.5 },
   backgroundColor: "rgba(0, 0, 0, 0.85)",
 } as const;
 
@@ -29,13 +33,14 @@ export const PLAYER_POPUP_ALIGN_SX = {
 
 export const PLAYER_POPUP_CARD_SX = {
   width: "100%",
-  maxWidth: 678,
+  maxWidth: 576,
   flexShrink: 0,
   margin: "auto",
   bgcolor: "rgba(38, 38, 38, 0.84)",
   backdropFilter: "blur(4px)",
   color: "#fff",
   boxShadow: "none",
+  containerType: "inline-size",
 } as const;
 
 export const PLAYER_DIALOG_TITLE_SX = {
@@ -157,8 +162,35 @@ export function buildPlayerDialogSelectMenuProps(
   selectedItemTextColor: string,
 ): Partial<MenuProps> {
   return {
+    // Portal оставляем: disablePortal ломает вёрстку (Dialog + backdropFilter
+    // создаёт containing block, backdrop меню сжимается до paper).
+    // Тач: disableScrollLock + stopPropagation на paper + крупные hit-area;
+    // у Dialog — disableEnforceFocus (см. SpeakerQuestionsDialog).
+    disableScrollLock: true,
+    sx: {
+      // Выше Dialog (modal=1300), чтобы пункты принимали pointer/touch.
+      zIndex: 1400,
+    },
+    slotProps: {
+      root: {
+        // Меню-модалка не должна уводить focus-trap Dialog'а в тупик на таче.
+        disableEnforceFocus: true,
+        disableAutoFocus: true,
+      },
+    },
     PaperProps: {
+      // Chrome Translate на Android портит подписи MenuItem (Select).
+      className: "notranslate",
+      // Не даём Dialog перехватить pointerdown до MenuItem (iOS/Android).
+      onMouseDown: (event: MouseEvent) => {
+        event.stopPropagation();
+      },
+      onTouchStart: (event: TouchEvent) => {
+        event.stopPropagation();
+      },
       sx: {
+        // Не шире диалога игрока (PLAYER_DIALOG_PAPER_SX maxWidth = 576).
+        maxWidth: "min(576px, calc(100vw - 32px))",
         bgcolor: "rgba(38, 38, 38, 0.96)",
         color: "#fff",
         fontFamily: brandFontFamily,
@@ -166,6 +198,14 @@ export function buildPlayerDialogSelectMenuProps(
           fontFamily: brandFontFamily,
           fontStyle: "normal",
           color: "#fff",
+          whiteSpace: "normal",
+          wordBreak: "break-word",
+          lineHeight: 1.35,
+          alignItems: "flex-start",
+          minHeight: 48,
+          py: 1.25,
+          touchAction: "manipulation",
+          WebkitTapHighlightColor: "transparent",
           transition: "background-color 160ms ease, color 160ms ease",
           "&:hover": {
             bgcolor: alpha(brandColor, 0.18),

@@ -26,11 +26,11 @@ import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import {
   formatTemperatureScaleLabel,
   formatVoteDistributionPercent,
+  groupSpeakerQuestionsBySession,
   voteDistributionPercentWidth,
   type ReportModuleId,
 } from "@meyouquize/shared";
 import { API_BASE } from "../config";
-import { buildBrandBackground } from "../features/branding/brandVisual";
 import { buildReportTheme } from "../features/report/buildReportTheme";
 import { resolveClientAssetUrl } from "../utils/resolveClientAssetUrl";
 import { useBrandFont } from "../hooks/useBrandFont";
@@ -141,8 +141,11 @@ type PublicReportPayload = {
     enabled: boolean;
     total: number;
     onScreen: number;
+    sessions?: Array<{ id: string; name: string }>;
     items: Array<{
       id: string;
+      sessionId?: string | null;
+      sessionName?: string | null;
       speakerName: string;
       text: string;
       author: string;
@@ -164,7 +167,7 @@ type PublicReportPayload = {
     }>;
     responses: Array<{
       nickname: string;
-      scaleAnswers: Record<string, number>;
+      scaleAnswers: Record<string, number | number[]>;
       openFieldAnswers: Record<string, string>;
       comment: string | null;
       submittedAt: string;
@@ -591,8 +594,9 @@ export function PublicReportPage() {
   const fontFamily = payload?.branding.brandFontFamily ?? "Jost, Arial, sans-serif";
   const logoUrl =
     resolveClientAssetUrl(payload?.branding.brandLogoUrl ?? "") || DEFAULT_REPORT_LOGO_URL;
-  const bgUrl = resolveClientAssetUrl(payload?.branding.brandProjectorBackgroundImageUrl ?? "");
   const brandFontUrl = resolveClientAssetUrl(payload?.branding.brandFontUrl ?? "");
+  /** Фон отчёта — сплошной Surface, без картинки проектора. */
+  const reportBodyBackground = payload?.branding.brandSurfaceColor?.trim() || "#ffffff";
   const pdfRobotoUrl = "/fonts/roboto/Roboto-VariableFont_wdth,wght.ttf";
   useBrandFont(
     isPdfMode ? "Roboto, Arial, sans-serif" : fontFamily,
@@ -609,24 +613,24 @@ export function PublicReportPage() {
   }, [payload?.title]);
 
   useBodyBrandBackground({
-    backgroundColor: payload?.branding.brandBodyBackgroundColor || "#0f1d2a",
+    backgroundColor: reportBodyBackground,
   });
 
-  const backgroundSx = useMemo(() => buildBrandBackground({ backgroundImageUrl: bgUrl }), [bgUrl]);
-  const reportTheme = useMemo(
-    () =>
-      buildReportTheme(
-        payload?.branding ?? {
-          brandPrimaryColor: "#7c5acb",
-          brandAccentColor: "#1976d2",
-          brandSurfaceColor: "#1a2634",
-          brandTextColor: "#ffffff",
-          brandFontFamily: fontFamily,
-          brandBodyBackgroundColor: "#0f1d2a",
-        },
-      ),
-    [payload, fontFamily],
-  );
+  const reportTheme = useMemo(() => {
+    const branding = payload?.branding ?? {
+      brandPrimaryColor: "#7c5acb",
+      brandAccentColor: "#1976d2",
+      brandSurfaceColor: "#ffffff",
+      brandTextColor: "#1f1f1f",
+      brandFontFamily: fontFamily,
+      brandBodyBackgroundColor: "#ffffff",
+    };
+    const pageBg = branding.brandSurfaceColor?.trim() || branding.brandBodyBackgroundColor;
+    return buildReportTheme({
+      ...branding,
+      brandBodyBackgroundColor: pageBg,
+    });
+  }, [payload, fontFamily]);
 
   useEffect(() => {
     if (!isPdfMode || !payload) return;
@@ -636,7 +640,7 @@ export function PublicReportPage() {
       @page { size: A4; margin: 0; }
       html, body, #root { margin: 0 !important; padding: 0 !important; }
       body {
-        background: ${payload.branding.brandBodyBackgroundColor || "#0f1d2a"} !important;
+        background: ${payload.branding.brandSurfaceColor?.trim() || "#ffffff"} !important;
         background-image: none !important;
         font-family: "Roboto", ${fontFamily} !important;
         -webkit-print-color-adjust: exact;
@@ -696,7 +700,6 @@ export function PublicReportPage() {
   }
 
   const modules = payload!.config.reportModules;
-  const hasModule = (id: ReportModuleId) => modules.includes(id);
   const tableBySubId = new Map(
     (payload!.subQuizParticipantTables ?? []).map((t) => [t.subQuizId, t] as const),
   );
@@ -752,7 +755,6 @@ export function PublicReportPage() {
     { label: "Форм обратной связи", value: payload!.feedback.length },
   ].filter((item) => item.value > 0);
   const feedbackFormsToShow = payload!.feedback;
-  const showReportHeading = hasModule("event_header") || modules.length > 0;
 
   const renderReportModule = (moduleId: ReportModuleId): ReactNode => {
     switch (moduleId) {
@@ -877,7 +879,16 @@ export function PublicReportPage() {
                           </TableCell>
                           <TableCell sx={{ maxWidth: 320, wordBreak: "break-word" }}>
                             {linkUrl ? (
-                              <Link href={linkUrl} target="_blank" rel="noopener noreferrer">
+                              <Link
+                                href={linkUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                underline="always"
+                                color="inherit"
+                                sx={{
+                                  color: payload!.branding.brandTextColor?.trim() || "text.primary",
+                                }}
+                              >
                                 {linkUrl}
                               </Link>
                             ) : (
@@ -1269,7 +1280,16 @@ export function PublicReportPage() {
             </CardContent>
           </Card>
         );
-      case "speaker_questions_summary":
+      case "speaker_questions_summary": {
+        const speakerGroups = groupSpeakerQuestionsBySession(
+          payload!.speakerQuestions.items.slice(0, 30),
+          (payload!.speakerQuestions.sessions ?? []).map((s) => ({
+            id: s.id,
+            name: s.name,
+            speakers: [],
+          })),
+        );
+        const showSessionHeaders = speakerGroups.length > 1;
         return (
           <Card variant="outlined" className="report-card">
             <CardContent>
@@ -1293,37 +1313,60 @@ export function PublicReportPage() {
                   {payload!.speakerQuestions.total}
                 </Box>
               </Stack>
-              <TableContainer sx={{ mt: 1.25 }}>
-                <Table size="small">
-                  <TableHead>
-                    <TableRow>
-                      <TableCell>Кому</TableCell>
-                      <TableCell>Вопрос</TableCell>
-                      <TableCell>Автор</TableCell>
-                      <TableCell>Реакции</TableCell>
-                    </TableRow>
-                  </TableHead>
-                  <TableBody>
-                    {payload!.speakerQuestions.items.slice(0, 30).map((item) => (
-                      <TableRow key={item.id}>
-                        <TableCell>{item.speakerName}</TableCell>
-                        <TableCell>{item.text}</TableCell>
-                        <TableCell>{item.author}</TableCell>
-                        <TableCell>
-                          {item.reactions.length > 0
-                            ? item.reactions
-                                .map((reaction) => `${reaction.reaction} (${reaction.count})`)
-                                .join(", ")
-                            : "нет"}
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </TableContainer>
+              <Stack spacing={2} sx={{ mt: 1.25 }}>
+                {speakerGroups.map((group) => (
+                  <Box key={group.sessionId ?? "__none__"}>
+                    {showSessionHeaders ? (
+                      <Typography variant="subtitle1" sx={{ mb: 0.75, fontWeight: 700 }}>
+                        {group.sessionName}
+                        <Box
+                          component="span"
+                          sx={{
+                            ml: 1,
+                            color: "text.secondary",
+                            fontWeight: 600,
+                            fontSize: "0.85em",
+                          }}
+                        >
+                          {group.items.length}
+                        </Box>
+                      </Typography>
+                    ) : null}
+                    <TableContainer>
+                      <Table size="small">
+                        <TableHead>
+                          <TableRow>
+                            <TableCell>Кому</TableCell>
+                            <TableCell>Вопрос</TableCell>
+                            <TableCell>Автор</TableCell>
+                            <TableCell>Реакции</TableCell>
+                          </TableRow>
+                        </TableHead>
+                        <TableBody>
+                          {group.items.map((item) => (
+                            <TableRow key={item.id}>
+                              <TableCell>{item.speakerName}</TableCell>
+                              <TableCell>{item.text}</TableCell>
+                              <TableCell>{item.author}</TableCell>
+                              <TableCell>
+                                {item.reactions.length > 0
+                                  ? item.reactions
+                                      .map((reaction) => `${reaction.reaction} (${reaction.count})`)
+                                      .join(", ")
+                                  : "нет"}
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </TableContainer>
+                  </Box>
+                ))}
+              </Stack>
             </CardContent>
           </Card>
         );
+      }
       default:
         return null;
     }
@@ -1336,11 +1379,11 @@ export function PublicReportPage() {
         maxWidth={false}
         disableGutters
         sx={{
-          ...backgroundSx,
           minHeight: "100dvh",
           py: isPdfMode ? 0 : 4,
           px: isPdfMode ? 0 : { xs: 2, md: 4 },
-          backgroundColor: payload!.branding.brandBodyBackgroundColor,
+          backgroundColor: reportBodyBackground,
+          backgroundImage: "none",
           fontFamily,
         }}
       >
@@ -1352,19 +1395,6 @@ export function PublicReportPage() {
             p: isPdfMode ? 1.5 : 0,
           }}
         >
-          {showReportHeading && !hasModule("event_header") ? (
-            <Card variant="outlined" className="report-card">
-              <CardContent>
-                <Typography variant="h4">
-                  {payload!.config.reportTitle || payload!.title}
-                </Typography>
-                <Typography variant="body2" color="text.secondary">
-                  Событие: {payload!.title}
-                </Typography>
-              </CardContent>
-            </Card>
-          ) : null}
-
           {modules.map((moduleId) => (
             <Fragment key={moduleId}>{renderReportModule(moduleId)}</Fragment>
           ))}

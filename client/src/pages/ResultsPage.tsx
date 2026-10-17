@@ -6,8 +6,10 @@ import { ProjectorLeaderboardTable } from "../components/projector/ProjectorLead
 import { ProjectorJoinQrBlock } from "../components/projector/ProjectorJoinQrBlock";
 import { ProjectorJoinQrOverlay } from "../components/projector/ProjectorJoinQrOverlay";
 import { ProjectorQuestionSection } from "../components/projector/ProjectorQuestionSection";
+import { ProjectorDebateCompareSection } from "../components/projector/ProjectorDebateCompareSection";
 import { ProjectorRandomizerSection } from "../components/projector/ProjectorRandomizerSection";
 import { ProjectorPhotoWallSection } from "../components/projector/ProjectorPhotoWallSection";
+import { ProjectorVideoWallSection } from "../components/projector/ProjectorVideoWallSection";
 import { useResultsProjectorSession } from "../hooks/useResultsProjectorSession";
 import { useProjectorJoinQr } from "../hooks/useProjectorJoinQr";
 import { ProjectorViewportBackground } from "../components/projector/ProjectorViewportBackground";
@@ -53,19 +55,125 @@ export function ResultsPage() {
     winnersRowsCount,
     showEventTitleScreen,
     selectedQuestion,
+    debateCompareBaselineQuestion,
+    debateCompareFinalQuestion,
+    debateSeriesRounds,
     fullScreenCloud,
     fullScreenContainer,
     barQuestionCentered,
     showProjectorWinnersHero,
     isTagCloudQuestion,
+    isGeoPollQuestion,
     firstCorrectWinnersShown,
     speakerQuestions,
     reactionSession,
   } = p;
-  const reactionList = useMemo(
-    () => (reactionSession?.reactions?.length ? reactionSession.reactions : [...DEFAULT_REACTIONS]),
-    [reactionSession?.reactions],
-  );
+  const geoPollFullBleed =
+    view.mode === "question" && isGeoPollQuestion && !showProjectorWinnersHero;
+  const projectorReactionWidget = useMemo(() => {
+    const widgets = view.reactionsWidgets ?? [];
+    if (widgets.length === 0) return undefined;
+    const overlay = view.reactionsOverlayText?.trim() ?? "";
+    if (overlay) {
+      const byTitle = widgets.find((widget) => widget.title.trim() === overlay);
+      if (byTitle) return byTitle;
+    }
+    if (reactionSession?.reactions?.length) {
+      const signature = reactionSession.reactions.join("||");
+      return widgets.find((widget) => widget.reactions.join("||") === signature);
+    }
+    return undefined;
+  }, [reactionSession?.reactions, view.reactionsOverlayText, view.reactionsWidgets]);
+
+  const reactionList = useMemo(() => {
+    if (reactionSession?.isActive && reactionSession.reactions?.length) {
+      return reactionSession.reactions;
+    }
+    if (projectorReactionWidget?.reactions?.length) {
+      return projectorReactionWidget.reactions;
+    }
+    if (reactionSession?.reactions?.length) return reactionSession.reactions;
+    return [...DEFAULT_REACTIONS];
+  }, [projectorReactionWidget?.reactions, reactionSession?.isActive, reactionSession?.reactions]);
+
+  const projectorReactionCounts = useMemo(() => {
+    if (reactionSession?.isActive) return reactionSession.counts;
+    if (!projectorReactionWidget) return reactionSession?.counts ?? {};
+    const row = (view.reactionsWidgetStats ?? []).find(
+      (item) => item.widgetId === projectorReactionWidget.id,
+    );
+    return row?.counts ?? {};
+  }, [
+    projectorReactionWidget,
+    reactionSession?.counts,
+    reactionSession?.isActive,
+    view.reactionsWidgetStats,
+  ]);
+
+  useEffect(() => {
+    const zoom = view.projectorBrowserZoom;
+    const html = document.documentElement;
+    const body = document.body;
+    const root = document.getElementById("root");
+
+    // Имитация Ctrl+/−: zoom на body.
+    // Ширина/высота 100/zoom → после zoom визуально ровно экран, без выхода за края.
+    const viewportWidth = `${100 / zoom}vw`;
+    const viewportHeight = `${100 / zoom}vh`;
+    body.style.setProperty("zoom", String(zoom));
+    body.style.width = viewportWidth;
+    body.style.maxWidth = viewportWidth;
+    body.style.height = viewportHeight;
+    body.style.minHeight = viewportHeight;
+    body.style.maxHeight = viewportHeight;
+    body.style.display = "flex";
+    body.style.flexDirection = "column";
+    body.style.justifyContent = "center";
+    body.style.alignItems = "center";
+    body.style.boxSizing = "border-box";
+    body.style.overflow = "hidden";
+    body.style.margin = "0";
+    html.style.width = "100%";
+    html.style.height = "100%";
+    html.style.overflow = "hidden";
+    if (root) {
+      root.style.width = "100%";
+      root.style.height = "100%";
+      root.style.maxWidth = "100%";
+      root.style.maxHeight = "100%";
+      root.style.overflow = "hidden";
+      root.style.boxSizing = "border-box";
+      root.style.flex = "1 1 auto";
+    }
+
+    return () => {
+      body.style.removeProperty("zoom");
+      body.style.removeProperty("width");
+      body.style.removeProperty("max-width");
+      body.style.removeProperty("height");
+      body.style.removeProperty("min-height");
+      body.style.removeProperty("max-height");
+      body.style.removeProperty("display");
+      body.style.removeProperty("flex-direction");
+      body.style.removeProperty("justify-content");
+      body.style.removeProperty("align-items");
+      body.style.removeProperty("box-sizing");
+      body.style.removeProperty("overflow");
+      body.style.removeProperty("margin");
+      html.style.removeProperty("width");
+      html.style.removeProperty("height");
+      html.style.removeProperty("overflow");
+      if (root) {
+        root.style.removeProperty("width");
+        root.style.removeProperty("height");
+        root.style.removeProperty("max-width");
+        root.style.removeProperty("max-height");
+        root.style.removeProperty("overflow");
+        root.style.removeProperty("box-sizing");
+        root.style.removeProperty("flex");
+      }
+    };
+  }, [view.projectorBrowserZoom]);
 
   useEffect(() => {
     if (!reactionSession?.isActive) {
@@ -142,13 +250,14 @@ export function ResultsPage() {
     setReactionBursts((prev) => prev.filter((b) => nowMs - b.bornAtMs < b.durationMs));
   }, [nowMs, reactionBursts.length]);
 
-  const containerContentMaxPx = 1920;
+  const containerContentMaxPx = view.projectorContentMaxWidthPx;
   const isFullScreenWidgetMode =
     view.mode === "leaderboard" ||
     view.mode === "speaker_questions" ||
     view.mode === "reactions" ||
     view.mode === "randomizer" ||
-    view.mode === "photo_wall";
+    view.mode === "photo_wall" ||
+    view.mode === "video_wall";
   const brandProjectorBackgroundImageUrl = view.brandProjectorBackgroundImageUrl?.trim()
     ? resolveClientAssetUrl(view.brandProjectorBackgroundImageUrl)
     : undefined;
@@ -185,7 +294,8 @@ export function ResultsPage() {
         maxWidth={false}
         disableGutters
         sx={{
-          minHeight: "100dvh",
+          minHeight: "100%",
+          height: "100%",
           width: "100%",
           bgcolor: "#000",
         }}
@@ -196,8 +306,9 @@ export function ResultsPage() {
   return (
     <>
       <ProjectorViewportBackground
-        backgroundColor={view.projectorBackground}
-        backgroundImageUrl={brandProjectorBackgroundImageUrl}
+        backgroundColor={geoPollFullBleed ? "#111111" : view.projectorBackground}
+        backgroundImageUrl={geoPollFullBleed ? undefined : brandProjectorBackgroundImageUrl}
+        contentZoom={view.projectorBrowserZoom}
       />
       {showJoinQrOverlay && joinQrOverlayDataUrl ? (
         <ProjectorJoinQrOverlay
@@ -214,26 +325,21 @@ export function ResultsPage() {
         sx={{
           position: "relative",
           zIndex: 1,
+          width: "100%",
+          height: "100%",
+          maxWidth: "100%",
+          maxHeight: "100%",
+          minHeight: "100%",
+          overflow: "hidden",
+          boxSizing: "border-box",
           backgroundColor: "transparent",
           fontFamily: view.brandFontFamily,
           "& .MuiTypography-root, & .MuiButton-root, & .MuiChip-root, & .MuiInputBase-root, & .MuiFormLabel-root":
             {
               fontFamily: view.brandFontFamily,
             },
-          ...(!fullScreenContainer && !isFullScreenWidgetMode
-            ? {
-                width: "100%",
-                maxWidth: containerContentMaxPx,
-                mx: "auto",
-                px: { xs: 2, sm: 3 },
-                boxSizing: "border-box",
-              }
-            : {}),
           ...(showEventTitleScreen
             ? {
-                minHeight: "100vh",
-                width: "100vw",
-                maxWidth: "none",
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
@@ -243,29 +349,44 @@ export function ResultsPage() {
               }
             : fullScreenCloud || barQuestionCentered
               ? {
-                  minHeight: "100dvh",
-                  height: "100dvh",
                   display: "flex",
                   flexDirection: "column",
                   alignItems: "flex-start",
                   justifyContent: fullScreenCloud ? "flex-start" : "center",
                   py: 0,
                   px: PROJECTOR_QUESTION_CONTENT_PX,
-                  boxSizing: "border-box",
-                  ...(fullScreenCloud ? { overflow: "hidden" } : {}),
+                  width: "100%",
+                  maxWidth: containerContentMaxPx,
+                  mx: "auto",
                 }
-              : isFullScreenWidgetMode
+              : view.mode === "randomizer"
                 ? {
-                    minHeight: "100dvh",
-                    height: "100dvh",
-                    width: "100vw",
-                    maxWidth: "100vw",
                     py: 0,
                     px: 0,
-                    overflow: "hidden",
                     mx: 0,
+                    display: "flex",
+                    flexDirection: "column",
+                    alignItems: "stretch",
+                    justifyContent: "center",
+                    height: "100%",
+                    minHeight: "100%",
                   }
-                : { py: 4 }),
+                : isFullScreenWidgetMode
+                  ? {
+                      py: 0,
+                      px: 0,
+                      mx: 0,
+                    }
+                  : {
+                      py: 4,
+                      ...(!fullScreenContainer
+                        ? {
+                            maxWidth: containerContentMaxPx,
+                            mx: "auto",
+                            px: { xs: 2, sm: 3 },
+                          }
+                        : {}),
+                    }),
         }}
       >
         {view.mode === "leaderboard" && leadersShown.length > 0 && (
@@ -283,12 +404,16 @@ export function ResultsPage() {
           <Stack
             spacing={2}
             sx={{
-              minHeight: "100dvh",
+              minHeight: "100%",
+              height: "100%",
               width: "100%",
+              maxWidth: "100%",
               alignItems: "center",
               justifyContent: "center",
               textAlign: "center",
               px: 2,
+              boxSizing: "border-box",
+              overflow: "hidden",
             }}
           >
             {!showJoinQrBlock && (
@@ -325,7 +450,32 @@ export function ResultsPage() {
             )}
           </Stack>
         )}
-        {view.mode === "question" &&
+        {view.mode === "debate_compare" &&
+          debateCompareBaselineQuestion &&
+          debateCompareFinalQuestion && (
+            <Box
+              sx={{
+                width: "100%",
+                px: PROJECTOR_QUESTION_CONTENT_PX,
+                boxSizing: "border-box",
+                flex: 1,
+                display: "flex",
+                alignItems: "center",
+              }}
+            >
+              <ProjectorDebateCompareSection
+                baselineQuestion={debateCompareBaselineQuestion}
+                finalQuestion={debateCompareFinalQuestion}
+                showVoteCount={view.showVoteCount}
+                voteQuestionTextColor={view.voteQuestionTextColor}
+                voteOptionTextColor={view.voteOptionTextColor}
+                voteProgressTrackColor={view.voteProgressTrackColor}
+                voteProgressBarColor={view.voteProgressBarColor}
+                brandFontFamily={view.brandFontFamily}
+              />
+            </Box>
+          )}
+        {(view.mode === "question" || view.mode === "debate_series") &&
           selectedQuestion &&
           (fullScreenCloud && isTagCloudQuestion ? (
             <Box
@@ -341,21 +491,27 @@ export function ResultsPage() {
             >
               <ProjectorQuestionSection
                 selectedQuestion={selectedQuestion}
-                view={view}
+                view={
+                  view.mode === "debate_series" ? { ...view, questionRevealStage: "results" } : view
+                }
                 showProjectorWinnersHero={showProjectorWinnersHero}
                 fullScreenCloud={fullScreenCloud}
                 isTagCloudQuestion={isTagCloudQuestion}
                 firstCorrectWinnersShown={firstCorrectWinnersShown}
+                debateSeriesRounds={debateSeriesRounds}
               />
             </Box>
           ) : (
             <ProjectorQuestionSection
               selectedQuestion={selectedQuestion}
-              view={view}
+              view={
+                view.mode === "debate_series" ? { ...view, questionRevealStage: "results" } : view
+              }
               showProjectorWinnersHero={showProjectorWinnersHero}
               fullScreenCloud={fullScreenCloud}
               isTagCloudQuestion={isTagCloudQuestion}
               firstCorrectWinnersShown={firstCorrectWinnersShown}
+              debateSeriesRounds={debateSeriesRounds}
             />
           ))}
         {view.mode === "speaker_questions" && screenSpeakerQuestions.length > 0 && (
@@ -364,11 +520,14 @@ export function ResultsPage() {
             sx={{
               py: 4,
               width: "100%",
-              minHeight: "100dvh",
+              maxWidth: "100%",
+              minHeight: "100%",
+              height: "100%",
               justifyContent: "center",
               alignItems: "center",
               px: { xs: 2, sm: 3 },
               boxSizing: "border-box",
+              overflow: "hidden",
             }}
           >
             {screenSpeakerQuestions.map((item, idx, arr) => {
@@ -515,7 +674,16 @@ export function ResultsPage() {
         {view.mode === "reactions" && (
           <Stack
             spacing={2}
-            sx={{ py: 3, width: "100%", minHeight: "100dvh", position: "relative" }}
+            sx={{
+              py: 3,
+              width: "100%",
+              maxWidth: "100%",
+              minHeight: "100%",
+              height: "100%",
+              position: "relative",
+              overflow: "hidden",
+              boxSizing: "border-box",
+            }}
           >
             {view.reactionsOverlayText?.trim() ? (
               <Box
@@ -610,9 +778,13 @@ export function ResultsPage() {
                 {reactionList.map((reaction) => (
                   <Typography
                     key={reaction}
-                    sx={{ fontSize: { xs: "2rem", md: "2.5rem" }, fontWeight: 700, lineHeight: 1 }}
+                    sx={{
+                      fontSize: { xs: "2rem", md: "2.5rem" },
+                      fontWeight: 700,
+                      lineHeight: 1,
+                    }}
                   >
-                    {reaction} {reactionSession?.counts[reaction] ?? 0}
+                    {reaction} {projectorReactionCounts[reaction] ?? 0}
                   </Typography>
                 ))}
               </Stack>
@@ -621,6 +793,7 @@ export function ResultsPage() {
         )}
         {view.mode === "randomizer" && <ProjectorRandomizerSection view={view} />}
         {view.mode === "photo_wall" && <ProjectorPhotoWallSection view={view} />}
+        {view.mode === "video_wall" && <ProjectorVideoWallSection view={view} />}
       </Container>
     </>
   );

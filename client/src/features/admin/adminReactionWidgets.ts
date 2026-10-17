@@ -76,3 +76,36 @@ export function readReactionsOverlayTextFromStorage(storageKey: string): string 
     return null;
   }
 }
+
+export function reactionListSignature(reactions: string[]): string {
+  return reactions
+    .map((item) => item.trim())
+    .filter(Boolean)
+    .join("||");
+}
+
+/** Восстановить виджет после reload: overlay title, затем набор реакций сессии. */
+export function findReactionWidgetMatch(
+  widgets: ReactionWidget[],
+  options: { overlayText?: string; sessionReactions?: string[] },
+): ReactionWidget | undefined {
+  const overlay = options.overlayText?.trim() ?? "";
+  if (overlay) {
+    const byTitle = widgets.find((widget) => widget.title.trim() === overlay);
+    if (byTitle) return byTitle;
+  }
+  const sessionSignature = options.sessionReactions
+    ? reactionListSignature(options.sessionReactions)
+    : "";
+  if (sessionSignature) {
+    const byReactions = widgets.filter(
+      (widget) => reactionListSignature(widget.reactions) === sessionSignature,
+    );
+    if (byReactions.length === 1) return byReactions[0];
+    if (byReactions.length > 1 && overlay) {
+      return byReactions.find((widget) => widget.title.trim() === overlay) ?? byReactions[0];
+    }
+    if (byReactions.length > 1) return byReactions[0];
+  }
+  return undefined;
+}

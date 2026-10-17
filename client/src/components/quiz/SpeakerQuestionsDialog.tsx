@@ -25,8 +25,6 @@ import {
 } from "../../features/speakerQuestions/playerSpeakerQuestionsLists";
 import {
   SPEAKER_ALL_TARGET_LABEL,
-  SPEAKER_SELECT_PLACEHOLDER_LABEL,
-  SPEAKER_UI_UNSELECTED,
   normalizeSpeakerUiSelection,
   speakerQuestionRecipientLabelForAudience,
 } from "../../features/speakerQuestions/speakerTargetUi";
@@ -144,17 +142,20 @@ export function SpeakerQuestionsDialog({
   const reactions = speakerQuestions?.settings.reactions ?? DEFAULT_SPEAKER_REACTIONS;
   const speakers = speakerQuestions?.settings.speakers ?? [];
   const allowAllSpeakersTarget = speakerQuestions?.settings.allowAllSpeakersTarget !== false;
+  const activeSessionId = speakerQuestions?.settings.activeSpeakerSessionId ?? null;
   const selectValue = normalizeSpeakerUiSelection(speakerName, allowAllSpeakersTarget, speakers);
   const actualItems = useMemo(
-    () => filterActualSpeakerQuestions(speakerQuestions?.items ?? []),
-    [speakerQuestions?.items],
+    () => filterActualSpeakerQuestions(speakerQuestions?.items ?? [], activeSessionId),
+    [speakerQuestions?.items, activeSessionId],
   );
   const mineItems = useMemo(
     () => filterMySpeakerQuestions(speakerQuestions?.items ?? []),
     [speakerQuestions?.items],
   );
+  const showActualTab = actualItems.length > 0;
   const showMineTab = mineItems.length > 0;
-  const showQuestionsSection = actualItems.length > 0 || mineItems.length > 0;
+  const showBothTabs = showActualTab && showMineTab;
+  const showQuestionsSection = showActualTab || showMineTab;
   const [tab, setTab] = useState<QuestionsTab>("actual");
   const textFieldSx = buildPlayerDialogTextFieldSx(
     formBackgroundColor,
@@ -178,18 +179,20 @@ export function SpeakerQuestionsDialog({
 
   useEffect(() => {
     if (!open) return;
-    if (actualItems.length > 0) {
+    if (showActualTab) {
       setTab("actual");
       return;
     }
-    if (mineItems.length > 0) setTab("mine");
-  }, [open, actualItems.length, mineItems.length]);
+    if (showMineTab) setTab("mine");
+  }, [open, showActualTab, showMineTab]);
 
   useEffect(() => {
-    if (!showMineTab && tab === "mine") setTab("actual");
-  }, [showMineTab, tab]);
+    if (tab === "mine" && !showMineTab && showActualTab) setTab("actual");
+    if (tab === "actual" && !showActualTab && showMineTab) setTab("mine");
+  }, [showActualTab, showMineTab, tab]);
 
-  const visibleItems = tab === "mine" ? mineItems : actualItems;
+  const activeTab: QuestionsTab = showBothTabs ? tab : showMineTab ? "mine" : "actual";
+  const visibleItems = activeTab === "mine" ? mineItems : actualItems;
 
   return (
     <Dialog
@@ -197,7 +200,19 @@ export function SpeakerQuestionsDialog({
       onClose={onClose}
       fullWidth
       maxWidth="sm"
+      // Select в portal: иначе focus-trap Dialog на части iOS/Android
+      // блокирует tap по MenuItem.
+      disableEnforceFocus
+      disableRestoreFocus
+      className="notranslate"
+      slotProps={{
+        root: {
+          // Chrome Translate на Android ломает текст Select/MenuItem.
+          translate: "no",
+        },
+      }}
       PaperProps={{
+        className: "notranslate",
         sx: buildPlayerDialogPaperSx(brandFontFamily),
       }}
     >
@@ -220,31 +235,31 @@ export function SpeakerQuestionsDialog({
               value={selectValue}
               onChange={(e) => onSpeakerNameChange(e.target.value)}
               sx={textFieldSx}
+              className="notranslate"
               slotProps={{
                 select: {
-                  displayEmpty: !allowAllSpeakersTarget,
+                  // Обёртка в span: Chrome Translate не должен подменять text node React.
                   renderValue: (selected) => {
                     const value = String(selected ?? "");
-                    if (!allowAllSpeakersTarget && value === SPEAKER_UI_UNSELECTED) {
-                      return SPEAKER_SELECT_PLACEHOLDER_LABEL;
-                    }
-                    if (value === SPEAKER_ALL_TARGET) return SPEAKER_ALL_TARGET_LABEL;
-                    return value;
+                    const label = value === SPEAKER_ALL_TARGET ? SPEAKER_ALL_TARGET_LABEL : value;
+                    return <span className="notranslate">{label}</span>;
                   },
                   MenuProps: selectMenuProps,
+                },
+                htmlInput: {
+                  className: "notranslate",
+                  translate: "no",
                 },
               }}
             >
               {allowAllSpeakersTarget ? (
-                <MenuItem value={SPEAKER_ALL_TARGET}>{SPEAKER_ALL_TARGET_LABEL}</MenuItem>
-              ) : (
-                <MenuItem value={SPEAKER_UI_UNSELECTED}>
-                  {SPEAKER_SELECT_PLACEHOLDER_LABEL}
+                <MenuItem value={SPEAKER_ALL_TARGET} className="notranslate" translate="no">
+                  <span>{SPEAKER_ALL_TARGET_LABEL}</span>
                 </MenuItem>
-              )}
+              ) : null}
               {speakers.map((name) => (
-                <MenuItem key={name} value={name}>
-                  {name}
+                <MenuItem key={name} value={name} className="notranslate" translate="no">
+                  <span>{name}</span>
                 </MenuItem>
               ))}
             </TextField>
@@ -275,9 +290,9 @@ export function SpeakerQuestionsDialog({
           {showQuestionsSection ? (
             <>
               <Divider />
-              {showMineTab ? (
+              {showBothTabs ? (
                 <Tabs
-                  value={tab}
+                  value={activeTab}
                   onChange={(_, next: QuestionsTab) => setTab(next)}
                   variant="fullWidth"
                   sx={buildPlayerDialogTabsSx(formBackgroundColor, brandFontFamily)}
@@ -287,31 +302,23 @@ export function SpeakerQuestionsDialog({
                 </Tabs>
               ) : (
                 <Typography variant="subtitle2" sx={{ color: formBackgroundColor }}>
-                  Актуальные вопросы
+                  {showMineTab ? "Мои вопросы" : "Актуальные вопросы"}
                 </Typography>
               )}
               <Stack spacing={0.75}>
-                {visibleItems.length === 0 ? (
-                  <Typography variant="body2" sx={{ color: alpha("#fff", 0.65), py: 0.5 }}>
-                    {tab === "actual"
-                      ? "Пока нет одобренных вопросов."
-                      : "У вас пока нет вопросов."}
-                  </Typography>
-                ) : (
-                  visibleItems.map((item, idx, arr) => (
-                    <Box key={item.id}>
-                      <SpeakerQuestionRow
-                        item={item}
-                        reactions={reactions}
-                        showReactions={tab === "actual"}
-                        showDelete={tab === "mine" && Boolean(item.isMine)}
-                        onReact={onReact}
-                        onDelete={onDelete}
-                      />
-                      {idx < arr.length - 1 ? <Divider sx={{ mt: 1.5 }} /> : null}
-                    </Box>
-                  ))
-                )}
+                {visibleItems.map((item, idx, arr) => (
+                  <Box key={item.id}>
+                    <SpeakerQuestionRow
+                      item={item}
+                      reactions={reactions}
+                      showReactions={activeTab === "actual"}
+                      showDelete={activeTab === "mine" && Boolean(item.isMine)}
+                      onReact={onReact}
+                      onDelete={onDelete}
+                    />
+                    {idx < arr.length - 1 ? <Divider sx={{ mt: 1.5 }} /> : null}
+                  </Box>
+                ))}
               </Stack>
             </>
           ) : null}

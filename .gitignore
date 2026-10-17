@@ -20,5 +20,9 @@ e2e/.fixture-state.json
 .cursor/
 test-results/
 
+# GeoNames raw dumps (generated index lives in server/src/data/)
+server/data/RU.txt
+server/data/RU.zip
+
 # Локальные ops-заметки, постмортемы, рекомендации (не коммитить)
 deploy/ops/

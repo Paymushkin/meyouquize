@@ -28,8 +28,8 @@ const DEMO_DEFAULT_BANNER: PublicBanner = {
   isVisible: true,
 };
 const DEMO_DEFAULT_PLAYER_TILES_ORDER = [
-  SPEAKER_TILE_ID,
   PROGRAM_TILE_ID,
+  SPEAKER_TILE_ID,
   DEMO_DEFAULT_BANNER_ID,
 ] as const;
 
@@ -516,6 +516,22 @@ function buildDemoPublicView(params: {
     speakerQuestionsShowAuthorOnScreen: false,
     speakerQuestionsShowRecipientOnScreen: true,
     speakerQuestionsShowReactionsOnScreen: true,
+    speakerQuestionSessions: [
+      {
+        id: "demo-session-1",
+        name: "Основная",
+        speakers: [
+          "Александр Петров",
+          "Екатерина Смирнова",
+          "Дмитрий Иванов",
+          "Анна Кузнецова",
+          "Сергей Волков",
+          "Ольга Романова",
+          "Михаил Ковалёв",
+        ],
+      },
+    ],
+    activeSpeakerSessionId: "demo-session-1",
     speakerQuestionsSpeakers: [
       "Александр Петров",
       "Екатерина Смирнова",
@@ -775,6 +791,7 @@ async function createDemoAnswersAndSpeakerQuestions(input: {
           speakerName: s.speakerName,
           text: s.text,
           isVisibleToUsers: true,
+          isVisibleToModerator: true,
           status: "APPROVED",
           isOnScreen: s.isOnScreen,
           createdAt: new Date(Date.now() - idx * 1000 * 60),

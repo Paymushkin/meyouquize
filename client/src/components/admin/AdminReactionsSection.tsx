@@ -7,6 +7,7 @@ import PhoneIphoneIcon from "@mui/icons-material/PhoneIphone";
 import EmojiEmotionsIcon from "@mui/icons-material/EmojiEmotions";
 import CloseIcon from "@mui/icons-material/Close";
 import AddIcon from "@mui/icons-material/Add";
+import RestartAltIcon from "@mui/icons-material/RestartAlt";
 import {
   Box,
   Button,
@@ -25,7 +26,7 @@ import {
   Tooltip,
   Typography,
 } from "@mui/material";
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import type { ReactionSession } from "../../pages/quiz-play/types";
 
 export type ReactionWidget = {
@@ -49,6 +50,7 @@ type Props = {
   onStartWidget: (widget: ReactionWidget) => void;
   onStop: () => void;
   onToggleProjector: (widget: ReactionWidget) => void;
+  onResetWidget: (widget: ReactionWidget) => void;
 };
 
 export function AdminReactionsSection({
@@ -66,6 +68,7 @@ export function AdminReactionsSection({
   onStartWidget,
   onStop,
   onToggleProjector,
+  onResetWidget,
 }: Props) {
   const formatUserWord = (count: number): string => {
     const n = Math.abs(Math.trunc(count));
@@ -85,19 +88,6 @@ export function AdminReactionsSection({
   const [newReactionsText, setNewReactionsText] = useState("👍\n👏\n🔥\n🤔");
   const [editTitle, setEditTitle] = useState("");
   const [editReactionsText, setEditReactionsText] = useState("");
-
-  const historyByWidget = useMemo(() => {
-    const history = session?.history ?? [];
-    const map = new Map<string, typeof history>();
-    for (const widget of widgets) {
-      const signature = widget.reactions.join("||");
-      map.set(
-        widget.id,
-        history.filter((item) => item.reactions.join("||") === signature),
-      );
-    }
-    return map;
-  }, [session?.history, widgets]);
 
   return (
     <Stack spacing={2}>
@@ -214,13 +204,22 @@ export function AdminReactionsSection({
               </Typography>
               <Collapse in={expandedWidgetId === widget.id} timeout="auto" unmountOnExit>
                 <Stack spacing={0.6} sx={{ mt: 1 }}>
-                  <Typography variant="subtitle2">Итоги виджета</Typography>
+                  <Stack direction="row" alignItems="center" justifyContent="space-between">
+                    <Typography variant="subtitle2">Итоги виджета</Typography>
+                    <Tooltip title="Обнулить итоги виджета">
+                      <IconButton
+                        color="warning"
+                        size="small"
+                        onClick={() => onResetWidget(widget)}
+                        aria-label="Обнулить итоги виджета"
+                      >
+                        <RestartAltIcon fontSize="small" />
+                      </IconButton>
+                    </Tooltip>
+                  </Stack>
                   {(() => {
-                    const latestHistory = historyByWidget.get(widget.id)?.[0];
                     const participantsTotal =
-                      isWidgetActive && session
-                        ? session.uniqueReactors
-                        : (latestHistory?.uniqueReactors ?? 0);
+                      isWidgetActive && session ? session.uniqueReactors : 0;
                     return (
                       <Typography variant="body2" color="text.secondary">
                         Приняли участие пользователей: {participantsTotal}
@@ -228,24 +227,13 @@ export function AdminReactionsSection({
                     );
                   })()}
                   {widget.reactions.map((reaction) => {
-                    const currentCount =
-                      isWidgetActive && session ? (session.counts[reaction] ?? 0) : 0;
-                    const currentUsers =
+                    const persistedCount = widgetStatsById?.[widget.id]?.[reaction] ?? 0;
+                    const displayCount =
+                      isWidgetActive && session ? (session.counts[reaction] ?? 0) : persistedCount;
+                    const displayUsers =
                       isWidgetActive && session
                         ? (session.uniqueReactorsByReaction?.[reaction] ?? 0)
                         : 0;
-                    const latestHistoryCount =
-                      historyByWidget.get(widget.id)?.[0]?.counts?.[reaction] ?? 0;
-                    const persistedCount = widgetStatsById?.[widget.id]?.[reaction] ?? 0;
-                    const latestHistoryUsers =
-                      historyByWidget.get(widget.id)?.[0]?.uniqueReactorsByReaction?.[reaction] ??
-                      0;
-                    const displayCount = isWidgetActive
-                      ? currentCount
-                      : latestHistoryCount > 0
-                        ? latestHistoryCount
-                        : persistedCount;
-                    const displayUsers = isWidgetActive ? currentUsers : latestHistoryUsers;
                     return (
                       <Typography
                         key={`${widget.id}_${reaction}`}

@@ -49,6 +49,12 @@ const optionInputSchema = z.object({
   isCorrect: z.boolean(),
   imageUrl: optionalClientAssetUrlSchema,
   weight: z.number().int().min(0).max(100).optional(),
+  color: z
+    .string()
+    .trim()
+    .regex(/^#[0-9a-fA-F]{6}$/)
+    .nullable()
+    .optional(),
 });
 
 const questionSchema = z
@@ -68,6 +74,12 @@ const questionSchema = z
     rankingPlayerHint: z.string().trim().max(300).nullable().optional(),
     tagCloudPlayerHint: z.string().trim().max(300).nullable().optional(),
     temperatureSubtitle: z.string().trim().max(300).nullable().optional(),
+    debateBaselineQuestionId: z.string().trim().min(1).max(80).nullable().optional(),
+    projectorDebateLayout: z.boolean().optional(),
+    debateSeriesId: z.string().trim().min(1).max(80).nullable().optional(),
+    debateRoundIndex: z.number().int().min(0).max(99).nullable().optional(),
+    debateSeriesResultTitle: z.string().trim().max(200).nullable().optional(),
+    geoPollDictionary: z.string().trim().min(1).max(80).nullable().optional(),
     adminDone: z.boolean().optional(),
     options: z.array(optionInputSchema),
   })
@@ -78,6 +90,16 @@ const questionSchema = z
         message: "У вопроса должен быть текст или картинка",
         path: ["text"],
       });
+    }
+    if (value.geoPollDictionary?.trim()) {
+      if (value.type !== "single") {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "Geo poll поддерживается только для типа single",
+          path: ["type"],
+        });
+      }
+      return;
     }
     if (value.type === "tag_cloud") {
       const sm = value.scoringMode ?? "poll";
@@ -203,13 +225,39 @@ const questionSchema = z
     }
   });
 
-const subQuizBlockSchema = z.object({
-  id: z.string().min(1).optional(),
-  title: z.string().min(1).max(120),
-  questionFlowMode: z.enum(["manual", "auto"]).optional(),
-  sortOrder: z.number().int().min(0).max(1000).optional(),
-  questions: z.array(questionSchema),
-});
+const subQuizBlockSchema = z
+  .object({
+    id: z.string().min(1).optional(),
+    title: z.string().min(1).max(120),
+    questionFlowMode: z.enum(["manual", "auto"]).optional(),
+    sortOrder: z.number().int().min(0).max(1000).optional(),
+    questions: z.array(questionSchema),
+  })
+  .superRefine((block, ctx) => {
+    block.questions.forEach((question, index) => {
+      if (question.geoPollDictionary?.trim()) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "Геоопрос недоступен в квизах",
+          path: ["questions", index, "geoPollDictionary"],
+        });
+      }
+      if (question.projectorDebateLayout === true || question.debateSeriesId?.trim()) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "Дебаты недоступны в квизах",
+          path: ["questions", index, "projectorDebateLayout"],
+        });
+      }
+      if (question.type === "temperature") {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "Измерение температуры недоступно в квизах",
+          path: ["questions", index, "type"],
+        });
+      }
+    });
+  });
 
 export const adminAuthSchema = z.object({
   login: z.string().min(1),
@@ -355,10 +403,18 @@ export const setPublicViewSchema = z.object({
       "reactions",
       "randomizer",
       "photo_wall",
+      "video_wall",
       "report",
+      "debate_compare",
+      "debate_series",
     ])
     .optional(),
   questionId: z.string().min(1).optional(),
+  debateCompareQuestionId: z.string().trim().min(1).max(80).optional(),
+  debateSeriesId: z.string().trim().min(1).max(80).optional(),
+  debateSeriesView: z.enum(["cumulative", "round"]).optional(),
+  debateSeriesQuestionIds: z.array(z.string().trim().min(1).max(80)).max(40).optional(),
+  debateSeriesShowRounds: z.boolean().optional(),
   questionRevealStage: z.enum(["options", "results"]).optional(),
   highlightedLeadersCount: z.number().int().min(0).max(100).optional(),
   leaderboardSubQuizId: z.string().trim().max(80).optional(),
@@ -467,12 +523,24 @@ export const setPublicViewSchema = z.object({
   showFirstCorrectAnswerer: z.boolean().optional(),
   firstCorrectWinnersCount: z.number().int().min(1).max(20).optional(),
   speakerQuestionsEnabled: z.boolean().optional(),
+  speakerQuestionSessions: z
+    .array(
+      z.object({
+        id: z.string().trim().min(1).max(80),
+        name: z.string().trim().min(1).max(80),
+        speakers: z.array(z.string().trim().min(1).max(80)).max(100),
+      }),
+    )
+    .max(40)
+    .optional(),
+  activeSpeakerSessionId: z.string().trim().min(1).max(80).nullable().optional(),
   speakerQuestionsSpeakers: z.array(z.string().trim().min(1).max(80)).max(100).optional(),
   speakerQuestionsReactions: z.array(z.string().trim().min(1).max(16)).max(12).optional(),
   speakerQuestionsShowAuthorOnScreen: z.boolean().optional(),
   speakerQuestionsShowRecipientOnScreen: z.boolean().optional(),
   speakerQuestionsShowReactionsOnScreen: z.boolean().optional(),
   speakerQuestionsAllowAllSpeakersTarget: z.boolean().optional(),
+  speakerQuestionsModeratorShowAll: z.boolean().optional(),
   showEventTitleOnPlayer: z.boolean().optional(),
   playerAutoJoinRandomNickname: z.boolean().optional(),
   playerBanners: z
@@ -480,9 +548,19 @@ export const setPublicViewSchema = z.object({
       z.object({
         id: z.string().trim().min(1).max(80),
         linkUrl: optionalBannerLinkUrlSchema,
-        backgroundUrl: clientAssetUrlSchema,
+        backgroundUrl: optionalClientAssetUrlSchema,
         size: z.enum(["2x1", "1x1", "full"]).optional(),
         isVisible: z.boolean().optional(),
+        visualStyle: z.enum(["image", "tile"]).optional(),
+        text: z.string().trim().max(120).optional(),
+        backgroundColor: z
+          .string()
+          .regex(/^#([0-9a-fA-F]{6})$/)
+          .optional(),
+        textColor: z
+          .string()
+          .regex(/^#([0-9a-fA-F]{6})$/)
+          .optional(),
       }),
     )
     .max(50)
@@ -510,6 +588,7 @@ export const setPublicViewSchema = z.object({
   programTileLinkUrl: optionalExternalHttpUrlSchema,
   programTileVisible: z.boolean().optional(),
   photoWallTileVisible: z.boolean().optional(),
+  videoWallTileVisible: z.boolean().optional(),
   playerQuizResultsTileVisible: z.boolean().optional(),
   playerQuizResultsTileText: z.string().trim().max(120).optional(),
   playerQuizResultsTileBackgroundColor: z
@@ -523,6 +602,7 @@ export const setPublicViewSchema = z.object({
   playerQuizResultsSubQuizId: z.string().trim().max(80).optional(),
   playerQuizResultsSubQuizIds: z.array(z.string().trim().min(1).max(80)).max(20).optional(),
   playerTilesOrder: z.array(z.string().trim().min(1).max(120)).max(100).optional(),
+  playerTilesGridColumns: z.union([z.literal(2), z.literal(3)]).optional(),
   reactionsOverlayText: z.string().trim().max(120).optional(),
   reactionsWidgets: z
     .array(
@@ -535,6 +615,7 @@ export const setPublicViewSchema = z.object({
     .max(100)
     .optional(),
   playerVisibleResultQuestionIds: z.array(z.string().trim().min(1).max(80)).max(200).optional(),
+  playerVisibleDebateSeriesIds: z.array(z.string().trim().min(1).max(80)).max(50).optional(),
   playerVoteOptionTextColor: z
     .string()
     .regex(/^#([0-9a-fA-F]{6})$/)
@@ -548,6 +629,8 @@ export const setPublicViewSchema = z.object({
     .regex(/^#([0-9a-fA-F]{6})$/)
     .optional(),
   projectorJoinQrVisible: z.boolean().optional(),
+  projectorBrowserZoom: z.number().min(0.5).max(5).optional(),
+  projectorContentMaxWidthPx: z.number().int().min(800).max(7680).optional(),
   projectorJoinQrOverlayVisible: z.boolean().optional(),
   projectorJoinQrText: z.string().trim().max(PROJECTOR_JOIN_QR_TEXT_MAX_LENGTH).optional(),
   projectorJoinQrTextColor: z
@@ -589,6 +672,34 @@ export const setPublicViewSchema = z.object({
   photoWallGridColumns: z.number().int().min(0).max(12).optional(),
   photoWallAnimate: z.boolean().optional(),
   photoWallKenBurns: z.boolean().optional(),
+  videoWallHorizontalItems: z
+    .array(
+      z.object({
+        id: z.string().trim().min(1).max(80),
+        url: z.string().trim().url().max(1000),
+        title: z.string().trim().max(120),
+      }),
+    )
+    .max(200)
+    .optional(),
+  videoWallHorizontalPosterUrl: z.string().trim().max(1000).optional(),
+  videoWallTileCoverUrl: z.string().trim().max(1000).optional(),
+  videoWallProjectorShowHorizontal: z.boolean().optional(),
+  videoWallProjectorShowVertical: z.boolean().optional(),
+  videoWallProjectorMaxVideos: z.number().int().min(1).max(40).optional(),
+  videoWallProjectorActiveSeconds: z.number().int().min(2).max(120).optional(),
+  videoWallProjectorFreezeSeconds: z.number().int().min(0).max(600).optional(),
+  videoWallVerticalItems: z
+    .array(
+      z.object({
+        id: z.string().trim().min(1).max(80),
+        url: z.string().trim().url().max(1000),
+        title: z.string().trim().max(120),
+      }),
+    )
+    .max(200)
+    .optional(),
+  videoWallVerticalPosterUrl: z.string().trim().max(1000).optional(),
   reportTitle: z.string().trim().max(120).optional(),
   reportModules: z
     .array(
@@ -681,7 +792,7 @@ export const updateEventThemeSchema = z
 
 export const subscribeSpeakerQuestionsSchema = z.object({
   slug: z.string().min(1),
-  viewer: z.enum(["player", "projector", "admin"]).optional(),
+  viewer: z.enum(["player", "projector", "admin", "moderator"]).optional(),
 });
 
 export const createSpeakerQuestionSchema = z.object({
@@ -714,6 +825,12 @@ export const adminSpeakerQuestionUserVisibleSchema = z.object({
   isVisibleToUsers: z.boolean(),
 });
 
+export const adminSpeakerQuestionModeratorVisibleSchema = z.object({
+  quizId: z.string().min(1),
+  speakerQuestionId: z.string().min(1),
+  isVisibleToModerator: z.boolean(),
+});
+
 export const adminSpeakerQuestionUpdateSchema = z.object({
   quizId: z.string().min(1),
   speakerQuestionId: z.string().min(1),
@@ -731,11 +848,23 @@ export const adminSpeakerSettingsSchema = z.object({
   quizId: z.string().min(1),
   enabled: z.boolean().optional(),
   speakers: z.array(z.string().trim().min(1).max(80)).max(100).optional(),
+  sessions: z
+    .array(
+      z.object({
+        id: z.string().trim().min(1).max(80),
+        name: z.string().trim().min(1).max(80),
+        speakers: z.array(z.string().trim().min(1).max(80)).max(100),
+      }),
+    )
+    .max(40)
+    .optional(),
+  activeSpeakerSessionId: z.string().trim().min(1).max(80).nullable().optional(),
   reactions: z.array(z.string().trim().min(1).max(16)).max(12).optional(),
   showAuthorOnScreen: z.boolean().optional(),
   showRecipientOnScreen: z.boolean().optional(),
   showReactionsOnScreen: z.boolean().optional(),
   allowAllSpeakersTarget: z.boolean().optional(),
+  moderatorShowAll: z.boolean().optional(),
 });
 
 export const activateQuestionSchema = z.object({
@@ -772,6 +901,11 @@ export const stopReactionSessionSchema = z.object({
   quizId: z.string().min(1),
 });
 
+export const resetReactionWidgetSchema = z.object({
+  quizId: z.string().min(1),
+  widgetId: z.string().trim().min(1).max(120),
+});
+
 export const toggleReactionSchema = z.object({
   quizId: z.string().min(1),
   reactionType: z.string().trim().min(1).max(16),
@@ -782,13 +916,31 @@ export const bannerClickSchema = z.object({
   bannerId: z.string().trim().min(1).max(80),
 });
 
-const feedbackScaleOptionSchema = z.string().trim().min(1).max(40);
+const feedbackScaleOptionSchema = z.string().trim().min(1).max(120);
 
-export const feedbackScaleSchema = z.object({
-  id: z.string().trim().min(1).max(80),
-  label: z.string().trim().min(1).max(200),
-  options: z.array(feedbackScaleOptionSchema).min(2).max(10),
-});
+export const feedbackScaleSchema = z
+  .object({
+    id: z.string().trim().min(1).max(80),
+    label: z.string().trim().min(1).max(200),
+    options: z.array(feedbackScaleOptionSchema).min(2).max(10),
+    selection: z.enum(["single", "multi"]).optional().default("single"),
+    maxAnswers: z.preprocess(
+      (value) => (value === null || value === "" ? undefined : value),
+      z.coerce.number().int().min(1).max(10).optional(),
+    ),
+  })
+  .superRefine((value, ctx) => {
+    if (value.selection !== "multi") return;
+    const optionCount = value.options.length;
+    const maxAnswers = value.maxAnswers ?? optionCount;
+    if (maxAnswers < 2 || maxAnswers > optionCount) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: `Для нескольких ответов укажите лимит от 2 до ${optionCount}`,
+        path: ["maxAnswers"],
+      });
+    }
+  });
 
 export const feedbackOpenFieldSchema = z.object({
   id: z.string().trim().min(1).max(80),
@@ -843,7 +995,13 @@ export const feedbackQuizIdSchema = z.object({
 
 export const submitFeedbackSchema = z.object({
   quizId: z.string().min(1),
-  scaleAnswers: z.record(z.string().trim().min(1).max(80), z.number().int().min(0).max(9)),
+  scaleAnswers: z.record(
+    z.string().trim().min(1).max(80),
+    z.union([
+      z.number().int().min(0).max(9),
+      z.array(z.number().int().min(0).max(9)).min(1).max(10),
+    ]),
+  ),
   openFieldAnswers: z
     .record(z.string().trim().min(1).max(80), z.string().trim().max(2000))
     .optional(),

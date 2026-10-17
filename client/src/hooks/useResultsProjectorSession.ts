@@ -135,7 +135,11 @@ export function useResultsProjectorSession(
     dispatch({ type: "bumpLeaderboardAnim" });
   }, [leaderboardAnimKey]);
 
-  useProjectorBodyBackground(state.view.projectorBackground);
+  useProjectorBodyBackground(
+    derived.isGeoPollQuestion && state.view.mode === "question"
+      ? "#111111"
+      : state.view.projectorBackground,
+  );
 
   useEffect(() => {
     if (!import.meta.env.DEV) return;

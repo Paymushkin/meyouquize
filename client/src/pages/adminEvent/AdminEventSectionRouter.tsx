@@ -9,6 +9,7 @@ import { AdminEventQuestionsTab, type AdminEventQuestionsTabProps } from "./Admi
 import { AdminEventReportTab } from "./AdminEventReportTab";
 import { AdminEventResultsTab, type AdminEventResultsTabProps } from "./AdminEventResultsTab";
 import { AdminEventSpeakersTab, type AdminEventSpeakersTabProps } from "./AdminEventSpeakersTab";
+import { AdminEventVideoWallTab, type AdminEventVideoWallTabProps } from "./AdminEventVideoWallTab";
 
 export type AdminEventSectionRouterProps = {
   activeSection: AdminSection;
@@ -17,6 +18,7 @@ export type AdminEventSectionRouterProps = {
   speakers: AdminEventSpeakersTabProps;
   banners: AdminEventBannersTabProps;
   photoWall: AdminEventPhotoWallTabProps;
+  videoWall: AdminEventVideoWallTabProps;
   branding: ComponentProps<typeof AdminBrandingSection>;
   results: AdminEventResultsTabProps;
   report: ComponentProps<typeof AdminEventReportTab>;
@@ -30,6 +32,7 @@ export function AdminEventSectionRouter({
   speakers,
   banners,
   photoWall,
+  videoWall,
   branding,
   results,
   report,
@@ -46,6 +49,8 @@ export function AdminEventSectionRouter({
       return <AdminEventBannersTab {...banners} />;
     case "photo_wall":
       return <AdminEventPhotoWallTab {...photoWall} />;
+    case "video_wall":
+      return <AdminEventVideoWallTab {...videoWall} />;
     case "branding":
       return <AdminBrandingSection {...branding} />;
     case "results":

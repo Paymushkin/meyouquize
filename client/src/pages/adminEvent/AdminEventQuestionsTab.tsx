@@ -2,13 +2,17 @@ import AddIcon from "@mui/icons-material/Add";
 import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import HowToVoteIcon from "@mui/icons-material/HowToVote";
+import KeyboardArrowDownIcon from "@mui/icons-material/KeyboardArrowDown";
+import KeyboardArrowUpIcon from "@mui/icons-material/KeyboardArrowUp";
 import QuizIcon from "@mui/icons-material/Quiz";
+import SettingsIcon from "@mui/icons-material/Settings";
 import {
   Accordion,
   AccordionDetails,
   AccordionSummary,
   Box,
   Button,
+  Divider,
   IconButton,
   Paper,
   Stack,
@@ -19,7 +23,7 @@ import {
   Typography,
 } from "@mui/material";
 import type { Dispatch, SetStateAction } from "react";
-import { useCallback, useEffect } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   buildQuestionIndexMapForSubQuiz,
   type QuestionForm,
@@ -44,6 +48,7 @@ import {
 import type { PublicViewMode, PublicViewSetPatch } from "../../publicViewContract";
 import { socket } from "../../socket";
 import type { FeedbackFormConfig } from "../../types/feedback";
+import { AdminEventVotesBlockList, type VotesBlockDragState } from "./AdminEventVotesBlockList";
 
 export type AdminEventQuestionsTabProps = {
   roomQuestionsTab: RoomQuestionsTab;
@@ -99,12 +104,32 @@ export type AdminEventQuestionsTabProps = {
   updateHighlightedLeaders: (nextValue: number) => void;
   confirmResetSubQuizAnswersById: (subQuizId: string, title: string) => void;
   toggleQuestionAdminDone: (globalIndex: number) => void | Promise<void>;
+  setQuestionsAdminDone: (globalIndices: number[], adminDone: boolean) => void | Promise<void>;
   reorderVoteInList: (
     fromLocal: number,
     toLocal: number,
     indexMap: number[],
   ) => void | Promise<void>;
+  reorderVoteDisplayBlocks: (
+    fromBlockIndex: number,
+    toBlockIndex: number,
+    scopeIndices: number[],
+  ) => void | Promise<void>;
   cloneQuestionAtIndex: (globalIndex: number) => void | Promise<void>;
+  cloneDebateSeries: (seriesId: string) => void | Promise<void>;
+  addDebateSeriesRoundAtIndex: (globalIndex: number) => void | Promise<void>;
+  updateDebateSeries: (
+    seriesId: string,
+    patch: {
+      resultTitle: string;
+      options: Array<{ text: string; color?: string | null; isCorrect?: boolean }>;
+      rounds: Array<{ formIndex: number; text: string }>;
+    },
+  ) => void | Promise<void>;
+  removeDebateSeries: (seriesId: string) => void | Promise<void>;
+  removeQuestion: (index: number) => void | Promise<void>;
+  debateSeriesShowRounds: boolean;
+  onToggleDebateSeriesShowRounds: () => void;
 };
 
 export function AdminEventQuestionsTab({
@@ -153,9 +178,44 @@ export function AdminEventQuestionsTab({
   updateHighlightedLeaders,
   confirmResetSubQuizAnswersById,
   toggleQuestionAdminDone,
+  setQuestionsAdminDone,
   reorderVoteInList,
+  reorderVoteDisplayBlocks,
   cloneQuestionAtIndex,
+  cloneDebateSeries,
+  addDebateSeriesRoundAtIndex,
+  updateDebateSeries,
+  removeDebateSeries,
+  removeQuestion,
+  debateSeriesShowRounds,
+  onToggleDebateSeriesShowRounds,
 }: AdminEventQuestionsTabProps) {
+  const [votesBlockDrag, setVotesBlockDrag] = useState<VotesBlockDragState>(null);
+  const [votesBlockDrop, setVotesBlockDrop] = useState<VotesBlockDragState>(null);
+  const votesBlockListSharedProps = {
+    questionForms,
+    questionsSectionBindings,
+    publicViewMode,
+    setPublicResultsView,
+    voteListManageMode,
+    votesBlockDrag,
+    votesBlockDrop,
+    setVotesBlockDrag,
+    setVotesBlockDrop,
+    reorderVoteDisplayBlocks,
+    reorderVoteInList,
+    addQuestionToSubQuiz,
+    cloneQuestionAtIndex,
+    toggleQuestionAdminDone,
+    setQuestionsAdminDone,
+    cloneDebateSeries,
+    addDebateSeriesRoundAtIndex,
+    updateDebateSeries,
+    removeDebateSeries,
+    removeQuestion,
+    debateSeriesShowRounds,
+    onToggleDebateSeriesShowRounds,
+  } as const;
   const importParticipantsToFreeList = useCallback(
     (nicknames: string[]) => {
       if (nicknames.length === 0) return;
@@ -202,7 +262,7 @@ export function AdminEventQuestionsTab({
   ]);
 
   return (
-    <Stack spacing={2} sx={{ minWidth: 0 }}>
+    <Stack spacing={0} sx={{ minWidth: 0, flex: 1, minHeight: 0, height: "100%" }}>
       <Paper
         variant="outlined"
         elevation={0}
@@ -214,11 +274,17 @@ export function AdminEventQuestionsTab({
           width: "100%",
           maxWidth: "100%",
           minWidth: 0,
+          flex: 1,
+          minHeight: 0,
+          height: "100%",
           boxSizing: "border-box",
           borderTopLeftRadius: 0,
           borderBottomLeftRadius: 0,
           borderTopRightRadius: 0,
           borderBottomRightRadius: 0,
+          display: "flex",
+          flexDirection: "column",
+          overflow: "hidden",
         }}
       >
         <Tabs
@@ -229,15 +295,15 @@ export function AdminEventQuestionsTab({
           variant="scrollable"
           scrollButtons="auto"
           allowScrollButtonsMobile
-          sx={{ borderBottom: 1, borderColor: "divider", px: 0.5 }}
+          sx={{ borderBottom: 1, borderColor: "divider", px: 0.5, flexShrink: 0 }}
         >
-          <Tab label="Квизы" value="quizzes" />
           <Tab label="Голосования" value="votes" />
+          <Tab label="Квизы" value="quizzes" />
+          <Tab label="ОС" value="feedback" />
+          <Tab label="Рандом" value="randomizer" />
           <Tab label="Реакции" value="reactions" />
-          <Tab label="Обратная связь" value="feedback" />
-          <Tab label="Рандомайзер" value="randomizer" />
         </Tabs>
-        <Box sx={{ pt: 2, px: 0.25 }}>
+        <Box sx={{ pt: 2, px: 0.25, flex: 1, minHeight: 0, overflowY: "auto" }}>
           {roomQuestionsTab === "quizzes" &&
             (subQuizSheets.length === 0 ? (
               <Box
@@ -571,29 +637,40 @@ export function AdminEventQuestionsTab({
                 </Box>
                 <Stack spacing={2}>
                   {activeVoteIndices.length > 0 ? (
-                    <AdminQuestionsSection
-                      {...questionsSectionBindings}
-                      listTitle={`Актуальные (${activeVoteIndices.length})`}
-                      addButtonLabel="Добавить голосование"
-                      listHeaderShowAddButton={false}
-                      questionForms={activeVoteIndices.map((i) => questionForms[i])}
-                      selectedListIndex={activeVotesSelectedListIndex}
-                      remapQuestionIndex={(local) => activeVoteIndices[local] ?? 0}
-                      adminDoneToggle={{
-                        mode: "markDone",
-                        onToggle: toggleQuestionAdminDone,
-                      }}
-                      voteListManageMode={voteListManageMode}
-                      voteListManageToggle={{
-                        enabled: voteListManageMode,
-                        onToggle: () => setVoteListManageMode((current) => !current),
-                      }}
-                      onReorderVoteInList={(fromLocal, toLocal) =>
-                        void reorderVoteInList(fromLocal, toLocal, activeVoteIndices)
-                      }
-                      addQuestion={() => addQuestionToSubQuiz(null)}
-                      onCloneQuestion={(g) => void cloneQuestionAtIndex(g)}
-                    />
+                    <Stack spacing={1.5}>
+                      <Stack
+                        direction="row"
+                        alignItems="center"
+                        justifyContent="space-between"
+                        spacing={1}
+                        sx={{ px: 0.5 }}
+                      >
+                        <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
+                          Актуальные ({activeVoteIndices.length})
+                        </Typography>
+                        <Tooltip
+                          title={
+                            voteListManageMode ? "Скрыть управление списком" : "Управление списком"
+                          }
+                        >
+                          <IconButton
+                            size="small"
+                            onClick={() => setVoteListManageMode((current) => !current)}
+                            aria-label="Управление списком голосований"
+                            aria-pressed={voteListManageMode}
+                            color={voteListManageMode ? "primary" : "default"}
+                          >
+                            <SettingsIcon fontSize="small" />
+                          </IconButton>
+                        </Tooltip>
+                      </Stack>
+                      <AdminEventVotesBlockList
+                        {...votesBlockListSharedProps}
+                        scope="active"
+                        memberIndices={activeVoteIndices}
+                        selectedListIndex={activeVotesSelectedListIndex}
+                      />
+                    </Stack>
                   ) : (
                     <Typography variant="body2" color="text.secondary" sx={{ px: 0.5, py: 1 }}>
                       Нет актуальных голосований
@@ -615,24 +692,11 @@ export function AdminEventQuestionsTab({
                         </Typography>
                       </AccordionSummary>
                       <AccordionDetails sx={{ p: 0 }}>
-                        <AdminQuestionsSection
-                          {...questionsSectionBindings}
-                          listTitle=""
-                          addButtonLabel="Добавить голосование"
-                          listHeaderShowAddButton={false}
-                          questionForms={doneVoteIndices.map((i) => questionForms[i])}
+                        <AdminEventVotesBlockList
+                          {...votesBlockListSharedProps}
+                          scope="done"
+                          memberIndices={doneVoteIndices}
                           selectedListIndex={doneVotesSelectedListIndex}
-                          remapQuestionIndex={(local) => doneVoteIndices[local] ?? 0}
-                          adminDoneToggle={{
-                            mode: "markActive",
-                            onToggle: toggleQuestionAdminDone,
-                          }}
-                          voteListManageMode={voteListManageMode}
-                          onReorderVoteInList={(fromLocal, toLocal) =>
-                            void reorderVoteInList(fromLocal, toLocal, doneVoteIndices)
-                          }
-                          addQuestion={() => addQuestionToSubQuiz(null)}
-                          onCloneQuestion={(g) => void cloneQuestionAtIndex(g)}
                         />
                       </AccordionDetails>
                     </Accordion>
@@ -754,6 +818,7 @@ export function AdminEventQuestionsTab({
               onDeleteWidget={adminReactions.deleteWidget}
               onStartWidget={adminReactions.startWidget}
               onStop={adminReactions.stopWidget}
+              onResetWidget={adminReactions.resetWidget}
               onToggleProjector={adminReactions.toggleProjector}
             />
           )}

@@ -1,6 +1,10 @@
 import { useCallback } from "react";
 import { socket } from "../socket";
-import type { AdminSpeakerQuestionsSettingsValues } from "../features/speakerQuestionsAdmin/adminSpeakerQuestionsSettings";
+import {
+  draftsToSessions,
+  type AdminSpeakerQuestionsSettingsValues,
+  type AdminSpeakerSessionDraft,
+} from "../features/speakerQuestionsAdmin/adminSpeakerQuestionsSettings";
 
 type Params = {
   quizId: string;
@@ -9,29 +13,89 @@ type Params = {
 };
 
 export function useSpeakerQuestionsAdminActions({ quizId, speakerSettings, setMessage }: Params) {
-  const saveSpeakerSettings = useCallback(() => {
-    if (!quizId) return;
-    const speakers = speakerSettings.speakersText
-      .split("\n")
-      .map((x) => x.trim())
-      .filter(Boolean);
-    const reactions = speakerSettings.reactionsText
-      .split("\n")
-      .map((x) => x.trim())
-      .filter(Boolean);
-    socket.emit("admin:speaker:settings:set", {
-      quizId,
-      enabled: speakerSettings.enabled,
-      speakers,
-      reactions,
-      showAuthorOnScreen: speakerSettings.showAuthorOnScreen,
-      showRecipientOnScreen: speakerSettings.showRecipientOnScreen,
-      showReactionsOnScreen: speakerSettings.showReactionsOnScreen,
-      allowAllSpeakersTarget: speakerSettings.allowAllSpeakersTarget,
-    });
-    setMessage("Настройки секции спикеров сохранены");
-  }, [quizId, setMessage, speakerSettings]);
+  const emitSpeakerSettings = useCallback(
+    (
+      overrides?: Partial<{
+        activeSpeakerSessionId: string | null;
+        sessions: AdminSpeakerSessionDraft[];
+        enabled: boolean;
+        reactionsText: string;
+        showAuthorOnScreen: boolean;
+        showRecipientOnScreen: boolean;
+        showReactionsOnScreen: boolean;
+        allowAllSpeakersTarget: boolean;
+        moderatorShowAll: boolean;
+      }>,
+      successMessage = "Настройки секции спикеров сохранены",
+    ) => {
+      if (!quizId) return;
+      const sessionDrafts = overrides?.sessions ?? speakerSettings.sessions;
+      const sessions = draftsToSessions(sessionDrafts);
+      const reactionsText = overrides?.reactionsText ?? speakerSettings.reactionsText;
+      const reactions = reactionsText
+        .split("\n")
+        .map((x) => x.trim())
+        .filter(Boolean);
+      const requestedActive =
+        overrides && "activeSpeakerSessionId" in overrides
+          ? overrides.activeSpeakerSessionId
+          : speakerSettings.activeSpeakerSessionId;
+      const activeId =
+        requestedActive && sessions.some((s) => s.id === requestedActive)
+          ? requestedActive
+          : (sessions[0]?.id ?? null);
+      const speakers = sessions.find((s) => s.id === activeId)?.speakers ?? [];
+      socket.emit("admin:speaker:settings:set", {
+        quizId,
+        enabled: overrides?.enabled ?? speakerSettings.enabled,
+        sessions,
+        activeSpeakerSessionId: activeId,
+        speakers,
+        reactions,
+        showAuthorOnScreen: overrides?.showAuthorOnScreen ?? speakerSettings.showAuthorOnScreen,
+        showRecipientOnScreen:
+          overrides?.showRecipientOnScreen ?? speakerSettings.showRecipientOnScreen,
+        showReactionsOnScreen:
+          overrides?.showReactionsOnScreen ?? speakerSettings.showReactionsOnScreen,
+        allowAllSpeakersTarget:
+          overrides?.allowAllSpeakersTarget ?? speakerSettings.allowAllSpeakersTarget,
+        moderatorShowAll: overrides?.moderatorShowAll ?? speakerSettings.moderatorShowAll,
+      });
+      setMessage(successMessage);
+    },
+    [quizId, setMessage, speakerSettings],
+  );
 
+  const saveSpeakerSettings = useCallback(() => {
+    emitSpeakerSettings();
+  }, [emitSpeakerSettings]);
+
+  const persistActiveSpeakerSession = useCallback(
+    (activeSpeakerSessionId: string | null) => {
+      emitSpeakerSettings({ activeSpeakerSessionId }, "Активная сессия обновлена");
+    },
+    [emitSpeakerSettings],
+  );
+
+  const persistSpeakerSessions = useCallback(
+    (sessions: AdminSpeakerSessionDraft[], activeSpeakerSessionId?: string | null) => {
+      emitSpeakerSettings(
+        {
+          sessions,
+          ...(activeSpeakerSessionId !== undefined ? { activeSpeakerSessionId } : {}),
+        },
+        "Сессии обновлены",
+      );
+    },
+    [emitSpeakerSettings],
+  );
+
+  const persistModeratorShowAll = useCallback(
+    (moderatorShowAll: boolean) => {
+      emitSpeakerSettings({ moderatorShowAll }, "Настройки модератора сохранены");
+    },
+    [emitSpeakerSettings],
+  );
   const setSpeakerQuestionStatus = useCallback(
     (id: string, status: "PENDING" | "APPROVED" | "REJECTED") => {
       if (!quizId) return;
@@ -75,6 +139,18 @@ export function useSpeakerQuestionsAdminActions({ quizId, speakerSettings, setMe
     [quizId],
   );
 
+  const setSpeakerQuestionModeratorVisible = useCallback(
+    (id: string, next: boolean) => {
+      if (!quizId) return;
+      socket.emit("admin:speaker:question:moderator-visible", {
+        quizId,
+        speakerQuestionId: id,
+        isVisibleToModerator: next,
+      });
+    },
+    [quizId],
+  );
+
   const updateSpeakerQuestionText = useCallback(
     (id: string, text: string) => {
       if (!quizId) return;
@@ -108,11 +184,15 @@ export function useSpeakerQuestionsAdminActions({ quizId, speakerSettings, setMe
 
   return {
     saveSpeakerSettings,
+    persistActiveSpeakerSession,
+    persistSpeakerSessions,
+    persistModeratorShowAll,
     setSpeakerQuestionStatus,
     setSpeakerQuestionOnScreen,
     hideSpeakerQuestion,
     restoreSpeakerQuestion,
     setSpeakerQuestionUserVisible,
+    setSpeakerQuestionModeratorVisible,
     updateSpeakerQuestionText,
     deleteSpeakerQuestion,
   };

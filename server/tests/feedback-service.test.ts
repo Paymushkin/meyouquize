@@ -155,6 +155,22 @@ describe("parseFeedbackScales", () => {
     const scales = parseFeedbackScales([{ id: "s1", label: "X", options: ["1", "2", "3"] }]);
     expect(scales).toHaveLength(1);
     expect(scales[0]?.options).toEqual(["1", "2", "3"]);
+    expect(scales[0]?.selection).toBe("single");
+  });
+
+  it("parses multi selection and maxAnswers", () => {
+    const scales = parseFeedbackScales([
+      {
+        id: "s1",
+        label: "Что понравилось?",
+        selection: "multi",
+        maxAnswers: 2,
+        options: ["A", "B", "C", "D"],
+      },
+    ]);
+    expect(scales).toHaveLength(1);
+    expect(scales[0]?.selection).toBe("multi");
+    expect(scales[0]?.maxAnswers).toBe(2);
   });
 
   it("rejects invalid option counts", () => {

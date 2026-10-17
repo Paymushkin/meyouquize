@@ -1,5 +1,6 @@
-import { expandTagCloudSubmitLines } from "@meyouquize/shared";
+import { expandTagCloudSubmitLines, resolveMultiMaxAnswers } from "@meyouquize/shared";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import type { GeoPollOption } from "../components/quiz/PlayerGeoPollAutocomplete";
 import { socket } from "../socket";
 import {
   isRoomMultiActiveFlow,
@@ -40,6 +41,7 @@ export function useQuizPlayQuestionFlow(params: Params) {
   const [selected, setSelected] = useState<string[]>([]);
   const [rankOrder, setRankOrder] = useState<string[]>([]);
   const [tagAnswers, setTagAnswers] = useState<string[]>([""]);
+  const [geoAnswer, setGeoAnswer] = useState<GeoPollOption | null>(null);
   const [dismissedQuestionId, setDismissedQuestionId] = useState<string | null>(null);
   const activeQuestionIdRef = useRef<string | null>(null);
   const activeQuestionTypeRef = useRef<
@@ -48,7 +50,13 @@ export function useQuizPlayQuestionFlow(params: Params) {
   const selectedRef = useRef<string[]>([]);
   const rankOrderRef = useRef<string[]>([]);
   const tagAnswersRef = useRef<string[]>([""]);
+  const geoAnswerRef = useRef<GeoPollOption | null>(null);
   const pendingSubmitPayloadRef = useRef<SubmitPayload | null>(null);
+  /** Sync-guard против двойного тапа до ре-рендера canSubmit. */
+  const submitInFlightRef = useRef<string | null>(null);
+  const [submitInFlightQuestionId, setSubmitInFlightQuestionId] = useState<string | null>(null);
+  const submittedQuestionIdsRef = useRef(submittedQuestionIds);
+  submittedQuestionIdsRef.current = submittedQuestionIds;
 
   const nonQuizActiveQuestion = useMemo(() => {
     if (!quiz) return null;
@@ -78,10 +86,12 @@ export function useQuizPlayQuestionFlow(params: Params) {
       setSelected([]);
       setRankOrder([]);
       setTagAnswers([""]);
+      setGeoAnswer(null);
       return;
     }
     setSelected([]);
     setTagAnswers([""]);
+    setGeoAnswer(null);
     if (nonQuizActiveQuestion.type === "ranking") {
       setRankOrder(nonQuizActiveQuestion.options.map((o) => o.id));
       return;
@@ -102,6 +112,10 @@ export function useQuizPlayQuestionFlow(params: Params) {
   }, [tagAnswers]);
 
   useEffect(() => {
+    geoAnswerRef.current = geoAnswer;
+  }, [geoAnswer]);
+
+  useEffect(() => {
     const q = nonQuizActiveQuestion;
     if (!q || q.type !== "ranking") {
       setRankOrder([]);
@@ -112,17 +126,18 @@ export function useQuizPlayQuestionFlow(params: Params) {
 
   const canSubmit = useMemo(() => {
     if (!quiz || !nonQuizActiveQuestion || !quizSessionReady) return false;
-    const alreadySubmitted = submittedQuestionIds.includes(nonQuizActiveQuestion.id);
+    const questionId = nonQuizActiveQuestion.id;
+    const alreadySubmitted = submittedQuestionIds.includes(questionId);
+    const inFlight = submitInFlightQuestionId === questionId;
+    if (alreadySubmitted || inFlight) return false;
+    if (nonQuizActiveQuestion.geoPollDictionary) {
+      return Boolean(geoAnswer?.key) && !nonQuizActiveQuestion.isClosed;
+    }
     if (nonQuizActiveQuestion.type === "tag_cloud") {
       const filled = tagAnswers.map((value) => value.trim()).filter(Boolean);
       const maxAnswers = Math.max(1, nonQuizActiveQuestion.maxAnswers ?? 1);
       const expandedCount = tagCloudExpandedCount(filled);
-      return (
-        expandedCount > 0 &&
-        expandedCount <= maxAnswers &&
-        !nonQuizActiveQuestion.isClosed &&
-        !alreadySubmitted
-      );
+      return expandedCount > 0 && expandedCount <= maxAnswers && !nonQuizActiveQuestion.isClosed;
     }
     if (nonQuizActiveQuestion.type === "ranking") {
       const n = nonQuizActiveQuestion.options.length;
@@ -132,75 +147,136 @@ export function useQuizPlayQuestionFlow(params: Params) {
         rankOrder.length === n &&
         rankOrder.every((id) => setOk.has(id)) &&
         setOk.size === n &&
-        !nonQuizActiveQuestion.isClosed &&
-        !alreadySubmitted
+        !nonQuizActiveQuestion.isClosed
       );
     }
-    return selected.length > 0 && !nonQuizActiveQuestion.isClosed && !alreadySubmitted;
+    return selected.length > 0 && !nonQuizActiveQuestion.isClosed;
   }, [
     quiz,
     nonQuizActiveQuestion,
     selected,
     rankOrder,
     submittedQuestionIds,
+    submitInFlightQuestionId,
     tagAnswers,
+    geoAnswer,
     quizSessionReady,
   ]);
 
+  const beginSubmitInFlight = useCallback((questionId: string) => {
+    submitInFlightRef.current = questionId;
+    setSubmitInFlightQuestionId(questionId);
+  }, []);
+
+  const clearSubmitInFlight = useCallback((questionId?: string) => {
+    if (questionId && submitInFlightRef.current && submitInFlightRef.current !== questionId) {
+      return;
+    }
+    submitInFlightRef.current = null;
+    setSubmitInFlightQuestionId(null);
+  }, []);
+
+  const emitSubmit = useCallback(
+    (payload: SubmitPayload) => {
+      if (submitInFlightRef.current === payload.questionId) return;
+      beginSubmitInFlight(payload.questionId);
+      pendingSubmitPayloadRef.current = payload;
+      socket.emit("answer:submit", payload);
+    },
+    [beginSubmitInFlight],
+  );
+
   const submit = useCallback(() => {
     if (!quiz || !nonQuizActiveQuestion || !canSubmit || !quizSessionReady) return;
+    if (nonQuizActiveQuestion.geoPollDictionary) {
+      if (!geoAnswer?.key) return;
+      emitSubmit({
+        quizId: quiz.id,
+        questionId: nonQuizActiveQuestion.id,
+        tagAnswers: [geoAnswer.key],
+      });
+      return;
+    }
     if (nonQuizActiveQuestion.type === "tag_cloud") {
       const expanded = expandTagCloudSubmitLines(
         tagAnswers.map((value) => value.trim()).filter(Boolean),
       );
       const maxAnswers = Math.max(1, nonQuizActiveQuestion.maxAnswers ?? 1);
       if (expanded.length === 0 || expanded.length > maxAnswers) return;
-      const payload = {
+      emitSubmit({
         quizId: quiz.id,
         questionId: nonQuizActiveQuestion.id,
         tagAnswers: expanded,
-      };
-      pendingSubmitPayloadRef.current = payload;
-      socket.emit("answer:submit", payload);
+      });
       return;
     }
     if (nonQuizActiveQuestion.type === "ranking") {
-      const payload = {
+      emitSubmit({
         quizId: quiz.id,
         questionId: nonQuizActiveQuestion.id,
         rankedOptionIds: rankOrder,
-      };
-      pendingSubmitPayloadRef.current = payload;
-      socket.emit("answer:submit", payload);
+      });
       return;
     }
-    const payload = {
+    emitSubmit({
       quizId: quiz.id,
       questionId: nonQuizActiveQuestion.id,
       optionIds: selected,
-    };
-    pendingSubmitPayloadRef.current = payload;
-    socket.emit("answer:submit", payload);
-  }, [quiz, nonQuizActiveQuestion, canSubmit, tagAnswers, rankOrder, selected, quizSessionReady]);
+    });
+  }, [
+    quiz,
+    nonQuizActiveQuestion,
+    canSubmit,
+    tagAnswers,
+    geoAnswer,
+    rankOrder,
+    selected,
+    quizSessionReady,
+    emitSubmit,
+  ]);
 
-  const onQuestionSubmitted = useCallback((questionId: string) => {
-    setDismissedQuestionId(questionId);
-    if (pendingSubmitPayloadRef.current?.questionId === questionId) {
-      pendingSubmitPayloadRef.current = null;
-    }
-  }, []);
+  const onQuestionSubmitted = useCallback(
+    (questionId: string) => {
+      setDismissedQuestionId(questionId);
+      clearSubmitInFlight(questionId);
+      if (pendingSubmitPayloadRef.current?.questionId === questionId) {
+        pendingSubmitPayloadRef.current = null;
+      }
+    },
+    [clearSubmitInFlight],
+  );
 
   const onQuizJoined = useCallback(() => {
     const payload = pendingSubmitPayloadRef.current;
     if (!payload) return;
+    if (submittedQuestionIdsRef.current.includes(payload.questionId)) {
+      pendingSubmitPayloadRef.current = null;
+      clearSubmitInFlight(payload.questionId);
+      return;
+    }
+    // После reconnect: один повтор, если submit ещё не подтверждён.
+    submitInFlightRef.current = null;
+    beginSubmitInFlight(payload.questionId);
     socket.emit("answer:submit", payload);
-  }, []);
+  }, [beginSubmitInFlight, clearSubmitInFlight]);
 
   const toggleOption = useCallback(
     (id: string) => {
       if (!nonQuizActiveQuestion) return;
       if (nonQuizActiveQuestion.type === "single" || nonQuizActiveQuestion.type === "temperature") {
         setSelected((prev) => (prev.includes(id) ? [] : [id]));
+        return;
+      }
+      if (nonQuizActiveQuestion.type === "multi") {
+        const maxAnswers = resolveMultiMaxAnswers(
+          nonQuizActiveQuestion.maxAnswers,
+          nonQuizActiveQuestion.options.length,
+        );
+        setSelected((prev) => {
+          if (prev.includes(id)) return prev.filter((v) => v !== id);
+          if (prev.length >= maxAnswers) return prev;
+          return [...prev, id];
+        });
         return;
       }
       setSelected((prev) => (prev.includes(id) ? prev.filter((v) => v !== id) : [...prev, id]));
@@ -243,8 +319,11 @@ export function useQuizPlayQuestionFlow(params: Params) {
     setSelected([]);
     setRankOrder([]);
     setTagAnswers([""]);
+    setGeoAnswer(null);
     setDismissedQuestionId(null);
     pendingSubmitPayloadRef.current = null;
+    submitInFlightRef.current = null;
+    setSubmitInFlightQuestionId(null);
   }, []);
 
   const answeredCurrentQuestion =
@@ -279,6 +358,8 @@ export function useQuizPlayQuestionFlow(params: Params) {
     setRankOrder,
     tagAnswers,
     setTagAnswers,
+    geoAnswer,
+    setGeoAnswer,
     activeQuestionIdRef,
     activeQuestionTypeRef,
     selectedRef,
@@ -290,6 +371,7 @@ export function useQuizPlayQuestionFlow(params: Params) {
     moveRankOption,
     submit,
     onQuestionSubmitted,
+    clearSubmitInFlight,
     onQuizJoined,
     closeQuestionPopup,
     resetQuestionFlow,

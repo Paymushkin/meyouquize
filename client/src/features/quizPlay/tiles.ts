@@ -3,6 +3,7 @@ import {
   PHOTO_WALL_TILE_ID,
   PROGRAM_TILE_ID,
   SPEAKER_TILE_ID,
+  VIDEO_WALL_TILE_ID,
   withQuizResultsTileLast,
 } from "../../publicViewContract";
 
@@ -12,6 +13,10 @@ type BannerItem = {
   linkUrl: string;
   backgroundUrl: string;
   size: "2x1" | "1x1" | "full";
+  visualStyle?: "image" | "tile";
+  text?: string;
+  backgroundColor?: string;
+  textColor?: string;
 };
 
 export function getVisiblePlayerBanners(banners: BannerItem[] | undefined): BannerItem[] {
@@ -36,8 +41,9 @@ export function buildPlayerTilesOrder(
   for (const b of banners) {
     if (!deduped.includes(b.id)) deduped.push(b.id);
   }
-  if (!deduped.includes(SPEAKER_TILE_ID)) deduped.push(SPEAKER_TILE_ID);
   if (!deduped.includes(PROGRAM_TILE_ID)) deduped.push(PROGRAM_TILE_ID);
+  if (!deduped.includes(SPEAKER_TILE_ID)) deduped.push(SPEAKER_TILE_ID);
   if (!deduped.includes(PHOTO_WALL_TILE_ID)) deduped.push(PHOTO_WALL_TILE_ID);
+  if (!deduped.includes(VIDEO_WALL_TILE_ID)) deduped.push(VIDEO_WALL_TILE_ID);
   return withQuizResultsTileLast([...deduped, ...quizTiles]);
 }

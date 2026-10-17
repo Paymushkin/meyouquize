@@ -1,7 +1,7 @@
 /* eslint-disable react-refresh/only-export-components */
 import React from "react";
 import { createRoot } from "react-dom/client";
-import { BrowserRouter, Route, Routes } from "react-router-dom";
+import { BrowserRouter, Outlet, Route, Routes } from "react-router-dom";
 import { CssBaseline, ThemeProvider, createTheme } from "@mui/material";
 import "./styles/jost-local.css";
 import "./styles/roboto-local.css";
@@ -17,9 +17,11 @@ import { AdminSubQuizResultsPage } from "./pages/AdminSubQuizResultsPage";
 import { AdminUsersPage } from "./pages/AdminUsersPage";
 import { PublicReportPage } from "./pages/PublicReportPage";
 import { LandingPage } from "./pages/LandingPage";
+import { SpeakerModeratorPage } from "./pages/SpeakerModeratorPage";
 import { NotFoundPage } from "./pages/NotFoundPage";
 import { ForbiddenPage } from "./pages/ForbiddenPage";
 import { AdminSectionLayout } from "./components/admin/AdminSectionLayout";
+import { AppErrorBoundary } from "./components/AppErrorBoundary";
 
 const theme = createTheme({
   palette: {
@@ -105,15 +107,25 @@ const theme = createTheme({
   },
 });
 
-function App() {
+function PurpleAppShell() {
   return (
     <ThemeProvider theme={theme}>
       <CssBaseline />
-      <BrowserRouter>
-        <Routes>
+      <Outlet />
+    </ThemeProvider>
+  );
+}
+
+function App() {
+  return (
+    <BrowserRouter>
+      <Routes>
+        <Route path="/" element={<LandingPage />} />
+        <Route element={<PurpleAppShell />}>
           <Route path="/q/:slug" element={<QuizPlayPage />} />
           <Route path="/q/:slug/results" element={<ResultsPage />} />
           <Route path="/p/:slug" element={<ResultsPage />} />
+          <Route path="/s/:slug" element={<SpeakerModeratorPage />} />
           <Route path="/report/:slug" element={<PublicReportPage />} />
           <Route path="/admin" element={<AdminSectionLayout />}>
             <Route index element={<AdminRoomsPage />} />
@@ -128,14 +140,22 @@ function App() {
             />
             <Route path=":eventName" element={<AdminEventRoute />} />
           </Route>
-          <Route path="/" element={<LandingPage />} />
           <Route path="/403" element={<ForbiddenPage />} />
           <Route path="/404" element={<NotFoundPage />} />
           <Route path="*" element={<NotFoundPage />} />
-        </Routes>
-      </BrowserRouter>
-    </ThemeProvider>
+        </Route>
+      </Routes>
+    </BrowserRouter>
   );
 }
 
-createRoot(document.getElementById("root")!).render(<App />);
+window.addEventListener("vite:preloadError", (event) => {
+  event.preventDefault();
+  window.location.reload();
+});
+
+createRoot(document.getElementById("root")!).render(
+  <AppErrorBoundary>
+    <App />
+  </AppErrorBoundary>,
+);

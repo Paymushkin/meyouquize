@@ -153,7 +153,11 @@ export function applyOptionVoteCountOverrides<T extends { optionId: string; coun
   });
   for (const row of overrides) {
     if (seen.has(row.text)) continue;
-    next.push({ optionId: row.text, count: resolveOptionOverrideDisplayCount(0, row) } as T);
+    next.push({
+      optionId: row.text,
+      text: row.text,
+      count: resolveOptionOverrideDisplayCount(0, row),
+    } as unknown as T);
   }
   return next;
 }

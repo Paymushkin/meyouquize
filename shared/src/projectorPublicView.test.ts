@@ -81,6 +81,42 @@ describe("projectorPublicViewChanged", () => {
     expect(projectorPublicViewChanged(prev, next)).toBe(false);
   });
 
+  it("returns true when debate series round bars toggle changes", () => {
+    const prev = normalizePublicViewState({
+      mode: "debate_series",
+      questionId: "q1",
+      debateSeriesId: "ser1",
+      debateSeriesView: "cumulative",
+      debateSeriesShowRounds: false,
+    });
+    const next = mergePublicViewState(prev, { debateSeriesShowRounds: true });
+    expect(projectorPublicViewChanged(prev, next)).toBe(true);
+    expect(pickProjectorPublicViewState(next).debateSeriesShowRounds).toBe(true);
+    expect(pickProjectorPublicViewState(next).questionId).toBe("q1");
+    expect(pickProjectorPublicViewState(next).debateSeriesId).toBe("ser1");
+  });
+
+  it("returns true when debate series option vote overrides change", () => {
+    const prev = normalizePublicViewState({
+      mode: "debate_series",
+      questionId: "q1",
+      debateSeriesId: "ser1",
+      debateSeriesView: "cumulative",
+      tagCloudManualByQuestionId: {},
+    });
+    const next = mergePublicViewState(prev, {
+      tagCloudManualByQuestionId: {
+        q1: {
+          hiddenTagTexts: [],
+          injectedTagWords: [],
+          tagCountOverrides: [],
+          optionVoteCountOverrides: [{ text: "opt-1", count: 5, mode: "delta" }],
+        },
+      },
+    });
+    expect(projectorPublicViewChanged(prev, next)).toBe(true);
+  });
+
   it("returns false for identical views", () => {
     const view = normalizePublicViewState(DEFAULT_PUBLIC_VIEW_STATE);
     expect(projectorPublicViewChanged(view, view)).toBe(false);
@@ -173,11 +209,45 @@ describe("projectorPublicViewChanged", () => {
     expect(picked.photoWallImageCount).toBe(2);
     expect(picked.photoWallBaseUrl).toBe("https://storage.yandexcloud.net/b/w/");
   });
+
+  it("returns true when video wall settings change", () => {
+    const prev = normalizePublicViewState({
+      mode: "video_wall",
+      videoWallHorizontalItems: [{ id: "1", url: "https://example.com/a.mp4", title: "A" }],
+    });
+    const next = mergePublicViewState(prev, {
+      videoWallHorizontalItems: [
+        { id: "1", url: "https://example.com/a.mp4", title: "A" },
+        { id: "2", url: "https://example.com/b.mp4", title: "B" },
+      ],
+    });
+    expect(projectorPublicViewChanged(prev, next)).toBe(true);
+  });
+
+  it("picks video_wall mode keys for projector", () => {
+    const view = normalizePublicViewState({
+      mode: "video_wall",
+      videoWallHorizontalItems: [{ id: "1", url: "https://example.com/a.mp4", title: "Горизонт" }],
+      videoWallHorizontalPosterUrl: "https://example.com/h.jpg",
+      videoWallVerticalItems: [{ id: "2", url: "https://example.com/b.mov", title: "Вертикаль" }],
+      videoWallVerticalPosterUrl: "https://example.com/v.jpg",
+    });
+    const picked = pickProjectorPublicViewState(view);
+    expect(picked.mode).toBe("video_wall");
+    expect(picked.videoWallHorizontalItems).toHaveLength(1);
+    expect(picked.videoWallVerticalItems).toHaveLength(1);
+    expect(picked.videoWallHorizontalItems[0]?.title).toBe("Горизонт");
+    expect(picked.videoWallHorizontalPosterUrl).toBeUndefined();
+    expect(picked.videoWallVerticalPosterUrl).toBeUndefined();
+  });
 });
 
 describe("isPlayerOnlyPublicViewStateKey", () => {
   it("recognizes player-only keys", () => {
     expect(isPlayerOnlyPublicViewStateKey("speakerTileVisible")).toBe(true);
+    expect(isPlayerOnlyPublicViewStateKey("playerTilesGridColumns")).toBe(true);
+    expect(isPlayerOnlyPublicViewStateKey("videoWallHorizontalPosterUrl")).toBe(true);
+    expect(isPlayerOnlyPublicViewStateKey("videoWallVerticalPosterUrl")).toBe(true);
     expect(isPlayerOnlyPublicViewStateKey("projectorBackground")).toBe(false);
   });
 });

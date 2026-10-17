@@ -7,7 +7,7 @@ import {
 import { ProjectorSideBySideContent } from "../projector/ProjectorSideBySideContent";
 
 type Props = {
-  text: string;
+  text?: string;
   imageUrl?: string | null;
   imageSize?: number;
   sx?: Record<string, unknown>;
@@ -16,7 +16,7 @@ type Props = {
 export function ProjectorOptionLabel(props: Props) {
   const { text, imageUrl, imageSize = PROJECTOR_OPTION_LABEL_IMAGE_SIZE, sx } = props;
   const hasImage = optionHasImage(imageUrl);
-  const hasText = Boolean(text.trim());
+  const hasText = Boolean(typeof text === "string" ? text.trim() : "");
   const alt = optionAltText(text);
 
   if (hasImage) {

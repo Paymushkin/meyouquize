@@ -206,6 +206,24 @@ describe("mergePublicViewState", () => {
     expect(next.questionRevealStage).toBe("options");
   });
 
+  it("keeps debate_series seed questionId when toggling round bars", () => {
+    const prev = normalizePublicViewState({
+      mode: "debate_series",
+      questionId: "q-seed",
+      debateSeriesId: "ser-1",
+      debateSeriesView: "cumulative",
+      debateSeriesQuestionIds: ["q-seed", "q-2"],
+      debateSeriesShowRounds: false,
+      questionRevealStage: "results",
+    });
+    const next = mergePublicViewState(prev, { debateSeriesShowRounds: true });
+    expect(next.mode).toBe("debate_series");
+    expect(next.questionId).toBe("q-seed");
+    expect(next.debateSeriesId).toBe("ser-1");
+    expect(next.debateSeriesShowRounds).toBe(true);
+    expect(next.questionRevealStage).toBe("results");
+  });
+
   it("projects manual tag cloud fields for active question", () => {
     const prev = normalizePublicViewState({
       mode: "question",
@@ -223,8 +241,8 @@ describe("mergePublicViewState", () => {
     expect(next.hiddenTagTexts).toEqual(["скрытый"]);
   });
 
-  it("backfills banners_summary for legacy report module lists", () => {
-    const state = normalizePublicViewState({
+  it("keeps explicit report module lists without re-adding banners_summary", () => {
+    const legacy = normalizePublicViewState({
       reportModules: [
         "event_header",
         "participation_summary",
@@ -235,15 +253,30 @@ describe("mergePublicViewState", () => {
         "speaker_questions_summary",
       ],
     });
-    expect(state.reportModules).toEqual([
+    expect(legacy.reportModules).not.toContain("banners_summary");
+
+    const optedOut = normalizePublicViewState({
+      reportModules: [
+        "event_header",
+        "participation_summary",
+        "quiz_results",
+        "vote_results",
+        "reactions_summary",
+        "feedback_summary",
+        "randomizer_summary",
+        "speaker_questions_summary",
+      ],
+    });
+    expect(optedOut.reportModules).not.toContain("banners_summary");
+    expect(optedOut.reportModules).toEqual([
       "event_header",
       "participation_summary",
       "quiz_results",
       "vote_results",
       "reactions_summary",
+      "feedback_summary",
       "randomizer_summary",
       "speaker_questions_summary",
-      "banners_summary",
     ]);
   });
 });
@@ -310,11 +343,60 @@ describe("projectorJoinQr visibility", () => {
   });
 });
 
+describe("projectorBrowserZoom", () => {
+  it("defaults to 1 and clamps to 0.5–5 with step 0.1", () => {
+    expect(DEFAULT_PUBLIC_VIEW_STATE.projectorBrowserZoom).toBe(1);
+    expect(normalizePublicViewState({ projectorBrowserZoom: 1.2 }).projectorBrowserZoom).toBe(1.2);
+    expect(normalizePublicViewState({ projectorBrowserZoom: 0.2 }).projectorBrowserZoom).toBe(0.5);
+    expect(normalizePublicViewState({ projectorBrowserZoom: 9 }).projectorBrowserZoom).toBe(5);
+  });
+
+  it("migrates legacy percent values", () => {
+    expect(
+      normalizePublicViewState({
+        projectorBrowserZoomPercent: 120,
+      } as Parameters<typeof normalizePublicViewState>[0]).projectorBrowserZoom,
+    ).toBe(1.2);
+  });
+});
+
+describe("projectorContentMaxWidthPx", () => {
+  it("defaults to 1920 and clamps to 800–7680", () => {
+    expect(DEFAULT_PUBLIC_VIEW_STATE.projectorContentMaxWidthPx).toBe(1920);
+    expect(
+      normalizePublicViewState({ projectorContentMaxWidthPx: 1600 }).projectorContentMaxWidthPx,
+    ).toBe(1600);
+    expect(
+      normalizePublicViewState({ projectorContentMaxWidthPx: 100 }).projectorContentMaxWidthPx,
+    ).toBe(800);
+    expect(
+      normalizePublicViewState({ projectorContentMaxWidthPx: 99999 }).projectorContentMaxWidthPx,
+    ).toBe(7680);
+  });
+});
+
 describe("DEFAULT_PUBLIC_VIEW_STATE", () => {
   it("has stable defaults", () => {
     expect(DEFAULT_PUBLIC_VIEW_STATE.mode).toBe("title");
     expect(DEFAULT_PUBLIC_VIEW_STATE.projectorJoinQrVisible).toBe(false);
     expect(DEFAULT_PUBLIC_VIEW_STATE.projectorJoinQrOverlayVisible).toBe(false);
     expect(DEFAULT_PUBLIC_VIEW_STATE.speakerTileVisible).toBe(false);
+    expect(DEFAULT_PUBLIC_VIEW_STATE.playerTilesGridColumns).toBe(3);
+  });
+});
+
+describe("playerTilesGridColumns", () => {
+  it("accepts 2 and 3", () => {
+    expect(normalizePublicViewState({ playerTilesGridColumns: 2 }).playerTilesGridColumns).toBe(2);
+    expect(normalizePublicViewState({ playerTilesGridColumns: 3 }).playerTilesGridColumns).toBe(3);
+  });
+
+  it("falls back to default for invalid values", () => {
+    expect(
+      normalizePublicViewState({ playerTilesGridColumns: 4 as 2 | 3 }).playerTilesGridColumns,
+    ).toBe(3);
+    expect(
+      normalizePublicViewState({ playerTilesGridColumns: 1 as 2 | 3 }).playerTilesGridColumns,
+    ).toBe(3);
   });
 });

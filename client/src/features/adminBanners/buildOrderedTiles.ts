@@ -3,8 +3,8 @@ import {
   parseQuizResultsSubQuizIdFromTileId,
   PHOTO_WALL_TILE_ID,
   PROGRAM_TILE_ID,
-  QUIZ_RESULTS_TILE_ID,
   SPEAKER_TILE_ID,
+  VIDEO_WALL_TILE_ID,
 } from "../../publicViewContract";
 import type { PublicBanner } from "../../publicViewContract";
 import type { OrderedTile } from "../../components/admin/banners/types";
@@ -26,6 +26,7 @@ export function buildOrderedTiles(
   brandPrimaryColor: string,
   playerVoteOptionTextColor: string,
   photoWallCollageSrcs: string[],
+  videoWallTileCoverUrl: string,
 ): OrderedTile[] {
   const legacyEffectiveId =
     playerQuizResultsSubQuizIds[0]?.trim() || subQuizzesForReport[0]?.id || "";
@@ -61,6 +62,14 @@ export function buildOrderedTiles(
           photoSrcs: photoWallCollageSrcs,
         };
       }
+      if (id === VIDEO_WALL_TILE_ID) {
+        return {
+          id,
+          kind: "video_wall" as const,
+          label: "Плитка «Видеостена» (1×1)",
+          coverUrl: videoWallTileCoverUrl,
+        };
+      }
       if (isQuizResultsTileId(id)) {
         const sqId = parseQuizResultsSubQuizIdFromTileId(id) ?? legacyEffectiveId;
         const sqTitle = subQuizzesForReport.find((s) => s.id === sqId)?.title?.trim();
@@ -78,7 +87,10 @@ export function buildOrderedTiles(
       return {
         id,
         kind: "banner" as const,
-        label: `Баннер: ${banner.linkUrl}`,
+        label:
+          banner.visualStyle === "tile"
+            ? `Баннер (плитка): ${banner.text?.trim() || banner.linkUrl}`
+            : `Баннер: ${banner.linkUrl}`,
         previewUrl: banner.backgroundUrl,
         size: banner.size,
         banner,

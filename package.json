@@ -8,7 +8,7 @@
     "shared"
   ],
   "scripts": {
-    "predev": "npm run build -w shared",
+    "predev": "npm run build -w shared && rm -rf client/node_modules/.vite",
     "dev": "concurrently -n server,client \"npm run dev -w server\" \"npm run dev -w client\"",
     "build": "npm run build -w shared && npm run build -w server && npm run build -w client",
     "test": "npm run test:unit && npm run test:integration",
@@ -40,7 +40,9 @@
     "ops:event-check": "bash deploy/scripts/event-day-check.sh",
     "ops:log-alerts": "bash deploy/scripts/meyouquize-log-alerts.sh",
     "install:chromium": "npx playwright install chromium",
-    "install:pdf": "bash deploy/scripts/install-pdf-chromium.sh"
+    "install:pdf": "bash deploy/scripts/install-pdf-chromium.sh",
+    "map:calibrate": "node -e \"console.log('Local only (npm run dev): http://localhost:5173/russia-map-calibrate.html')\"",
+    "map:apply-controls": "node client/scripts/apply-russia-map-controls.mjs client/scripts/russia-map-controls.latest.json"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.1",

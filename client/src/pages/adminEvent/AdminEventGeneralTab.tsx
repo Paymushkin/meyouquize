@@ -14,6 +14,10 @@ export type AdminEventGeneralTabProps = {
   onTogglePlayerAutoJoinRandomNickname: (next: boolean) => void;
   projectorJoinQrVisible: boolean;
   setProjectorJoinQrVisible: (value: boolean) => void;
+  projectorBrowserZoom: number;
+  setProjectorBrowserZoom: (value: number) => void;
+  projectorContentMaxWidthPx: number;
+  setProjectorContentMaxWidthPx: (value: number) => void;
   projectorJoinQrText: string;
   setProjectorJoinQrText: (value: string) => void;
   projectorJoinQrTextColor: string;
@@ -32,6 +36,10 @@ export function AdminEventGeneralTab({
   onTogglePlayerAutoJoinRandomNickname,
   projectorJoinQrVisible,
   setProjectorJoinQrVisible,
+  projectorBrowserZoom,
+  setProjectorBrowserZoom,
+  projectorContentMaxWidthPx,
+  setProjectorContentMaxWidthPx,
   projectorJoinQrText,
   setProjectorJoinQrText,
   projectorJoinQrTextColor,
@@ -51,6 +59,10 @@ export function AdminEventGeneralTab({
         onTogglePlayerAutoJoinRandomNickname={onTogglePlayerAutoJoinRandomNickname}
         projectorJoinQrVisible={projectorJoinQrVisible}
         setProjectorJoinQrVisible={setProjectorJoinQrVisible}
+        projectorBrowserZoom={projectorBrowserZoom}
+        setProjectorBrowserZoom={setProjectorBrowserZoom}
+        projectorContentMaxWidthPx={projectorContentMaxWidthPx}
+        setProjectorContentMaxWidthPx={setProjectorContentMaxWidthPx}
         projectorJoinQrText={projectorJoinQrText}
         setProjectorJoinQrText={setProjectorJoinQrText}
         projectorJoinQrTextColor={projectorJoinQrTextColor}

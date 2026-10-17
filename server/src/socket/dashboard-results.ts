@@ -6,7 +6,12 @@ import {
   invalidateDashboardResultsCache,
   setDashboardDebounceToken,
 } from "../dashboard-results-cache.js";
-import { isDashboardDebounceTokenCurrent } from "../dashboard-results-build.js";
+import {
+  dashboardBroadcastDelayMs,
+  isDashboardDebounceTokenCurrent,
+  shouldFlushDashboardForMaxWait,
+  shouldHonorRedisDebounceToken,
+} from "../dashboard-results-build.js";
 import { getDashboardResults, getQuizPublicState, type DashboardResults } from "../quiz-service.js";
 import { prisma } from "../prisma.js";
 import { getStoredPublicView } from "./public-view-store.js";
@@ -20,33 +25,49 @@ function emitDashboardBundle(io: Server, quizId: string, results: DashboardResul
 type PendingDebounce = {
   timer: ReturnType<typeof setTimeout>;
   token: string;
+  burstStartedAt: number;
 };
 
 const pendingTimers = new Map<string, PendingDebounce>();
 /** Один пересчёт на quizId за раз: параллельные submit/admin не дублируют getDashboardResults. */
 const inFlightBroadcast = new Map<string, Promise<void>>();
+/** Submit во время in-flight: после текущего пересчёта нужен ещё один. */
+const dirtyAfterBroadcast = new Set<string>();
+const lastBroadcastAt = new Map<string, number>();
 
 export function scheduleDashboardResultsBroadcast(io: Server, quizId: string) {
   const debounceMs = env.dashboardResultsDebounceMs;
-  const token = randomUUID();
-  void setDashboardDebounceToken(quizId, token, debounceMs);
-
+  const maxWaitMs = env.dashboardResultsMaxWaitMs;
+  const now = Date.now();
+  const last = lastBroadcastAt.get(quizId) ?? 0;
   const existing = pendingTimers.get(quizId);
+  const burstStartedAt = existing?.burstStartedAt ?? now;
+  const elapsedSinceEmitOrBurst = last > 0 ? now - last : now - burstStartedAt;
+  if (shouldFlushDashboardForMaxWait(maxWaitMs, elapsedSinceEmitOrBurst)) {
+    void broadcastDashboardResultsNow(io, quizId);
+    return;
+  }
+
+  const token = randomUUID();
+  const delayMs = dashboardBroadcastDelayMs(debounceMs, maxWaitMs, now - burstStartedAt);
+  void setDashboardDebounceToken(quizId, token, Math.max(debounceMs, maxWaitMs, delayMs));
+
   if (existing) clearTimeout(existing.timer);
 
+  const isMaxWaitFlush = delayMs === 0 && maxWaitMs > 0;
   const timer = setTimeout(() => {
     pendingTimers.delete(quizId);
     void (async () => {
-      if (env.redisUrl) {
+      if (env.redisUrl && shouldHonorRedisDebounceToken(isMaxWaitFlush)) {
         const redisToken = await getDashboardDebounceToken(quizId);
         // null — ключ истёк в тот же тик, что и таймер; не отменять единственный broadcast.
         if (redisToken !== null && !isDashboardDebounceTokenCurrent(token, redisToken)) return;
       }
       await broadcastDashboardResultsNow(io, quizId);
     })();
-  }, debounceMs);
+  }, delayMs);
 
-  pendingTimers.set(quizId, { timer, token });
+  pendingTimers.set(quizId, { timer, token, burstStartedAt });
 }
 
 export async function broadcastDashboardResultsNow(io: Server, quizId: string): Promise<void> {
@@ -55,8 +76,12 @@ export async function broadcastDashboardResultsNow(io: Server, quizId: string): 
   pendingTimers.delete(quizId);
 
   const running = inFlightBroadcast.get(quizId);
-  if (running) return running;
+  if (running) {
+    dirtyAfterBroadcast.add(quizId);
+    return running;
+  }
 
+  lastBroadcastAt.set(quizId, Date.now());
   const task = (async () => {
     try {
       await invalidateDashboardResultsCache(quizId);
@@ -64,6 +89,9 @@ export async function broadcastDashboardResultsNow(io: Server, quizId: string): 
       emitDashboardBundle(io, quizId, results);
     } finally {
       inFlightBroadcast.delete(quizId);
+      if (dirtyAfterBroadcast.delete(quizId)) {
+        scheduleDashboardResultsBroadcast(io, quizId);
+      }
     }
   })();
 

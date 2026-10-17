@@ -25,7 +25,7 @@ export function BrandPlayerUiResultsSection(props: Props) {
   } = props;
 
   return (
-    <Accordion defaultExpanded>
+    <Accordion>
       <AccordionSummary expandIcon={<ExpandMoreIcon />}>
         <Typography variant="subtitle2">Пользователь</Typography>
       </AccordionSummary>

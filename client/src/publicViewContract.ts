@@ -7,8 +7,17 @@ import {
   DEFAULT_PROJECTOR_JOIN_QR_OVERLAY_INSET_HORIZONTAL_PX,
   DEFAULT_PROJECTOR_JOIN_QR_OVERLAY_INSET_VERTICAL_PX,
   DEFAULT_PROJECTOR_JOIN_QR_OVERLAY_CORNER,
+  DEFAULT_PROJECTOR_BROWSER_ZOOM,
+  DEFAULT_PROJECTOR_CONTENT_MAX_WIDTH_PX,
+  PROJECTOR_BROWSER_ZOOM_MIN,
+  PROJECTOR_BROWSER_ZOOM_MAX,
+  PROJECTOR_BROWSER_ZOOM_STEP,
+  PROJECTOR_CONTENT_MAX_WIDTH_PX_MIN,
+  PROJECTOR_CONTENT_MAX_WIDTH_PX_MAX,
   PROJECTOR_JOIN_QR_TEXT_MAX_LENGTH,
   PROJECTOR_JOIN_QR_OVERLAY_CORNERS,
+  clampProjectorBrowserZoom,
+  clampProjectorContentMaxWidthPx,
   normalizePublicViewState,
   resolveBannerUniqueClicks,
   sanitizeBrandThemeId,
@@ -58,6 +67,8 @@ type BrandingKeys =
   | "brandProjectorBackgroundImageUrl"
   | "brandBodyBackgroundColor"
   | "projectorJoinQrVisible"
+  | "projectorBrowserZoom"
+  | "projectorContentMaxWidthPx"
   | "projectorJoinQrOverlayVisible"
   | "projectorJoinQrText"
   | "projectorJoinQrTextColor"
@@ -92,11 +103,12 @@ type PublicReactionWidget = {
 };
 
 export const PROGRAM_TILE_ID = "program_tile";
-export { PHOTO_WALL_TILE_ID } from "@meyouquize/shared";
+export { PHOTO_WALL_TILE_ID, VIDEO_WALL_TILE_ID } from "@meyouquize/shared";
 
 export type PublicViewPayload = SharedPublicViewPayload & {
   reactionsWidgets?: PublicReactionWidget[];
   playerVisibleResultQuestionIds?: string[];
+  playerVisibleDebateSeriesIds?: string[];
   randomizerListMode?: "participants_only" | "free_list";
   speakerTileVisible?: boolean;
   programTileText?: string;
@@ -108,6 +120,7 @@ export type PublicViewPayload = SharedPublicViewPayload & {
 export type PublicViewSetPatch = SharedPublicViewPatch & {
   reactionsWidgets?: PublicReactionWidget[];
   playerVisibleResultQuestionIds?: string[];
+  playerVisibleDebateSeriesIds?: string[];
   randomizerListMode?: "participants_only" | "free_list";
   speakerTileVisible?: boolean;
   programTileText?: string;
@@ -134,8 +147,17 @@ export {
   DEFAULT_PROJECTOR_JOIN_QR_OVERLAY_INSET_HORIZONTAL_PX,
   DEFAULT_PROJECTOR_JOIN_QR_OVERLAY_INSET_VERTICAL_PX,
   DEFAULT_PROJECTOR_JOIN_QR_OVERLAY_CORNER,
+  DEFAULT_PROJECTOR_BROWSER_ZOOM,
+  DEFAULT_PROJECTOR_CONTENT_MAX_WIDTH_PX,
+  PROJECTOR_BROWSER_ZOOM_MIN,
+  PROJECTOR_BROWSER_ZOOM_MAX,
+  PROJECTOR_BROWSER_ZOOM_STEP,
+  PROJECTOR_CONTENT_MAX_WIDTH_PX_MIN,
+  PROJECTOR_CONTENT_MAX_WIDTH_PX_MAX,
   PROJECTOR_JOIN_QR_TEXT_MAX_LENGTH,
   PROJECTOR_JOIN_QR_OVERLAY_CORNERS,
+  clampProjectorBrowserZoom,
+  clampProjectorContentMaxWidthPx,
   normalizePublicViewState,
   resolveBannerUniqueClicks,
   QUIZ_RESULTS_TILE_ID,
@@ -177,6 +199,8 @@ export function toBrandingState(payload: Partial<PublicViewPayload>): BrandingSt
     brandBodyBackgroundColor: view.brandBodyBackgroundColor,
     brandTheme: sanitizeBrandThemeId(view.brandTheme),
     projectorJoinQrVisible: view.projectorJoinQrVisible,
+    projectorBrowserZoom: view.projectorBrowserZoom,
+    projectorContentMaxWidthPx: view.projectorContentMaxWidthPx,
     projectorJoinQrOverlayVisible: view.projectorJoinQrOverlayVisible,
     projectorJoinQrText: view.projectorJoinQrText,
     projectorJoinQrTextColor: view.projectorJoinQrTextColor,

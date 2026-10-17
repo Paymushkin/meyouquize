@@ -3,11 +3,14 @@ import {
   PHOTO_WALL_TILE_ID,
   PROGRAM_TILE_ID,
   SPEAKER_TILE_ID,
+  VIDEO_WALL_TILE_ID,
+  contrastingTextOnColor,
   ruBallLabel,
 } from "@meyouquize/shared";
 import { isQuizResultsTileId } from "../../publicViewContract";
 import { PlayerPhotoWallCollageTile } from "../../components/quiz/PlayerPhotoWallCollageTile";
 import { PlayerQuizResultsTile } from "../../components/quiz/PlayerQuizResultsTile";
+import { PlayerVideoWallCollageTile } from "../../components/quiz/PlayerVideoWallCollageTile";
 import type { PlayerQuizResultsTileModel } from "../../features/quizPlay/playerQuizResults";
 import {
   playerEventTitleSx,
@@ -38,6 +41,13 @@ import { alpha, type SxProps, type Theme } from "@mui/material/styles";
 import { useState, type RefObject } from "react";
 import type { QuizState, ReactionType } from "./types";
 import { PlayerVisibleResultTileCard } from "../../components/quiz/PlayerVisibleResultTileCard";
+import { pcq } from "../../features/quizPlay/playerContainerQuery";
+import { buildPlayerTilesGridColumnsSx } from "../../features/quizPlay/playerTilesGridColumns";
+import { buildBrandBackground } from "../../features/branding/brandVisual";
+import {
+  quizPlayConnectionDotColor,
+  type QuizPlayConnectionIndicator,
+} from "../../features/quizPlay/connectionChip";
 import { resolveClientAssetUrl } from "../../utils/resolveClientAssetUrl";
 import {
   sanitizeBannerLinkUrl,
@@ -50,21 +60,47 @@ type BannerTile = {
   linkUrl: string;
   backgroundUrl: string;
   size: "2x1" | "1x1" | "full";
+  visualStyle?: "image" | "tile";
+  text?: string;
+  backgroundColor?: string;
+  textColor?: string;
 };
 
 type QuizPlayContainerSxParams = {
   brandFontFamily: string;
   isJoinScreen?: boolean;
   joined?: boolean;
+  backgroundColor?: string;
+  backgroundImageUrl?: string;
 };
 
 export function buildQuizPlayContainerSx(params: QuizPlayContainerSxParams): SxProps<Theme> {
-  const { brandFontFamily, isJoinScreen = false, joined = false } = params;
+  const {
+    brandFontFamily,
+    isJoinScreen = false,
+    joined = false,
+    backgroundColor,
+    backgroundImageUrl,
+  } = params;
   const allowMainScroll = joined && !isJoinScreen;
+  const normalizedImageUrl = backgroundImageUrl?.trim() ?? "";
+  const brandBg = buildBrandBackground({
+    backgroundImageUrl: normalizedImageUrl || undefined,
+    backgroundAnchor: "bottom",
+    backgroundAttachment: "scroll",
+  });
   return {
     position: "relative",
     zIndex: 1,
-    bgcolor: "transparent",
+    width: "100%",
+    maxWidth: "576px !important",
+    mx: "auto",
+    px: 2,
+    boxSizing: "border-box",
+    containerType: "inline-size",
+    backgroundColor: backgroundColor ?? "transparent",
+    ...brandBg,
+    backgroundRepeat: "no-repeat",
     fontFamily: brandFontFamily,
     fontStyle: "normal",
     "&, & *": {
@@ -75,18 +111,13 @@ export function buildQuizPlayContainerSx(params: QuizPlayContainerSxParams): SxP
         fontFamily: brandFontFamily,
         fontStyle: "normal",
       },
-    pt: isJoinScreen ? { xs: 5, sm: 6 } : 2,
-    maxWidth: "678px !important",
+    pt: isJoinScreen ? 5 : 2,
     pb: isJoinScreen
       ? "env(safe-area-inset-bottom, 0px)"
-      : {
-          xs: "calc(env(safe-area-inset-bottom, 0px) + 96px)",
-          sm: 4,
-        },
+      : "calc(env(safe-area-inset-bottom, 0px) + 96px)",
     minHeight: "100dvh",
     height: allowMainScroll ? "auto" : "100dvh",
     overflowY: allowMainScroll ? "auto" : "hidden",
-    boxSizing: "border-box",
     display: "flex",
     flexDirection: "column",
     justifyContent: "flex-start",
@@ -140,8 +171,8 @@ export function EventTitleBlock(props: EventTitleBlockProps) {
         flexShrink: 0,
         ...(isJoinScreen
           ? {
-              px: { xs: 2, sm: 0 },
-              mt: { xs: 1, sm: 1.5 },
+              px: pcq(2, 0),
+              mt: pcq(1, 1.5),
               alignSelf: "stretch",
             }
           : {}),
@@ -163,7 +194,7 @@ export function EventTitleBlock(props: EventTitleBlockProps) {
               alignSelf: "flex-start",
               mb: isJoinScreen ? 0.5 : 1.5,
               maxHeight: 56,
-              maxWidth: isJoinScreen ? "min(56vw, 220px)" : "min(60vw, 280px)",
+              maxWidth: isJoinScreen ? "min(56cqw, 220px)" : "min(60cqw, 280px)",
               objectFit: "contain",
             }}
           />
@@ -177,7 +208,7 @@ export function EventTitleBlock(props: EventTitleBlockProps) {
               isJoinScreen
                 ? {
                     ...playerEventTitleSx(brandFontFamily),
-                    fontSize: "clamp(1.75rem, 6vw, 3rem)",
+                    fontSize: "clamp(1.75rem, 6cqw, 3rem)",
                     lineHeight: 1.08,
                     letterSpacing: 0.4,
                     mb: 0,
@@ -195,6 +226,7 @@ export function EventTitleBlock(props: EventTitleBlockProps) {
 
 type PlayerTilesGridProps = {
   tileOrder: string[];
+  gridColumns: 2 | 3;
   visibleBannerById: Map<string, BannerTile>;
   speakerTileVisible: boolean;
   onSpeakerOpen: () => void;
@@ -210,6 +242,9 @@ type PlayerTilesGridProps = {
   photoWallTileVisible: boolean;
   photoWallCollageSrcs: string[];
   onOpenPhotoWall: () => void;
+  videoWallTileVisible: boolean;
+  videoWallTileCoverUrl: string;
+  onOpenVideoWall: () => void;
   playerQuizResultsTilesBySubQuizId: Map<string, PlayerQuizResultsTileModel>;
   onOpenQuizReport: (subQuizId: string) => void;
   playerVoteOptionTextColor: string;
@@ -222,6 +257,7 @@ type PlayerTilesGridProps = {
 export function PlayerTilesGrid(props: PlayerTilesGridProps) {
   const {
     tileOrder,
+    gridColumns,
     visibleBannerById,
     speakerTileVisible,
     onSpeakerOpen,
@@ -237,6 +273,9 @@ export function PlayerTilesGrid(props: PlayerTilesGridProps) {
     photoWallTileVisible,
     photoWallCollageSrcs,
     onOpenPhotoWall,
+    videoWallTileVisible,
+    videoWallTileCoverUrl,
+    onOpenVideoWall,
     playerQuizResultsTilesBySubQuizId,
     onOpenQuizReport,
     playerVoteOptionTextColor,
@@ -251,13 +290,9 @@ export function PlayerTilesGrid(props: PlayerTilesGridProps) {
       sx={{
         width: "100%",
         display: "grid",
-        /** 2 колонки до 600px, 3 колонки от sm (600px) */
-        gridTemplateColumns: {
-          xs: "repeat(2, minmax(0, 1fr))",
-          sm: "repeat(3, minmax(0, 1fr))",
-        },
+        ...buildPlayerTilesGridColumnsSx(gridColumns),
         justifyContent: "stretch",
-        gap: { xs: 1.5, sm: 2 },
+        gap: pcq(1.5, 2),
         mb: 2,
         mt: 1.5,
         alignItems: "start",
@@ -326,6 +361,16 @@ export function PlayerTilesGrid(props: PlayerTilesGridProps) {
               key={PHOTO_WALL_TILE_ID}
               photoSrcs={photoWallCollageSrcs}
               onClick={onOpenPhotoWall}
+            />
+          );
+        }
+        if (tileId === VIDEO_WALL_TILE_ID) {
+          if (!videoWallTileVisible || !videoWallTileCoverUrl.trim()) return null;
+          return (
+            <PlayerVideoWallCollageTile
+              key={VIDEO_WALL_TILE_ID}
+              coverUrl={videoWallTileCoverUrl}
+              onClick={onOpenVideoWall}
             />
           );
         }
@@ -404,9 +449,54 @@ export function PlayerTilesGrid(props: PlayerTilesGridProps) {
         const banner = visibleBannerById.get(tileId);
         if (!banner) return null;
         const safeBannerLinkUrl = sanitizeBannerLinkUrl(banner.linkUrl);
-        const safeBannerBackgroundUrl = sanitizeClientAssetUrl(banner.backgroundUrl);
-        if (!safeBannerLinkUrl || !safeBannerBackgroundUrl) return null;
+        if (!safeBannerLinkUrl) return null;
         const bannerOpensMail = safeBannerLinkUrl.startsWith("mailto:");
+        const isTileVisual = banner.visualStyle === "tile";
+        if (isTileVisual) {
+          const tileText = banner.text?.trim() || "Баннер";
+          const tileBg = banner.backgroundColor?.trim() || brandPrimaryColor;
+          const tileFg = banner.textColor?.trim() || "#fff";
+          return (
+            <Box
+              key={banner.id}
+              component="a"
+              href={safeBannerLinkUrl}
+              {...(bannerOpensMail ? {} : { target: "_blank", rel: "noopener noreferrer" })}
+              onClick={() => onBannerClick(banner.id)}
+              sx={{
+                gridColumn: "1 / -1",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "flex-start",
+                width: "100%",
+                height: "auto",
+                justifySelf: "stretch",
+                position: "relative",
+                border: "none",
+                borderRadius: 2,
+                px: 2.5,
+                py: 2,
+                cursor: "pointer",
+                textAlign: "left",
+                textDecoration: "none",
+                whiteSpace: "pre-line",
+                backgroundColor: tileBg,
+                color: tileFg,
+                boxShadow: 3,
+                transition: "background-color 120ms ease",
+                "&:hover": {
+                  backgroundColor: alpha(tileBg, 0.88),
+                },
+              }}
+            >
+              <Typography component="span" sx={playerFullWidthTileLabelSx}>
+                {tileText}
+              </Typography>
+            </Box>
+          );
+        }
+        const safeBannerBackgroundUrl = sanitizeClientAssetUrl(banner.backgroundUrl);
+        if (!safeBannerBackgroundUrl) return null;
         return (
           <Box
             key={banner.id}
@@ -457,9 +547,7 @@ export function PlayerTilesGrid(props: PlayerTilesGridProps) {
   );
 }
 
-type ConnectionChipState =
-  | { label: string; variant: "filled"; accentFill: true }
-  | { label: string; color: "warning" | "error"; variant: "filled" | "outlined" };
+type ConnectionChipState = QuizPlayConnectionIndicator;
 
 const PLAYER_BAR_ROOT_SX: SxProps<Theme> = { mb: 3 };
 
@@ -485,37 +573,13 @@ const NICKNAME_CHIP_SX: SxProps<Theme> = {
   },
 };
 
-function buildConnectionChipSx(
-  connectionChip: ConnectionChipState,
-  accentBackgroundColor: string,
-  accentTextColor: string,
-): SxProps<Theme> {
-  const accentFill = "accentFill" in connectionChip;
-  return {
-    alignItems: "center",
-    borderRadius: 1.25,
-    fontWeight: 400,
-    ...(accentFill
-      ? {
-          backgroundColor: accentBackgroundColor,
-          color: accentTextColor,
-          border: "1px solid rgba(255,255,255,0.35)",
-          boxShadow: `0 0 0 1px ${alpha(accentBackgroundColor, 0.45)} inset`,
-        }
-      : {}),
-    "& .MuiChip-label": {
-      display: "flex",
-      alignItems: "center",
-      height: "100%",
-      fontWeight: 400,
-      letterSpacing: 0.2,
-      ...(accentFill ? { color: accentTextColor } : {}),
-    },
-    "& .MuiChip-icon": {
-      ...(accentFill ? { color: accentTextColor } : {}),
-    },
-  };
-}
+const CONNECTION_DOT_SX = {
+  width: 10,
+  height: 10,
+  borderRadius: "50%",
+  flexShrink: 0,
+  boxShadow: "0 0 0 2px rgba(255,255,255,0.55)",
+} as const;
 
 const JOIN_CARD_ROOT_SX: SxProps<Theme> = {
   width: "100%",
@@ -529,7 +593,7 @@ const JOIN_CARD_ROOT_SX: SxProps<Theme> = {
 export const JOIN_SCREEN_STACK_SX: SxProps<Theme> = {
   width: "100%",
   maxWidth: 520,
-  px: { xs: 2, sm: 0 },
+  px: pcq(2, 0),
   display: "flex",
   flexDirection: "column",
   alignItems: "stretch",
@@ -615,8 +679,8 @@ const RANDOM_NICKNAME_BUTTON_SX: SxProps<Theme> = {
   borderColor: "rgba(255, 255, 255, 0.5)",
   minHeight: 56,
   px: 4,
-  mx: { xs: 0, sm: 1 },
-  minWidth: { sm: 180 },
+  mx: pcq(0, 1),
+  minWidth: { "@sm": 180 },
   whiteSpace: "nowrap",
   "&:hover": {
     borderColor: "rgba(255, 255, 255, 0.75)",
@@ -647,14 +711,13 @@ export function buildBrandOutlinedButtonSx(textColor: string): SxProps<Theme> {
 
 type PlayerIdentityBarProps = {
   nickname: string;
-  formBackgroundColor: string;
-  formTextColor: string;
   connectionChip: ConnectionChipState;
   onNicknameClick: () => void;
 };
 
 export function PlayerIdentityBar(props: PlayerIdentityBarProps) {
-  const { nickname, formBackgroundColor, formTextColor, connectionChip, onNicknameClick } = props;
+  const { nickname, connectionChip, onNicknameClick } = props;
+  const dotColor = quizPlayConnectionDotColor(connectionChip.tone);
   return (
     <Box sx={PLAYER_BAR_ROOT_SX}>
       <Stack direction="row" alignItems="center" justifyContent="space-between" spacing={1}>
@@ -672,13 +735,17 @@ export function PlayerIdentityBar(props: PlayerIdentityBarProps) {
             </IconButton>
           </Tooltip>
         </Stack>
-        <Chip
-          size="small"
-          label={connectionChip.label}
-          {...("accentFill" in connectionChip ? {} : { color: connectionChip.color })}
-          variant={connectionChip.variant}
-          sx={buildConnectionChipSx(connectionChip, formBackgroundColor, formTextColor)}
-        />
+        <Tooltip title={connectionChip.label}>
+          <Box
+            component="span"
+            role="status"
+            aria-label={connectionChip.label}
+            sx={{
+              ...CONNECTION_DOT_SX,
+              bgcolor: dotColor,
+            }}
+          />
+        </Tooltip>
       </Stack>
     </Box>
   );
@@ -734,12 +801,15 @@ export function ReactionsDock(props: ReactionsDockProps) {
     <Box
       sx={{
         position: "fixed",
-        left: 0,
-        right: 0,
+        left: "50%",
+        transform: "translateX(-50%)",
+        width: "100%",
+        maxWidth: 576,
         bottom: 0,
         zIndex: 1450,
-        px: { xs: 1.25, sm: 2 },
-        pb: { xs: 1.25, sm: 2 },
+        containerType: "inline-size",
+        px: pcq(1.25, 2),
+        pb: pcq(1.25, 2),
       }}
     >
       {bursts.map((burst) => (
@@ -786,40 +856,69 @@ export function ReactionsDock(props: ReactionsDockProps) {
         useFlexGap
         sx={{ overflowX: "visible", pb: 0.25 }}
       >
-        {reactions.map((item) => (
-          <Button
-            key={item.type}
-            variant="outlined"
-            color="primary"
-            size="large"
-            onClick={(event) => {
-              onToggleReaction(item.type);
-              spawnBurstsFromButton(item.emoji, event.currentTarget);
-            }}
-            sx={{
-              bgcolor: "rgba(0, 0, 0, 0.52)",
-              borderWidth: 2,
-              borderColor: brandPrimaryColor,
-              "&:hover": {
-                bgcolor: "rgba(0, 0, 0, 0.62)",
+        {reactions.map((item) => {
+          // Эмодзи — квадрат 76×76; длинный текст — ширина по контенту (min = тот же размер).
+          const isShortGlyph = Array.from(item.emoji.trim()).length <= 2;
+          return (
+            <Button
+              key={item.type}
+              variant="outlined"
+              color="inherit"
+              size="large"
+              onClick={(event) => {
+                onToggleReaction(item.type);
+                spawnBurstsFromButton(item.emoji, event.currentTarget);
+              }}
+              sx={{
+                bgcolor: "rgba(0, 0, 0, 0.52)",
                 borderWidth: 2,
                 borderColor: brandPrimaryColor,
-              },
-              textTransform: "none",
-              width: { xs: 76, sm: 86 },
-              minWidth: { xs: 76, sm: 86 },
-              height: { xs: 76, sm: 86 },
-              minHeight: { xs: 76, sm: 86 },
-              p: 0,
-              fontWeight: 700,
-              borderRadius: 1.5,
-            }}
-          >
-            <Box component="span" sx={{ fontSize: { xs: "1.8rem", sm: "2rem" }, lineHeight: 1 }}>
-              {item.emoji}
-            </Box>
-          </Button>
-        ))}
+                color: brandPrimaryColor,
+                "&:hover": {
+                  bgcolor: "rgba(0, 0, 0, 0.62)",
+                  borderWidth: 2,
+                  borderColor: brandPrimaryColor,
+                  color: brandPrimaryColor,
+                },
+                "&:active": {
+                  bgcolor: brandPrimaryColor,
+                  borderColor: brandPrimaryColor,
+                  color: contrastingTextOnColor(brandPrimaryColor),
+                },
+                "&.Mui-focusVisible": {
+                  bgcolor: "rgba(0, 0, 0, 0.52)",
+                  borderColor: brandPrimaryColor,
+                  color: brandPrimaryColor,
+                },
+                ".MuiTouchRipple-child": {
+                  backgroundColor: brandPrimaryColor,
+                },
+                textTransform: "none",
+                minWidth: pcq(76, 86),
+                minHeight: pcq(76, 86),
+                width: "auto",
+                height: "auto",
+                px: isShortGlyph ? 0 : pcq(1.75, 2.25),
+                py: isShortGlyph ? 0 : pcq(1.25, 1.5),
+                fontWeight: 700,
+                borderRadius: 1.5,
+              }}
+            >
+              <Box
+                component="span"
+                sx={{
+                  fontSize: isShortGlyph ? pcq("1.8rem", "2rem") : pcq("0.95rem", "1.05rem"),
+                  lineHeight: isShortGlyph ? 1 : 1.2,
+                  whiteSpace: "nowrap",
+                  maxWidth: "100%",
+                  color: "inherit",
+                }}
+              >
+                {item.emoji}
+              </Box>
+            </Button>
+          );
+        })}
       </Stack>
     </Box>
   );
@@ -856,7 +955,11 @@ export function JoinCard(props: JoinCardProps) {
       <CardContent sx={JOIN_CARD_CONTENT_SX}>
         <Stack spacing={2}>
           <Stack spacing={0.75}>
-            <Stack direction={{ xs: "column", sm: "row" }} spacing={1}>
+            <Stack
+              direction={pcq<"column" | "row">("column", "row")}
+              spacing={0}
+              sx={{ gap: pcq(1.5, 1.5) }}
+            >
               <OutlinedInput
                 autoFocus
                 inputRef={nicknameInputRef}
@@ -909,11 +1012,8 @@ export function RestoreJoinPendingBlock() {
   return (
     <Box
       sx={{
-        mt: { xs: 2, md: "auto" },
-        mb: {
-          xs: "calc(env(safe-area-inset-bottom, 0px) + 76px)",
-          md: 5,
-        },
+        mt: pcq(2, "auto"),
+        mb: pcq("calc(env(safe-area-inset-bottom, 0px) + 76px)", 5),
         width: "100%",
         minHeight: 220,
         display: "flex",
@@ -948,13 +1048,19 @@ export function CompletionOverlay(props: CompletionOverlayProps) {
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        p: { xs: 1.5, sm: 2.5 },
+        p: pcq(1.5, 2.5),
         backgroundColor: "rgba(0, 0, 0, 0.42)",
       }}
     >
       <Card
         variant="outlined"
-        sx={{ width: "100%", maxWidth: 980, maxHeight: "92vh", overflowY: "auto" }}
+        sx={{
+          width: "100%",
+          maxWidth: 576,
+          maxHeight: "92vh",
+          overflowY: "auto",
+          containerType: "inline-size",
+        }}
       >
         <CardContent sx={{ position: "relative" }}>
           <IconButton

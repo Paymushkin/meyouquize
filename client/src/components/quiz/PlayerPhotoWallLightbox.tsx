@@ -40,7 +40,9 @@ export function PlayerPhotoWallLightbox({
       on={{ view: ({ index: nextIndex }) => onIndexChange(nextIndex) }}
       render={{
         slideFooter: ({ slide }) => {
-          const photo = photos.find((item) => item.src === slide.src);
+          const slideSrc = "src" in slide && typeof slide.src === "string" ? slide.src : "";
+          if (!slideSrc) return null;
+          const photo = photos.find((item) => item.src === slideSrc);
           if (!photo) return null;
           return (
             <Box sx={{ position: "absolute", right: 16, bottom: 20, zIndex: 2 }}>

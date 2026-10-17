@@ -1,6 +1,12 @@
 import { Box, Button } from "@mui/material";
 import { alpha } from "@mui/material/styles";
 import {
+  contrastingTextOnColor,
+  sanitizeOptionColor,
+  withDebateOptionColors,
+} from "@meyouquize/shared";
+import { pcq } from "../../features/quizPlay/playerContainerQuery";
+import {
   playerOptionImageGridTemplate,
   questionHasOptionImages,
   shouldSpanFullWidthInOptionGrid,
@@ -11,10 +17,13 @@ type VoteOption = {
   id: string;
   text: string;
   imageUrl?: string;
+  color?: string | null;
 };
 
 type Props = {
   options: VoteOption[];
+  /** Дебаты: те же цвета, что на шкале проектора. */
+  coloredByOption?: boolean;
   displayedSelected: string[];
   answeredCurrentQuestion: boolean;
   brandPrimaryColor: string;
@@ -27,23 +36,17 @@ function buildOptionButtonSx(
   brandPrimaryColor: string,
   playerVoteOptionTextColor: string,
   cardLayout: boolean,
+  accentColor?: string | null,
 ) {
-  return {
+  const layoutSx = {
     boxSizing: "border-box" as const,
-    border: "2px solid",
-    borderColor: isSelected ? brandPrimaryColor : "rgba(255,255,255,0.45)",
-    bgcolor: isSelected ? brandPrimaryColor : "transparent",
-    color: isSelected ? playerVoteOptionTextColor : "inherit",
-    "&:hover": {
-      bgcolor: isSelected ? alpha(brandPrimaryColor, 0.88) : "rgba(255,255,255,0.06)",
-    },
     transition: "background-color 180ms ease, border-color 180ms ease, color 180ms ease",
     boxShadow: "none",
     justifyContent: "flex-start",
     textAlign: "left" as const,
-    whiteSpace: "normal" as const,
-    px: cardLayout ? { xs: 1, sm: 1.5 } : 2,
-    py: cardLayout ? { xs: 1, sm: 1.5 } : 1.25,
+    whiteSpace: "pre-line" as const,
+    px: cardLayout ? pcq(1, 1.5) : 2,
+    py: cardLayout ? pcq(1, 1.5) : 1.25,
     ...(cardLayout
       ? {
           flexDirection: "column" as const,
@@ -51,11 +54,49 @@ function buildOptionButtonSx(
         }
       : {}),
   };
+
+  if (accentColor) {
+    const textOnAccent = contrastingTextOnColor(accentColor);
+    return {
+      ...layoutSx,
+      border: "2px solid",
+      borderColor: accentColor,
+      bgcolor: isSelected ? accentColor : "transparent",
+      // Невыбранный: тот же цвет, что и рамка; выбранный — контраст на заливке.
+      color: isSelected ? textOnAccent : accentColor,
+      "&:hover": {
+        bgcolor: isSelected ? alpha(accentColor, 0.88) : "rgba(255,255,255,0.06)",
+        borderColor: accentColor,
+      },
+    };
+  }
+
+  return {
+    ...layoutSx,
+    border: "2px solid",
+    borderColor: isSelected ? brandPrimaryColor : "rgba(255,255,255,0.45)",
+    bgcolor: isSelected ? brandPrimaryColor : "transparent",
+    color: isSelected ? playerVoteOptionTextColor : "inherit",
+    "&:hover": {
+      bgcolor: isSelected ? alpha(brandPrimaryColor, 0.88) : "rgba(255,255,255,0.06)",
+    },
+  };
+}
+
+export function resolvePlayerVoteOptionColors(
+  options: VoteOption[],
+  coloredByOption: boolean,
+): Array<string | null> {
+  if (!coloredByOption) {
+    return options.map((option) => sanitizeOptionColor(option.color));
+  }
+  return withDebateOptionColors(options).map((option) => option.color);
 }
 
 export function PlayerVoteOptionsGrid(props: Props) {
   const {
     options,
+    coloredByOption = false,
     displayedSelected,
     answeredCurrentQuestion,
     brandPrimaryColor,
@@ -63,28 +104,39 @@ export function PlayerVoteOptionsGrid(props: Props) {
     onToggleOption,
   } = props;
   const hasOptionImages = questionHasOptionImages(options);
+  const optionColors = resolvePlayerVoteOptionColors(options, coloredByOption);
+  const hugContentLayout = coloredByOption && !hasOptionImages;
 
   return (
     <Box
-      sx={{
-        width: "100%",
-        display: "grid",
-        gridTemplateColumns: playerOptionImageGridTemplate(hasOptionImages),
-        gap: 1.25,
-        alignItems: "stretch",
-      }}
+      sx={
+        hugContentLayout
+          ? {
+              width: "100%",
+              display: "flex",
+              flexWrap: "wrap",
+              gap: 1.25,
+              justifyContent: "center",
+              alignItems: "center",
+            }
+          : {
+              width: "100%",
+              display: "grid",
+              gridTemplateColumns: playerOptionImageGridTemplate(hasOptionImages),
+              gap: 1.25,
+              alignItems: "stretch",
+            }
+      }
     >
       {options.map((option, optionIndex) => {
         const isSelected = displayedSelected.includes(option.id);
-        const spanFullWidth = shouldSpanFullWidthInOptionGrid(
-          hasOptionImages,
-          options.length,
-          optionIndex,
-        );
+        const spanFullWidth =
+          !hugContentLayout &&
+          shouldSpanFullWidthInOptionGrid(hasOptionImages, options.length, optionIndex);
         return (
           <Button
             key={option.id}
-            fullWidth
+            fullWidth={!hugContentLayout}
             variant="outlined"
             color="inherit"
             sx={{
@@ -93,7 +145,17 @@ export function PlayerVoteOptionsGrid(props: Props) {
                 brandPrimaryColor,
                 playerVoteOptionTextColor,
                 hasOptionImages,
+                optionColors[optionIndex],
               ),
+              ...(hugContentLayout
+                ? {
+                    width: "auto",
+                    minWidth: 0,
+                    maxWidth: "100%",
+                    justifyContent: "center",
+                    textAlign: "center",
+                  }
+                : {}),
               ...(spanFullWidth ? { gridColumn: "1 / -1" } : {}),
             }}
             disabled={answeredCurrentQuestion}
@@ -104,6 +166,8 @@ export function PlayerVoteOptionsGrid(props: Props) {
               imageUrl={option.imageUrl}
               layout={hasOptionImages ? "card" : "inline"}
               compact={hasOptionImages}
+              fillWidth={!hugContentLayout}
+              textSx={hugContentLayout ? { textAlign: "center" } : undefined}
             />
           </Button>
         );

@@ -6,6 +6,7 @@ import {
   type PublicViewPatch,
 } from "@meyouquize/shared";
 import { setPublicViewSchema, subscribeResultsSchema } from "../../schemas.js";
+import { cleanupUnusedQuestionMedia, findRemovedLocalMediaUrls } from "../../media-cleanup.js";
 import { getDashboardResults, getQuizBySlug, getQuizPublicState } from "../../quiz-service.js";
 import { prisma } from "../../prisma.js";
 import { getStoredPublicView, saveStoredPublicView } from "../public-view-store.js";
@@ -147,6 +148,15 @@ export function registerResultsDashboardHandlers(socket: EnrichedSocket, io: Ser
         });
       }
       await saveStoredPublicView(payload.quizId, nextView);
+      const removedMediaUrls = findRemovedLocalMediaUrls(prevView, nextView);
+      if (removedMediaUrls.length > 0) {
+        void cleanupUnusedQuestionMedia(removedMediaUrls).catch((error) => {
+          console.warn("[media-cleanup] failed after public view update", {
+            quizId: payload.quizId,
+            error: error instanceof Error ? error.message : String(error),
+          });
+        });
+      }
       console.info("[mq-winners] admin:results:view:set merged", {
         quizId: payload.quizId,
         mode: nextView.mode,

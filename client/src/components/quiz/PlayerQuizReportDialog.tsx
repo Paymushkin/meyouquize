@@ -166,11 +166,7 @@ export function PlayerQuizReportDialog(props: Props) {
           </Box>
         ) : error ? (
           <Typography sx={{ color: "#ff8a80" }}>{error}</Typography>
-        ) : report && answeredQuestions.length === 0 ? (
-          <Typography sx={PLAYER_DIALOG_SECONDARY_TEXT}>
-            Пока нет отвеченных вопросов. Здесь появятся только те, на которые вы уже ответили.
-          </Typography>
-        ) : report ? (
+        ) : report && answeredQuestions.length > 0 ? (
           <Stack spacing={0.75} sx={{ pt: 0.5 }}>
             {answeredQuestions.map((q, idx, arr) => {
               const ok = isQuestionFullyCorrect(q);
@@ -205,7 +201,7 @@ export function PlayerQuizReportDialog(props: Props) {
                           flexShrink: 0,
                           color: brandPrimaryColor,
                           fontWeight: 800,
-                          fontSize: { xs: "1.35rem", sm: "1.5rem" },
+                          fontSize: { "@": "1.35rem", "@sm": "1.5rem" },
                           lineHeight: 1,
                           letterSpacing: -0.02,
                           whiteSpace: "nowrap",

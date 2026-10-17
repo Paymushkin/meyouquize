@@ -2,7 +2,7 @@
 
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
-import { PlayerVoteOptionsGrid } from "./PlayerVoteOptionsGrid";
+import { PlayerVoteOptionsGrid, resolvePlayerVoteOptionColors } from "./PlayerVoteOptionsGrid";
 import { ProjectorOptionLabel } from "./ProjectorOptionLabel";
 import { VoteResultOptionRow } from "./VoteResultOptionRow";
 
@@ -25,6 +25,57 @@ describe("PlayerVoteOptionsGrid", () => {
     expect(screen.getByText("Alpha")).toBeTruthy();
     expect(screen.getByText("Beta")).toBeTruthy();
   });
+
+  it("preserves line breaks in option text", () => {
+    render(
+      <PlayerVoteOptionsGrid
+        options={[{ id: "a", text: "Первая строка\nВторая строка" }]}
+        displayedSelected={[]}
+        answeredCurrentQuestion={false}
+        brandPrimaryColor="#7c5acb"
+        playerVoteOptionTextColor="#ffffff"
+        onToggleOption={vi.fn()}
+      />,
+    );
+
+    const label = screen.getByText(/Первая строка/);
+    expect(label.textContent).toBe("Первая строка\nВторая строка");
+    expect(getComputedStyle(label).whiteSpace).toBe("pre-line");
+  });
+
+  it("uses debate option colors for accents", () => {
+    const colors = resolvePlayerVoteOptionColors(
+      [
+        { id: "a", text: "A", color: "#00ff00" },
+        { id: "b", text: "B" },
+        { id: "c", text: "C" },
+      ],
+      true,
+    );
+    expect(colors).toEqual(["#00ff00", "#c62828", "#90a4ae"]);
+  });
+
+  it("hugs debate option labels and matches text color to border", () => {
+    render(
+      <PlayerVoteOptionsGrid
+        options={[
+          { id: "a", text: "Алармизм", color: "#c62828" },
+          { id: "b", text: "Оптимизм", color: "#2e7d32" },
+        ]}
+        coloredByOption
+        displayedSelected={[]}
+        answeredCurrentQuestion={false}
+        brandPrimaryColor="#7c5acb"
+        playerVoteOptionTextColor="#ffffff"
+        onToggleOption={vi.fn()}
+      />,
+    );
+
+    const button = screen.getByRole("button", { name: "Алармизм" });
+    expect(button.className).not.toMatch(/MuiButton-fullWidth/);
+    expect(getComputedStyle(button).color).toBe("rgb(198, 40, 40)");
+    expect(getComputedStyle(button).borderColor).toBe("rgb(198, 40, 40)");
+  });
 });
 
 describe("VoteResultOptionRow", () => {
@@ -45,11 +96,36 @@ describe("VoteResultOptionRow", () => {
     expect(screen.getByText("Вариант A")).toBeTruthy();
     expect(screen.getByText("42%")).toBeTruthy();
   });
+
+  it("renders image-only option without text", () => {
+    expect(() =>
+      render(
+        <VoteResultOptionRow
+          text={undefined}
+          imageUrl="/media/a.png"
+          pct={55}
+          rightStatValue="55%"
+          isCorrectAnswer={false}
+          isUserAnswer={false}
+          canShowUserAnswer={false}
+          playerVoteOptionTextColor="#ffffff"
+          playerVoteProgressBarColor="#1976d2"
+        />,
+      ),
+    ).not.toThrow();
+    expect(screen.getByText("55%")).toBeTruthy();
+  });
 });
 
 describe("ProjectorOptionLabel", () => {
   it("renders text-only label", () => {
     render(<ProjectorOptionLabel text="Проекторный вариант" />);
     expect(screen.getByText("Проекторный вариант")).toBeTruthy();
+  });
+
+  it("renders image-only label without text", () => {
+    expect(() =>
+      render(<ProjectorOptionLabel text={undefined} imageUrl="/media/a.png" />),
+    ).not.toThrow();
   });
 });

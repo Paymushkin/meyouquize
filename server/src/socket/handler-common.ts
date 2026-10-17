@@ -6,7 +6,7 @@ export type SocketData = {
   participantId?: string;
   quizId?: string;
   isAdmin?: boolean;
-  speakerViewer?: "player" | "projector" | "admin";
+  speakerViewer?: "player" | "projector" | "admin" | "moderator";
 };
 
 export type EnrichedSocket = Socket & { data: SocketData };

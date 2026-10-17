@@ -16,6 +16,7 @@ import {
   TextField,
   Typography,
 } from "@mui/material";
+import ContentCopyOutlinedIcon from "@mui/icons-material/ContentCopyOutlined";
 import SaveOutlinedIcon from "@mui/icons-material/SaveOutlined";
 import DeleteOutlineOutlinedIcon from "@mui/icons-material/DeleteOutlineOutlined";
 import type { SpeakerQuestionItem } from "../../types/speakerQuestions";
@@ -29,6 +30,33 @@ import { useSpeakerQuestionsTableState } from "../../features/speakerQuestionsAd
 
 const PAGE_SIZE = 50;
 
+function speakerRecipientDisplayName(speakerName: string): string {
+  if (speakerName === SPEAKER_ALL_TARGET) return "Все спикеры";
+  if (speakerName === SPEAKER_NOT_SELECTED) return "Не выбрано";
+  return speakerName;
+}
+
+/** Текст для буфера: «Кому: …» + текст вопроса из поля редактирования. */
+export function buildSpeakerQuestionClipboardText(
+  speakerName: string,
+  questionText: string,
+): string {
+  return `Кому: ${speakerRecipientDisplayName(speakerName)}\n${questionText}`;
+}
+
+async function copySpeakerQuestionToClipboard(
+  speakerName: string,
+  questionText: string,
+): Promise<void> {
+  const value = buildSpeakerQuestionClipboardText(speakerName, questionText);
+  if (!value.trim()) return;
+  try {
+    await navigator.clipboard.writeText(value);
+  } catch {
+    // unsupported browser / denied permission
+  }
+}
+
 type Props = {
   rows: SpeakerQuestionItem[];
   title: string;
@@ -37,6 +65,7 @@ type Props = {
   actionIcon: ReactNode;
   showScreenColumn: boolean;
   onSetUserVisible: (id: string, next: boolean) => void;
+  onSetModeratorVisible: (id: string, next: boolean) => void;
   onSetOnScreen?: (id: string, next: boolean) => void;
   onUpdateQuestionText: (id: string, text: string) => void;
   onAction: (id: string) => void;
@@ -77,6 +106,7 @@ export function SpeakerQuestionsTable({
   actionIcon,
   showScreenColumn,
   onSetUserVisible,
+  onSetModeratorVisible,
   onSetOnScreen,
   onUpdateQuestionText,
   onAction,
@@ -124,6 +154,9 @@ export function SpeakerQuestionsTable({
               <TableCell width={72}>
                 <SortableHeader label="UI" sort={sort} sortKey="ui" onChange={setSort} />
               </TableCell>
+              <TableCell width={72}>
+                <SortableHeader label="Мод." sort={sort} sortKey="moderator" onChange={setSort} />
+              </TableCell>
               {showScreenColumn ? (
                 <TableCell width={72}>
                   <SortableHeader label="Экран" sort={sort} sortKey="screen" onChange={setSort} />
@@ -151,11 +184,7 @@ export function SpeakerQuestionsTable({
                 </TableCell>
                 <TableCell>
                   <Typography variant="body2">
-                    {q.speakerName === SPEAKER_ALL_TARGET
-                      ? "Все спикеры"
-                      : q.speakerName === SPEAKER_NOT_SELECTED
-                        ? "Не выбрано"
-                        : q.speakerName}
+                    {speakerRecipientDisplayName(q.speakerName)}
                   </Typography>
                 </TableCell>
                 <TableCell align="center">
@@ -174,14 +203,25 @@ export function SpeakerQuestionsTable({
                       maxRows={6}
                       fullWidth
                     />
-                    <IconButton
-                      size="small"
-                      aria-label="Сохранить вопрос"
-                      onClick={() => onUpdateQuestionText(q.id, getTrimmedDraft(q))}
-                      disabled={!canSaveDraft(q)}
-                    >
-                      <SaveOutlinedIcon fontSize="small" />
-                    </IconButton>
+                    <Stack spacing={0.25}>
+                      <IconButton
+                        size="small"
+                        aria-label="Скопировать вопрос"
+                        onClick={() =>
+                          void copySpeakerQuestionToClipboard(q.speakerName, getDraftValue(q))
+                        }
+                      >
+                        <ContentCopyOutlinedIcon fontSize="small" />
+                      </IconButton>
+                      <IconButton
+                        size="small"
+                        aria-label="Сохранить вопрос"
+                        onClick={() => onUpdateQuestionText(q.id, getTrimmedDraft(q))}
+                        disabled={!canSaveDraft(q)}
+                      >
+                        <SaveOutlinedIcon fontSize="small" />
+                      </IconButton>
+                    </Stack>
                   </Stack>
                 </TableCell>
                 <TableCell>
@@ -192,6 +232,20 @@ export function SpeakerQuestionsTable({
                       <Switch
                         checked={q.userVisible}
                         onChange={(_, next) => onSetUserVisible(q.id, next)}
+                        inputProps={{ "aria-label": "Видимость у игроков" }}
+                      />
+                    }
+                  />
+                </TableCell>
+                <TableCell>
+                  <FormControlLabel
+                    sx={{ m: 0 }}
+                    label=""
+                    control={
+                      <Switch
+                        checked={q.moderatorVisible === true}
+                        onChange={(_, next) => onSetModeratorVisible(q.id, next)}
+                        inputProps={{ "aria-label": "Видимость на странице модератора" }}
                       />
                     }
                   />
@@ -205,6 +259,7 @@ export function SpeakerQuestionsTable({
                         <Switch
                           checked={q.isOnScreen}
                           onChange={(_, next) => onSetOnScreen?.(q.id, next)}
+                          inputProps={{ "aria-label": "Показать на экране" }}
                         />
                       }
                     />
@@ -236,7 +291,7 @@ export function SpeakerQuestionsTable({
             <TableFooter>
               <TableRow>
                 <TablePagination
-                  colSpan={showScreenColumn ? 9 : 8}
+                  colSpan={showScreenColumn ? 10 : 9}
                   count={sortedRows.length}
                   page={page}
                   onPageChange={(_, nextPage) => setPage(nextPage)}

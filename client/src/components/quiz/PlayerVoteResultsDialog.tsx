@@ -8,6 +8,7 @@ import {
 import { voteResultsDialogQuestionSx } from "../../features/voteUi/voteQuestionLayout";
 import type { PlayerVisibleResultTile } from "../../pages/quiz-play/types";
 import { QuestionAssetImage } from "./QuestionAssetImage";
+import { PLAYER_DIALOG_PAPER_SX } from "./playerDialogStyles";
 import { VoteResultOptionRow } from "./VoteResultOptionRow";
 
 type Props = {
@@ -47,11 +48,7 @@ export function PlayerVoteResultsDialog(props: Props) {
       fullWidth
       maxWidth="sm"
       PaperProps={{
-        sx: {
-          bgcolor: "rgba(0, 0, 0, 0.9)",
-          color: "#fff",
-          backdropFilter: "blur(4px)",
-        },
+        sx: PLAYER_DIALOG_PAPER_SX,
       }}
     >
       <DialogTitle

@@ -49,6 +49,16 @@ export function buildReportTheme(branding: Branding) {
           },
         },
       },
+      MuiLink: {
+        defaultProps: {
+          color: "inherit",
+        },
+        styleOverrides: {
+          root: {
+            color: textColor,
+          },
+        },
+      },
       MuiCssBaseline: {
         styleOverrides: {
           body: {

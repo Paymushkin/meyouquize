@@ -3,15 +3,23 @@ import {
   collectTagCloudQuizReferenceAliases,
   computeTemperatureWeightedAverage,
   expandTagCloudSubmitLines,
+  findSpeakerSessionName,
   formatTagCloudReferenceAnswer,
+  groupDebateSeriesQuestionIds,
+  normalizeSpeakerQuestionSessions,
   normalizeTagComparable,
   parseStoredTagAnswersJson,
+  resolveDebateSeriesResultTitle,
+  resolveMultiMaxAnswers,
+  sanitizeOptionColor,
   sanitizeTagCloudManualByQuestionId,
+  sumDebateSeriesOptionStats,
   type PublicViewState,
   type TagCloudManualByQuestionId,
   prunePublicViewForRoomContent,
   publicViewRoomPruneChanged,
 } from "@meyouquize/shared";
+import { geoPollEntryLabel, resolveGeoPollEntry } from "./geo-poll-service.js";
 import {
   Prisma,
   QuestionType,
@@ -125,9 +133,20 @@ function pickPrimaryActiveSubQuizQuestion<
 }
 
 function isStoredAnswerValidForQuestion(
-  question: { type: QuestionType; options: Array<{ id: string }> },
+  question: {
+    type: QuestionType;
+    options: Array<{ id: string }>;
+    geoPollDictionary?: string | null;
+  },
   rawSelectedOptionIds: string,
 ): boolean {
+  const geoDictionary = question.geoPollDictionary?.trim() || null;
+  if (geoDictionary) {
+    // Geo keys are `city:<id>` / `country:XX` — do not run tag-cloud normalizeTag (it strips `:`).
+    const tags = parseSelectedIds(rawSelectedOptionIds);
+    if (tags.length !== 1) return false;
+    return resolveGeoPollEntry(geoDictionary, tags[0]!) != null;
+  }
   if (question.type === QuestionType.TAG_CLOUD) {
     return parseTagAnswers(rawSelectedOptionIds, false).length > 0;
   }
@@ -163,6 +182,12 @@ type QuestionDashboardRowBase = Prisma.QuestionGetPayload<{
     rankingKind: true;
     imageUrl: true;
     temperatureSubtitle: true;
+    debateBaselineQuestionId: true;
+    projectorDebateLayout: true;
+    debateSeriesId: true;
+    debateRoundIndex: true;
+    debateSeriesResultTitle: true;
+    geoPollDictionary: true;
     options: {
       select: {
         id: true;
@@ -171,6 +196,7 @@ type QuestionDashboardRowBase = Prisma.QuestionGetPayload<{
         sortOrder: true;
         imageUrl: true;
         weight: true;
+        color: true;
       };
     };
   };
@@ -202,10 +228,28 @@ export type QuestionReplaceInput = {
   tagCloudPlayerHint?: string | null;
   /** Для TEMPERATURE: подзаголовок на проекторе над шкалой. */
   temperatureSubtitle?: string | null;
+  /** Для дебатов: id baseline-опроса «до». */
+  debateBaselineQuestionId?: string | null;
+  /** Side-by-side layout на проекторе для дебатов (от 2 вариантов). */
+  projectorDebateLayout?: boolean;
+  /** Серия многораундовых дебатов. */
+  debateSeriesId?: string | null;
+  /** Индекс раунда в серии (0-based). */
+  debateRoundIndex?: number | null;
+  /** Заголовок накопительного итога серии. */
+  debateSeriesResultTitle?: string | null;
+  /** Geo poll: id словаря автодополнения. */
+  geoPollDictionary?: string | null;
   /** Только UI админки: корзина «отработанные». */
   adminDone?: boolean;
   imageUrl?: string;
-  options: Array<{ text: string; isCorrect: boolean; imageUrl?: string; weight?: number }>;
+  options: Array<{
+    text: string;
+    isCorrect: boolean;
+    imageUrl?: string;
+    weight?: number;
+    color?: string | null;
+  }>;
 };
 
 function normalizeStoredImageUrl(value: string | undefined | null): string | null {
@@ -341,6 +385,13 @@ function pointsForReplaceQuestion(q: QuestionReplaceInput): number {
 
 function maxAnswersForReplaceQuestion(q: QuestionReplaceInput): number {
   if (q.type === "tag_cloud") return q.maxAnswers ?? 3;
+  if (q.type === "multi") {
+    const optionCount = Math.max(1, q.options.length);
+    // 1 = без лимита (legacy и явный «все варианты»; схема maxAnswers ≤ 5).
+    const raw = Math.trunc(q.maxAnswers ?? 0) || 0;
+    if (raw <= 1 || raw >= optionCount) return 1;
+    return Math.min(5, optionCount, raw);
+  }
   if (q.type === "ranking") return q.options.length;
   if (q.type === "temperature") return 1;
   return 1;
@@ -354,6 +405,7 @@ function optionsCreateRows(questionId: string, options: QuestionReplaceInput["op
     sortOrder: idx,
     imageUrl: normalizeStoredImageUrl(o.imageUrl),
     weight: o.weight ?? null,
+    color: sanitizeOptionColor(o.color),
   }));
 }
 
@@ -401,6 +453,33 @@ function temperatureQuestionCreateData(q: QuestionReplaceInput) {
       q.temperatureSubtitle != null && q.temperatureSubtitle.trim() !== ""
         ? q.temperatureSubtitle.trim()
         : null,
+  };
+}
+
+function singlePollDebateQuestionData(q: QuestionReplaceInput) {
+  if (q.type !== "single" && q.type !== "multi") return {};
+  const baselineId =
+    q.debateBaselineQuestionId != null && q.debateBaselineQuestionId.trim() !== ""
+      ? q.debateBaselineQuestionId.trim()
+      : null;
+  const geoDictionary =
+    q.geoPollDictionary != null && q.geoPollDictionary.trim() !== ""
+      ? q.geoPollDictionary.trim()
+      : null;
+  return {
+    debateBaselineQuestionId: baselineId,
+    projectorDebateLayout: q.projectorDebateLayout ?? false,
+    debateSeriesId:
+      q.debateSeriesId != null && q.debateSeriesId.trim() !== "" ? q.debateSeriesId.trim() : null,
+    debateRoundIndex:
+      q.debateRoundIndex != null && Number.isFinite(q.debateRoundIndex)
+        ? Math.max(0, Math.min(99, Math.trunc(q.debateRoundIndex)))
+        : null,
+    debateSeriesResultTitle:
+      q.debateSeriesResultTitle != null && q.debateSeriesResultTitle.trim() !== ""
+        ? q.debateSeriesResultTitle.trim().slice(0, 200)
+        : null,
+    geoPollDictionary: geoDictionary,
   };
 }
 
@@ -660,6 +739,7 @@ export async function replaceRoomContent(eventName: string, content: RoomContent
               sortOrder: idx,
               imageUrl: normalizeStoredImageUrl(opt.imageUrl),
               weight: opt.weight ?? null,
+              color: sanitizeOptionColor(opt.color),
             },
           });
         }
@@ -672,6 +752,7 @@ export async function replaceRoomContent(eventName: string, content: RoomContent
               sortOrder: existing.length + relIdx,
               imageUrl: normalizeStoredImageUrl(opt.imageUrl),
               weight: opt.weight ?? null,
+              color: sanitizeOptionColor(opt.color),
             })),
           });
         } else if (existing.length > options.length) {
@@ -702,6 +783,7 @@ export async function replaceRoomContent(eventName: string, content: RoomContent
         ...tagCloudPlayerHintData(q),
         ...temperatureQuestionCreateData(q),
         ...tagCloudQuestionCreateData(q),
+        ...singlePollDebateQuestionData(q),
       };
       let targetQuestionId: string;
       if (q.id && existingQuestionIds.has(q.id)) {
@@ -788,7 +870,10 @@ export async function replaceRoomContent(eventName: string, content: RoomContent
 
   const [subQuizzes, questions, roomRow] = await Promise.all([
     prisma.subQuiz.findMany({ where: { quizId: roomId }, select: { id: true } }),
-    prisma.question.findMany({ where: { quizId: roomId }, select: { id: true } }),
+    prisma.question.findMany({
+      where: { quizId: roomId },
+      select: { id: true, debateSeriesId: true },
+    }),
     prisma.quiz.findUnique({ where: { id: roomId }, select: { publicView: true } }),
   ]);
   const storedView = publicViewJsonToState(roomRow?.publicView ?? null);
@@ -796,6 +881,9 @@ export async function replaceRoomContent(eventName: string, content: RoomContent
     storedView,
     new Set(subQuizzes.map((sq) => sq.id)),
     new Set(questions.map((q) => q.id)),
+    new Set(
+      questions.map((q) => q.debateSeriesId?.trim()).filter((id): id is string => Boolean(id)),
+    ),
   );
   if (publicViewRoomPruneChanged(storedView, prunedView)) {
     await saveStoredPublicView(roomId, prunedView);
@@ -908,11 +996,13 @@ export type PlayerVisibleResultTile = {
   temperatureSubtitle?: string | null;
   optionStats: Array<{
     optionId: string;
-    text: string;
+    /** Image-only варианты / ручные override могут прийти без текста. */
+    text?: string;
     imageUrl?: string;
     count: number;
     isCorrect: boolean;
     weight?: number;
+    color?: string;
     avgRank?: number;
     avgScore?: number;
     totalScore?: number;
@@ -946,15 +1036,24 @@ export async function getQuizPublicState(quizId: string) {
       );
   const activeQuestion = primarySubQuizQuestion ?? activeQuestions[0];
   let quizProgress: QuizProgressPayload | null = null;
+  const validDebateSeriesIds = new Set(
+    quiz.questions.map((q) => q.debateSeriesId?.trim()).filter((id): id is string => Boolean(id)),
+  );
   const view = prunePublicViewForRoomContent(
     publicViewJsonToState(quiz.publicView as Prisma.JsonValue | null),
     new Set(subQuizzesForPlayer.map((sq) => sq.id)),
     new Set(quiz.questions.map((q) => q.id)),
+    validDebateSeriesIds,
   );
-  const playerVisibleResults = await getPlayerVisibleResultsForQuiz(
-    quiz.id,
-    view.playerVisibleResultQuestionIds ?? [],
-  );
+  const [playerVisibleQuestionResults, playerVisibleSeriesResults] = await Promise.all([
+    getPlayerVisibleResultsForQuiz(quiz.id, view.playerVisibleResultQuestionIds ?? []),
+    getPlayerVisibleDebateSeriesResultsForQuiz(
+      quiz.id,
+      view.playerVisibleDebateSeriesIds ?? [],
+      view.tagCloudManualByQuestionId,
+    ),
+  ]);
+  const playerVisibleResults = [...playerVisibleQuestionResults, ...playerVisibleSeriesResults];
   const activeFeedbackForm = await getActiveFeedbackFormPublic(quiz.id);
   let activeStepIndex: number | undefined;
   let activeStepTotal: number | undefined;
@@ -1015,6 +1114,17 @@ export async function getQuizPublicState(quizId: string) {
     photoWallImageCount: view.photoWallImageCount,
     photoWallImageExt: view.photoWallImageExt,
     photoWallTileVisible: view.photoWallTileVisible,
+    videoWallHorizontalItems: view.videoWallHorizontalItems,
+    videoWallHorizontalPosterUrl: view.videoWallHorizontalPosterUrl,
+    videoWallVerticalItems: view.videoWallVerticalItems,
+    videoWallVerticalPosterUrl: view.videoWallVerticalPosterUrl,
+    videoWallProjectorShowHorizontal: view.videoWallProjectorShowHorizontal,
+    videoWallProjectorShowVertical: view.videoWallProjectorShowVertical,
+    videoWallProjectorMaxVideos: view.videoWallProjectorMaxVideos,
+    videoWallProjectorActiveSeconds: view.videoWallProjectorActiveSeconds,
+    videoWallProjectorFreezeSeconds: view.videoWallProjectorFreezeSeconds,
+    videoWallTileVisible: view.videoWallTileVisible,
+    videoWallTileCoverUrl: view.videoWallTileCoverUrl,
     playerQuizResultsTileVisible: view.playerQuizResultsTileVisible,
     playerQuizResultsTileText: view.playerQuizResultsTileText,
     playerQuizResultsTileBackgroundColor: view.playerQuizResultsTileBackgroundColor,
@@ -1030,6 +1140,7 @@ export async function getQuizPublicState(quizId: string) {
     playerVoteProgressBarColor: view.playerVoteProgressBarColor,
     playerVisibleResults,
     playerTilesOrder: view.playerTilesOrder,
+    playerTilesGridColumns: view.playerTilesGridColumns,
     brandPrimaryColor: view.brandPrimaryColor,
     brandAccentColor: view.brandAccentColor,
     brandSurfaceColor: view.brandSurfaceColor,
@@ -1041,7 +1152,7 @@ export async function getQuizPublicState(quizId: string) {
     brandPlayerBackgroundImageUrl: view.brandPlayerBackgroundImageUrl,
     brandProjectorBackgroundImageUrl: view.brandProjectorBackgroundImageUrl,
     brandBodyBackgroundColor: view.brandBodyBackgroundColor,
-    reactionSession: getReactionSessionPublic(quiz.id),
+    reactionSession: await getReactionSessionPublic(quiz.id),
     quizProgress,
     activeQuestions: activeQuestions.map((q) => ({
       id: q.id,
@@ -1049,11 +1160,15 @@ export async function getQuizPublicState(quizId: string) {
       imageUrl: q.imageUrl ?? undefined,
       type: prismaTypeToApi(q.type),
       scoringMode: q.scoringMode === ScoringMode.POLL ? "poll" : "quiz",
-      maxAnswers: q.maxAnswers,
+      maxAnswers:
+        q.type === QuestionType.MULTI
+          ? resolveMultiMaxAnswers(q.maxAnswers, q.options.length)
+          : q.maxAnswers,
       options: q.options.map((o) => ({
         id: o.id,
         text: o.text,
         imageUrl: o.imageUrl ?? undefined,
+        color: sanitizeOptionColor(o.color) ?? undefined,
       })),
       isClosed: q.isClosed,
       rankingKind: q.type === QuestionType.RANKING ? rankingKindToApi(q.rankingKind) : undefined,
@@ -1061,6 +1176,13 @@ export async function getQuizPublicState(quizId: string) {
         q.type === QuestionType.RANKING ? (q.rankingPlayerHint ?? undefined) : undefined,
       tagCloudPlayerHint:
         q.type === QuestionType.TAG_CLOUD ? (q.tagCloudPlayerHint ?? undefined) : undefined,
+      geoPollDictionary: q.geoPollDictionary?.trim() || undefined,
+      projectorDebateLayout: q.projectorDebateLayout ?? false,
+      debateSeriesId: q.debateSeriesId?.trim() || undefined,
+      debateRoundIndex:
+        q.debateRoundIndex != null && Number.isFinite(q.debateRoundIndex)
+          ? Math.trunc(q.debateRoundIndex)
+          : undefined,
       rankingPointsByRank:
         q.type === QuestionType.RANKING
           ? (() => {
@@ -1078,11 +1200,15 @@ export async function getQuizPublicState(quizId: string) {
           imageUrl: activeQuestion.imageUrl ?? undefined,
           type: prismaTypeToApi(activeQuestion.type),
           scoringMode: activeQuestion.scoringMode === ScoringMode.POLL ? "poll" : "quiz",
-          maxAnswers: activeQuestion.maxAnswers,
+          maxAnswers:
+            activeQuestion.type === QuestionType.MULTI
+              ? resolveMultiMaxAnswers(activeQuestion.maxAnswers, activeQuestion.options.length)
+              : activeQuestion.maxAnswers,
           options: activeQuestion.options.map((o) => ({
             id: o.id,
             text: o.text,
             imageUrl: o.imageUrl ?? undefined,
+            color: sanitizeOptionColor(o.color) ?? undefined,
           })),
           isClosed: activeQuestion.isClosed,
           stepIndex: activeStepIndex,
@@ -1098,6 +1224,14 @@ export async function getQuizPublicState(quizId: string) {
           tagCloudPlayerHint:
             activeQuestion.type === QuestionType.TAG_CLOUD
               ? (activeQuestion.tagCloudPlayerHint ?? undefined)
+              : undefined,
+          geoPollDictionary: activeQuestion.geoPollDictionary?.trim() || undefined,
+          projectorDebateLayout: activeQuestion.projectorDebateLayout ?? false,
+          debateSeriesId: activeQuestion.debateSeriesId?.trim() || undefined,
+          debateRoundIndex:
+            activeQuestion.debateRoundIndex != null &&
+            Number.isFinite(activeQuestion.debateRoundIndex)
+              ? Math.trunc(activeQuestion.debateRoundIndex)
               : undefined,
           rankingPointsByRank:
             activeQuestion.type === QuestionType.RANKING
@@ -1144,6 +1278,7 @@ async function getPlayerVisibleResultsForQuiz(
       rankingProjectorMetric: true,
       rankingKind: true,
       temperatureSubtitle: true,
+      geoPollDictionary: true,
       options: {
         select: {
           id: true,
@@ -1152,6 +1287,7 @@ async function getPlayerVisibleResultsForQuiz(
           sortOrder: true,
           imageUrl: true,
           weight: true,
+          color: true,
         },
       },
       answers: { select: { selectedOptionIds: true } },
@@ -1167,7 +1303,7 @@ async function getPlayerVisibleResultsForQuiz(
         item,
       ): item is NonNullable<typeof item> & {
         type: "single" | "multi" | "ranking" | "temperature";
-      } => item.type !== "tag_cloud",
+      } => item.type !== "tag_cloud" && !item.geoPollDictionary,
     )
     .map((item) => ({
       questionId: item.questionId,
@@ -1189,11 +1325,121 @@ async function getPlayerVisibleResultsForQuiz(
         count: row.count,
         isCorrect: row.isCorrect,
         weight: row.weight,
+        color: row.color,
         avgRank: row.avgRank,
         avgScore: row.avgScore,
         totalScore: row.totalScore,
       })),
     }));
+}
+
+/** Синтетический questionId плитки накопительного итога серии у игрока. */
+export function playerVisibleDebateSeriesTileId(seriesId: string): string {
+  return `debate_series:${seriesId.trim()}`;
+}
+
+async function getPlayerVisibleDebateSeriesResultsForQuiz(
+  quizId: string,
+  seriesIds: string[],
+  tagCloudManualByQuestionId?: TagCloudManualByQuestionId,
+): Promise<PlayerVisibleResultTile[]> {
+  const orderedSeriesIds = seriesIds
+    .map((id) => id.trim())
+    .filter((id) => id.length > 0)
+    .slice(0, 50);
+  if (orderedSeriesIds.length === 0) return [];
+  const rows = (await prisma.question.findMany({
+    where: {
+      quizId,
+      debateSeriesId: { in: orderedSeriesIds },
+      type: { in: [QuestionType.SINGLE, QuestionType.MULTI] },
+    },
+    select: {
+      id: true,
+      text: true,
+      imageUrl: true,
+      subQuizId: true,
+      type: true,
+      projectorShowFirstCorrect: true,
+      projectorFirstCorrectWinnersCount: true,
+      rankingPointsByRank: true,
+      rankingProjectorMetric: true,
+      rankingKind: true,
+      temperatureSubtitle: true,
+      debateBaselineQuestionId: true,
+      projectorDebateLayout: true,
+      debateSeriesId: true,
+      debateRoundIndex: true,
+      debateSeriesResultTitle: true,
+      geoPollDictionary: true,
+      options: {
+        select: {
+          id: true,
+          text: true,
+          isCorrect: true,
+          sortOrder: true,
+          imageUrl: true,
+          weight: true,
+          color: true,
+        },
+      },
+      answers: { select: { selectedOptionIds: true } },
+    },
+    orderBy: [{ debateRoundIndex: "asc" }, { order: "asc" }],
+  })) as QuestionDashboardRow[];
+  const mapped = mapPerQuestion(rows).filter((item) => !item.geoPollDictionary);
+  const byQuestionId = new Map(mapped.map((item) => [item.questionId, item]));
+  const grouped = groupDebateSeriesQuestionIds(
+    mapped.map((item) => ({
+      questionId: item.questionId,
+      debateSeriesId: item.debateSeriesId,
+      debateRoundIndex: item.debateRoundIndex,
+    })),
+  );
+  return orderedSeriesIds
+    .map((seriesId) => {
+      const roundIds = grouped.get(seriesId);
+      if (!roundIds || roundIds.length === 0) return null;
+      const rounds = roundIds
+        .map((qid) => byQuestionId.get(qid))
+        .filter((item): item is NonNullable<typeof item> => Boolean(item));
+      if (rounds.length === 0) return null;
+      const summed = sumDebateSeriesOptionStats(
+        rounds.map((round) => {
+          const displayed = applyQuestionResultManualDisplay(
+            round,
+            tagCloudManualByQuestionId ?? {},
+          );
+          return displayed.optionStats.map((row) => ({
+            optionId: row.optionId,
+            text: row.text,
+            count: row.count,
+            imageUrl: row.imageUrl,
+            color: row.color,
+            isCorrect: row.isCorrect,
+          }));
+        }),
+      );
+      if (summed.length === 0) return null;
+      const title = resolveDebateSeriesResultTitle(
+        rounds.map((r) => r.debateSeriesResultTitle).find((t) => t?.trim()) ??
+          rounds[0]?.debateSeriesResultTitle,
+      );
+      return {
+        questionId: playerVisibleDebateSeriesTileId(seriesId),
+        text: title,
+        type: "single" as const,
+        optionStats: summed.map((row) => ({
+          optionId: row.optionId,
+          text: row.text,
+          imageUrl: row.imageUrl,
+          count: row.count,
+          isCorrect: Boolean(row.isCorrect),
+          color: row.color,
+        })),
+      };
+    })
+    .filter((tile): tile is NonNullable<typeof tile> => Boolean(tile));
 }
 
 function mapPerQuestion(questions: QuestionDashboardRow[]) {
@@ -1225,9 +1471,12 @@ function mapPerQuestion(questions: QuestionDashboardRow[]) {
       count: number;
       isCorrect: boolean;
       weight?: number;
+      color?: string;
       avgRank?: number;
       avgScore?: number;
       totalScore?: number;
+      lat?: number;
+      lon?: number;
     }>;
     let temperatureValue: number | null | undefined;
     let voterCount = q.answers.length;
@@ -1286,6 +1535,7 @@ function mapPerQuestion(questions: QuestionDashboardRow[]) {
         imageUrl: o.imageUrl ?? undefined,
         count: answerCount,
         isCorrect: o.isCorrect,
+        color: sanitizeOptionColor(o.color) ?? undefined,
         avgRank: answerCount > 0 ? sumsRank[o.id]! / answerCount : 0,
         avgScore:
           answerCount > 0 && (useTiers || !isJury) ? sumsAvgScore[o.id]! / answerCount : undefined,
@@ -1309,10 +1559,34 @@ function mapPerQuestion(questions: QuestionDashboardRow[]) {
         count: optionCounts[o.id] ?? 0,
         isCorrect: false,
         weight: o.weight ?? 0,
+        color: sanitizeOptionColor(o.color) ?? undefined,
       }));
       temperatureValue = computeTemperatureWeightedAverage(
         optionStats.map((row) => ({ count: row.count, weight: row.weight ?? 0 })),
       );
+    } else if (q.geoPollDictionary?.trim()) {
+      const geoDictionary = q.geoPollDictionary.trim();
+      const counts: Record<string, number> = {};
+      q.answers.forEach((a) => {
+        parseSelectedIds(a.selectedOptionIds).forEach((tag) => {
+          const resolved = resolveGeoPollEntry(geoDictionary, tag);
+          if (!resolved) return;
+          counts[resolved.key] = (counts[resolved.key] ?? 0) + 1;
+        });
+      });
+      optionStats = Object.entries(counts)
+        .map(([key, count]) => {
+          const resolved = resolveGeoPollEntry(geoDictionary, key);
+          return {
+            optionId: key,
+            text: resolved?.label ?? geoPollEntryLabel(geoDictionary, key),
+            count,
+            isCorrect: false,
+            lat: resolved?.lat,
+            lon: resolved?.lon,
+          };
+        })
+        .sort((a, b) => b.count - a.count || a.text.localeCompare(b.text, "ru"));
     } else {
       const optionCounts: Record<string, number> = {};
       sortedOpts.forEach((o) => {
@@ -1332,6 +1606,7 @@ function mapPerQuestion(questions: QuestionDashboardRow[]) {
         imageUrl: o.imageUrl ?? undefined,
         count: optionCounts[o.id] ?? 0,
         isCorrect: isQuizTagCloud ? Boolean(o.text.trim()) : o.isCorrect,
+        color: sanitizeOptionColor(o.color) ?? undefined,
       }));
     }
 
@@ -1355,6 +1630,15 @@ function mapPerQuestion(questions: QuestionDashboardRow[]) {
         q.type === QuestionType.TEMPERATURE && q.temperatureSubtitle?.trim()
           ? q.temperatureSubtitle.trim()
           : undefined,
+      debateBaselineQuestionId: q.debateBaselineQuestionId ?? undefined,
+      projectorDebateLayout: q.projectorDebateLayout ?? false,
+      debateSeriesId: q.debateSeriesId?.trim() || undefined,
+      debateRoundIndex:
+        q.debateRoundIndex != null && Number.isFinite(q.debateRoundIndex)
+          ? Math.trunc(q.debateRoundIndex)
+          : undefined,
+      debateSeriesResultTitle: q.debateSeriesResultTitle?.trim() || undefined,
+      geoPollDictionary: q.geoPollDictionary?.trim() || undefined,
       optionStats,
       tagCloud,
       answerCount: voterCount,
@@ -1700,6 +1984,12 @@ async function computeDashboardResults(quizId: string): Promise<DashboardResults
     rankingKind: true,
     imageUrl: true,
     temperatureSubtitle: true,
+    debateBaselineQuestionId: true,
+    projectorDebateLayout: true,
+    debateSeriesId: true,
+    debateRoundIndex: true,
+    debateSeriesResultTitle: true,
+    geoPollDictionary: true,
     options: {
       select: {
         id: true,
@@ -1708,6 +1998,7 @@ async function computeDashboardResults(quizId: string): Promise<DashboardResults
         sortOrder: true,
         imageUrl: true,
         weight: true,
+        color: true,
       },
     },
   } as const;
@@ -1762,6 +2053,7 @@ export async function getParticipantAnswersMap(quizId: string, participantId: st
       question: {
         select: {
           type: true,
+          geoPollDictionary: true,
           options: { select: { id: true } },
         },
       },
@@ -1769,6 +2061,13 @@ export async function getParticipantAnswersMap(quizId: string, participantId: st
   });
   return answers.reduce<Record<string, string[]>>((acc, answer) => {
     if (!isStoredAnswerValidForQuestion(answer.question, answer.selectedOptionIds)) {
+      return acc;
+    }
+    const geoDictionary = answer.question.geoPollDictionary?.trim() || null;
+    if (geoDictionary) {
+      acc[answer.questionId] = parseSelectedIds(answer.selectedOptionIds).map((key) =>
+        geoPollEntryLabel(geoDictionary, key),
+      );
       return acc;
     }
     acc[answer.questionId] = parseSelectedIds(answer.selectedOptionIds);
@@ -2109,8 +2408,11 @@ export type PublicEventReport = {
     enabled: boolean;
     total: number;
     onScreen: number;
+    sessions: Array<{ id: string; name: string }>;
     items: Array<{
       id: string;
+      sessionId: string | null;
+      sessionName: string | null;
       speakerName: string;
       text: string;
       author: string;
@@ -2132,7 +2434,7 @@ export type PublicEventReport = {
     }>;
     responses: Array<{
       nickname: string;
-      scaleAnswers: Record<string, number>;
+      scaleAnswers: Record<string, number | number[]>;
       openFieldAnswers: Record<string, string>;
       comment: string | null;
       submittedAt: string;
@@ -2211,6 +2513,7 @@ export async function getPublicReportBySlug(slug: string): Promise<PublicEventRe
         take: 100,
         select: {
           id: true,
+          sessionId: true,
           speakerName: true,
           text: true,
           participant: { select: { nickname: true } },
@@ -2222,7 +2525,7 @@ export async function getPublicReportBySlug(slug: string): Promise<PublicEventRe
 
   const onScreen = speakerStats.find((row) => row.isOnScreen)?._count._all ?? 0;
   const total = speakerStats.reduce((sum, row) => sum + row._count._all, 0);
-  const reactionSession = getReactionSessionPublic(quiz.id);
+  const reactionSession = await getReactionSessionPublic(quiz.id);
   const latestReactionCounts =
     reactionSession?.counts ??
     reactionSession?.history[0]?.counts ??
@@ -2245,6 +2548,11 @@ export async function getPublicReportBySlug(slug: string): Promise<PublicEventRe
     if (voteQuestionIdSet.size === 0) return true;
     return voteQuestionIdSet.has(row.questionId);
   });
+  const speakerSessionsNorm = normalizeSpeakerQuestionSessions({
+    sessions: view.speakerQuestionSessions,
+    activeSpeakerSessionId: view.activeSpeakerSessionId,
+    speakers: view.speakerQuestionsSpeakers,
+  });
   const speakerItems = speakerItemsRaw.map((item) => {
     const reactionCountByValue = new Map<string, number>();
     for (const reaction of item.reactions) {
@@ -2255,6 +2563,8 @@ export async function getPublicReportBySlug(slug: string): Promise<PublicEventRe
     }
     return {
       id: item.id,
+      sessionId: item.sessionId ?? null,
+      sessionName: findSpeakerSessionName(speakerSessionsNorm.sessions, item.sessionId),
       speakerName: item.speakerName,
       text: item.text,
       author: item.participant.nickname,
@@ -2386,6 +2696,7 @@ export async function getPublicReportBySlug(slug: string): Promise<PublicEventRe
         enabled: view.speakerQuestionsEnabled,
         total: items.length,
         onScreen,
+        sessions: speakerSessionsNorm.sessions.map((s) => ({ id: s.id, name: s.name })),
         items,
       };
     })(),
@@ -2452,11 +2763,26 @@ export async function setQuestionEnabled(quizId: string, questionId: string, ena
 
   if (enabled) {
     if (question.subQuizId == null) {
+      const debateSeriesId = question.debateSeriesId?.trim() || null;
       await prisma.$transaction([
         prisma.question.updateMany({
           where: { quizId, subQuizId: { not: null } },
           data: { isActive: false, isClosed: true },
         }),
+        // В серии дебатов на телефон — только один раунд.
+        ...(debateSeriesId
+          ? [
+              prisma.question.updateMany({
+                where: {
+                  quizId,
+                  subQuizId: null,
+                  debateSeriesId,
+                  id: { not: questionId },
+                },
+                data: { isActive: false, isClosed: true },
+              }),
+            ]
+          : []),
         prisma.question.update({
           where: { id: questionId },
           data: { isActive: true, isClosed: false, activatedAt: new Date() },
@@ -2677,6 +3003,23 @@ async function loadSubmitQuestion(
   return question;
 }
 
+function isAnswerUniqueViolation(error: unknown): boolean {
+  return error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002";
+}
+
+/** create с игнором гонки двойного submit (unique questionId+participantId). */
+async function createAnswerIgnoringDuplicate(
+  data: Prisma.AnswerCreateInput | Prisma.AnswerUncheckedCreateInput,
+): Promise<"created" | "duplicate"> {
+  try {
+    await prisma.answer.create({ data });
+    return "created";
+  } catch (error) {
+    if (isAnswerUniqueViolation(error)) return "duplicate";
+    throw error;
+  }
+}
+
 export async function submitAnswer(payload: {
   quizId: string;
   questionId: string;
@@ -2712,8 +3055,9 @@ export async function submitAnswer(payload: {
     },
   });
   if (existing) {
+    // Идемпотентность: повтор того же ответа (двойной тап / reconnect) — успех, не ошибка.
     if (isStoredAnswerValidForQuestion(question, existing.selectedOptionIds)) {
-      throw new Error("Already answered this question");
+      return;
     }
     await prisma.answer.delete({
       where: {
@@ -2727,6 +3071,29 @@ export async function submitAnswer(payload: {
   }
 
   const responseMs = computeResponseMs(Date.now(), question.activatedAt);
+  const geoDictionary = question.geoPollDictionary?.trim() || null;
+
+  if (geoDictionary) {
+    const rawGeoAnswers = payload.tagAnswers ?? [];
+    if (rawGeoAnswers.length !== 1) {
+      throw new Error("Geo poll requires exactly one answer");
+    }
+    const resolved = resolveGeoPollEntry(geoDictionary, rawGeoAnswers[0]!);
+    if (!resolved) {
+      throw new Error("Answer must be from the dictionary");
+    }
+    const created = await createAnswerIgnoringDuplicate({
+      quizId: payload.quizId,
+      questionId: payload.questionId,
+      participantId: payload.participantId,
+      selectedOptionIds: JSON.stringify([resolved.key]),
+      isCorrect: false,
+      scoreAwarded: 0,
+      responseMs,
+    });
+    if (created === "created") void invalidateDashboardResultsCache(payload.quizId);
+    return;
+  }
 
   if (question.type === QuestionType.RANKING) {
     const ranked = payload.rankedOptionIds ?? [];
@@ -2752,18 +3119,16 @@ export async function submitAnswer(payload: {
       if (!useTiers) {
         throw new Error("Jury ranking requires points for each rank");
       }
-      await prisma.answer.create({
-        data: {
-          quizId: payload.quizId,
-          questionId: payload.questionId,
-          participantId: payload.participantId,
-          selectedOptionIds: JSON.stringify(ranked),
-          isCorrect: false,
-          scoreAwarded: 0,
-          responseMs,
-        },
+      const createdJury = await createAnswerIgnoringDuplicate({
+        quizId: payload.quizId,
+        questionId: payload.questionId,
+        participantId: payload.participantId,
+        selectedOptionIds: JSON.stringify(ranked),
+        isCorrect: false,
+        scoreAwarded: 0,
+        responseMs,
       });
-      void invalidateDashboardResultsCache(payload.quizId);
+      if (createdJury === "created") void invalidateDashboardResultsCache(payload.quizId);
       return;
     }
 
@@ -2771,18 +3136,16 @@ export async function submitAnswer(payload: {
       question.scoringMode === ScoringMode.QUIZ && evaluateRankingAnswer(expectedIds, ranked);
     const scoreAwarded =
       question.scoringMode === ScoringMode.QUIZ && isCorrect ? question.points : 0;
-    await prisma.answer.create({
-      data: {
-        quizId: payload.quizId,
-        questionId: payload.questionId,
-        participantId: payload.participantId,
-        selectedOptionIds: JSON.stringify(ranked),
-        isCorrect,
-        scoreAwarded,
-        responseMs,
-      },
+    const createdRank = await createAnswerIgnoringDuplicate({
+      quizId: payload.quizId,
+      questionId: payload.questionId,
+      participantId: payload.participantId,
+      selectedOptionIds: JSON.stringify(ranked),
+      isCorrect,
+      scoreAwarded,
+      responseMs,
     });
-    void invalidateDashboardResultsCache(payload.quizId);
+    if (createdRank === "created") void invalidateDashboardResultsCache(payload.quizId);
     return;
   }
 
@@ -2821,6 +3184,14 @@ export async function submitAnswer(payload: {
     if (selected.length !== 1) {
       throw new Error("Temperature requires exactly one option");
     }
+  } else if (question.type === QuestionType.MULTI) {
+    if (selected.length < 1) {
+      throw new Error("At least one option is required");
+    }
+    const maxAnswers = resolveMultiMaxAnswers(question.maxAnswers, question.options.length);
+    if (selected.length > maxAnswers) {
+      throw new Error(`Too many options: max ${maxAnswers}`);
+    }
   } else if (selected.length < 1) {
     throw new Error("At least one option is required");
   }
@@ -2849,20 +3220,18 @@ export async function submitAnswer(payload: {
     scoreAwarded = question.scoringMode === ScoringMode.QUIZ && isCorrect ? question.points : 0;
   }
 
-  await prisma.answer.create({
-    data: {
-      quizId: payload.quizId,
-      questionId: payload.questionId,
-      participantId: payload.participantId,
-      selectedOptionIds: JSON.stringify(
-        question.type === QuestionType.TAG_CLOUD ? normalizedTags : selected,
-      ),
-      isCorrect,
-      scoreAwarded,
-      responseMs,
-    },
+  const created = await createAnswerIgnoringDuplicate({
+    quizId: payload.quizId,
+    questionId: payload.questionId,
+    participantId: payload.participantId,
+    selectedOptionIds: JSON.stringify(
+      question.type === QuestionType.TAG_CLOUD ? normalizedTags : selected,
+    ),
+    isCorrect,
+    scoreAwarded,
+    responseMs,
   });
-  void invalidateDashboardResultsCache(payload.quizId);
+  if (created === "created") void invalidateDashboardResultsCache(payload.quizId);
 }
 
 export async function resetParticipantAnswers(quizId: string, participantId: string) {
@@ -2962,9 +3331,12 @@ export type StandaloneVoteAdminDetail = {
     imageUrl?: string;
     count: number;
     isCorrect: boolean;
+    color?: string;
     avgRank?: number;
     avgScore?: number;
     totalScore?: number;
+    lat?: number;
+    lon?: number;
   }>;
   tagCloud: Array<{ text: string; count: number }>;
   answerRows: Array<{
@@ -3014,7 +3386,30 @@ export async function getStandaloneVoteAdminDetail(
 
   const sortedOpts = [...q.options].sort((a, b) => a.sortOrder - b.sortOrder);
   let optionStats: StandaloneVoteAdminDetail["optionStats"];
-  if (q.type === QuestionType.RANKING) {
+  const geoDictionary = q.geoPollDictionary?.trim() || null;
+  if (geoDictionary) {
+    const counts: Record<string, number> = {};
+    answers.forEach((a) => {
+      parseSelectedIds(a.selectedOptionIds).forEach((tag) => {
+        const resolved = resolveGeoPollEntry(geoDictionary, tag);
+        if (!resolved) return;
+        counts[resolved.key] = (counts[resolved.key] ?? 0) + 1;
+      });
+    });
+    optionStats = Object.entries(counts)
+      .map(([key, count]) => {
+        const resolved = resolveGeoPollEntry(geoDictionary, key);
+        return {
+          optionId: key,
+          text: resolved?.label ?? geoPollEntryLabel(geoDictionary, key),
+          count,
+          isCorrect: false,
+          lat: resolved?.lat,
+          lon: resolved?.lon,
+        };
+      })
+      .sort((a, b) => b.count - a.count || a.text.localeCompare(b.text, "ru"));
+  } else if (q.type === QuestionType.RANKING) {
     const n = sortedOpts.length;
     const expectedIds = rankingExpectedIdsFromQuestion(
       sortedOpts,
@@ -3066,6 +3461,7 @@ export async function getStandaloneVoteAdminDetail(
       imageUrl: o.imageUrl ?? undefined,
       count: answerCount,
       isCorrect: o.isCorrect,
+      color: sanitizeOptionColor(o.color) ?? undefined,
       avgRank: answerCount > 0 ? sumsRank[o.id]! / answerCount : 0,
       avgScore:
         answerCount > 0 && (useTiers || !isJury) ? sumsAvgScore[o.id]! / answerCount : undefined,
@@ -3087,6 +3483,7 @@ export async function getStandaloneVoteAdminDetail(
       imageUrl: o.imageUrl ?? undefined,
       count: optionCounts[o.id] ?? 0,
       isCorrect: o.isCorrect,
+      color: sanitizeOptionColor(o.color) ?? undefined,
     }));
   }
 
@@ -3108,8 +3505,9 @@ export async function getStandaloneVoteAdminDetail(
 
   const answerRows = answers.map((a) => {
     const ids = parseSelectedIds(a.selectedOptionIds);
-    const labels =
-      q.type === QuestionType.TAG_CLOUD
+    const labels = geoDictionary
+      ? ids.map((key) => geoPollEntryLabel(geoDictionary, key))
+      : q.type === QuestionType.TAG_CLOUD
         ? parseTagAnswers(a.selectedOptionIds, false)
         : ids.map((id) => optionById[id] ?? id);
     return {

@@ -17,8 +17,11 @@ import {
 } from "@mui/material";
 import {
   buildPhotoWallAlbumPhotos,
+  buildVideoWallAlbumVideos,
   photoWallCollagePhotoIndices,
+  resolveVideoWallTileCoverUrl,
   ruBallLabel,
+  sanitizeVideoWallItems,
   SPEAKER_TILE_ID,
 } from "@meyouquize/shared";
 import {
@@ -37,6 +40,7 @@ import {
 import { PlayerVoteResultsDialog } from "../components/quiz/PlayerVoteResultsDialog";
 import { PlayerQuizReportDialog } from "../components/quiz/PlayerQuizReportDialog";
 import { PlayerPhotoWallDialog } from "../components/quiz/PlayerPhotoWallDialog";
+import { PlayerVideoWallDialog } from "../components/quiz/PlayerVideoWallDialog";
 import {
   PLAYER_DIALOG_CONTENT_SX,
   PLAYER_DIALOG_TITLE_SX,
@@ -59,7 +63,6 @@ import { buildQuizPlayConnectionChip } from "../features/quizPlay/connectionChip
 import { getRoomNickKey, shouldRestoreJoin } from "../features/quizPlay/joinStorage";
 import { buildPlayerTilesOrder, getVisiblePlayerBanners } from "../features/quizPlay/tiles";
 import { QuestionPopupCard } from "../components/quiz/QuestionPopupCard";
-import { PlayerViewportBackground } from "../components/quiz/PlayerViewportBackground";
 import {
   buildQuizPlayContainerSx,
   CompletionOverlay,
@@ -108,6 +111,7 @@ export function QuizPlayPage() {
   const [quizReportOpen, setQuizReportOpen] = useState(false);
   const [quizReportSubQuizId, setQuizReportSubQuizId] = useState("");
   const [photoWallDialogOpen, setPhotoWallDialogOpen] = useState(false);
+  const [videoWallDialogOpen, setVideoWallDialogOpen] = useState(false);
   const [bootLoading, setBootLoading] = useState(() => Boolean(slug));
   const nicknameInputRef = useRef<HTMLInputElement | null>(null);
   const autoJoinStartedRef = useRef(false);
@@ -144,6 +148,8 @@ export function QuizPlayPage() {
     setRankOrder,
     tagAnswers,
     setTagAnswers,
+    geoAnswer,
+    setGeoAnswer,
     activeQuestionIdRef,
     activeQuestionTypeRef,
     selectedRef,
@@ -154,6 +160,7 @@ export function QuizPlayPage() {
     moveRankOption,
     submit,
     onQuestionSubmitted: handleQuestionSubmitted,
+    clearSubmitInFlight,
     onQuizJoined: handleQuizJoined,
     closeQuestionPopup,
     resetQuestionFlow,
@@ -261,7 +268,15 @@ export function QuizPlayPage() {
 
   useQuizPlayScrollLock({
     joined,
-    hasPlayerOverlay: showQuestionPopup || shouldShowFeedbackPopup,
+    hasPlayerOverlay:
+      showQuestionPopup ||
+      shouldShowFeedbackPopup ||
+      speakerDialogOpen ||
+      nicknameDialogOpen ||
+      photoWallDialogOpen ||
+      videoWallDialogOpen ||
+      quizReportOpen ||
+      Boolean(resultsDialogQuestionId),
   });
 
   useEffect(() => {
@@ -285,6 +300,7 @@ export function QuizPlayPage() {
     setSubmittedQuestionIds,
     setPlayerAnswersHydrated,
     onQuestionSubmitted: handleQuestionSubmitted,
+    clearSubmitInFlight,
     setError,
     setJoined,
     setConnectionStatus,
@@ -496,6 +512,39 @@ export function QuizPlayPage() {
       (index) => photoWallAlbumPhotos[index]!.src,
     );
   }, [photoWallAlbumPhotos]);
+  const videoWallTileVisible = quiz?.videoWallTileVisible ?? false;
+  const videoWallHorizontalItems = useMemo(
+    () => sanitizeVideoWallItems(quiz?.videoWallHorizontalItems),
+    [quiz?.videoWallHorizontalItems],
+  );
+  const videoWallVerticalItems = useMemo(
+    () => sanitizeVideoWallItems(quiz?.videoWallVerticalItems),
+    [quiz?.videoWallVerticalItems],
+  );
+  const videoWallHorizontalPosterUrl = quiz?.videoWallHorizontalPosterUrl ?? "";
+  const videoWallVerticalPosterUrl = quiz?.videoWallVerticalPosterUrl ?? "";
+  const videoWallTileCoverUrl = useMemo(
+    () =>
+      resolveVideoWallTileCoverUrl(
+        quiz?.videoWallTileCoverUrl,
+        videoWallHorizontalPosterUrl,
+        videoWallVerticalPosterUrl,
+      ),
+    [quiz?.videoWallTileCoverUrl, videoWallHorizontalPosterUrl, videoWallVerticalPosterUrl],
+  );
+  const videoWallHorizontalVideos = useMemo(
+    () =>
+      buildVideoWallAlbumVideos(
+        videoWallHorizontalItems,
+        "horizontal",
+        videoWallHorizontalPosterUrl,
+      ),
+    [videoWallHorizontalItems, videoWallHorizontalPosterUrl],
+  );
+  const videoWallVerticalVideos = useMemo(
+    () => buildVideoWallAlbumVideos(videoWallVerticalItems, "vertical", videoWallVerticalPosterUrl),
+    [videoWallVerticalItems, videoWallVerticalPosterUrl],
+  );
   const enabledQuizReportSubQuizIds = useMemo(
     () =>
       resolveEnabledQuizReportSubQuizIds({
@@ -554,6 +603,7 @@ export function QuizPlayPage() {
     visiblePlayerBanners.length > 0 ||
     (programTileVisible && programTileLinkUrl.length > 0) ||
     (photoWallTileVisible && photoWallCollageSrcs.length > 0) ||
+    (videoWallTileVisible && Boolean(videoWallTileCoverUrl)) ||
     enabledQuizReportSubQuizIds.length > 0;
   const visibleResultTiles = useMemo(
     () => quiz?.playerVisibleResults ?? [],
@@ -604,16 +654,15 @@ export function QuizPlayPage() {
 
   return (
     <>
-      <PlayerViewportBackground
-        backgroundColor={brandBodyBackgroundColor}
-        backgroundImageUrl={brandPlayerBackgroundImageUrl}
-      />
       <Container
-        maxWidth="md"
+        maxWidth={false}
+        disableGutters
         sx={buildQuizPlayContainerSx({
           brandFontFamily,
           isJoinScreen,
           joined,
+          backgroundColor: brandBodyBackgroundColor,
+          backgroundImageUrl: brandPlayerBackgroundImageUrl,
         })}
       >
         {bootLoading ? (
@@ -634,8 +683,6 @@ export function QuizPlayPage() {
             {joined ? (
               <PlayerIdentityBar
                 nickname={nickname}
-                formBackgroundColor={formBackgroundColor}
-                formTextColor={formTextColor}
                 connectionChip={connectionChip}
                 onNicknameClick={editNickname}
               />
@@ -662,6 +709,11 @@ export function QuizPlayPage() {
             {joined ? (
               <PlayerTilesGrid
                 tileOrder={tileOrder}
+                gridColumns={
+                  quiz?.playerTilesGridColumns === 2 || quiz?.playerTilesGridColumns === 3
+                    ? quiz.playerTilesGridColumns
+                    : 3
+                }
                 visibleBannerById={visibleBannerById}
                 speakerTileVisible={speakerTileVisible}
                 onSpeakerOpen={() => setSpeakerDialogOpen(true)}
@@ -677,6 +729,9 @@ export function QuizPlayPage() {
                 photoWallTileVisible={photoWallTileVisible}
                 photoWallCollageSrcs={photoWallCollageSrcs}
                 onOpenPhotoWall={() => setPhotoWallDialogOpen(true)}
+                videoWallTileVisible={videoWallTileVisible}
+                videoWallTileCoverUrl={videoWallTileCoverUrl}
+                onOpenVideoWall={() => setVideoWallDialogOpen(true)}
                 playerQuizResultsTilesBySubQuizId={playerQuizResultsTilesBySubQuizId}
                 onOpenQuizReport={(subQuizId) => {
                   setQuizReportSubQuizId(subQuizId);
@@ -748,6 +803,15 @@ export function QuizPlayPage() {
               brandFontFamily={brandFontFamily}
               onClose={() => setPhotoWallDialogOpen(false)}
             />
+            <PlayerVideoWallDialog
+              open={videoWallDialogOpen}
+              horizontalVideos={videoWallHorizontalVideos}
+              verticalVideos={videoWallVerticalVideos}
+              brandFontFamily={brandFontFamily}
+              brandPrimaryColor={brandPrimaryColor}
+              playerVoteOptionTextColor={playerVoteOptionTextColor}
+              onClose={() => setVideoWallDialogOpen(false)}
+            />
             {showQuestionPopup && (
               <QuestionPopupCard
                 brandPrimaryColor={brandPrimaryColor}
@@ -764,6 +828,8 @@ export function QuizPlayPage() {
                 closeQuestionPopup={closeQuestionPopup}
                 tagAnswers={tagAnswers}
                 setTagAnswers={setTagAnswers}
+                geoAnswer={geoAnswer}
+                setGeoAnswer={setGeoAnswer}
                 canSubmit={canSubmit}
                 submit={submit}
                 ruBallLabel={ruBallLabel}
