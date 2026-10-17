@@ -22,12 +22,10 @@ import {
   Tooltip,
   Typography,
 } from "@mui/material";
-import type { Dispatch, DragEvent, SetStateAction } from "react";
+import type { Dispatch, SetStateAction } from "react";
 import { useCallback, useEffect, useState } from "react";
 import {
   buildQuestionIndexMapForSubQuiz,
-  buildVotesDisplayBlocks,
-  filterVotesDisplayBlocks,
   type QuestionForm,
   type SubQuizSheet,
 } from "../../admin/adminEventForm";
@@ -50,7 +48,7 @@ import {
 import type { PublicViewMode, PublicViewSetPatch } from "../../publicViewContract";
 import { socket } from "../../socket";
 import type { FeedbackFormConfig } from "../../types/feedback";
-import { DebateSeriesBlockShell } from "./AdminEventDebateSeriesBlocks";
+import { AdminEventVotesBlockList, type VotesBlockDragState } from "./AdminEventVotesBlockList";
 
 export type AdminEventQuestionsTabProps = {
   roomQuestionsTab: RoomQuestionsTab;
@@ -192,14 +190,32 @@ export function AdminEventQuestionsTab({
   debateSeriesShowRounds,
   onToggleDebateSeriesShowRounds,
 }: AdminEventQuestionsTabProps) {
-  const [votesBlockDrag, setVotesBlockDrag] = useState<{
-    scope: "active" | "done";
-    index: number;
-  } | null>(null);
-  const [votesBlockDrop, setVotesBlockDrop] = useState<{
-    scope: "active" | "done";
-    index: number;
-  } | null>(null);
+  const [votesBlockDrag, setVotesBlockDrag] = useState<VotesBlockDragState>(null);
+  const [votesBlockDrop, setVotesBlockDrop] = useState<VotesBlockDragState>(null);
+  const votesBlockListSharedProps = {
+    questionForms,
+    questionsSectionBindings,
+    publicViewMode,
+    setPublicResultsView,
+    voteListManageMode,
+    votesBlockDrag,
+    votesBlockDrop,
+    setVotesBlockDrag,
+    setVotesBlockDrop,
+    reorderVoteDisplayBlocks,
+    reorderVoteInList,
+    addQuestionToSubQuiz,
+    cloneQuestionAtIndex,
+    toggleQuestionAdminDone,
+    setQuestionsAdminDone,
+    cloneDebateSeries,
+    addDebateSeriesRoundAtIndex,
+    updateDebateSeries,
+    removeDebateSeries,
+    removeQuestion,
+    debateSeriesShowRounds,
+    onToggleDebateSeriesShowRounds,
+  } as const;
   const importParticipantsToFreeList = useCallback(
     (nicknames: string[]) => {
       if (nicknames.length === 0) return;
@@ -648,174 +664,12 @@ export function AdminEventQuestionsTab({
                           </IconButton>
                         </Tooltip>
                       </Stack>
-                      {filterVotesDisplayBlocks(
-                        buildVotesDisplayBlocks(questionForms),
-                        new Set(activeVoteIndices),
-                      ).map((block, blockIndex) => {
-                        const indices =
-                          block.kind === "debate_series" ? block.formIndices : [block.formIndex];
-                        const selectedLocal = indices.indexOf(
-                          activeVoteIndices[activeVotesSelectedListIndex] ?? -1,
-                        );
-                        const isDropTarget =
-                          voteListManageMode &&
-                          votesBlockDrop?.scope === "active" &&
-                          votesBlockDrop.index === blockIndex &&
-                          votesBlockDrag?.scope === "active" &&
-                          votesBlockDrag.index !== blockIndex;
-                        const blockDropSx = {
-                          outline: isDropTarget ? "2px solid" : undefined,
-                          outlineColor: isDropTarget ? "primary.main" : undefined,
-                          opacity:
-                            voteListManageMode &&
-                            votesBlockDrag?.scope === "active" &&
-                            votesBlockDrag.index === blockIndex
-                              ? 0.55
-                              : 1,
-                        } as const;
-                        const blockDragHandlers = voteListManageMode
-                          ? {
-                              onDragOver: (event: DragEvent) => {
-                                if (votesBlockDrag?.scope !== "active") return;
-                                event.preventDefault();
-                                event.dataTransfer.dropEffect = "move";
-                                setVotesBlockDrop({ scope: "active", index: blockIndex });
-                              },
-                              onDragLeave: () => {
-                                setVotesBlockDrop((current) =>
-                                  current?.scope === "active" && current.index === blockIndex
-                                    ? null
-                                    : current,
-                                );
-                              },
-                              onDrop: (event: DragEvent) => {
-                                event.preventDefault();
-                                event.stopPropagation();
-                                if (
-                                  votesBlockDrag?.scope === "active" &&
-                                  votesBlockDrag.index !== blockIndex
-                                ) {
-                                  void reorderVoteDisplayBlocks(
-                                    votesBlockDrag.index,
-                                    blockIndex,
-                                    activeVoteIndices,
-                                  );
-                                }
-                                setVotesBlockDrag(null);
-                                setVotesBlockDrop(null);
-                              },
-                            }
-                          : {};
-                        const hostBlockDragProps =
-                          voteListManageMode && block.kind === "single"
-                            ? {
-                                onHostBlockDragStart: () => {
-                                  setVotesBlockDrag({ scope: "active", index: blockIndex });
-                                  setVotesBlockDrop(null);
-                                },
-                                onHostBlockDragEnd: () => {
-                                  setVotesBlockDrag(null);
-                                  setVotesBlockDrop(null);
-                                },
-                              }
-                            : {};
-                        return block.kind === "debate_series" ? (
-                          <DebateSeriesBlockShell
-                            key={`series-${block.seriesId}`}
-                            seriesId={block.seriesId}
-                            formIndices={indices}
-                            questionForms={questionForms}
-                            questionResults={questionsSectionBindings.questionResults}
-                            publicViewMode={publicViewMode}
-                            publicViewQuestionId={questionsSectionBindings.publicViewQuestionId}
-                            playerResultsVisible={questionsSectionBindings.playerVisibleDebateSeriesIds.includes(
-                              block.seriesId,
-                            )}
-                            onTogglePlayerResults={() =>
-                              questionsSectionBindings.togglePlayerVisibleDebateSeriesId(
-                                block.seriesId,
-                              )
-                            }
-                            debateSeriesShowRounds={debateSeriesShowRounds}
-                            onToggleDebateSeriesShowRounds={onToggleDebateSeriesShowRounds}
-                            setMessage={questionsSectionBindings.setMessage}
-                            setPublicResultsView={setPublicResultsView}
-                            onAddRound={(g) => void addDebateSeriesRoundAtIndex(g)}
-                            onCloneSeries={(id) => void cloneDebateSeries(id)}
-                            onSaveSeries={(id, payload) => void updateDebateSeries(id, payload)}
-                            onRemoveSeries={(id) => void removeDebateSeries(id)}
-                            onRemoveRound={(formIndex) => void removeQuestion(formIndex)}
-                            manageMode={voteListManageMode}
-                            adminDoneMode="markDone"
-                            onToggleAdminDone={() => void setQuestionsAdminDone(indices, true)}
-                            onBlockDragStart={() => {
-                              setVotesBlockDrag({ scope: "active", index: blockIndex });
-                              setVotesBlockDrop(null);
-                            }}
-                            onBlockDragEnd={() => {
-                              setVotesBlockDrag(null);
-                              setVotesBlockDrop(null);
-                            }}
-                            onDragOver={blockDragHandlers.onDragOver}
-                            onDragLeave={blockDragHandlers.onDragLeave}
-                            onDrop={blockDragHandlers.onDrop}
-                            paperSx={{
-                              bgcolor: "background.paper",
-                              ...blockDropSx,
-                            }}
-                          >
-                            <AdminQuestionsSection
-                              {...questionsSectionBindings}
-                              listTitle=""
-                              addButtonLabel="Добавить голосование"
-                              listHeaderShowAddButton={false}
-                              questionForms={indices.map((i) => questionForms[i]!)}
-                              selectedListIndex={selectedLocal >= 0 ? selectedLocal : 0}
-                              remapQuestionIndex={(local) => indices[local] ?? 0}
-                              voteListManageMode={voteListManageMode}
-                              onReorderVoteInList={(fromLocal, toLocal) =>
-                                void reorderVoteInList(fromLocal, toLocal, indices)
-                              }
-                              addQuestion={() => addQuestionToSubQuiz(null)}
-                              onCloneQuestion={(g) => void cloneQuestionAtIndex(g)}
-                            />
-                          </DebateSeriesBlockShell>
-                        ) : (
-                          <Paper
-                            key={`single-${block.formIndex}`}
-                            variant="outlined"
-                            sx={{
-                              borderColor: "divider",
-                              bgcolor: "background.paper",
-                              ...blockDropSx,
-                            }}
-                            onDragOver={blockDragHandlers.onDragOver}
-                            onDragLeave={blockDragHandlers.onDragLeave}
-                            onDrop={blockDragHandlers.onDrop}
-                          >
-                            <AdminQuestionsSection
-                              {...questionsSectionBindings}
-                              listTitle=""
-                              addButtonLabel="Добавить голосование"
-                              listHeaderShowAddButton={false}
-                              questionForms={indices.map((i) => questionForms[i]!)}
-                              selectedListIndex={selectedLocal >= 0 ? selectedLocal : 0}
-                              remapQuestionIndex={(local) => indices[local] ?? 0}
-                              adminDoneToggle={{
-                                mode: "markDone",
-                                onToggle: toggleQuestionAdminDone,
-                              }}
-                              voteListManageMode={voteListManageMode}
-                              onReorderVoteInList={(fromLocal, toLocal) =>
-                                void reorderVoteInList(fromLocal, toLocal, indices)
-                              }
-                              {...hostBlockDragProps}
-                              addQuestion={() => addQuestionToSubQuiz(null)}
-                              onCloneQuestion={(g) => void cloneQuestionAtIndex(g)}
-                            />
-                          </Paper>
-                        );
-                      })}
+                      <AdminEventVotesBlockList
+                        {...votesBlockListSharedProps}
+                        scope="active"
+                        memberIndices={activeVoteIndices}
+                        selectedListIndex={activeVotesSelectedListIndex}
+                      />
                     </Stack>
                   ) : (
                     <Typography variant="body2" color="text.secondary" sx={{ px: 0.5, py: 1 }}>
@@ -838,171 +692,12 @@ export function AdminEventQuestionsTab({
                         </Typography>
                       </AccordionSummary>
                       <AccordionDetails sx={{ p: 0 }}>
-                        <Stack spacing={1.5}>
-                          {filterVotesDisplayBlocks(
-                            buildVotesDisplayBlocks(questionForms),
-                            new Set(doneVoteIndices),
-                          ).map((block, blockIndex) => {
-                            const indices =
-                              block.kind === "debate_series"
-                                ? block.formIndices
-                                : [block.formIndex];
-                            const selectedLocal = indices.indexOf(
-                              doneVoteIndices[doneVotesSelectedListIndex] ?? -1,
-                            );
-                            const isDropTarget =
-                              voteListManageMode &&
-                              votesBlockDrop?.scope === "done" &&
-                              votesBlockDrop.index === blockIndex &&
-                              votesBlockDrag?.scope === "done" &&
-                              votesBlockDrag.index !== blockIndex;
-                            const blockDropSx = {
-                              outline: isDropTarget ? "2px solid" : undefined,
-                              outlineColor: isDropTarget ? "primary.main" : undefined,
-                              opacity:
-                                voteListManageMode &&
-                                votesBlockDrag?.scope === "done" &&
-                                votesBlockDrag.index === blockIndex
-                                  ? 0.55
-                                  : 1,
-                            } as const;
-                            const blockDragHandlers = voteListManageMode
-                              ? {
-                                  onDragOver: (event: DragEvent) => {
-                                    if (votesBlockDrag?.scope !== "done") return;
-                                    event.preventDefault();
-                                    event.dataTransfer.dropEffect = "move";
-                                    setVotesBlockDrop({ scope: "done", index: blockIndex });
-                                  },
-                                  onDragLeave: () => {
-                                    setVotesBlockDrop((current) =>
-                                      current?.scope === "done" && current.index === blockIndex
-                                        ? null
-                                        : current,
-                                    );
-                                  },
-                                  onDrop: (event: DragEvent) => {
-                                    event.preventDefault();
-                                    event.stopPropagation();
-                                    if (
-                                      votesBlockDrag?.scope === "done" &&
-                                      votesBlockDrag.index !== blockIndex
-                                    ) {
-                                      void reorderVoteDisplayBlocks(
-                                        votesBlockDrag.index,
-                                        blockIndex,
-                                        doneVoteIndices,
-                                      );
-                                    }
-                                    setVotesBlockDrag(null);
-                                    setVotesBlockDrop(null);
-                                  },
-                                }
-                              : {};
-                            const hostBlockDragProps =
-                              voteListManageMode && block.kind === "single"
-                                ? {
-                                    onHostBlockDragStart: () => {
-                                      setVotesBlockDrag({ scope: "done", index: blockIndex });
-                                      setVotesBlockDrop(null);
-                                    },
-                                    onHostBlockDragEnd: () => {
-                                      setVotesBlockDrag(null);
-                                      setVotesBlockDrop(null);
-                                    },
-                                  }
-                                : {};
-                            return block.kind === "debate_series" ? (
-                              <DebateSeriesBlockShell
-                                key={`done-series-${block.seriesId}`}
-                                seriesId={block.seriesId}
-                                formIndices={indices}
-                                questionForms={questionForms}
-                                questionResults={questionsSectionBindings.questionResults}
-                                publicViewMode={publicViewMode}
-                                publicViewQuestionId={questionsSectionBindings.publicViewQuestionId}
-                                playerResultsVisible={questionsSectionBindings.playerVisibleDebateSeriesIds.includes(
-                                  block.seriesId,
-                                )}
-                                onTogglePlayerResults={() =>
-                                  questionsSectionBindings.togglePlayerVisibleDebateSeriesId(
-                                    block.seriesId,
-                                  )
-                                }
-                                debateSeriesShowRounds={debateSeriesShowRounds}
-                                onToggleDebateSeriesShowRounds={onToggleDebateSeriesShowRounds}
-                                setMessage={questionsSectionBindings.setMessage}
-                                setPublicResultsView={setPublicResultsView}
-                                onAddRound={(g) => void addDebateSeriesRoundAtIndex(g)}
-                                onCloneSeries={(id) => void cloneDebateSeries(id)}
-                                onSaveSeries={(id, payload) => void updateDebateSeries(id, payload)}
-                                onRemoveSeries={(id) => void removeDebateSeries(id)}
-                                onRemoveRound={(formIndex) => void removeQuestion(formIndex)}
-                                manageMode={voteListManageMode}
-                                adminDoneMode="markActive"
-                                onToggleAdminDone={() => void setQuestionsAdminDone(indices, false)}
-                                onBlockDragStart={() => {
-                                  setVotesBlockDrag({ scope: "done", index: blockIndex });
-                                  setVotesBlockDrop(null);
-                                }}
-                                onBlockDragEnd={() => {
-                                  setVotesBlockDrag(null);
-                                  setVotesBlockDrop(null);
-                                }}
-                                onDragOver={blockDragHandlers.onDragOver}
-                                onDragLeave={blockDragHandlers.onDragLeave}
-                                onDrop={blockDragHandlers.onDrop}
-                                paperSx={{ bgcolor: "background.paper", ...blockDropSx }}
-                              >
-                                <AdminQuestionsSection
-                                  {...questionsSectionBindings}
-                                  listTitle=""
-                                  addButtonLabel="Добавить голосование"
-                                  listHeaderShowAddButton={false}
-                                  questionForms={indices.map((i) => questionForms[i]!)}
-                                  selectedListIndex={selectedLocal >= 0 ? selectedLocal : 0}
-                                  remapQuestionIndex={(local) => indices[local] ?? 0}
-                                  voteListManageMode={voteListManageMode}
-                                  onReorderVoteInList={(fromLocal, toLocal) =>
-                                    void reorderVoteInList(fromLocal, toLocal, indices)
-                                  }
-                                  addQuestion={() => addQuestionToSubQuiz(null)}
-                                  onCloneQuestion={(g) => void cloneQuestionAtIndex(g)}
-                                />
-                              </DebateSeriesBlockShell>
-                            ) : (
-                              <Paper
-                                key={`done-single-${block.formIndex}`}
-                                variant="outlined"
-                                sx={{ bgcolor: "background.paper", ...blockDropSx }}
-                                onDragOver={blockDragHandlers.onDragOver}
-                                onDragLeave={blockDragHandlers.onDragLeave}
-                                onDrop={blockDragHandlers.onDrop}
-                              >
-                                <AdminQuestionsSection
-                                  {...questionsSectionBindings}
-                                  listTitle=""
-                                  addButtonLabel="Добавить голосование"
-                                  listHeaderShowAddButton={false}
-                                  questionForms={indices.map((i) => questionForms[i]!)}
-                                  selectedListIndex={selectedLocal >= 0 ? selectedLocal : 0}
-                                  remapQuestionIndex={(local) => indices[local] ?? 0}
-                                  adminDoneToggle={{
-                                    mode: "markActive",
-                                    onToggle: toggleQuestionAdminDone,
-                                  }}
-                                  voteListManageMode={voteListManageMode}
-                                  onReorderVoteInList={(fromLocal, toLocal) =>
-                                    void reorderVoteInList(fromLocal, toLocal, indices)
-                                  }
-                                  {...hostBlockDragProps}
-                                  addQuestion={() => addQuestionToSubQuiz(null)}
-                                  onCloneQuestion={(g) => void cloneQuestionAtIndex(g)}
-                                />
-                              </Paper>
-                            );
-                          })}
-                        </Stack>
+                        <AdminEventVotesBlockList
+                          {...votesBlockListSharedProps}
+                          scope="done"
+                          memberIndices={doneVoteIndices}
+                          selectedListIndex={doneVotesSelectedListIndex}
+                        />
                       </AccordionDetails>
                     </Accordion>
                   ) : null}
