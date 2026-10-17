@@ -72,7 +72,11 @@ fetch_logs() {
     journal_cmd+=(--until "${UNTIL}")
   fi
   if [[ -n "${SSH_TARGET}" ]]; then
-    ssh -o ConnectTimeout=20 "${SSH_TARGET}" "${journal_cmd[*]}"
+    # printf %q на каждый аргумент: даты с пробелами не ломают remote shell
+    # (раньше "${journal_cmd[*]}" резал --since "2026-10-16 00:00:00").
+    local remote=""
+    printf -v remote '%q ' "${journal_cmd[@]}"
+    ssh -o ConnectTimeout=20 "${SSH_TARGET}" "${remote}"
   else
     "${journal_cmd[@]}"
   fi

@@ -46,7 +46,8 @@ BASE_URL=https://ваш-домен ./deploy/scripts/event-day-check.sh
 
 - [ ] Сохранить вывод сводки в `deploy/ops/` (локально, не в git).
 - [ ] Сравнить `quiz_join_ok`, `answer_submit_error`, `ping timeout` с прошлым ивентом.
-- [ ] При необходимости: `DEBUG_TRIAL_LOGS=0` на проде до следующего ивента.
+- [ ] **`DEBUG_TRIAL_LOGS=0`** на проде до следующего ивента (`systemctl restart meyouquize`).
+- [ ] `free -h`: swap не `0B` на VPS с 4 GB RAM (`deploy/scripts/ensure-swap.sh`).
 
 ## Быстрые команды
 

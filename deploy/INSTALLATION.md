@@ -88,9 +88,25 @@ npm test
 | ------ | --------------------------------- | --------------------------------- |
 | vCPU   | 2                                 | 4+                                |
 | RAM    | 4 GB                              | 8 GB                              |
+| Swap   | **1–2 GB** (обязателен на 4 GB)   | 2 GB+                             |
 | Диск   | SSD, запас под `media/` и journal | —                                 |
 | ОС     | Ubuntu 22.04+                     | —                                 |
 | Пакеты | Node 20, PostgreSQL, Caddy        | + **redis-server**, **pgbouncer** |
+
+#### Ориентир по залу (VPS)
+
+| Зал (онлайн)  | Железо            | Комментарий                                                                 |
+| ------------- | ----------------- | --------------------------------------------------------------------------- |
+| до ~300       | **2 vCPU / 4 GB** | Хватает при Redis + `CLUSTER_WORKERS=auto` и **swap 2 GB** (страховка OOM). |
+| 300–500 / пик | **4 vCPU / 8 GB** | Запас под фото/видеостену, реакции, много вкладок админки.                  |
+| 500+          | 4+/8+ + PgBouncer | Смотри [DEPLOYMENT.md](./DEPLOYMENT.md) (пул БД, cluster).                  |
+
+Swap на Ubuntu (если `free -h` показывает `Swap: 0B`):
+
+```bash
+sudo bash /opt/meyouquize/current/deploy/scripts/ensure-swap.sh   # 2G по умолчанию
+# или: SWAP_SIZE=1G sudo bash deploy/scripts/ensure-swap.sh
+```
 
 Пользователь приложения: `meyouquize`, код: `/opt/meyouquize/current`.
 
