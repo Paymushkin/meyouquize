@@ -55,6 +55,12 @@ type BrandingKeys =
   | "voteOptionBorderColor"
   | "voteProgressTrackColor"
   | "voteProgressBarColor"
+  | "geoPollMarkerColor"
+  | "geoPollRegionFillIdle"
+  | "geoPollRegionFillVoted"
+  | "geoPollRegionStrokeIdle"
+  | "geoPollRegionStrokeVoted"
+  | "geoPollScreenBackground"
   | "brandPrimaryColor"
   | "brandAccentColor"
   | "brandSurfaceColor"
@@ -186,6 +192,12 @@ export function toBrandingState(payload: Partial<PublicViewPayload>): BrandingSt
     voteOptionBorderColor: view.voteOptionBorderColor,
     voteProgressTrackColor: view.voteProgressTrackColor,
     voteProgressBarColor: view.voteProgressBarColor,
+    geoPollMarkerColor: view.geoPollMarkerColor,
+    geoPollRegionFillIdle: view.geoPollRegionFillIdle,
+    geoPollRegionFillVoted: view.geoPollRegionFillVoted,
+    geoPollRegionStrokeIdle: view.geoPollRegionStrokeIdle,
+    geoPollRegionStrokeVoted: view.geoPollRegionStrokeVoted,
+    geoPollScreenBackground: view.geoPollScreenBackground,
     brandPrimaryColor: view.brandPrimaryColor,
     brandAccentColor: view.brandAccentColor,
     brandSurfaceColor: view.brandSurfaceColor,

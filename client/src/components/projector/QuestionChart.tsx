@@ -64,6 +64,8 @@ const resultsOptionTextSx = {
 export type QuestionChartProps = {
   question: ProjectorQuestionResult;
   showVoteCount: boolean;
+  /** Геоопрос: боковой список ответов на проекторе. */
+  geoPollShowAnswerList?: boolean;
   showCorrectOption?: boolean;
   questionRevealStage?: "options" | "results";
   fillHeight?: boolean;
@@ -83,6 +85,11 @@ export type QuestionChartProps = {
   voteOptionBorderColor?: string;
   voteProgressTrackColor?: string;
   voteProgressBarColor?: string;
+  geoPollMarkerColor?: string;
+  geoPollRegionFillIdle?: string;
+  geoPollRegionFillVoted?: string;
+  geoPollRegionStrokeIdle?: string;
+  geoPollRegionStrokeVoted?: string;
   brandPrimaryColor?: string;
   brandFontFamily?: string;
   /** Заголовок вопроса внутри блока облака (вместо отдельной строки над областью чарта) */
@@ -93,6 +100,7 @@ export function QuestionChart(props: QuestionChartProps) {
   const {
     question,
     showVoteCount,
+    geoPollShowAnswerList = true,
     showCorrectOption = false,
     questionRevealStage = "results",
     fillHeight = false,
@@ -111,6 +119,11 @@ export function QuestionChart(props: QuestionChartProps) {
     voteOptionBorderColor = "rgba(255,255,255,0.4)",
     voteProgressTrackColor = "#e3e3e3",
     voteProgressBarColor = "#1976d2",
+    geoPollMarkerColor = "#F0B429",
+    geoPollRegionFillIdle = "#323232",
+    geoPollRegionFillVoted = "#5d5d5d",
+    geoPollRegionStrokeIdle = "#4a4a4a",
+    geoPollRegionStrokeVoted = "#ffffff",
     brandPrimaryColor = "#1976d2",
     brandFontFamily,
     cloudHeader,
@@ -514,6 +527,12 @@ export function QuestionChart(props: QuestionChartProps) {
         brandPrimaryColor={brandPrimaryColor}
         voteOptionTextColor={voteOptionTextColor}
         brandFontFamily={brandFontFamily}
+        showAnswerList={geoPollShowAnswerList}
+        markerColor={geoPollMarkerColor}
+        regionFillIdle={geoPollRegionFillIdle}
+        regionFillVoted={geoPollRegionFillVoted}
+        regionStrokeIdle={geoPollRegionStrokeIdle}
+        regionStrokeVoted={geoPollRegionStrokeVoted}
       />
     );
   }

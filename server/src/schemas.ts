@@ -419,6 +419,7 @@ export const setPublicViewSchema = z.object({
   highlightedLeadersCount: z.number().int().min(0).max(100).optional(),
   leaderboardSubQuizId: z.string().trim().max(80).optional(),
   showVoteCount: z.boolean().optional(),
+  geoPollShowAnswerList: z.boolean().optional(),
   showCorrectOption: z.boolean().optional(),
   showQuestionTitle: z.boolean().optional(),
   hiddenTagTexts: z.array(z.string().min(1).max(120)).max(300).optional(),
@@ -518,6 +519,32 @@ export const setPublicViewSchema = z.object({
     .max(200)
     .refine(isValidVoteFillColor, {
       message: "Must be #RRGGBB or linear-gradient(deg, #hex 0%, #hex 100%)",
+    })
+    .optional(),
+  geoPollMarkerColor: z
+    .string()
+    .regex(/^#([0-9a-fA-F]{6})$/)
+    .optional(),
+  geoPollRegionFillIdle: z
+    .string()
+    .regex(/^#([0-9a-fA-F]{6})$/)
+    .optional(),
+  geoPollRegionFillVoted: z
+    .string()
+    .regex(/^#([0-9a-fA-F]{6})$/)
+    .optional(),
+  geoPollRegionStrokeIdle: z
+    .string()
+    .regex(/^#([0-9a-fA-F]{6})$/)
+    .optional(),
+  geoPollRegionStrokeVoted: z
+    .string()
+    .regex(/^#([0-9a-fA-F]{6})$/)
+    .optional(),
+  geoPollScreenBackground: z
+    .string()
+    .refine((value) => value === "transparent" || /^#([0-9a-fA-F]{6})$/.test(value), {
+      message: "Must be transparent or #RRGGBB",
     })
     .optional(),
   showFirstCorrectAnswerer: z.boolean().optional(),

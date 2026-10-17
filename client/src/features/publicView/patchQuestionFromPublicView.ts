@@ -5,6 +5,7 @@ import { readCloudManualFromPublicView } from "../tagCloudAdmin";
 type PatchableQuestion = {
   id?: string;
   showVoteCount?: boolean;
+  geoPollShowAnswerList?: boolean;
   showCorrectOption?: boolean;
   showQuestionTitle?: boolean;
   hiddenTagTexts?: string[];
@@ -29,6 +30,10 @@ export function patchQuestionsFromPublicView<TQuestion extends PatchableQuestion
             (typeof publicView.showVoteCount === "boolean"
               ? publicView.showVoteCount
               : q.showVoteCount) ?? false,
+          geoPollShowAnswerList:
+            (typeof publicView.geoPollShowAnswerList === "boolean"
+              ? publicView.geoPollShowAnswerList
+              : q.geoPollShowAnswerList) ?? true,
           showCorrectOption:
             (typeof publicView.showCorrectOption === "boolean"
               ? publicView.showCorrectOption

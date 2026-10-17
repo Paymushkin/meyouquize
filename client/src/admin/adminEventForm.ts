@@ -48,6 +48,8 @@ export type QuestionForm = {
   adminDone?: boolean;
   isActive?: boolean;
   showVoteCount?: boolean;
+  /** Геоопрос: список ответов на проекторе (по умолчанию true). */
+  geoPollShowAnswerList?: boolean;
   showCorrectOption?: boolean;
   showQuestionTitle?: boolean;
   /** Голосование комнаты: показывать победителей на проекторе (вместе с переключателем в «Результаты»). */
@@ -342,6 +344,7 @@ export function createEmptyQuestion(subQuizId: string | null = null): QuestionFo
     points: 1,
     maxAnswers: 3,
     showVoteCount: false,
+    geoPollShowAnswerList: true,
     showCorrectOption: false,
     showQuestionTitle: true,
     hiddenTagTexts: [],
@@ -389,6 +392,7 @@ function normalizeGeoPollQuestionForm(form: QuestionForm): QuestionForm {
     debateSeriesResultTitle: null,
     geoPollDictionary: form.geoPollDictionary ?? GEO_POLL_DICTIONARY_WORLD_CITIES,
     showVoteCount: false,
+    geoPollShowAnswerList: form.geoPollShowAnswerList ?? true,
     showCorrectOption: false,
     options: [],
   };
@@ -1004,6 +1008,7 @@ export function mergeServerQuestionsIntoForms(
       isActive: q.isActive,
       adminDone: Boolean(q.adminDone),
       showVoteCount: prev?.showVoteCount ?? false,
+      geoPollShowAnswerList: prev?.geoPollShowAnswerList ?? true,
       showQuestionTitle: prev?.showQuestionTitle ?? true,
       projectorShowFirstCorrect: q.projectorShowFirstCorrect ?? true,
       projectorFirstCorrectWinnersCount: Math.max(
@@ -1079,6 +1084,7 @@ export function mergeRoomReloadIntoState(
       ...q,
       useImages: prev.useImages ?? q.useImages,
       showVoteCount: prev.showVoteCount ?? false,
+      geoPollShowAnswerList: prev.geoPollShowAnswerList ?? true,
       showQuestionTitle: prev.showQuestionTitle ?? true,
       hiddenTagTexts: prev.hiddenTagTexts ?? [],
       injectedTagWords: prev.injectedTagWords ?? [],

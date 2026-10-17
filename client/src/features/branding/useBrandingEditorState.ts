@@ -56,6 +56,12 @@ export function useBrandingEditorState() {
   const [voteOptionBorderColor, setVoteOptionBorderColor] = useState("rgba(255,255,255,0.4)");
   const [voteProgressTrackColor, setVoteProgressTrackColor] = useState("#e3e3e3");
   const [voteProgressBarColor, setVoteProgressBarColor] = useState("#1976d2");
+  const [geoPollMarkerColor, setGeoPollMarkerColor] = useState("#F0B429");
+  const [geoPollRegionFillIdle, setGeoPollRegionFillIdle] = useState("#323232");
+  const [geoPollRegionFillVoted, setGeoPollRegionFillVoted] = useState("#5d5d5d");
+  const [geoPollRegionStrokeIdle, setGeoPollRegionStrokeIdle] = useState("#4a4a4a");
+  const [geoPollRegionStrokeVoted, setGeoPollRegionStrokeVoted] = useState("#ffffff");
+  const [geoPollScreenBackground, setGeoPollScreenBackground] = useState("#111111");
   const [playerVoteOptionTextColor, setPlayerVoteOptionTextColor] = useState("#ffffff");
   const [playerVoteProgressTrackColor, setPlayerVoteProgressTrackColor] = useState("#6a5600");
   const [playerVoteProgressBarColor, setPlayerVoteProgressBarColor] = useState("#F3F722");
@@ -115,6 +121,12 @@ export function useBrandingEditorState() {
     setVoteOptionBorderColor,
     setVoteProgressTrackColor,
     setVoteProgressBarColor,
+    setGeoPollMarkerColor,
+    setGeoPollRegionFillIdle,
+    setGeoPollRegionFillVoted,
+    setGeoPollRegionStrokeIdle,
+    setGeoPollRegionStrokeVoted,
+    setGeoPollScreenBackground,
     setPlayerVoteOptionTextColor,
     setPlayerVoteProgressTrackColor,
     setPlayerVoteProgressBarColor,
@@ -147,6 +159,12 @@ export function useBrandingEditorState() {
     setVoteOptionBorderColor,
     setVoteProgressTrackColor,
     setVoteProgressBarColor,
+    setGeoPollMarkerColor,
+    setGeoPollRegionFillIdle,
+    setGeoPollRegionFillVoted,
+    setGeoPollRegionStrokeIdle,
+    setGeoPollRegionStrokeVoted,
+    setGeoPollScreenBackground,
     setPlayerVoteOptionTextColor,
     setPlayerVoteProgressTrackColor,
     setPlayerVoteProgressBarColor,
@@ -302,6 +320,12 @@ export function useBrandingEditorState() {
       voteOptionBorderColor,
       voteProgressTrackColor,
       voteProgressBarColor,
+      geoPollMarkerColor,
+      geoPollRegionFillIdle,
+      geoPollRegionFillVoted,
+      geoPollRegionStrokeIdle,
+      geoPollRegionStrokeVoted,
+      geoPollScreenBackground,
       playerVoteOptionTextColor,
       playerVoteProgressTrackColor,
       playerVoteProgressBarColor,
@@ -346,6 +370,12 @@ export function useBrandingEditorState() {
     voteOptionBorderColor,
     voteProgressTrackColor,
     voteProgressBarColor,
+    geoPollMarkerColor,
+    geoPollRegionFillIdle,
+    geoPollRegionFillVoted,
+    geoPollRegionStrokeIdle,
+    geoPollRegionStrokeVoted,
+    geoPollScreenBackground,
     playerVoteOptionTextColor,
     playerVoteProgressTrackColor,
     playerVoteProgressBarColor,
@@ -405,6 +435,18 @@ export function useBrandingEditorState() {
     setVoteProgressTrackColor,
     voteProgressBarColor,
     setVoteProgressBarColor,
+    geoPollMarkerColor,
+    setGeoPollMarkerColor,
+    geoPollRegionFillIdle,
+    setGeoPollRegionFillIdle,
+    geoPollRegionFillVoted,
+    setGeoPollRegionFillVoted,
+    geoPollRegionStrokeIdle,
+    setGeoPollRegionStrokeIdle,
+    geoPollRegionStrokeVoted,
+    setGeoPollRegionStrokeVoted,
+    geoPollScreenBackground,
+    setGeoPollScreenBackground,
     playerVoteOptionTextColor,
     setPlayerVoteOptionTextColor,
     playerVoteProgressTrackColor,

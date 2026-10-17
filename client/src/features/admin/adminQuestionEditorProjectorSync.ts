@@ -192,6 +192,29 @@ export function createAdminQuestionEditorProjectorSync(ctx: AdminQuestionEditorP
       mode: "question",
       questionId: question.id,
       showVoteCount: next,
+      geoPollShowAnswerList: question.geoPollShowAnswerList ?? true,
+      showCorrectOption: question.showCorrectOption ?? false,
+      showQuestionTitle: question.showQuestionTitle ?? true,
+    });
+  }
+
+  function updateQuestionGeoPollShowAnswerList(questionIndex: number, next: boolean) {
+    ctx.setQuestionForms((prev) =>
+      prev.map((q, idx) => (idx === questionIndex ? { ...q, geoPollShowAnswerList: next } : q)),
+    );
+    const question = ctx.questionForms[questionIndex];
+    if (
+      !ctx.quizId ||
+      ctx.publicViewMode !== "question" ||
+      !question?.id ||
+      ctx.publicViewQuestionId !== question.id
+    )
+      return;
+    ctx.emitPublicViewSet({
+      mode: "question",
+      questionId: question.id,
+      showVoteCount: question.showVoteCount ?? false,
+      geoPollShowAnswerList: next,
       showCorrectOption: question.showCorrectOption ?? false,
       showQuestionTitle: question.showQuestionTitle ?? true,
     });
@@ -213,6 +236,7 @@ export function createAdminQuestionEditorProjectorSync(ctx: AdminQuestionEditorP
       mode: "question",
       questionId: question.id,
       showVoteCount: question.showVoteCount ?? false,
+      geoPollShowAnswerList: question.geoPollShowAnswerList ?? true,
       showCorrectOption: next,
       showQuestionTitle: question.showQuestionTitle ?? true,
     });
@@ -234,6 +258,7 @@ export function createAdminQuestionEditorProjectorSync(ctx: AdminQuestionEditorP
       mode: "question",
       questionId: question.id,
       showVoteCount: question.showVoteCount ?? false,
+      geoPollShowAnswerList: question.geoPollShowAnswerList ?? true,
       showCorrectOption: question.showCorrectOption ?? false,
       showQuestionTitle: next,
     });
@@ -474,6 +499,7 @@ export function createAdminQuestionEditorProjectorSync(ctx: AdminQuestionEditorP
     setPublicResultsView,
     setQuestionRevealStageForQuestion,
     updateQuestionShowVoteCount,
+    updateQuestionGeoPollShowAnswerList,
     updateQuestionShowCorrectOption,
     updateQuestionShowTitle,
     toggleQuestionAdminDone,

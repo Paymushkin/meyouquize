@@ -16,6 +16,20 @@ describe("eventThemeBranding", () => {
     expect(normalized.speakerTileBackgroundColor).toBe(
       DEFAULT_PUBLIC_VIEW_STATE.speakerTileBackgroundColor,
     );
+    expect(normalized.geoPollMarkerColor).toBe(DEFAULT_PUBLIC_VIEW_STATE.geoPollMarkerColor);
+    expect(normalized.geoPollRegionFillIdle).toBe(DEFAULT_PUBLIC_VIEW_STATE.geoPollRegionFillIdle);
+    expect(normalized.geoPollRegionFillVoted).toBe(
+      DEFAULT_PUBLIC_VIEW_STATE.geoPollRegionFillVoted,
+    );
+    expect(normalized.geoPollRegionStrokeIdle).toBe(
+      DEFAULT_PUBLIC_VIEW_STATE.geoPollRegionStrokeIdle,
+    );
+    expect(normalized.geoPollRegionStrokeVoted).toBe(
+      DEFAULT_PUBLIC_VIEW_STATE.geoPollRegionStrokeVoted,
+    );
+    expect(normalized.geoPollScreenBackground).toBe(
+      DEFAULT_PUBLIC_VIEW_STATE.geoPollScreenBackground,
+    );
   });
 
   it("eventThemeBrandingToPublicViewPatch adds applied name metadata", () => {

@@ -21,6 +21,12 @@ export type AdminBrandingVisualSetters = {
   setVoteOptionBorderColor: (value: string) => void;
   setVoteProgressTrackColor: (value: string) => void;
   setVoteProgressBarColor: (value: string) => void;
+  setGeoPollMarkerColor: (value: string) => void;
+  setGeoPollRegionFillIdle: (value: string) => void;
+  setGeoPollRegionFillVoted: (value: string) => void;
+  setGeoPollRegionStrokeIdle: (value: string) => void;
+  setGeoPollRegionStrokeVoted: (value: string) => void;
+  setGeoPollScreenBackground: (value: string) => void;
   setPlayerVoteOptionTextColor: (value: string) => void;
   setPlayerVoteProgressTrackColor: (value: string) => void;
   setPlayerVoteProgressBarColor: (value: string) => void;
@@ -82,6 +88,12 @@ export function applyAdminBrandingVisualFromPublicView(
   setters.setVoteOptionBorderColor(b.voteOptionBorderColor);
   setters.setVoteProgressTrackColor(b.voteProgressTrackColor);
   setters.setVoteProgressBarColor(b.voteProgressBarColor);
+  setters.setGeoPollMarkerColor(b.geoPollMarkerColor);
+  setters.setGeoPollRegionFillIdle(b.geoPollRegionFillIdle);
+  setters.setGeoPollRegionFillVoted(b.geoPollRegionFillVoted);
+  setters.setGeoPollRegionStrokeIdle(b.geoPollRegionStrokeIdle);
+  setters.setGeoPollRegionStrokeVoted(b.geoPollRegionStrokeVoted);
+  setters.setGeoPollScreenBackground(b.geoPollScreenBackground);
   setters.setPlayerVoteOptionTextColor(b.playerVoteOptionTextColor);
   setters.setPlayerVoteProgressTrackColor(b.playerVoteProgressTrackColor);
   setters.setPlayerVoteProgressBarColor(b.playerVoteProgressBarColor);

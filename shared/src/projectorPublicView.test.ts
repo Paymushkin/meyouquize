@@ -210,6 +210,26 @@ describe("projectorPublicViewChanged", () => {
     expect(picked.photoWallBaseUrl).toBe("https://storage.yandexcloud.net/b/w/");
   });
 
+  it("picks geo poll branding colors in question mode", () => {
+    const view = normalizePublicViewState({
+      mode: "question",
+      questionId: "q-geo",
+      geoPollMarkerColor: "#112233",
+      geoPollRegionFillIdle: "#223344",
+      geoPollRegionFillVoted: "#334455",
+      geoPollRegionStrokeIdle: "#445566",
+      geoPollRegionStrokeVoted: "#556677",
+      geoPollScreenBackground: "transparent",
+    });
+    const picked = pickProjectorPublicViewState(view);
+    expect(picked.geoPollMarkerColor).toBe("#112233");
+    expect(picked.geoPollRegionFillIdle).toBe("#223344");
+    expect(picked.geoPollRegionFillVoted).toBe("#334455");
+    expect(picked.geoPollRegionStrokeIdle).toBe("#445566");
+    expect(picked.geoPollRegionStrokeVoted).toBe("#556677");
+    expect(picked.geoPollScreenBackground).toBe("transparent");
+  });
+
   it("returns true when video wall settings change", () => {
     const prev = normalizePublicViewState({
       mode: "video_wall",

@@ -28,6 +28,7 @@ import { filterPublicViewSetEmitPayload } from "../features/publicView/filterPub
 type QuestionViewState = {
   id?: string;
   showVoteCount?: boolean;
+  geoPollShowAnswerList?: boolean;
   showCorrectOption?: boolean;
   showQuestionTitle?: boolean;
   hiddenTagTexts?: string[];
@@ -92,6 +93,12 @@ type UsePublicViewEmitterParams = {
   voteOptionBorderColor: string;
   voteProgressTrackColor: string;
   voteProgressBarColor: string;
+  geoPollMarkerColor: string;
+  geoPollRegionFillIdle: string;
+  geoPollRegionFillVoted: string;
+  geoPollRegionStrokeIdle: string;
+  geoPollRegionStrokeVoted: string;
+  geoPollScreenBackground: string;
   showFirstCorrectAnswerer: boolean;
   firstCorrectWinnersCount: number;
   showEventTitleOnPlayer: boolean;
@@ -215,6 +222,12 @@ export function usePublicViewEmitter(params: UsePublicViewEmitterParams) {
     voteOptionBorderColor,
     voteProgressTrackColor,
     voteProgressBarColor,
+    geoPollMarkerColor,
+    geoPollRegionFillIdle,
+    geoPollRegionFillVoted,
+    geoPollRegionStrokeIdle,
+    geoPollRegionStrokeVoted,
+    geoPollScreenBackground,
     showFirstCorrectAnswerer,
     firstCorrectWinnersCount,
     showEventTitleOnPlayer,
@@ -320,6 +333,7 @@ export function usePublicViewEmitter(params: UsePublicViewEmitterParams) {
       const question = questionForms.find((q) => q.id === questionId);
       return {
         showVoteCount: question?.showVoteCount ?? false,
+        geoPollShowAnswerList: question?.geoPollShowAnswerList ?? true,
         showCorrectOption: question?.showCorrectOption ?? false,
         showQuestionTitle: question?.showQuestionTitle ?? true,
         hiddenTagTexts: question?.hiddenTagTexts ?? [],
@@ -391,6 +405,7 @@ export function usePublicViewEmitter(params: UsePublicViewEmitterParams) {
             ? { leaderboardSubQuizId: leaderboardSubQuizIdForEmit }
             : {}),
         showVoteCount: patch.showVoteCount ?? questionState.showVoteCount,
+        geoPollShowAnswerList: patch.geoPollShowAnswerList ?? questionState.geoPollShowAnswerList,
         showCorrectOption: patch.showCorrectOption ?? questionState.showCorrectOption,
         showQuestionTitle: patch.showQuestionTitle ?? questionState.showQuestionTitle,
         hiddenTagTexts: patch.hiddenTagTexts ?? questionState.hiddenTagTexts,
@@ -410,6 +425,12 @@ export function usePublicViewEmitter(params: UsePublicViewEmitterParams) {
         voteOptionBorderColor: patch.voteOptionBorderColor ?? voteOptionBorderColor,
         voteProgressTrackColor: patch.voteProgressTrackColor ?? voteProgressTrackColor,
         voteProgressBarColor: patch.voteProgressBarColor ?? voteProgressBarColor,
+        geoPollMarkerColor: patch.geoPollMarkerColor ?? geoPollMarkerColor,
+        geoPollRegionFillIdle: patch.geoPollRegionFillIdle ?? geoPollRegionFillIdle,
+        geoPollRegionFillVoted: patch.geoPollRegionFillVoted ?? geoPollRegionFillVoted,
+        geoPollRegionStrokeIdle: patch.geoPollRegionStrokeIdle ?? geoPollRegionStrokeIdle,
+        geoPollRegionStrokeVoted: patch.geoPollRegionStrokeVoted ?? geoPollRegionStrokeVoted,
+        geoPollScreenBackground: patch.geoPollScreenBackground ?? geoPollScreenBackground,
         showFirstCorrectAnswerer: patch.showFirstCorrectAnswerer ?? showFirstCorrectAnswerer,
         firstCorrectWinnersCount: patch.firstCorrectWinnersCount ?? firstCorrectWinnersCount,
         showEventTitleOnPlayer: patch.showEventTitleOnPlayer ?? showEventTitleOnPlayer,
@@ -573,6 +594,12 @@ export function usePublicViewEmitter(params: UsePublicViewEmitterParams) {
       voteOptionBorderColor,
       voteProgressTrackColor,
       voteProgressBarColor,
+      geoPollMarkerColor,
+      geoPollRegionFillIdle,
+      geoPollRegionFillVoted,
+      geoPollRegionStrokeIdle,
+      geoPollRegionStrokeVoted,
+      geoPollScreenBackground,
       showFirstCorrectAnswerer,
       firstCorrectWinnersCount,
       showEventTitleOnPlayer,

@@ -107,6 +107,12 @@ const BRANDING_EMIT_GUARD_KEYS = [
   "voteOptionBorderColor",
   "voteProgressTrackColor",
   "voteProgressBarColor",
+  "geoPollMarkerColor",
+  "geoPollRegionFillIdle",
+  "geoPollRegionFillVoted",
+  "geoPollRegionStrokeIdle",
+  "geoPollRegionStrokeVoted",
+  "geoPollScreenBackground",
 ] as const satisfies ReadonlyArray<keyof PublicViewState>;
 
 const BRANDING_EMIT_GUARD_KEY_SET = new Set<string>(BRANDING_EMIT_GUARD_KEYS);
@@ -115,6 +121,7 @@ const QUESTION_MODE_KEYS = [
   "questionId",
   "questionRevealStage",
   "showVoteCount",
+  "geoPollShowAnswerList",
   "showCorrectOption",
   "showQuestionTitle",
   "hiddenTagTexts",
@@ -133,6 +140,12 @@ const QUESTION_MODE_KEYS = [
   "voteOptionBorderColor",
   "voteProgressTrackColor",
   "voteProgressBarColor",
+  "geoPollMarkerColor",
+  "geoPollRegionFillIdle",
+  "geoPollRegionFillVoted",
+  "geoPollRegionStrokeIdle",
+  "geoPollRegionStrokeVoted",
+  "geoPollScreenBackground",
   "showFirstCorrectAnswerer",
   "firstCorrectWinnersCount",
 ] as const satisfies ReadonlyArray<keyof PublicViewState>;

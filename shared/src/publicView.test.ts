@@ -320,6 +320,54 @@ describe("resolveProjectorLeaderboardRows", () => {
   });
 });
 
+describe("geo poll branding colors", () => {
+  it("defaults marker and region colors to map constants", () => {
+    const state = normalizePublicViewState({});
+    expect(state.geoPollMarkerColor).toBe("#F0B429");
+    expect(state.geoPollRegionFillIdle).toBe("#323232");
+    expect(state.geoPollRegionFillVoted).toBe("#5d5d5d");
+    expect(state.geoPollRegionStrokeIdle).toBe("#4a4a4a");
+    expect(state.geoPollRegionStrokeVoted).toBe("#ffffff");
+    expect(state.geoPollScreenBackground).toBe("#111111");
+  });
+
+  it("keeps valid hex overrides and falls back on invalid values", () => {
+    const state = normalizePublicViewState({
+      geoPollMarkerColor: "#112233",
+      geoPollRegionFillIdle: "not-a-color",
+      geoPollRegionFillVoted: "#abcdef",
+      geoPollRegionStrokeIdle: "#00ff00",
+      geoPollRegionStrokeVoted: "#fff",
+      geoPollScreenBackground: "transparent",
+    });
+    expect(state.geoPollMarkerColor).toBe("#112233");
+    expect(state.geoPollRegionFillIdle).toBe("#323232");
+    expect(state.geoPollRegionFillVoted).toBe("#abcdef");
+    expect(state.geoPollRegionStrokeIdle).toBe("#00ff00");
+    expect(state.geoPollRegionStrokeVoted).toBe("#ffffff");
+    expect(state.geoPollScreenBackground).toBe("transparent");
+  });
+
+  it("rejects invalid geo poll screen background", () => {
+    expect(
+      normalizePublicViewState({ geoPollScreenBackground: "rgba(0,0,0,0.5)" })
+        .geoPollScreenBackground,
+    ).toBe("#111111");
+  });
+
+  it("accepts hex geo poll screen background", () => {
+    expect(
+      normalizePublicViewState({ geoPollScreenBackground: "#0a0a0a" }).geoPollScreenBackground,
+    ).toBe("#0a0a0a");
+  });
+
+  it("normalizes Transparent casing to transparent", () => {
+    expect(
+      normalizePublicViewState({ geoPollScreenBackground: "Transparent" }).geoPollScreenBackground,
+    ).toBe("transparent");
+  });
+});
+
 describe("projectorJoinQr visibility", () => {
   it("inherits legacy single flag for overlay when overlay field is missing", () => {
     const state = normalizePublicViewState({ projectorJoinQrVisible: true });

@@ -37,6 +37,7 @@ import {
 import type { QuestionResult } from "../../admin/adminEventTypes";
 import type { PublicViewMode, PublicViewSetPatch } from "../../publicViewContract";
 import {
+  GEO_POLL_DICTIONARY_WORLD_COUNTRIES,
   hasOptionVoteCountOverride,
   isDebatePollPreset,
   isGeoPollPreset,
@@ -103,6 +104,7 @@ type Props = {
     extraPatch?: PublicViewSetPatch,
   ) => void;
   updateQuestionShowVoteCount: (globalIndex: number, next: boolean) => void;
+  updateQuestionGeoPollShowAnswerList: (globalIndex: number, next: boolean) => void;
   updateQuestionShowCorrectOption: (globalIndex: number, next: boolean) => void;
   openTagInputDialog: (globalIndex: number) => void;
   openTagResultsDialog: (globalIndex: number) => void;
@@ -180,6 +182,7 @@ export function AdminQuestionsSection(props: Props) {
     listHeaderPrimaryAction,
     setPublicResultsView,
     updateQuestionShowVoteCount,
+    updateQuestionGeoPollShowAnswerList,
     updateQuestionShowCorrectOption,
     openTagInputDialog,
     openTagResultsDialog,
@@ -633,6 +636,9 @@ export function AdminQuestionsSection(props: Props) {
                             question={question}
                             globalIndex={g}
                             updateQuestionShowVoteCount={updateQuestionShowVoteCount}
+                            updateQuestionGeoPollShowAnswerList={
+                              updateQuestionGeoPollShowAnswerList
+                            }
                             updateQuestionShowCorrectOption={updateQuestionShowCorrectOption}
                             openTagInputDialog={openTagInputDialog}
                             confirmResetQuestionAnswersByIndex={confirmResetQuestionAnswersByIndex}
@@ -734,7 +740,11 @@ export function AdminQuestionsSection(props: Props) {
                               const totalAnswers =
                                 result?.answerCount ??
                                 stats.reduce((sum, row) => sum + row.count, 0);
-                              const uniqueCities = stats.length;
+                              const uniquePlaces = stats.length;
+                              const placesLabel =
+                                question.geoPollDictionary === GEO_POLL_DICTIONARY_WORLD_COUNTRIES
+                                  ? "Стран"
+                                  : "Городов";
                               return (
                                 <Stack spacing={0.75} sx={{ mt: 0.5 }}>
                                   <Stack
@@ -755,10 +765,10 @@ export function AdminQuestionsSection(props: Props) {
                                     alignItems="center"
                                   >
                                     <Typography variant="body2" color="text.secondary">
-                                      Городов
+                                      {placesLabel}
                                     </Typography>
                                     <Typography variant="body2" color="text.secondary">
-                                      {uniqueCities}
+                                      {uniquePlaces}
                                     </Typography>
                                   </Stack>
                                 </Stack>

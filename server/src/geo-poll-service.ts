@@ -177,9 +177,13 @@ function buildCountryCentroids(): Map<string, [number, number]> {
 
 const countryCentroids = buildCountryCentroids();
 
+/** Не показываем в выборе (нет смысла для опросов; на карте тоже скрыта). */
+const GEO_POLL_EXCLUDED_COUNTRY_ALPHA2 = new Set(["AQ"]);
+
 const countryNamesRu = countries.getNames("ru", { select: "alias" });
 const countryEntries: GeoPollEntry[] = Object.entries(countryNamesRu)
   .map(([alpha2, label]) => {
+    if (GEO_POLL_EXCLUDED_COUNTRY_ALPHA2.has(alpha2.toUpperCase())) return null;
     const centroid = countryCentroids.get(alpha2);
     if (!centroid) return null;
     return {

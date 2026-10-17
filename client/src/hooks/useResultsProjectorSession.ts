@@ -136,8 +136,10 @@ export function useResultsProjectorSession(
   }, [leaderboardAnimKey]);
 
   useProjectorBodyBackground(
-    derived.isGeoPollQuestion && state.view.mode === "question"
-      ? "#111111"
+    derived.isGeoPollQuestion &&
+      state.view.mode === "question" &&
+      state.view.geoPollScreenBackground !== "transparent"
+      ? state.view.geoPollScreenBackground
       : state.view.projectorBackground,
   );
 

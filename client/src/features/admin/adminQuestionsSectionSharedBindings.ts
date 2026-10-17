@@ -16,6 +16,7 @@ export type AdminQuestionsSectionSharedBindings = Pick<
   | "openQuestionDialog"
   | "setPublicResultsView"
   | "updateQuestionShowVoteCount"
+  | "updateQuestionGeoPollShowAnswerList"
   | "updateQuestionShowCorrectOption"
   | "openTagInputDialog"
   | "openTagResultsDialog"
@@ -50,6 +51,7 @@ type Source = {
   openQuestionDialog: (globalIndex: number) => void;
   setPublicResultsView: AdminQuestionsSectionSharedBindings["setPublicResultsView"];
   updateQuestionShowVoteCount: AdminQuestionsSectionSharedBindings["updateQuestionShowVoteCount"];
+  updateQuestionGeoPollShowAnswerList: AdminQuestionsSectionSharedBindings["updateQuestionGeoPollShowAnswerList"];
   updateQuestionShowCorrectOption: AdminQuestionsSectionSharedBindings["updateQuestionShowCorrectOption"];
   openTagInputDialog: (globalIndex: number) => void;
   openTagResultsDialog: (globalIndex: number) => void;
@@ -87,6 +89,7 @@ export function buildAdminQuestionsSectionSharedBindings(
     openQuestionDialog: source.openQuestionDialog,
     setPublicResultsView: source.setPublicResultsView,
     updateQuestionShowVoteCount: source.updateQuestionShowVoteCount,
+    updateQuestionGeoPollShowAnswerList: source.updateQuestionGeoPollShowAnswerList,
     updateQuestionShowCorrectOption: source.updateQuestionShowCorrectOption,
     openTagInputDialog: source.openTagInputDialog,
     openTagResultsDialog: source.openTagResultsDialog,

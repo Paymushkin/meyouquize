@@ -351,6 +351,8 @@ export interface PublicViewState {
   /** Сабквиз для режима `leaderboard` на проекторе (пусто = первый по sortOrder). */
   leaderboardSubQuizId: string;
   showVoteCount: boolean;
+  /** Геоопрос на проекторе: показывать боковой список ответов */
+  geoPollShowAnswerList: boolean;
   /** Показывать подсветку правильного ответа в вариантах на проекторе */
   showCorrectOption: boolean;
   showQuestionTitle: boolean;
@@ -376,6 +378,18 @@ export interface PublicViewState {
   voteOptionBorderColor: string;
   voteProgressTrackColor: string;
   voteProgressBarColor: string;
+  /** Геоопрос на проекторе: цвет точки на карте */
+  geoPollMarkerColor: string;
+  /** Геоопрос: заливка региона без голоса */
+  geoPollRegionFillIdle: string;
+  /** Геоопрос: заливка региона с голосом */
+  geoPollRegionFillVoted: string;
+  /** Геоопрос: обводка региона idle */
+  geoPollRegionStrokeIdle: string;
+  /** Геоопрос: обводка региона voted */
+  geoPollRegionStrokeVoted: string;
+  /** Фон экрана геоопроса: `transparent` или #RRGGBB */
+  geoPollScreenBackground: string;
   /** Для голосований комнаты: показывать на проекторе ники первых верно ответивших */
   showFirstCorrectAnswerer: boolean;
   /** Сколько первых верных ответов показать (1–20), если showFirstCorrectAnswerer */
@@ -720,6 +734,7 @@ export const DEFAULT_PUBLIC_VIEW_STATE: PublicViewState = {
   highlightedLeadersCount: 3,
   leaderboardSubQuizId: "",
   showVoteCount: false,
+  geoPollShowAnswerList: true,
   showCorrectOption: false,
   showQuestionTitle: true,
   hiddenTagTexts: [],
@@ -740,6 +755,12 @@ export const DEFAULT_PUBLIC_VIEW_STATE: PublicViewState = {
   voteOptionBorderColor: "rgba(255,255,255,0.4)",
   voteProgressTrackColor: "#e3e3e3",
   voteProgressBarColor: "#1976d2",
+  geoPollMarkerColor: "#F0B429",
+  geoPollRegionFillIdle: "#323232",
+  geoPollRegionFillVoted: "#5d5d5d",
+  geoPollRegionStrokeIdle: "#4a4a4a",
+  geoPollRegionStrokeVoted: "#ffffff",
+  geoPollScreenBackground: "#111111",
   showFirstCorrectAnswerer: false,
   firstCorrectWinnersCount: 1,
   speakerQuestionsEnabled: false,
@@ -1076,6 +1097,15 @@ export function sanitizeTagCloudManualByQuestionId(value: unknown): TagCloudManu
 function sanitizeHex6(value: string | undefined, fallback: string): string {
   if (typeof value === "string" && /^#[0-9a-fA-F]{6}$/.test(value.trim())) return value.trim();
   return fallback;
+}
+
+/** Фон экрана геоопроса: `transparent` или #RRGGBB. */
+function sanitizeGeoPollScreenBackground(value: string | undefined, fallback: string): string {
+  if (typeof value !== "string") return fallback;
+  const trimmed = value.trim();
+  if (trimmed.toLowerCase() === "transparent") return "transparent";
+  const hexFallback = fallback === "transparent" ? "#111111" : fallback;
+  return sanitizeHex6(trimmed, hexFallback);
 }
 
 function sanitizePalette(colors: string[] | undefined, fallback: string[]): string[] {
@@ -1535,6 +1565,10 @@ export function normalizePublicViewState(
         : base.leaderboardSubQuizId,
     showVoteCount:
       typeof value?.showVoteCount === "boolean" ? value.showVoteCount : base.showVoteCount,
+    geoPollShowAnswerList:
+      typeof value?.geoPollShowAnswerList === "boolean"
+        ? value.geoPollShowAnswerList
+        : base.geoPollShowAnswerList,
     showCorrectOption:
       typeof value?.showCorrectOption === "boolean"
         ? value.showCorrectOption
@@ -1597,6 +1631,24 @@ export function normalizePublicViewState(
     voteProgressBarColor: sanitizeVoteFillColor(
       value?.voteProgressBarColor,
       base.voteProgressBarColor,
+    ),
+    geoPollMarkerColor: sanitizeHex6(value?.geoPollMarkerColor, base.geoPollMarkerColor),
+    geoPollRegionFillIdle: sanitizeHex6(value?.geoPollRegionFillIdle, base.geoPollRegionFillIdle),
+    geoPollRegionFillVoted: sanitizeHex6(
+      value?.geoPollRegionFillVoted,
+      base.geoPollRegionFillVoted,
+    ),
+    geoPollRegionStrokeIdle: sanitizeHex6(
+      value?.geoPollRegionStrokeIdle,
+      base.geoPollRegionStrokeIdle,
+    ),
+    geoPollRegionStrokeVoted: sanitizeHex6(
+      value?.geoPollRegionStrokeVoted,
+      base.geoPollRegionStrokeVoted,
+    ),
+    geoPollScreenBackground: sanitizeGeoPollScreenBackground(
+      value?.geoPollScreenBackground,
+      base.geoPollScreenBackground,
     ),
     showFirstCorrectAnswerer:
       typeof value?.showFirstCorrectAnswerer === "boolean"

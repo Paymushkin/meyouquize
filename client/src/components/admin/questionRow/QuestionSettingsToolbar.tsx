@@ -14,6 +14,7 @@ type Props = {
   question: QuestionForm;
   globalIndex: number;
   updateQuestionShowVoteCount: (globalIndex: number, next: boolean) => void;
+  updateQuestionGeoPollShowAnswerList: (globalIndex: number, next: boolean) => void;
   updateQuestionShowCorrectOption: (globalIndex: number, next: boolean) => void;
   openTagInputDialog: (globalIndex: number) => void;
   confirmResetQuestionAnswersByIndex: (globalIndex: number) => void;
@@ -33,6 +34,7 @@ export function QuestionSettingsToolbar(props: Props) {
     question,
     globalIndex,
     updateQuestionShowVoteCount,
+    updateQuestionGeoPollShowAnswerList,
     updateQuestionShowCorrectOption,
     openTagInputDialog,
     confirmResetQuestionAnswersByIndex,
@@ -78,6 +80,32 @@ export function QuestionSettingsToolbar(props: Props) {
         ) : null}
       </Stack>
       <Stack direction="row" alignItems="center" spacing={0.5}>
+        {isGeoPoll ? (
+          <Tooltip
+            title={
+              (question.geoPollShowAnswerList ?? true)
+                ? "Скрыть список ответов на проекторе"
+                : "Показать список ответов на проекторе"
+            }
+          >
+            <IconButton
+              size="small"
+              onClick={() =>
+                updateQuestionGeoPollShowAnswerList(
+                  globalIndex,
+                  !(question.geoPollShowAnswerList ?? true),
+                )
+              }
+              aria-label="Показывать список ответов геоопроса на проекторе"
+            >
+              {(question.geoPollShowAnswerList ?? true) ? (
+                <VisibilityIcon fontSize="small" color="action" />
+              ) : (
+                <VisibilityOffIcon fontSize="small" color="action" />
+              )}
+            </IconButton>
+          </Tooltip>
+        ) : null}
         {question.type !== "tag_cloud" && !isGeoPoll && !isDebatePoll ? (
           <Tooltip
             title={

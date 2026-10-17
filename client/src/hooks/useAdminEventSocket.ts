@@ -26,6 +26,7 @@ type QuestionFormPatchable = {
   id?: string;
   isActive?: boolean;
   showVoteCount?: boolean;
+  geoPollShowAnswerList?: boolean;
   showCorrectOption?: boolean;
   showQuestionTitle?: boolean;
   hiddenTagTexts?: string[];
@@ -60,6 +61,12 @@ type Params = {
   setVoteOptionBorderColor: (value: string) => void;
   setVoteProgressTrackColor: (value: string) => void;
   setVoteProgressBarColor: (value: string) => void;
+  setGeoPollMarkerColor: (value: string) => void;
+  setGeoPollRegionFillIdle: (value: string) => void;
+  setGeoPollRegionFillVoted: (value: string) => void;
+  setGeoPollRegionStrokeIdle: (value: string) => void;
+  setGeoPollRegionStrokeVoted: (value: string) => void;
+  setGeoPollScreenBackground: (value: string) => void;
   setBrandPrimaryColor: (value: string) => void;
   setBrandAccentColor: (value: string) => void;
   setBrandSurfaceColor: (value: string) => void;
@@ -136,6 +143,12 @@ export function useAdminEventSocket<TQuestion extends QuestionFormPatchable>(
     setVoteOptionBorderColor,
     setVoteProgressTrackColor,
     setVoteProgressBarColor,
+    setGeoPollMarkerColor,
+    setGeoPollRegionFillIdle,
+    setGeoPollRegionFillVoted,
+    setGeoPollRegionStrokeIdle,
+    setGeoPollRegionStrokeVoted,
+    setGeoPollScreenBackground,
     setBrandPrimaryColor,
     setBrandAccentColor,
     setBrandSurfaceColor,
@@ -206,6 +219,12 @@ export function useAdminEventSocket<TQuestion extends QuestionFormPatchable>(
       setVoteOptionBorderColor(nextBranding.voteOptionBorderColor);
       setVoteProgressTrackColor(nextBranding.voteProgressTrackColor);
       setVoteProgressBarColor(nextBranding.voteProgressBarColor);
+      setGeoPollMarkerColor(nextBranding.geoPollMarkerColor);
+      setGeoPollRegionFillIdle(nextBranding.geoPollRegionFillIdle);
+      setGeoPollRegionFillVoted(nextBranding.geoPollRegionFillVoted);
+      setGeoPollRegionStrokeIdle(nextBranding.geoPollRegionStrokeIdle);
+      setGeoPollRegionStrokeVoted(nextBranding.geoPollRegionStrokeVoted);
+      setGeoPollScreenBackground(nextBranding.geoPollScreenBackground);
       setBrandPrimaryColor(nextBranding.brandPrimaryColor);
       setBrandAccentColor(nextBranding.brandAccentColor);
       setBrandSurfaceColor(nextBranding.brandSurfaceColor);
@@ -267,6 +286,12 @@ export function useAdminEventSocket<TQuestion extends QuestionFormPatchable>(
       setVoteOptionTextColor,
       setVoteProgressTrackColor,
       setVoteProgressBarColor,
+      setGeoPollMarkerColor,
+      setGeoPollRegionFillIdle,
+      setGeoPollRegionFillVoted,
+      setGeoPollRegionStrokeIdle,
+      setGeoPollRegionStrokeVoted,
+      setGeoPollScreenBackground,
       setBrandPrimaryColor,
       setBrandAccentColor,
       setBrandSurfaceColor,
@@ -357,6 +382,7 @@ export function useAdminEventSocket<TQuestion extends QuestionFormPatchable>(
         questionRevealStage: payload.questionRevealStage,
         showFirstCorrectAnswerer: payload.showFirstCorrectAnswerer,
         showVoteCount: payload.showVoteCount,
+        geoPollShowAnswerList: payload.geoPollShowAnswerList,
         showQuestionTitle: payload.showQuestionTitle,
         leaderboardSubQuizId: payload.leaderboardSubQuizId,
         highlightedLeadersCount: payload.highlightedLeadersCount,

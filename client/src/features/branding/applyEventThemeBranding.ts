@@ -46,6 +46,12 @@ export function brandingEditorStateToEventThemeBranding(state: {
   voteOptionBorderColor: string;
   voteProgressTrackColor: string;
   voteProgressBarColor: string;
+  geoPollMarkerColor: string;
+  geoPollRegionFillIdle: string;
+  geoPollRegionFillVoted: string;
+  geoPollRegionStrokeIdle: string;
+  geoPollRegionStrokeVoted: string;
+  geoPollScreenBackground: string;
   playerVoteOptionTextColor: string;
   playerVoteProgressTrackColor: string;
   playerVoteProgressBarColor: string;

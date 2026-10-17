@@ -6,6 +6,7 @@ import { BrandImagesSection } from "./branding/BrandImagesSection";
 import { BrandPlayerUiResultsSection } from "./branding/BrandPlayerUiResultsSection";
 import { BrandProjectorJoinQrSection } from "./branding/BrandProjectorJoinQrSection";
 import { BrandScreenColorsSection } from "./branding/BrandScreenColorsSection";
+import { BrandGeoPollSection } from "./branding/BrandGeoPollSection";
 import { BrandTagCloudSection } from "./branding/BrandTagCloudSection";
 import { BrandThemeSection } from "./branding/BrandThemeSection";
 import { BrandTileColorsSection } from "./branding/BrandTileColorsSection";
@@ -33,6 +34,18 @@ type Props = {
   setVoteProgressTrackColor: (value: string) => void;
   voteProgressBarColor: string;
   setVoteProgressBarColor: (value: string) => void;
+  geoPollMarkerColor: string;
+  setGeoPollMarkerColor: (value: string) => void;
+  geoPollRegionFillIdle: string;
+  setGeoPollRegionFillIdle: (value: string) => void;
+  geoPollRegionFillVoted: string;
+  setGeoPollRegionFillVoted: (value: string) => void;
+  geoPollRegionStrokeIdle: string;
+  setGeoPollRegionStrokeIdle: (value: string) => void;
+  geoPollRegionStrokeVoted: string;
+  setGeoPollRegionStrokeVoted: (value: string) => void;
+  geoPollScreenBackground: string;
+  setGeoPollScreenBackground: (value: string) => void;
   playerVoteOptionTextColor: string;
   setPlayerVoteOptionTextColor: (value: string) => void;
   playerVoteProgressBarColor: string;
@@ -129,6 +142,18 @@ export function AdminBrandingSection(props: Props) {
     setVoteProgressTrackColor,
     voteProgressBarColor,
     setVoteProgressBarColor,
+    geoPollMarkerColor,
+    setGeoPollMarkerColor,
+    geoPollRegionFillIdle,
+    setGeoPollRegionFillIdle,
+    geoPollRegionFillVoted,
+    setGeoPollRegionFillVoted,
+    geoPollRegionStrokeIdle,
+    setGeoPollRegionStrokeIdle,
+    geoPollRegionStrokeVoted,
+    setGeoPollRegionStrokeVoted,
+    geoPollScreenBackground,
+    setGeoPollScreenBackground,
     playerVoteOptionTextColor,
     setPlayerVoteOptionTextColor,
     playerVoteProgressBarColor,
@@ -233,6 +258,22 @@ export function AdminBrandingSection(props: Props) {
             setCloudSpiral={setCloudSpiral}
             cloudAnimationStrength={cloudAnimationStrength}
             setCloudAnimationStrength={setCloudAnimationStrength}
+            emitPatch={emitBrandingPatch}
+          />
+          <BrandGeoPollSection
+            colorGridSx={colorGridSx}
+            geoPollMarkerColor={geoPollMarkerColor}
+            setGeoPollMarkerColor={setGeoPollMarkerColor}
+            geoPollRegionFillIdle={geoPollRegionFillIdle}
+            setGeoPollRegionFillIdle={setGeoPollRegionFillIdle}
+            geoPollRegionFillVoted={geoPollRegionFillVoted}
+            setGeoPollRegionFillVoted={setGeoPollRegionFillVoted}
+            geoPollRegionStrokeIdle={geoPollRegionStrokeIdle}
+            setGeoPollRegionStrokeIdle={setGeoPollRegionStrokeIdle}
+            geoPollRegionStrokeVoted={geoPollRegionStrokeVoted}
+            setGeoPollRegionStrokeVoted={setGeoPollRegionStrokeVoted}
+            geoPollScreenBackground={geoPollScreenBackground}
+            setGeoPollScreenBackground={setGeoPollScreenBackground}
             emitPatch={emitBrandingPatch}
           />
           <BrandPlayerUiResultsSection

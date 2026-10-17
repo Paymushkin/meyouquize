@@ -13,6 +13,7 @@ import { ProjectorVideoWallSection } from "../components/projector/ProjectorVide
 import { useResultsProjectorSession } from "../hooks/useResultsProjectorSession";
 import { useProjectorJoinQr } from "../hooks/useProjectorJoinQr";
 import { ProjectorViewportBackground } from "../components/projector/ProjectorViewportBackground";
+import { resolveGeoPollProjectorBackground } from "../features/projectorPage/resolveGeoPollProjectorBackground";
 import { useBrandFont } from "../hooks/useBrandFont";
 import { useEventFavicon } from "../hooks/useEventFavicon";
 import { resolveClientAssetUrl } from "../utils/resolveClientAssetUrl";
@@ -261,6 +262,12 @@ export function ResultsPage() {
   const brandProjectorBackgroundImageUrl = view.brandProjectorBackgroundImageUrl?.trim()
     ? resolveClientAssetUrl(view.brandProjectorBackgroundImageUrl)
     : undefined;
+  const geoPollProjectorBackground = resolveGeoPollProjectorBackground({
+    isGeoPollFullBleed: geoPollFullBleed,
+    geoPollScreenBackground: view.geoPollScreenBackground,
+    projectorBackground: view.projectorBackground,
+    brandProjectorBackgroundImageUrl,
+  });
   const brandFontUrl = view.brandFontUrl?.trim()
     ? resolveClientAssetUrl(view.brandFontUrl)
     : undefined;
@@ -306,8 +313,8 @@ export function ResultsPage() {
   return (
     <>
       <ProjectorViewportBackground
-        backgroundColor={geoPollFullBleed ? "#111111" : view.projectorBackground}
-        backgroundImageUrl={geoPollFullBleed ? undefined : brandProjectorBackgroundImageUrl}
+        backgroundColor={geoPollProjectorBackground.backgroundColor}
+        backgroundImageUrl={geoPollProjectorBackground.backgroundImageUrl}
         contentZoom={view.projectorBrowserZoom}
       />
       {showJoinQrOverlay && joinQrOverlayDataUrl ? (

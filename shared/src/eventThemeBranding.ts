@@ -22,6 +22,12 @@ export type EventThemeBranding = {
   voteOptionBorderColor: string;
   voteProgressTrackColor: string;
   voteProgressBarColor: string;
+  geoPollMarkerColor: string;
+  geoPollRegionFillIdle: string;
+  geoPollRegionFillVoted: string;
+  geoPollRegionStrokeIdle: string;
+  geoPollRegionStrokeVoted: string;
+  geoPollScreenBackground: string;
   playerVoteOptionTextColor: string;
   playerVoteProgressTrackColor: string;
   playerVoteProgressBarColor: string;
@@ -81,6 +87,12 @@ export function pickEventThemeBrandingFromPublicView(view: unknown): EventThemeB
     voteOptionBorderColor: String(value.voteOptionBorderColor ?? ""),
     voteProgressTrackColor: String(value.voteProgressTrackColor ?? ""),
     voteProgressBarColor: String(value.voteProgressBarColor ?? ""),
+    geoPollMarkerColor: String(value.geoPollMarkerColor ?? ""),
+    geoPollRegionFillIdle: String(value.geoPollRegionFillIdle ?? ""),
+    geoPollRegionFillVoted: String(value.geoPollRegionFillVoted ?? ""),
+    geoPollRegionStrokeIdle: String(value.geoPollRegionStrokeIdle ?? ""),
+    geoPollRegionStrokeVoted: String(value.geoPollRegionStrokeVoted ?? ""),
+    geoPollScreenBackground: String(value.geoPollScreenBackground ?? ""),
     playerVoteOptionTextColor: String(value.playerVoteOptionTextColor ?? ""),
     playerVoteProgressTrackColor: String(value.playerVoteProgressTrackColor ?? ""),
     playerVoteProgressBarColor: String(value.playerVoteProgressBarColor ?? ""),

@@ -24,6 +24,7 @@ function baseQuestion(overrides: Partial<QuestionForm> = {}): QuestionForm {
 
 const toolbarHandlers = {
   updateQuestionShowVoteCount: vi.fn(),
+  updateQuestionGeoPollShowAnswerList: vi.fn(),
   updateQuestionShowCorrectOption: vi.fn(),
   openTagInputDialog: vi.fn(),
   confirmResetQuestionAnswersByIndex: vi.fn(),
@@ -61,7 +62,7 @@ describe("QuestionSettingsToolbar", () => {
     expect(screen.getByLabelText("Правка голосов")).toBeTruthy();
   });
 
-  it("hides vote count, correct answer and player results for geo poll", () => {
+  it("hides vote count, correct answer and player results for geo poll; shows answer list toggle", () => {
     render(
       <QuestionSettingsToolbar
         question={baseQuestion({
@@ -78,6 +79,7 @@ describe("QuestionSettingsToolbar", () => {
     expect(screen.queryByLabelText("Показывать кол-во голосов")).toBeNull();
     expect(screen.queryByLabelText("Показывать правильный ответ на проекторе")).toBeNull();
     expect(screen.queryByLabelText(/результаты в интерфейсе пользователя/)).toBeNull();
+    expect(screen.getByLabelText("Показывать список ответов геоопроса на проекторе")).toBeTruthy();
   });
 
   it("hides vote count and correct answer for debate poll", () => {

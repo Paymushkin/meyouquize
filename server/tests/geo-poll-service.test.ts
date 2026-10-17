@@ -11,6 +11,12 @@ describe("geo-poll-service", () => {
     expect(rows.some((row) => row.label === "Россия")).toBe(true);
   });
 
+  it("excludes Antarctica from country choices", () => {
+    const byQuery = searchGeoPollEntries(GEO_POLL_DICTIONARY_WORLD_COUNTRIES, "антаркт", 10);
+    expect(byQuery.some((row) => row.key === "country:AQ")).toBe(false);
+    expect(resolveGeoPollEntry(GEO_POLL_DICTIONARY_WORLD_COUNTRIES, "country:AQ")).toBeNull();
+  });
+
   it("searches cities with cyrillic transliteration", () => {
     const rows = searchGeoPollEntries(GEO_POLL_DICTIONARY_WORLD_CITIES, "моск", 5);
     expect(rows.some((row) => row.key.startsWith("city:"))).toBe(true);
