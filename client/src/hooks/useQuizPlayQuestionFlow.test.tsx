@@ -137,6 +137,27 @@ describe("useQuizPlayQuestionFlow", () => {
     });
   });
 
+  it("ignores double submit while previous answer is in flight", () => {
+    const quiz = makeQuiz();
+    const { result } = renderHook(() =>
+      useQuizPlayQuestionFlow({
+        quiz,
+        submittedQuestionIds: [],
+        submittedAnswers: {},
+        playerAnswersHydrated: true,
+      }),
+    );
+
+    act(() => result.current.toggleOption("o1"));
+    act(() => {
+      result.current.submit();
+      result.current.submit();
+    });
+
+    expect(mockSocket.emit).toHaveBeenCalledTimes(1);
+    expect(result.current.canSubmit).toBe(false);
+  });
+
   it("submits tag cloud answers expanded from input", () => {
     const question = makeQuestion({ type: "tag_cloud", maxAnswers: 3 });
     const quiz = makeQuiz({ activeQuestion: question, activeQuestions: [question] });

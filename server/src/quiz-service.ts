@@ -3003,6 +3003,23 @@ async function loadSubmitQuestion(
   return question;
 }
 
+function isAnswerUniqueViolation(error: unknown): boolean {
+  return error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002";
+}
+
+/** create с игнором гонки двойного submit (unique questionId+participantId). */
+async function createAnswerIgnoringDuplicate(
+  data: Prisma.AnswerCreateInput | Prisma.AnswerUncheckedCreateInput,
+): Promise<"created" | "duplicate"> {
+  try {
+    await prisma.answer.create({ data });
+    return "created";
+  } catch (error) {
+    if (isAnswerUniqueViolation(error)) return "duplicate";
+    throw error;
+  }
+}
+
 export async function submitAnswer(payload: {
   quizId: string;
   questionId: string;
@@ -3038,8 +3055,9 @@ export async function submitAnswer(payload: {
     },
   });
   if (existing) {
+    // Идемпотентность: повтор того же ответа (двойной тап / reconnect) — успех, не ошибка.
     if (isStoredAnswerValidForQuestion(question, existing.selectedOptionIds)) {
-      throw new Error("Already answered this question");
+      return;
     }
     await prisma.answer.delete({
       where: {
@@ -3064,18 +3082,16 @@ export async function submitAnswer(payload: {
     if (!resolved) {
       throw new Error("Answer must be from the dictionary");
     }
-    await prisma.answer.create({
-      data: {
-        quizId: payload.quizId,
-        questionId: payload.questionId,
-        participantId: payload.participantId,
-        selectedOptionIds: JSON.stringify([resolved.key]),
-        isCorrect: false,
-        scoreAwarded: 0,
-        responseMs,
-      },
+    const created = await createAnswerIgnoringDuplicate({
+      quizId: payload.quizId,
+      questionId: payload.questionId,
+      participantId: payload.participantId,
+      selectedOptionIds: JSON.stringify([resolved.key]),
+      isCorrect: false,
+      scoreAwarded: 0,
+      responseMs,
     });
-    void invalidateDashboardResultsCache(payload.quizId);
+    if (created === "created") void invalidateDashboardResultsCache(payload.quizId);
     return;
   }
 
@@ -3103,18 +3119,16 @@ export async function submitAnswer(payload: {
       if (!useTiers) {
         throw new Error("Jury ranking requires points for each rank");
       }
-      await prisma.answer.create({
-        data: {
-          quizId: payload.quizId,
-          questionId: payload.questionId,
-          participantId: payload.participantId,
-          selectedOptionIds: JSON.stringify(ranked),
-          isCorrect: false,
-          scoreAwarded: 0,
-          responseMs,
-        },
+      const createdJury = await createAnswerIgnoringDuplicate({
+        quizId: payload.quizId,
+        questionId: payload.questionId,
+        participantId: payload.participantId,
+        selectedOptionIds: JSON.stringify(ranked),
+        isCorrect: false,
+        scoreAwarded: 0,
+        responseMs,
       });
-      void invalidateDashboardResultsCache(payload.quizId);
+      if (createdJury === "created") void invalidateDashboardResultsCache(payload.quizId);
       return;
     }
 
@@ -3122,18 +3136,16 @@ export async function submitAnswer(payload: {
       question.scoringMode === ScoringMode.QUIZ && evaluateRankingAnswer(expectedIds, ranked);
     const scoreAwarded =
       question.scoringMode === ScoringMode.QUIZ && isCorrect ? question.points : 0;
-    await prisma.answer.create({
-      data: {
-        quizId: payload.quizId,
-        questionId: payload.questionId,
-        participantId: payload.participantId,
-        selectedOptionIds: JSON.stringify(ranked),
-        isCorrect,
-        scoreAwarded,
-        responseMs,
-      },
+    const createdRank = await createAnswerIgnoringDuplicate({
+      quizId: payload.quizId,
+      questionId: payload.questionId,
+      participantId: payload.participantId,
+      selectedOptionIds: JSON.stringify(ranked),
+      isCorrect,
+      scoreAwarded,
+      responseMs,
     });
-    void invalidateDashboardResultsCache(payload.quizId);
+    if (createdRank === "created") void invalidateDashboardResultsCache(payload.quizId);
     return;
   }
 
@@ -3208,20 +3220,18 @@ export async function submitAnswer(payload: {
     scoreAwarded = question.scoringMode === ScoringMode.QUIZ && isCorrect ? question.points : 0;
   }
 
-  await prisma.answer.create({
-    data: {
-      quizId: payload.quizId,
-      questionId: payload.questionId,
-      participantId: payload.participantId,
-      selectedOptionIds: JSON.stringify(
-        question.type === QuestionType.TAG_CLOUD ? normalizedTags : selected,
-      ),
-      isCorrect,
-      scoreAwarded,
-      responseMs,
-    },
+  const created = await createAnswerIgnoringDuplicate({
+    quizId: payload.quizId,
+    questionId: payload.questionId,
+    participantId: payload.participantId,
+    selectedOptionIds: JSON.stringify(
+      question.type === QuestionType.TAG_CLOUD ? normalizedTags : selected,
+    ),
+    isCorrect,
+    scoreAwarded,
+    responseMs,
   });
-  void invalidateDashboardResultsCache(payload.quizId);
+  if (created === "created") void invalidateDashboardResultsCache(payload.quizId);
 }
 
 export async function resetParticipantAnswers(quizId: string, participantId: string) {

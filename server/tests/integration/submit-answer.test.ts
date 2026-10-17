@@ -261,6 +261,11 @@ describe("submitAnswer", () => {
     };
 
     await submitAnswer(payload);
-    await expect(submitAnswer(payload)).rejects.toThrow("Already answered this question");
+    // Повторный submit того же ответа — идемпотентный успех (двойной тап / reconnect).
+    await expect(submitAnswer(payload)).resolves.toBeUndefined();
+    const answers = await prisma.answer.findMany({
+      where: { questionId: question.id, participantId: player.participantId },
+    });
+    expect(answers).toHaveLength(1);
   });
 });
