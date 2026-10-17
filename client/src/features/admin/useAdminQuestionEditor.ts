@@ -9,16 +9,7 @@ import {
 } from "react";
 import { randomUuid } from "../../utils/randomUuid";
 import { socket } from "../../socket";
-import {
-  buildTagResultsDisplayOrder,
-  clearCountOverrideRow,
-  clearQuestionManualFields,
-  mergeInjectedTagWords,
-  parseInjectedTagLines,
-  setTagCountOverrideRow,
-  setOptionVoteCountOverrideRow,
-  toggleHiddenTagText,
-} from "../tagCloudAdmin";
+import { clearQuestionManualFields } from "../tagCloudAdmin";
 import {
   cloneQuestionForm,
   createEmptyQuestion,
@@ -46,6 +37,7 @@ import {
 } from "./adminQuestionFormPatch";
 import { createAdminQuestionEditorDebateSeriesMutations } from "./adminQuestionEditorDebateSeries";
 import { createAdminQuestionEditorProjectorSync } from "./adminQuestionEditorProjectorSync";
+import { createAdminQuestionEditorTagCloudMutations } from "./adminQuestionEditorTagCloud";
 import { prunePlayerUiRefsForRoom, type PublicViewSetPatch } from "../../publicViewContract";
 import type { PublicViewMode } from "../../publicViewContract";
 
@@ -666,138 +658,29 @@ export function useAdminQuestionEditor({
     setShowFirstCorrectAnswerer,
   });
 
-  function toggleTagVisibility(questionIndex: number, tagText: string) {
-    const question = questionForms[questionIndex];
-    const nextHidden = toggleHiddenTagText(question.hiddenTagTexts ?? [], tagText);
-    setQuestionForms((prev) => {
-      const next = prev.map((q, idx) =>
-        idx === questionIndex ? { ...q, hiddenTagTexts: nextHidden } : q,
-      );
-      persistCloudManualSnapshot(next);
-      return next;
-    });
-  }
-
-  function applyInjectedTagList(questionIndex: number) {
-    const question = questionForms[questionIndex];
-    const parsed = parseInjectedTagLines(question.injectedTagsInput ?? "");
-    if (parsed.length === 0) {
-      setMessage("Список пустой или формат неверный. Используйте строки вида: слово 10");
-      return;
-    }
-    const nextWords = mergeInjectedTagWords(question.injectedTagWords ?? [], parsed);
-    setQuestionForms((prev) => {
-      const next = prev.map((q, idx) =>
-        idx === questionIndex ? { ...q, injectedTagWords: nextWords, injectedTagsInput: "" } : q,
-      );
-      persistCloudManualSnapshot(next);
-      return next;
-    });
-    setMessage("Список ответов добавлен");
-  }
-
-  function updateTagCountOverride(questionIndex: number, tagText: string, nextCount: number) {
-    const question = questionForms[questionIndex];
-    const nextOverrides = setTagCountOverrideRow(
-      question.tagCountOverrides ?? [],
-      tagText,
-      nextCount,
-    );
-    setQuestionForms((prev) => {
-      const next = prev.map((q, idx) =>
-        idx === questionIndex ? { ...q, tagCountOverrides: nextOverrides } : q,
-      );
-      persistCloudManualSnapshot(next);
-      return next;
-    });
-  }
-
-  function clearTagCountOverride(questionIndex: number, tagText: string) {
-    const question = questionForms[questionIndex];
-    const nextOverrides = clearCountOverrideRow(question.tagCountOverrides ?? [], tagText);
-    setQuestionForms((prev) => {
-      const next = prev.map((q, idx) =>
-        idx === questionIndex ? { ...q, tagCountOverrides: nextOverrides } : q,
-      );
-      persistCloudManualSnapshot(next);
-      return next;
-    });
-  }
-
-  function updateOptionVoteCountOverride(
-    questionIndex: number,
-    optionId: string,
-    liveCount: number,
-    nextDisplayCount: number,
-  ) {
-    const question = questionForms[questionIndex];
-    const nextOverrides = setOptionVoteCountOverrideRow(
-      question.optionVoteCountOverrides ?? [],
-      optionId,
-      liveCount,
-      nextDisplayCount,
-    );
-    setQuestionForms((prev) => {
-      const next = prev.map((q, idx) =>
-        idx === questionIndex ? { ...q, optionVoteCountOverrides: nextOverrides } : q,
-      );
-      persistCloudManualSnapshot(next);
-      return next;
-    });
-  }
-
-  function clearOptionVoteCountOverride(questionIndex: number, optionId: string) {
-    const question = questionForms[questionIndex];
-    const nextOverrides = clearCountOverrideRow(question.optionVoteCountOverrides ?? [], optionId);
-    setQuestionForms((prev) => {
-      const next = prev.map((q, idx) =>
-        idx === questionIndex ? { ...q, optionVoteCountOverrides: nextOverrides } : q,
-      );
-      persistCloudManualSnapshot(next);
-      return next;
-    });
-  }
-
-  function resetOptionVoteCountOverrides(questionIndex: number) {
-    setQuestionForms((prev) => {
-      const next = prev.map((q, idx) =>
-        idx === questionIndex ? { ...q, optionVoteCountOverrides: [] } : q,
-      );
-      persistCloudManualSnapshot(next);
-      return next;
-    });
-  }
-
-  function openTagInputDialog(questionIndex: number) {
-    setTagInputDialogQuestionIndex(questionIndex);
-  }
-
-  function closeTagInputDialog() {
-    setTagInputDialogQuestionIndex(null);
-  }
-
-  function applyInjectedTagListFromDialog() {
-    if (tagInputDialogQuestionIndex === null) return;
-    applyInjectedTagList(tagInputDialogQuestionIndex);
-    closeTagInputDialog();
-  }
-
-  function openTagResultsDialog(questionIndex: number) {
-    const question = questionForms[questionIndex];
-    const result = question?.id
-      ? questionResults.find((item) => item.questionId === question.id)
-      : undefined;
-    const tags = result?.tagCloud ?? [];
-    const injected = question?.injectedTagWords ?? [];
-    const overrides = question?.tagCountOverrides ?? [];
-    setTagResultsOrder(buildTagResultsDisplayOrder({ liveTags: tags, injected, overrides }));
-    setTagResultsDialogQuestionIndex(questionIndex);
-  }
-
-  function closeTagResultsDialog() {
-    setTagResultsDialogQuestionIndex(null);
-    setTagResultsOrder([]);
-  }
+  const {
+    toggleTagVisibility,
+    updateTagCountOverride,
+    clearTagCountOverride,
+    updateOptionVoteCountOverride,
+    clearOptionVoteCountOverride,
+    resetOptionVoteCountOverrides,
+    openTagInputDialog,
+    closeTagInputDialog,
+    applyInjectedTagListFromDialog,
+    openTagResultsDialog,
+    closeTagResultsDialog,
+  } = createAdminQuestionEditorTagCloudMutations({
+    questionForms,
+    questionResults,
+    setQuestionForms,
+    setMessage,
+    persistCloudManualSnapshot,
+    tagInputDialogQuestionIndex,
+    setTagInputDialogQuestionIndex,
+    setTagResultsDialogQuestionIndex,
+    setTagResultsOrder,
+  });
 
   function openQuestionDialog(index: number) {
     const q = questionForms[index];
