@@ -1,6 +1,5 @@
 import { flushSync } from "react-dom";
 import {
-  useCallback,
   useEffect,
   useRef,
   useState,
@@ -21,11 +20,8 @@ import {
   toggleHiddenTagText,
 } from "../tagCloudAdmin";
 import {
-  applyVotesDisplayBlocksReorder,
-  buildVotesDisplayBlocks,
   cloneQuestionForm,
   createEmptyQuestion,
-  filterVotesDisplayBlocks,
   isEditorQuizMode,
   normalizeTagCloudQuestionPoints,
   validateQuestionsForm,
@@ -49,6 +45,7 @@ import {
   patchQuestionAtIndex,
 } from "./adminQuestionFormPatch";
 import { createAdminQuestionEditorDebateSeriesMutations } from "./adminQuestionEditorDebateSeries";
+import { createAdminQuestionEditorProjectorSync } from "./adminQuestionEditorProjectorSync";
 import { prunePlayerUiRefsForRoom, type PublicViewSetPatch } from "../../publicViewContract";
 import type { PublicViewMode } from "../../publicViewContract";
 
@@ -634,432 +631,40 @@ export function useAdminQuestionEditor({
     }
   }
 
-  const setPublicResultsView = useCallback(
-    (
-      mode:
-        | "title"
-        | "question"
-        | "leaderboard"
-        | "speaker_questions"
-        | "reactions"
-        | "randomizer"
-        | "photo_wall"
-        | "video_wall"
-        | "debate_compare"
-        | "debate_series",
-      questionIdForMode?: string,
-      extraPatch?: PublicViewSetPatch,
-    ) => {
-      if (!quizId) {
-        setMessage("Quiz ID не найден");
-        return;
-      }
-      const nextQuestionId =
-        mode === "question" || mode === "debate_series" ? questionIdForMode : undefined;
-      const nextDebateCompareQuestionId = mode === "debate_compare" ? questionIdForMode : undefined;
-      if (mode === "question" && !nextQuestionId) {
-        setMessage("Не найден вопрос для экрана");
-        return;
-      }
-      if (mode === "debate_compare" && !nextDebateCompareQuestionId) {
-        setMessage("Не найден финальный вопрос дебатов");
-        return;
-      }
-      if (mode === "debate_compare") {
-        const finalQuestion = questionForms.find((q) => q.id === nextDebateCompareQuestionId);
-        if (!finalQuestion?.debateBaselineQuestionId?.trim()) {
-          setMessage("У финального вопроса не указан baseline-опрос «до»");
-          return;
-        }
-      }
-      let nextDebateSeriesId: string | undefined;
-      if (mode === "debate_series") {
-        const seedQuestion = questionForms.find((q) => q.id === questionIdForMode);
-        nextDebateSeriesId =
-          (typeof extraPatch?.debateSeriesId === "string"
-            ? extraPatch.debateSeriesId.trim()
-            : "") ||
-          seedQuestion?.debateSeriesId?.trim() ||
-          undefined;
-        if (!nextDebateSeriesId) {
-          setMessage("У дебатов не задана серия");
-          return;
-        }
-      }
-      const resolvedSeriesQuestionId =
-        mode === "debate_series"
-          ? nextQuestionId ||
-            [...questionForms]
-              .filter(
-                (q) =>
-                  q.subQuizId == null &&
-                  isDebatePollPreset(q) &&
-                  q.debateSeriesId?.trim() === nextDebateSeriesId,
-              )
-              .sort((a, b) => (a.debateRoundIndex ?? 0) - (b.debateRoundIndex ?? 0))
-              .at(-1)?.id
-          : nextQuestionId;
-      if (mode === "debate_series" && !resolvedSeriesQuestionId) {
-        setMessage("Не найден раунд серии для экрана");
-        return;
-      }
-      const targetQuestion =
-        (mode === "question" || mode === "debate_series") && resolvedSeriesQuestionId
-          ? questionForms.find((q) => q.id === resolvedSeriesQuestionId)
-          : undefined;
-      const nextQuestionRevealStage =
-        mode === "debate_compare" || mode === "debate_series"
-          ? "results"
-          : mode === "question" && targetQuestion?.type !== "tag_cloud"
-            ? "options"
-            : "results";
-      const leaderboardSubQuizIdForEmit =
-        mode === "leaderboard"
-          ? (extraPatch?.leaderboardSubQuizId ?? resultsSubQuizId ?? "").trim() || undefined
-          : undefined;
-      if (mode === "leaderboard" && leaderboardSubQuizIdForEmit) {
-        setResultsSubQuizId(leaderboardSubQuizIdForEmit);
-      }
-      setShowFirstCorrectAnswerer(false);
-      setPublicViewMode(mode);
-      setPublicViewQuestionId(
-        mode === "question" || mode === "debate_series" ? resolvedSeriesQuestionId : undefined,
-      );
-      setPublicDebateCompareQuestionId(
-        mode === "debate_compare" ? nextDebateCompareQuestionId : undefined,
-      );
-      setQuestionRevealStage(nextQuestionRevealStage);
-      emitPublicViewSet({
-        mode,
-        questionId: resolvedSeriesQuestionId,
-        debateCompareQuestionId: nextDebateCompareQuestionId,
-        debateSeriesId: nextDebateSeriesId,
-        debateSeriesView: mode === "debate_series" ? "cumulative" : undefined,
-        showCorrectOption: targetQuestion?.showCorrectOption ?? false,
-        showFirstCorrectAnswerer: false,
-        ...(leaderboardSubQuizIdForEmit
-          ? { leaderboardSubQuizId: leaderboardSubQuizIdForEmit }
-          : {}),
-        ...extraPatch,
-        // После extraPatch: накопительный итог / сравнение всегда с графиками, не с карточками вариантов.
-        questionRevealStage:
-          mode === "debate_series" || mode === "debate_compare"
-            ? "results"
-            : (extraPatch?.questionRevealStage ?? nextQuestionRevealStage),
-      });
-    },
-    [
-      emitPublicViewSet,
-      questionForms,
-      quizId,
-      resultsSubQuizId,
-      setPublicViewMode,
-      setPublicViewQuestionId,
-      setPublicDebateCompareQuestionId,
-      setQuestionRevealStage,
-      setShowFirstCorrectAnswerer,
-      setResultsSubQuizId,
-      setMessage,
-    ],
-  );
-
-  function setQuestionRevealStageForQuestion(
-    questionIdForProjector: string,
-    stage: "options" | "results",
-  ) {
-    if (!quizId) {
-      setMessage("Quiz ID не найден");
-      return;
-    }
-    setPublicViewMode("question");
-    setPublicViewQuestionId(questionIdForProjector);
-    setQuestionRevealStage(stage);
-    emitPublicViewSet({
-      mode: "question",
-      questionId: questionIdForProjector,
-      questionRevealStage: stage,
-      showFirstCorrectAnswerer: false,
-    });
-  }
-  function updateQuestionShowVoteCount(questionIndex: number, next: boolean) {
-    setQuestionForms((prev) =>
-      prev.map((q, idx) => (idx === questionIndex ? { ...q, showVoteCount: next } : q)),
-    );
-    const question = questionForms[questionIndex];
-    if (
-      !quizId ||
-      publicViewMode !== "question" ||
-      !question?.id ||
-      publicViewQuestionId !== question.id
-    )
-      return;
-    emitPublicViewSet({
-      mode: "question",
-      questionId: question.id,
-      showVoteCount: next,
-      showCorrectOption: question.showCorrectOption ?? false,
-      showQuestionTitle: question.showQuestionTitle ?? true,
-    });
-  }
-
-  function updateQuestionShowCorrectOption(questionIndex: number, next: boolean) {
-    setQuestionForms((prev) =>
-      prev.map((q, idx) => (idx === questionIndex ? { ...q, showCorrectOption: next } : q)),
-    );
-    const question = questionForms[questionIndex];
-    if (
-      !quizId ||
-      publicViewMode !== "question" ||
-      !question?.id ||
-      publicViewQuestionId !== question.id
-    )
-      return;
-    emitPublicViewSet({
-      mode: "question",
-      questionId: question.id,
-      showVoteCount: question.showVoteCount ?? false,
-      showCorrectOption: next,
-      showQuestionTitle: question.showQuestionTitle ?? true,
-    });
-  }
-
-  function updateQuestionShowTitle(questionIndex: number, next: boolean) {
-    setQuestionForms((prev) =>
-      prev.map((q, idx) => (idx === questionIndex ? { ...q, showQuestionTitle: next } : q)),
-    );
-    const question = questionForms[questionIndex];
-    if (
-      !quizId ||
-      publicViewMode !== "question" ||
-      !question?.id ||
-      publicViewQuestionId !== question.id
-    )
-      return;
-    emitPublicViewSet({
-      mode: "question",
-      questionId: question.id,
-      showVoteCount: question.showVoteCount ?? false,
-      showCorrectOption: question.showCorrectOption ?? false,
-      showQuestionTitle: next,
-    });
-  }
-
-  async function toggleQuestionAdminDone(globalIndex: number) {
-    const prev = questionForms[globalIndex];
-    if (!prev?.id) {
-      setMessage("Сначала сохраните вопрос");
-      return;
-    }
-    const nextDone = !prev.adminDone;
-    const nextForms = questionForms.map((q, idx) =>
-      idx === globalIndex ? { ...q, adminDone: nextDone } : q,
-    );
-    setQuestionForms(nextForms);
-    const ok = await patchQuestionAdminDone(prev.id, nextDone, subQuizSheets, nextForms, quizId);
-    if (!ok) {
-      setQuestionForms((forms) =>
-        forms.map((q, idx) => (idx === globalIndex ? { ...q, adminDone: prev.adminDone } : q)),
-      );
-    }
-  }
-
-  /** Пометить все раунды серии (или набор индексов) отработанными / актуальными. */
-  async function setQuestionsAdminDone(globalIndices: number[], adminDone: boolean) {
-    const targets = globalIndices
-      .map((index) => ({ index, q: questionForms[index] }))
-      .filter((row): row is { index: number; q: QuestionForm } => Boolean(row.q));
-    if (targets.length === 0) return;
-    if (targets.some((row) => !row.q.id)) {
-      setMessage("Сначала сохраните все раунды серии");
-      return;
-    }
-
-    const indexSet = new Set(targets.map((row) => row.index));
-    const snapshot = questionForms;
-    const nextForms = questionForms.map((q, idx) => (indexSet.has(idx) ? { ...q, adminDone } : q));
-    setQuestionForms(nextForms);
-
-    for (const { q } of targets) {
-      const ok = await patchQuestionAdminDone(q.id!, adminDone, subQuizSheets, nextForms, quizId);
-      if (!ok) {
-        setQuestionForms(snapshot);
-        return;
-      }
-    }
-  }
-
-  async function reorderVoteInList(
-    fromLocalIndex: number,
-    toLocalIndex: number,
-    scopeIndices: number[],
-  ) {
-    if (fromLocalIndex === toLocalIndex) return;
-    if (
-      fromLocalIndex < 0 ||
-      toLocalIndex < 0 ||
-      fromLocalIndex >= scopeIndices.length ||
-      toLocalIndex >= scopeIndices.length
-    ) {
-      return;
-    }
-
-    const orderedGlobals = [...scopeIndices];
-    const [removed] = orderedGlobals.splice(fromLocalIndex, 1);
-    if (removed === undefined) return;
-    orderedGlobals.splice(toLocalIndex, 0, removed);
-
-    const scopePositions = [...scopeIndices].sort((a, b) => a - b);
-    const reorderedQuestions = orderedGlobals.map((globalIndex) => questionForms[globalIndex]!);
-
-    const snapshot = questionForms;
-    const next = [...questionForms];
-    scopePositions.forEach((position, index) => {
-      next[position] = reorderedQuestions[index]!;
-    });
-    setQuestionForms(next);
-
-    const merged = await persistQuestions(next, subQuizSheets, { suppressToast: true });
-    if (!merged) {
-      setQuestionForms(snapshot);
-      setMessage("Не удалось изменить порядок");
-    }
-  }
-
-  async function reorderVoteDisplayBlocks(
-    fromBlockIndex: number,
-    toBlockIndex: number,
-    scopeIndices: number[],
-  ) {
-    const blocks = filterVotesDisplayBlocks(
-      buildVotesDisplayBlocks(questionForms),
-      new Set(scopeIndices),
-    );
-    const next = applyVotesDisplayBlocksReorder(
-      questionForms,
-      blocks,
-      fromBlockIndex,
-      toBlockIndex,
-    );
-    if (!next) return;
-
-    const snapshot = questionForms;
-    setQuestionForms(next);
-    const merged = await persistQuestions(next, subQuizSheets, { suppressToast: true });
-    if (!merged) {
-      setQuestionForms(snapshot);
-      setMessage("Не удалось изменить порядок");
-    }
-  }
-
-  async function updateQuestionProjectorShowFirstCorrect(questionIndex: number, next: boolean) {
-    const prev = questionForms[questionIndex];
-    if (!prev?.id) {
-      setMessage("Сначала сохраните вопрос");
-      return;
-    }
-    const previousSwitch = prev.projectorShowFirstCorrect ?? true;
-    const nextForms = questionForms.map((q, idx) =>
-      idx === questionIndex ? { ...q, projectorShowFirstCorrect: next } : q,
-    );
-    setQuestionForms(nextForms);
-    const ok = await patchQuestionProjectorSettings(
-      prev.id,
-      { projectorShowFirstCorrect: next },
-      subQuizSheets,
-      nextForms,
-      quizId,
-    );
-    if (!ok) {
-      setQuestionForms((forms) =>
-        forms.map((q, idx) =>
-          idx === questionIndex ? { ...q, projectorShowFirstCorrect: previousSwitch } : q,
-        ),
-      );
-    }
-  }
-
-  async function updateQuestionRankingProjectorMetric(
-    questionIndex: number,
-    value: "avg_rank" | "avg_score" | "total_score",
-  ) {
-    const prev = questionForms[questionIndex];
-    if (!prev?.id) {
-      setMessage("Сначала сохраните вопрос");
-      return;
-    }
-    if (prev.type !== "ranking") return;
-    const previousMetric = prev.rankingProjectorMetric ?? "avg_score";
-    const nextForms = questionForms.map((q, idx) =>
-      idx === questionIndex ? { ...q, rankingProjectorMetric: value } : q,
-    );
-    setQuestionForms(nextForms);
-    const ok = await patchQuestionProjectorSettings(
-      prev.id,
-      { rankingProjectorMetric: value },
-      subQuizSheets,
-      nextForms,
-      quizId,
-    );
-    if (!ok) {
-      setQuestionForms((forms) =>
-        forms.map((q, idx) =>
-          idx === questionIndex ? { ...q, rankingProjectorMetric: previousMetric } : q,
-        ),
-      );
-    }
-  }
-
-  function patchQuestionProjectorFirstCorrectWinnersCount(questionIndex: number, next: number) {
-    const safe = Math.max(1, Math.min(20, Math.trunc(Number.isFinite(next) ? next : 1)));
-    setQuestionForms((prev) =>
-      prev.map((q, idx) =>
-        idx === questionIndex ? { ...q, projectorFirstCorrectWinnersCount: safe } : q,
-      ),
-    );
-  }
-
-  function commitQuestionProjectorFirstCorrectWinnersCount(questionIndex: number, raw: number) {
-    const safe = Math.max(1, Math.min(20, Math.trunc(Number.isFinite(raw) ? raw : 1)));
-    setQuestionForms((prev) => {
-      const previousCount = prev[questionIndex]?.projectorFirstCorrectWinnersCount ?? 1;
-      const qid = prev[questionIndex]?.id;
-      const nextForms = prev.map((q, idx) =>
-        idx === questionIndex ? { ...q, projectorFirstCorrectWinnersCount: safe } : q,
-      );
-      queueMicrotask(() => {
-        void (async () => {
-          if (!qid) {
-            setMessage("Сначала сохраните вопрос");
-            setQuestionForms((p) =>
-              p.map((q, idx) =>
-                idx === questionIndex
-                  ? { ...q, projectorFirstCorrectWinnersCount: previousCount }
-                  : q,
-              ),
-            );
-            return;
-          }
-          const ok = await patchQuestionProjectorSettings(
-            qid,
-            { projectorFirstCorrectWinnersCount: safe },
-            subQuizSheets,
-            nextForms,
-            quizId,
-          );
-          if (!ok) {
-            setQuestionForms((p) =>
-              p.map((q, idx) =>
-                idx === questionIndex
-                  ? { ...q, projectorFirstCorrectWinnersCount: previousCount }
-                  : q,
-              ),
-            );
-          }
-        })();
-      });
-      return nextForms;
-    });
-  }
+  const {
+    setPublicResultsView,
+    setQuestionRevealStageForQuestion,
+    updateQuestionShowVoteCount,
+    updateQuestionShowCorrectOption,
+    updateQuestionShowTitle,
+    toggleQuestionAdminDone,
+    setQuestionsAdminDone,
+    reorderVoteInList,
+    reorderVoteDisplayBlocks,
+    updateQuestionProjectorShowFirstCorrect,
+    updateQuestionRankingProjectorMetric,
+    patchQuestionProjectorFirstCorrectWinnersCount,
+    commitQuestionProjectorFirstCorrectWinnersCount,
+  } = createAdminQuestionEditorProjectorSync({
+    quizId,
+    questionForms,
+    subQuizSheets,
+    setQuestionForms,
+    setMessage,
+    persistQuestions,
+    patchQuestionProjectorSettings,
+    patchQuestionAdminDone,
+    publicViewMode,
+    publicViewQuestionId,
+    setPublicViewMode,
+    setPublicViewQuestionId,
+    setPublicDebateCompareQuestionId,
+    setQuestionRevealStage,
+    emitPublicViewSet,
+    resultsSubQuizId,
+    setResultsSubQuizId,
+    setShowFirstCorrectAnswerer,
+  });
 
   function toggleTagVisibility(questionIndex: number, tagText: string) {
     const question = questionForms[questionIndex];
