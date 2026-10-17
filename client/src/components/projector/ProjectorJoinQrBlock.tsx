@@ -4,10 +4,12 @@ type Props = {
   text: string;
   textColor: string;
   qrDataUrl: string;
+  /** Макс. ширина контейнера проектора (из настроек ивента). */
+  maxWidthPx: number;
 };
 
 export function ProjectorJoinQrBlock(props: Props) {
-  const { text, textColor, qrDataUrl } = props;
+  const { text, textColor, qrDataUrl, maxWidthPx } = props;
   return (
     <Stack
       direction={{ xs: "column", sm: "row" }}
@@ -15,7 +17,7 @@ export function ProjectorJoinQrBlock(props: Props) {
       sx={{
         mt: 2,
         width: "100%",
-        maxWidth: 1280,
+        maxWidth: maxWidthPx,
         mx: "auto",
         alignItems: "center",
         justifyContent: "space-between",
@@ -33,7 +35,7 @@ export function ProjectorJoinQrBlock(props: Props) {
           width: "100%",
           minWidth: 0,
           pr: { sm: 2 },
-          fontSize: "clamp(1.75rem, 8cqw, 3.5rem)",
+          fontSize: "clamp(2rem, 9.5cqw, 4rem)",
           lineHeight: 1.15,
         }}
       >

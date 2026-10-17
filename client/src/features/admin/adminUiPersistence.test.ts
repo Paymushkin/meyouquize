@@ -43,7 +43,11 @@ describe("adminUiPersistence", () => {
 
     expect(readAdminUiPersistence("demo")).toMatchObject({
       section: "photo_wall",
-      questionsTab: "quizzes",
+      questionsTab: "votes",
     });
+  });
+
+  it("по умолчанию открывает вкладку голосований", () => {
+    expect(readAdminUiPersistence("fresh-event").questionsTab).toBe("votes");
   });
 });

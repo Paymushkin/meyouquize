@@ -1,4 +1,5 @@
 import type { Socket } from "socket.io";
+import { ZodError } from "zod";
 import { isAdminAuthBypassed } from "../admin-auth-guard.js";
 import { isAdminTokenValid } from "../admin-session-cache.js";
 
@@ -51,6 +52,33 @@ export function fail(socket: Socket, error: string | Partial<SocketErrorPayload>
           details: error.details,
         };
   socket.emit("error:message", payload);
+}
+
+/** Человекочитаемое сообщение из catch: Zod не отдаёт сырой JSON issues. */
+export function caughtErrorMessage(error: unknown, fallback: string): string {
+  if (error instanceof ZodError) {
+    const first = error.issues[0];
+    if (first?.path?.[0] === "text" && first.code === "too_small") {
+      return "Текст вопроса должен быть не короче 3 символов";
+    }
+    if (
+      typeof first?.message === "string" &&
+      first.message.trim() &&
+      !first.message.startsWith("[")
+    ) {
+      return first.message;
+    }
+    return "Некорректные данные";
+  }
+  if (error instanceof Error && error.message.trim()) {
+    // Zod иногда кладёт JSON issues в Error.message
+    const trimmed = error.message.trim();
+    if (trimmed.startsWith("[{") || trimmed.startsWith('[{"code"')) {
+      return "Некорректные данные";
+    }
+    return error.message;
+  }
+  return fallback;
 }
 
 function readCookieValue(cookieHeader: string, key: string): string | null {

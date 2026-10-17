@@ -112,8 +112,16 @@ export function SpeakerQuestionsTable({
   onAction,
   onDelete,
 }: Props) {
-  const { sort, setSort, sortedRows, getDraftValue, setDraftValue, canSaveDraft, getTrimmedDraft } =
-    useSpeakerQuestionsTableState(rows);
+  const {
+    sort,
+    setSort,
+    sortedRows,
+    sequenceById,
+    getDraftValue,
+    setDraftValue,
+    canSaveDraft,
+    getTrimmedDraft,
+  } = useSpeakerQuestionsTableState(rows);
   const [page, setPage] = useState(0);
   const pageCount = Math.max(1, Math.ceil(sortedRows.length / PAGE_SIZE));
 
@@ -176,9 +184,9 @@ export function SpeakerQuestionsTable({
             </TableRow>
           </TableHead>
           <TableBody>
-            {pagedRows.map((q, idx) => (
+            {pagedRows.map((q) => (
               <TableRow key={q.id} hover>
-                <TableCell>{page * PAGE_SIZE + idx + 1}</TableCell>
+                <TableCell>{sequenceById.get(q.id) ?? "—"}</TableCell>
                 <TableCell>
                   <Typography variant="body2">{q.authorNickname}</Typography>
                 </TableCell>

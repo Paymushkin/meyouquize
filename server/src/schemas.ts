@@ -798,7 +798,11 @@ export const subscribeSpeakerQuestionsSchema = z.object({
 export const createSpeakerQuestionSchema = z.object({
   quizId: z.string().min(1),
   speakerName: z.string().trim().min(1).max(80),
-  text: z.string().trim().min(3).max(500),
+  text: z
+    .string()
+    .trim()
+    .min(3, "Текст вопроса должен быть не короче 3 символов")
+    .max(500, "Текст вопроса слишком длинный"),
 });
 
 export const speakerQuestionReactSchema = z.object({
@@ -834,7 +838,11 @@ export const adminSpeakerQuestionModeratorVisibleSchema = z.object({
 export const adminSpeakerQuestionUpdateSchema = z.object({
   quizId: z.string().min(1),
   speakerQuestionId: z.string().min(1),
-  text: z.string().trim().min(3).max(500),
+  text: z
+    .string()
+    .trim()
+    .min(3, "Текст вопроса должен быть не короче 3 символов")
+    .max(500, "Текст вопроса слишком длинный"),
 });
 
 export const speakerQuestionDeleteSchema = z.object({

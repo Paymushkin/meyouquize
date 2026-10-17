@@ -61,7 +61,7 @@ export type AdminUiPersistence = {
 
 const DEFAULTS: AdminUiPersistence = {
   section: "questions",
-  questionsTab: "quizzes",
+  questionsTab: "votes",
   bannersTab: "banner",
   resultsSubQuizId: "",
 };

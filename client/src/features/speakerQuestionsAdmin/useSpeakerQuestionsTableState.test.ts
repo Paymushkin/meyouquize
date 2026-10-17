@@ -30,6 +30,19 @@ describe("useSpeakerQuestionsTableState", () => {
     expect(result.current.sortedRows.map((x) => x.id)).toEqual(["new", "mid", "old"]);
   });
 
+  it("назначает стабильный порядковый номер: новый вопрос — последний", () => {
+    const rows = [
+      makeItem({ id: "old", createdAt: "2026-01-01T10:00:00.000Z" }),
+      makeItem({ id: "new", createdAt: "2026-01-02T12:00:00.000Z" }),
+      makeItem({ id: "mid", createdAt: "2026-01-01T18:00:00.000Z" }),
+    ];
+    const { result } = renderHook(() => useSpeakerQuestionsTableState(rows));
+    expect(result.current.sortedRows.map((x) => x.id)).toEqual(["new", "mid", "old"]);
+    expect(result.current.sequenceById.get("old")).toBe(1);
+    expect(result.current.sequenceById.get("mid")).toBe(2);
+    expect(result.current.sequenceById.get("new")).toBe(3);
+  });
+
   it("обновляет сортировку через setSort", () => {
     const rows = [
       makeItem({ id: "b", authorNickname: "Борис" }),

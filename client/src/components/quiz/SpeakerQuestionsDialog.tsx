@@ -282,7 +282,7 @@ export function SpeakerQuestionsDialog({
           <Button
             variant="contained"
             onClick={onSubmit}
-            disabled={!speakerQuestionText.trim()}
+            disabled={speakerQuestionText.trim().length < 3}
             sx={buildBrandPrimaryContainedButtonSx(formBackgroundColor, formTextColor)}
           >
             Отправить вопрос

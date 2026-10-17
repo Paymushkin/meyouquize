@@ -162,6 +162,13 @@ describe("SpeakerQuestionsDialog", () => {
     expect(props.onSubmit).toHaveBeenCalledTimes(1);
   });
 
+  it("disables submit when question text is shorter than 3 characters", () => {
+    renderDialog({ speakerQuestionText: "аб" });
+    expect(
+      (screen.getByRole("button", { name: "Отправить вопрос" }) as HTMLButtonElement).disabled,
+    ).toBe(true);
+  });
+
   it("lists user-visible questions in actual tab including own published ones", () => {
     renderDialog(undefined, {
       items: [

@@ -24,7 +24,7 @@ import {
   findSpeakerSessionName,
 } from "@meyouquize/shared";
 import type { EnrichedSocket } from "../handler-common.js";
-import { assertAdmin, fail } from "../handler-common.js";
+import { assertAdmin, caughtErrorMessage, fail } from "../handler-common.js";
 import { allowSocketAction } from "../action-rate-limit.js";
 import { getStoredPublicView } from "../public-view-store.js";
 import { saveStoredPublicView } from "../public-view-store.js";
@@ -361,7 +361,7 @@ export function registerSpeakerQuestionsHandlers(socket: EnrichedSocket, io: Ser
       socket.emit("speaker:questions:update", result);
       await broadcastSpeakerQuestions(io, payload.quizId, socket.id);
     } catch (error) {
-      fail(socket, error instanceof Error ? error.message : "Create speaker question failed");
+      fail(socket, caughtErrorMessage(error, "Create speaker question failed"));
     }
   });
 
@@ -615,7 +615,7 @@ export function registerSpeakerQuestionsHandlers(socket: EnrichedSocket, io: Ser
       });
       await broadcastSpeakerQuestions(io, payload.quizId);
     } catch (error) {
-      fail(socket, error instanceof Error ? error.message : "Update speaker question failed");
+      fail(socket, caughtErrorMessage(error, "Update speaker question failed"));
     }
   });
 

@@ -427,12 +427,13 @@ export function QuizPlayPage() {
   }
 
   function submitSpeakerQuestion() {
-    if (!quiz?.id || !speakerQuestionText.trim() || !quizSessionReady) return;
+    const text = speakerQuestionText.trim();
+    if (!quiz?.id || text.length < 3 || !quizSessionReady) return;
     const allowAll = speakerQuestions?.settings.allowAllSpeakersTarget !== false;
     socket.emit("speaker:question:create", {
       quizId: quiz.id,
       speakerName: resolveSpeakerNameForCreate(speakerName, allowAll),
-      text: speakerQuestionText.trim(),
+      text,
     });
     setSpeakerQuestionText("");
   }

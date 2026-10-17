@@ -446,6 +446,7 @@ export function ResultsPage() {
                 text={view.projectorJoinQrText}
                 textColor={view.projectorJoinQrTextColor}
                 qrDataUrl={joinQrDataUrl}
+                maxWidthPx={containerContentMaxPx}
               />
             )}
           </Stack>
@@ -587,8 +588,14 @@ export function ResultsPage() {
                         >
                           {recipientLabel ? (
                             <Typography
-                              variant="caption"
-                              sx={{ color: "#fff", fontWeight: 700, letterSpacing: 0.2 }}
+                              variant="body1"
+                              sx={{
+                                color: "#fff",
+                                fontWeight: 700,
+                                letterSpacing: 0.2,
+                                fontSize: { xs: "1.05rem", md: "1.25rem" },
+                                lineHeight: 1.3,
+                              }}
                             >
                               {recipientLabel}
                             </Typography>
@@ -613,7 +620,15 @@ export function ResultsPage() {
                           sx={{ px: 0.5 }}
                         >
                           {view.speakerQuestionsShowAuthorOnScreen ? (
-                            <Typography variant="body2" sx={{ opacity: 0.9, color: "#fff" }}>
+                            <Typography
+                              variant="body1"
+                              sx={{
+                                opacity: 0.9,
+                                color: "#fff",
+                                fontSize: { xs: "1rem", md: "1.2rem" },
+                                lineHeight: 1.3,
+                              }}
+                            >
                               от {item.authorNickname}
                             </Typography>
                           ) : (
