@@ -193,6 +193,7 @@ export function createAdminQuestionEditorProjectorSync(ctx: AdminQuestionEditorP
       questionId: question.id,
       showVoteCount: next,
       geoPollShowAnswerList: question.geoPollShowAnswerList ?? true,
+      geoPollRegionHeatEnabled: question.geoPollRegionHeatEnabled ?? false,
       showCorrectOption: question.showCorrectOption ?? false,
       showQuestionTitle: question.showQuestionTitle ?? true,
     });
@@ -215,6 +216,30 @@ export function createAdminQuestionEditorProjectorSync(ctx: AdminQuestionEditorP
       questionId: question.id,
       showVoteCount: question.showVoteCount ?? false,
       geoPollShowAnswerList: next,
+      geoPollRegionHeatEnabled: question.geoPollRegionHeatEnabled ?? false,
+      showCorrectOption: question.showCorrectOption ?? false,
+      showQuestionTitle: question.showQuestionTitle ?? true,
+    });
+  }
+
+  function updateQuestionGeoPollRegionHeatEnabled(questionIndex: number, next: boolean) {
+    ctx.setQuestionForms((prev) =>
+      prev.map((q, idx) => (idx === questionIndex ? { ...q, geoPollRegionHeatEnabled: next } : q)),
+    );
+    const question = ctx.questionForms[questionIndex];
+    if (
+      !ctx.quizId ||
+      ctx.publicViewMode !== "question" ||
+      !question?.id ||
+      ctx.publicViewQuestionId !== question.id
+    )
+      return;
+    ctx.emitPublicViewSet({
+      mode: "question",
+      questionId: question.id,
+      showVoteCount: question.showVoteCount ?? false,
+      geoPollShowAnswerList: question.geoPollShowAnswerList ?? true,
+      geoPollRegionHeatEnabled: next,
       showCorrectOption: question.showCorrectOption ?? false,
       showQuestionTitle: question.showQuestionTitle ?? true,
     });
@@ -237,6 +262,7 @@ export function createAdminQuestionEditorProjectorSync(ctx: AdminQuestionEditorP
       questionId: question.id,
       showVoteCount: question.showVoteCount ?? false,
       geoPollShowAnswerList: question.geoPollShowAnswerList ?? true,
+      geoPollRegionHeatEnabled: question.geoPollRegionHeatEnabled ?? false,
       showCorrectOption: next,
       showQuestionTitle: question.showQuestionTitle ?? true,
     });
@@ -259,6 +285,7 @@ export function createAdminQuestionEditorProjectorSync(ctx: AdminQuestionEditorP
       questionId: question.id,
       showVoteCount: question.showVoteCount ?? false,
       geoPollShowAnswerList: question.geoPollShowAnswerList ?? true,
+      geoPollRegionHeatEnabled: question.geoPollRegionHeatEnabled ?? false,
       showCorrectOption: question.showCorrectOption ?? false,
       showQuestionTitle: next,
     });
@@ -500,6 +527,7 @@ export function createAdminQuestionEditorProjectorSync(ctx: AdminQuestionEditorP
     setQuestionRevealStageForQuestion,
     updateQuestionShowVoteCount,
     updateQuestionGeoPollShowAnswerList,
+    updateQuestionGeoPollRegionHeatEnabled,
     updateQuestionShowCorrectOption,
     updateQuestionShowTitle,
     toggleQuestionAdminDone,

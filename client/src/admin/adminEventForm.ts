@@ -4,10 +4,12 @@ import type {
   PublicViewPayload,
 } from "../publicViewContract";
 import {
+  GEO_POLL_DICTIONARY_CENTRAL_ASIA_COUNTRIES,
   GEO_POLL_DICTIONARY_WORLD_CITIES,
   GEO_POLL_DICTIONARY_WORLD_COUNTRIES,
   isDebatePollPreset,
   isGeoPollPreset,
+  normalizeGeoPollDictionaryId,
   resolveMultiMaxAnswers,
   withDebateOptionColors,
 } from "@meyouquize/shared";
@@ -50,6 +52,8 @@ export type QuestionForm = {
   showVoteCount?: boolean;
   /** Геоопрос: список ответов на проекторе (по умолчанию true). */
   geoPollShowAnswerList?: boolean;
+  /** Геоопрос: интенсивность заливки региона по числу голосов (по умолчанию false). */
+  geoPollRegionHeatEnabled?: boolean;
   showCorrectOption?: boolean;
   showQuestionTitle?: boolean;
   /** Голосование комнаты: показывать победителей на проекторе (вместе с переключателем в «Результаты»). */
@@ -289,9 +293,14 @@ export function getQuestionTypeSelectValue(question: QuestionForm): QuestionType
 export function getQuestionTypeDisplayLabel(question: QuestionForm): string {
   const value = getQuestionTypeSelectValue(question);
   if (value === "geo_poll") {
-    return question.geoPollDictionary === GEO_POLL_DICTIONARY_WORLD_COUNTRIES
-      ? "Геоопрос · Страны"
-      : "Геоопрос · Города";
+    const geoDictionary = normalizeGeoPollDictionaryId(question.geoPollDictionary ?? "");
+    if (geoDictionary === GEO_POLL_DICTIONARY_WORLD_COUNTRIES) {
+      return "Геоопрос · Страны";
+    }
+    if (geoDictionary === GEO_POLL_DICTIONARY_CENTRAL_ASIA_COUNTRIES) {
+      return "Геоопрос · Центральная Азия";
+    }
+    return "Геоопрос · Города";
   }
   if (value === "debate_poll") return "Дебаты";
   if (value === "poll") return "Голосование";
@@ -345,6 +354,7 @@ export function createEmptyQuestion(subQuizId: string | null = null): QuestionFo
     maxAnswers: 3,
     showVoteCount: false,
     geoPollShowAnswerList: true,
+    geoPollRegionHeatEnabled: false,
     showCorrectOption: false,
     showQuestionTitle: true,
     hiddenTagTexts: [],
@@ -393,6 +403,7 @@ function normalizeGeoPollQuestionForm(form: QuestionForm): QuestionForm {
     geoPollDictionary: form.geoPollDictionary ?? GEO_POLL_DICTIONARY_WORLD_CITIES,
     showVoteCount: false,
     geoPollShowAnswerList: form.geoPollShowAnswerList ?? true,
+    geoPollRegionHeatEnabled: form.geoPollRegionHeatEnabled ?? false,
     showCorrectOption: false,
     options: [],
   };
@@ -1009,6 +1020,7 @@ export function mergeServerQuestionsIntoForms(
       adminDone: Boolean(q.adminDone),
       showVoteCount: prev?.showVoteCount ?? false,
       geoPollShowAnswerList: prev?.geoPollShowAnswerList ?? true,
+      geoPollRegionHeatEnabled: prev?.geoPollRegionHeatEnabled ?? false,
       showQuestionTitle: prev?.showQuestionTitle ?? true,
       projectorShowFirstCorrect: q.projectorShowFirstCorrect ?? true,
       projectorFirstCorrectWinnersCount: Math.max(
@@ -1085,6 +1097,7 @@ export function mergeRoomReloadIntoState(
       useImages: prev.useImages ?? q.useImages,
       showVoteCount: prev.showVoteCount ?? false,
       geoPollShowAnswerList: prev.geoPollShowAnswerList ?? true,
+      geoPollRegionHeatEnabled: prev.geoPollRegionHeatEnabled ?? false,
       showQuestionTitle: prev.showQuestionTitle ?? true,
       hiddenTagTexts: prev.hiddenTagTexts ?? [],
       injectedTagWords: prev.injectedTagWords ?? [],

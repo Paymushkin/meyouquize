@@ -219,6 +219,7 @@ describe("projectorPublicViewChanged", () => {
       geoPollRegionFillVoted: "#334455",
       geoPollRegionStrokeIdle: "#445566",
       geoPollRegionStrokeVoted: "#556677",
+      geoPollRegionHeatScale: "cold_warm",
       geoPollScreenBackground: "transparent",
     });
     const picked = pickProjectorPublicViewState(view);
@@ -227,6 +228,7 @@ describe("projectorPublicViewChanged", () => {
     expect(picked.geoPollRegionFillVoted).toBe("#334455");
     expect(picked.geoPollRegionStrokeIdle).toBe("#445566");
     expect(picked.geoPollRegionStrokeVoted).toBe("#556677");
+    expect(picked.geoPollRegionHeatScale).toBe("cold_warm");
     expect(picked.geoPollScreenBackground).toBe("transparent");
   });
 

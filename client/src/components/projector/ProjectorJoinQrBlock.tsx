@@ -13,14 +13,14 @@ export function ProjectorJoinQrBlock(props: Props) {
   return (
     <Stack
       direction={{ xs: "column", sm: "row" }}
-      spacing={{ xs: 1, sm: 2 }}
+      spacing={{ xs: 8, sm: 24 }}
       sx={{
         mt: 2,
         width: "100%",
         maxWidth: maxWidthPx,
         mx: "auto",
         alignItems: "center",
-        justifyContent: "space-between",
+        justifyContent: "center",
         boxSizing: "border-box",
         containerType: "inline-size",
       }}
@@ -32,9 +32,9 @@ export function ProjectorJoinQrBlock(props: Props) {
           fontWeight: 700,
           textAlign: "left",
           whiteSpace: "pre-line",
-          width: "100%",
+          width: "auto",
           minWidth: 0,
-          pr: { sm: 2 },
+          flex: "0 1 auto",
           fontSize: "clamp(2rem, 9.5cqw, 4rem)",
           lineHeight: 1.15,
         }}

@@ -37,7 +37,7 @@ import {
 import type { QuestionResult } from "../../admin/adminEventTypes";
 import type { PublicViewMode, PublicViewSetPatch } from "../../publicViewContract";
 import {
-  GEO_POLL_DICTIONARY_WORLD_COUNTRIES,
+  geoPollDictionaryInputLabel,
   hasOptionVoteCountOverride,
   isDebatePollPreset,
   isGeoPollPreset,
@@ -105,6 +105,7 @@ type Props = {
   ) => void;
   updateQuestionShowVoteCount: (globalIndex: number, next: boolean) => void;
   updateQuestionGeoPollShowAnswerList: (globalIndex: number, next: boolean) => void;
+  updateQuestionGeoPollRegionHeatEnabled: (globalIndex: number, next: boolean) => void;
   updateQuestionShowCorrectOption: (globalIndex: number, next: boolean) => void;
   openTagInputDialog: (globalIndex: number) => void;
   openTagResultsDialog: (globalIndex: number) => void;
@@ -183,6 +184,7 @@ export function AdminQuestionsSection(props: Props) {
     setPublicResultsView,
     updateQuestionShowVoteCount,
     updateQuestionGeoPollShowAnswerList,
+    updateQuestionGeoPollRegionHeatEnabled,
     updateQuestionShowCorrectOption,
     openTagInputDialog,
     openTagResultsDialog,
@@ -639,6 +641,9 @@ export function AdminQuestionsSection(props: Props) {
                             updateQuestionGeoPollShowAnswerList={
                               updateQuestionGeoPollShowAnswerList
                             }
+                            updateQuestionGeoPollRegionHeatEnabled={
+                              updateQuestionGeoPollRegionHeatEnabled
+                            }
                             updateQuestionShowCorrectOption={updateQuestionShowCorrectOption}
                             openTagInputDialog={openTagInputDialog}
                             confirmResetQuestionAnswersByIndex={confirmResetQuestionAnswersByIndex}
@@ -742,7 +747,8 @@ export function AdminQuestionsSection(props: Props) {
                                 stats.reduce((sum, row) => sum + row.count, 0);
                               const uniquePlaces = stats.length;
                               const placesLabel =
-                                question.geoPollDictionary === GEO_POLL_DICTIONARY_WORLD_COUNTRIES
+                                geoPollDictionaryInputLabel(question.geoPollDictionary ?? "") ===
+                                "Страна"
                                   ? "Стран"
                                   : "Городов";
                               return (

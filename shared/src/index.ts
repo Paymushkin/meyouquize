@@ -15,6 +15,11 @@ import {
 } from "./videoWall.js";
 import type { BrandThemeId } from "./brandThemes.js";
 import type { EventThemeBranding } from "./eventThemeBranding.js";
+import type { GeoPollRegionHeatScale } from "./geoPollRegionHeatScale.js";
+import {
+  DEFAULT_GEO_POLL_REGION_HEAT_SCALE,
+  normalizeGeoPollRegionHeatScale,
+} from "./geoPollRegionHeatScale.js";
 import {
   eventThemeBrandingToPublicViewPatch,
   sanitizeAppliedEventThemeKey,
@@ -200,11 +205,14 @@ export {
 } from "./debateCompare.js";
 export type { GeoPollDictionaryId } from "./geoPollDictionaries.js";
 export {
+  GEO_POLL_DICTIONARY_CENTRAL_ASIA_COUNTRIES,
+  GEO_POLL_DICTIONARY_OPTIONS,
   GEO_POLL_DICTIONARY_WORLD_CITIES,
   GEO_POLL_DICTIONARY_WORLD_COUNTRIES,
   geoPollDictionaryInputLabel,
   geoPollDictionaryLabel,
   isGeoPollDictionary,
+  normalizeGeoPollDictionaryId,
 } from "./geoPollDictionaries.js";
 export type { GeoPollMapKind, GeoPollMapPoint } from "./geoPollMapLayout.js";
 export {
@@ -213,6 +221,18 @@ export {
   geoPollMapViewBox,
   projectGeoLatLon,
 } from "./geoPollMapLayout.js";
+export type { GeoPollRegionHeatScale } from "./geoPollRegionHeatScale.js";
+export {
+  DEFAULT_GEO_POLL_REGION_HEAT_SCALE,
+  GEO_POLL_REGION_HEAT_SCALE_OPTIONS,
+  geoPollRegionHeatIntensity,
+  geoPollRegionHeatLegendCssGradient,
+  geoPollRegionHeatScaleLabel,
+  isGeoPollRegionHeatScale,
+  normalizeGeoPollRegionHeatScale,
+  resolveGeoPollRegionHeatFillColor,
+  resolveGeoPollRegionHeatFillOpacity,
+} from "./geoPollRegionHeatScale.js";
 export {
   DEBATE_POLL_DEFAULT_QUESTION_TEXT,
   GEO_POLL_DEFAULT_QUESTION_TEXT,
@@ -353,6 +373,13 @@ export interface PublicViewState {
   showVoteCount: boolean;
   /** Геоопрос на проекторе: показывать боковой список ответов */
   geoPollShowAnswerList: boolean;
+  /** Геоопрос: заливка региона непрозрачнее при большем числе голосов (по умолчанию выкл.) */
+  geoPollRegionHeatEnabled: boolean;
+  /**
+   * Шкала интенсивности заливки регионов (брендирование).
+   * `region` — цвет «Подсветка региона» + прозрачность; остальные — цветовые пресеты.
+   */
+  geoPollRegionHeatScale: GeoPollRegionHeatScale;
   /** Показывать подсветку правильного ответа в вариантах на проекторе */
   showCorrectOption: boolean;
   showQuestionTitle: boolean;
@@ -735,6 +762,8 @@ export const DEFAULT_PUBLIC_VIEW_STATE: PublicViewState = {
   leaderboardSubQuizId: "",
   showVoteCount: false,
   geoPollShowAnswerList: true,
+  geoPollRegionHeatEnabled: false,
+  geoPollRegionHeatScale: DEFAULT_GEO_POLL_REGION_HEAT_SCALE,
   showCorrectOption: false,
   showQuestionTitle: true,
   hiddenTagTexts: [],
@@ -1569,6 +1598,14 @@ export function normalizePublicViewState(
       typeof value?.geoPollShowAnswerList === "boolean"
         ? value.geoPollShowAnswerList
         : base.geoPollShowAnswerList,
+    geoPollRegionHeatEnabled:
+      typeof value?.geoPollRegionHeatEnabled === "boolean"
+        ? value.geoPollRegionHeatEnabled
+        : base.geoPollRegionHeatEnabled,
+    geoPollRegionHeatScale: normalizeGeoPollRegionHeatScale(
+      value?.geoPollRegionHeatScale,
+      base.geoPollRegionHeatScale,
+    ),
     showCorrectOption:
       typeof value?.showCorrectOption === "boolean"
         ? value.showCorrectOption

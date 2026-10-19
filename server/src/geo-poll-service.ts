@@ -7,9 +7,11 @@ import { geoCentroid } from "d3-geo";
 import type { FeatureCollection, Geometry } from "geojson";
 import countries110m from "world-atlas/countries-110m.json" with { type: "json" };
 import {
+  GEO_POLL_DICTIONARY_CENTRAL_ASIA_COUNTRIES,
   GEO_POLL_DICTIONARY_WORLD_CITIES,
   GEO_POLL_DICTIONARY_WORLD_COUNTRIES,
   isGeoPollDictionary,
+  normalizeGeoPollDictionaryId,
 } from "@meyouquize/shared";
 import cityRuNamesJson from "./data/geo-ru-names.json" with { type: "json" };
 
@@ -127,6 +129,13 @@ const FORCE_INCLUDE_CITY_IDS = new Set<number>([
  * 05 Донецкая, 08 Херсонская, 11 Крым, 14 Луганская, 20 Севастополь, 26 Запорожская.
  */
 const RUSSIA_GEO_POLL_UA_ADMIN_CODES = new Set(["05", "08", "11", "14", "20", "26"]);
+/** Казахстан, Кыргызстан, Таджикистан, Туркменистан, Узбекистан. */
+const CENTRAL_ASIA_GEO_POLL_COUNTRY_CODES = new Set(["KZ", "KG", "TJ", "TM", "UZ"]);
+
+/** Русские названия стран поверх i18n-iso-countries (alias часто устаревший). */
+const COUNTRY_RU_LABEL_OVERRIDES: Record<string, string> = {
+  TM: "Туркменистан",
+};
 
 function isRussiaGeoPollCity(city: CityRow): boolean {
   if (city.country === "RU") return true;
@@ -183,12 +192,13 @@ const GEO_POLL_EXCLUDED_COUNTRY_ALPHA2 = new Set(["AQ"]);
 const countryNamesRu = countries.getNames("ru", { select: "alias" });
 const countryEntries: GeoPollEntry[] = Object.entries(countryNamesRu)
   .map(([alpha2, label]) => {
-    if (GEO_POLL_EXCLUDED_COUNTRY_ALPHA2.has(alpha2.toUpperCase())) return null;
+    const code = alpha2.toUpperCase();
+    if (GEO_POLL_EXCLUDED_COUNTRY_ALPHA2.has(code)) return null;
     const centroid = countryCentroids.get(alpha2);
     if (!centroid) return null;
     return {
-      key: countryKey(alpha2),
-      label,
+      key: countryKey(code),
+      label: COUNTRY_RU_LABEL_OVERRIDES[code] ?? label,
       lat: centroid[1]!,
       lon: centroid[0]!,
     };
@@ -196,13 +206,33 @@ const countryEntries: GeoPollEntry[] = Object.entries(countryNamesRu)
   .filter((row): row is GeoPollEntry => row != null)
   .sort((a, b) => a.label.localeCompare(b.label, "ru"));
 
+const centralAsiaCountryEntries = countryEntries.filter((row) => {
+  const alpha2 = row.key.slice("country:".length);
+  return CENTRAL_ASIA_GEO_POLL_COUNTRY_CODES.has(alpha2);
+});
+
 const countryByKey = new Map(countryEntries.map((row) => [row.key, row]));
 const countryByLabelLower = new Map<string, GeoPollEntry>();
 for (const row of countryEntries) {
   countryByLabelLower.set(normalizeSearch(row.label), row);
   const alpha2 = row.key.slice("country:".length);
+  const alias = countries.getName(alpha2, "ru", { select: "alias" });
   const official = countries.getName(alpha2, "ru", { select: "official" });
+  if (alias) countryByLabelLower.set(normalizeSearch(alias), row);
   if (official) countryByLabelLower.set(normalizeSearch(official), row);
+}
+
+function countryEntriesForDictionary(dictionaryId: string): GeoPollEntry[] {
+  const id = normalizeGeoPollDictionaryId(dictionaryId);
+  if (id === GEO_POLL_DICTIONARY_CENTRAL_ASIA_COUNTRIES) return centralAsiaCountryEntries;
+  return countryEntries;
+}
+
+function isCountryDictionary(dictionaryId: string): boolean {
+  const id = normalizeGeoPollDictionaryId(dictionaryId);
+  return (
+    id === GEO_POLL_DICTIONARY_WORLD_COUNTRIES || id === GEO_POLL_DICTIONARY_CENTRAL_ASIA_COUNTRIES
+  );
 }
 
 function normalizeSearch(value: string): string {
@@ -216,10 +246,12 @@ function searchTokens(value: string): string[] {
 }
 
 function countryLabelRu(alpha2: string): string {
+  const code = alpha2.toUpperCase();
   return (
-    countries.getName(alpha2, "ru", { select: "alias" }) ??
-    countries.getName(alpha2, "ru") ??
-    alpha2
+    COUNTRY_RU_LABEL_OVERRIDES[code] ??
+    countries.getName(code, "ru", { select: "alias" }) ??
+    countries.getName(code, "ru") ??
+    code
   );
 }
 
@@ -321,18 +353,30 @@ export function searchGeoPollEntries(
   limit = 12,
 ): GeoPollEntry[] {
   if (!isGeoPollDictionary(dictionaryId)) return [];
+  const id = normalizeGeoPollDictionaryId(dictionaryId);
   const safeLimit = Math.max(1, Math.min(30, Math.trunc(limit)));
   const tokens = searchTokens(query);
   if (tokens.every((token) => token.length === 0)) {
-    if (dictionaryId === GEO_POLL_DICTIONARY_WORLD_COUNTRIES) {
-      return countryEntries.slice(0, safeLimit);
+    if (isCountryDictionary(id)) {
+      return countryEntriesForDictionary(id).slice(0, safeLimit);
     }
     return russiaCitiesSearchPool.slice(0, safeLimit).map(cityEntry);
   }
 
-  if (dictionaryId === GEO_POLL_DICTIONARY_WORLD_COUNTRIES) {
-    return countryEntries
-      .filter((row) => tokens.some((token) => normalizeSearch(row.label).includes(token)))
+  if (isCountryDictionary(id)) {
+    return countryEntriesForDictionary(id)
+      .filter((row) =>
+        tokens.some((token) => {
+          if (normalizeSearch(row.label).includes(token)) return true;
+          const alpha2 = row.key.slice("country:".length);
+          const alias = countries.getName(alpha2, "ru", { select: "alias" });
+          const official = countries.getName(alpha2, "ru", { select: "official" });
+          return Boolean(
+            (alias && normalizeSearch(alias).includes(token)) ||
+            (official && normalizeSearch(official).includes(token)),
+          );
+        }),
+      )
       .slice(0, safeLimit);
   }
 
@@ -347,29 +391,52 @@ export function searchGeoPollEntries(
 
 export function resolveGeoPollEntry(dictionaryId: string, input: string): GeoPollEntry | null {
   if (!isGeoPollDictionary(dictionaryId)) return null;
+  const id = normalizeGeoPollDictionaryId(dictionaryId);
   const trimmed = input.trim();
   if (!trimmed) return null;
 
   const parsed = parseStoredGeoKey(trimmed);
   if (parsed?.kind === "country") {
-    return countryByKey.get(countryKey(parsed.id)) ?? null;
+    const entry = countryByKey.get(countryKey(parsed.id));
+    if (!entry) return null;
+    if (id === GEO_POLL_DICTIONARY_CENTRAL_ASIA_COUNTRIES) {
+      return CENTRAL_ASIA_GEO_POLL_COUNTRY_CODES.has(parsed.id) ? entry : null;
+    }
+    if (id === GEO_POLL_DICTIONARY_WORLD_CITIES) return null;
+    return entry;
   }
   if (parsed?.kind === "city") {
+    if (isCountryDictionary(id)) return null;
     const city = citiesById.get(Number(parsed.id));
     if (!city) return null;
-    if (dictionaryId === GEO_POLL_DICTIONARY_WORLD_CITIES && !russiaCitiesById.has(city.cityId)) {
+    if (id === GEO_POLL_DICTIONARY_WORLD_CITIES && !russiaCitiesById.has(city.cityId)) {
       return null;
     }
     return cityEntry(city);
   }
 
-  if (dictionaryId === GEO_POLL_DICTIONARY_WORLD_COUNTRIES) {
-    const byLabel = countryByLabelLower.get(normalizeSearch(trimmed));
+  if (isCountryDictionary(id)) {
+    const allowed = countryEntriesForDictionary(id);
+    const allowedByLabel = new Map(
+      allowed.flatMap((row) => {
+        const alpha2 = row.key.slice("country:".length);
+        const pairs: Array<[string, GeoPollEntry]> = [[normalizeSearch(row.label), row]];
+        const alias = countries.getName(alpha2, "ru", { select: "alias" });
+        const official = countries.getName(alpha2, "ru", { select: "official" });
+        if (alias) pairs.push([normalizeSearch(alias), row]);
+        if (official) pairs.push([normalizeSearch(official), row]);
+        return pairs;
+      }),
+    );
+    const byLabel = allowedByLabel.get(normalizeSearch(trimmed));
     if (byLabel) return byLabel;
     const alpha2 =
       countries.getAlpha2Code(trimmed, "ru") ?? countries.getSimpleAlpha2Code(trimmed, "ru");
-    if (alpha2) return countryByKey.get(countryKey(alpha2)) ?? null;
-    return searchGeoPollEntries(dictionaryId, trimmed, 1)[0] ?? null;
+    if (alpha2) {
+      const entry = countryByKey.get(countryKey(alpha2));
+      if (entry && allowed.some((row) => row.key === entry.key)) return entry;
+    }
+    return searchGeoPollEntries(id, trimmed, 1)[0] ?? null;
   }
 
   const exact = russiaCitiesSearchPool.find(
@@ -379,7 +446,7 @@ export function resolveGeoPollEntry(dictionaryId: string, input: string): GeoPol
   );
   if (exact) return cityEntry(exact);
 
-  return searchGeoPollEntries(dictionaryId, trimmed, 1)[0] ?? null;
+  return searchGeoPollEntries(id, trimmed, 1)[0] ?? null;
 }
 
 /** @deprecated use resolveGeoPollEntry */

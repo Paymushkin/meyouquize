@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  GEO_POLL_DICTIONARY_CENTRAL_ASIA_COUNTRIES,
   GEO_POLL_DICTIONARY_WORLD_CITIES,
   GEO_POLL_DICTIONARY_WORLD_COUNTRIES,
 } from "@meyouquize/shared";
@@ -71,5 +72,39 @@ describe("geo-poll-service", () => {
 
     const city = resolveGeoPollEntry(GEO_POLL_DICTIONARY_WORLD_CITIES, "city:524901");
     expect(city?.label).toContain("Москва");
+  });
+
+  it("searches only Central Asia countries", () => {
+    const empty = searchGeoPollEntries(GEO_POLL_DICTIONARY_CENTRAL_ASIA_COUNTRIES, "", 10);
+    expect(empty).toHaveLength(5);
+    expect(empty.map((row) => row.key).sort()).toEqual([
+      "country:KG",
+      "country:KZ",
+      "country:TJ",
+      "country:TM",
+      "country:UZ",
+    ]);
+
+    const kazakh = searchGeoPollEntries(GEO_POLL_DICTIONARY_CENTRAL_ASIA_COUNTRIES, "казах", 3);
+    expect(kazakh[0]?.key).toBe("country:KZ");
+
+    const russia = searchGeoPollEntries(GEO_POLL_DICTIONARY_CENTRAL_ASIA_COUNTRIES, "рос", 5);
+    expect(russia.some((row) => row.key === "country:RU")).toBe(false);
+
+    expect(
+      resolveGeoPollEntry(GEO_POLL_DICTIONARY_CENTRAL_ASIA_COUNTRIES, "country:RU"),
+    ).toBeNull();
+    expect(
+      resolveGeoPollEntry(GEO_POLL_DICTIONARY_CENTRAL_ASIA_COUNTRIES, "country:KZ")?.label,
+    ).toMatch(/Казахстан/);
+    expect(
+      resolveGeoPollEntry(GEO_POLL_DICTIONARY_CENTRAL_ASIA_COUNTRIES, "country:TM")?.label,
+    ).toBe("Туркменистан");
+    expect(
+      searchGeoPollEntries(GEO_POLL_DICTIONARY_CENTRAL_ASIA_COUNTRIES, "туркмения", 3)[0]?.key,
+    ).toBe("country:TM");
+    expect(
+      resolveGeoPollEntry(GEO_POLL_DICTIONARY_CENTRAL_ASIA_COUNTRIES, "city:524901"),
+    ).toBeNull();
   });
 });

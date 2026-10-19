@@ -1,6 +1,12 @@
-import { fireEvent, render, screen } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+// @vitest-environment jsdom
+
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { BrandGeoPollSection } from "./BrandGeoPollSection";
+
+afterEach(() => {
+  cleanup();
+});
 
 const colorGridSx = {
   display: "grid",
@@ -24,6 +30,8 @@ function renderSection(overrides: Partial<Parameters<typeof BrandGeoPollSection>
       setGeoPollRegionStrokeIdle={vi.fn()}
       geoPollRegionStrokeVoted="#ffffff"
       setGeoPollRegionStrokeVoted={vi.fn()}
+      geoPollRegionHeatScale="region"
+      setGeoPollRegionHeatScale={vi.fn()}
       geoPollScreenBackground="#111111"
       setGeoPollScreenBackground={setGeoPollScreenBackground}
       emitPatch={emitPatch}
@@ -42,6 +50,7 @@ describe("BrandGeoPollSection", () => {
     expect(screen.getByRole("button", { name: "Цвет" })).toBeTruthy();
     expect(screen.getByLabelText("Цвет фона")).toBeTruthy();
     expect(screen.getByLabelText("Цвет точки")).toBeTruthy();
+    expect(screen.getByLabelText("Шкала интенсивности")).toBeTruthy();
   });
 
   it("emits transparent when switching to projector background", () => {

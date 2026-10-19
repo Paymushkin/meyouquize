@@ -3,13 +3,19 @@ import {
   AccordionDetails,
   AccordionSummary,
   Box,
+  MenuItem,
   Stack,
+  TextField,
   ToggleButton,
   ToggleButtonGroup,
   Typography,
 } from "@mui/material";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import type { SxProps, Theme } from "@mui/material/styles";
+import {
+  GEO_POLL_REGION_HEAT_SCALE_OPTIONS,
+  type GeoPollRegionHeatScale,
+} from "@meyouquize/shared";
 import type { PublicViewSetPatch } from "../../../publicViewContract";
 import { CompactColorField } from "./CompactColorField";
 
@@ -27,6 +33,8 @@ type Props = {
   setGeoPollRegionStrokeIdle: (value: string) => void;
   geoPollRegionStrokeVoted: string;
   setGeoPollRegionStrokeVoted: (value: string) => void;
+  geoPollRegionHeatScale: GeoPollRegionHeatScale;
+  setGeoPollRegionHeatScale: (value: GeoPollRegionHeatScale) => void;
   geoPollScreenBackground: string;
   setGeoPollScreenBackground: (value: string) => void;
   emitPatch: (patch: PublicViewSetPatch) => void;
@@ -45,6 +53,8 @@ export function BrandGeoPollSection(props: Props) {
     setGeoPollRegionStrokeIdle,
     geoPollRegionStrokeVoted,
     setGeoPollRegionStrokeVoted,
+    geoPollRegionHeatScale,
+    setGeoPollRegionHeatScale,
     geoPollScreenBackground,
     setGeoPollScreenBackground,
     emitPatch,
@@ -125,6 +135,25 @@ export function BrandGeoPollSection(props: Props) {
               onBlur={() => emitPatch({ geoPollRegionStrokeVoted })}
             />
           </Box>
+          <TextField
+            select
+            label="Шкала интенсивности"
+            value={geoPollRegionHeatScale}
+            onChange={(e) => {
+              const next = e.target.value as GeoPollRegionHeatScale;
+              setGeoPollRegionHeatScale(next);
+              emitPatch({ geoPollRegionHeatScale: next });
+            }}
+            size="small"
+            sx={{ maxWidth: 280 }}
+            helperText="Для режима интенсивности в настройках вопроса"
+          >
+            {GEO_POLL_REGION_HEAT_SCALE_OPTIONS.map((option) => (
+              <MenuItem key={option.id} value={option.id}>
+                {option.label}
+              </MenuItem>
+            ))}
+          </TextField>
         </Stack>
       </AccordionDetails>
     </Accordion>

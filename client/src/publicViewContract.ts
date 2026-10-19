@@ -60,6 +60,7 @@ type BrandingKeys =
   | "geoPollRegionFillVoted"
   | "geoPollRegionStrokeIdle"
   | "geoPollRegionStrokeVoted"
+  | "geoPollRegionHeatScale"
   | "geoPollScreenBackground"
   | "brandPrimaryColor"
   | "brandAccentColor"
@@ -197,6 +198,7 @@ export function toBrandingState(payload: Partial<PublicViewPayload>): BrandingSt
     geoPollRegionFillVoted: view.geoPollRegionFillVoted,
     geoPollRegionStrokeIdle: view.geoPollRegionStrokeIdle,
     geoPollRegionStrokeVoted: view.geoPollRegionStrokeVoted,
+    geoPollRegionHeatScale: view.geoPollRegionHeatScale,
     geoPollScreenBackground: view.geoPollScreenBackground,
     brandPrimaryColor: view.brandPrimaryColor,
     brandAccentColor: view.brandAccentColor,

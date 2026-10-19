@@ -29,6 +29,7 @@ type QuestionViewState = {
   id?: string;
   showVoteCount?: boolean;
   geoPollShowAnswerList?: boolean;
+  geoPollRegionHeatEnabled?: boolean;
   showCorrectOption?: boolean;
   showQuestionTitle?: boolean;
   hiddenTagTexts?: string[];
@@ -98,6 +99,7 @@ type UsePublicViewEmitterParams = {
   geoPollRegionFillVoted: string;
   geoPollRegionStrokeIdle: string;
   geoPollRegionStrokeVoted: string;
+  geoPollRegionHeatScale: import("@meyouquize/shared").GeoPollRegionHeatScale;
   geoPollScreenBackground: string;
   showFirstCorrectAnswerer: boolean;
   firstCorrectWinnersCount: number;
@@ -227,6 +229,7 @@ export function usePublicViewEmitter(params: UsePublicViewEmitterParams) {
     geoPollRegionFillVoted,
     geoPollRegionStrokeIdle,
     geoPollRegionStrokeVoted,
+    geoPollRegionHeatScale,
     geoPollScreenBackground,
     showFirstCorrectAnswerer,
     firstCorrectWinnersCount,
@@ -334,6 +337,7 @@ export function usePublicViewEmitter(params: UsePublicViewEmitterParams) {
       return {
         showVoteCount: question?.showVoteCount ?? false,
         geoPollShowAnswerList: question?.geoPollShowAnswerList ?? true,
+        geoPollRegionHeatEnabled: question?.geoPollRegionHeatEnabled ?? false,
         showCorrectOption: question?.showCorrectOption ?? false,
         showQuestionTitle: question?.showQuestionTitle ?? true,
         hiddenTagTexts: question?.hiddenTagTexts ?? [],
@@ -406,6 +410,8 @@ export function usePublicViewEmitter(params: UsePublicViewEmitterParams) {
             : {}),
         showVoteCount: patch.showVoteCount ?? questionState.showVoteCount,
         geoPollShowAnswerList: patch.geoPollShowAnswerList ?? questionState.geoPollShowAnswerList,
+        geoPollRegionHeatEnabled:
+          patch.geoPollRegionHeatEnabled ?? questionState.geoPollRegionHeatEnabled,
         showCorrectOption: patch.showCorrectOption ?? questionState.showCorrectOption,
         showQuestionTitle: patch.showQuestionTitle ?? questionState.showQuestionTitle,
         hiddenTagTexts: patch.hiddenTagTexts ?? questionState.hiddenTagTexts,
@@ -430,6 +436,7 @@ export function usePublicViewEmitter(params: UsePublicViewEmitterParams) {
         geoPollRegionFillVoted: patch.geoPollRegionFillVoted ?? geoPollRegionFillVoted,
         geoPollRegionStrokeIdle: patch.geoPollRegionStrokeIdle ?? geoPollRegionStrokeIdle,
         geoPollRegionStrokeVoted: patch.geoPollRegionStrokeVoted ?? geoPollRegionStrokeVoted,
+        geoPollRegionHeatScale: patch.geoPollRegionHeatScale ?? geoPollRegionHeatScale,
         geoPollScreenBackground: patch.geoPollScreenBackground ?? geoPollScreenBackground,
         showFirstCorrectAnswerer: patch.showFirstCorrectAnswerer ?? showFirstCorrectAnswerer,
         firstCorrectWinnersCount: patch.firstCorrectWinnersCount ?? firstCorrectWinnersCount,
@@ -599,6 +606,7 @@ export function usePublicViewEmitter(params: UsePublicViewEmitterParams) {
       geoPollRegionFillVoted,
       geoPollRegionStrokeIdle,
       geoPollRegionStrokeVoted,
+      geoPollRegionHeatScale,
       geoPollScreenBackground,
       showFirstCorrectAnswerer,
       firstCorrectWinnersCount,

@@ -1,10 +1,14 @@
 // @vitest-environment jsdom
 
-import { render, screen } from "@testing-library/react";
+import { cleanup, render, screen } from "@testing-library/react";
 import { buildDebatePollQuestionPatch, buildGeoPollQuestionPatch } from "@meyouquize/shared";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import type { QuestionForm } from "../../../admin/adminEventForm";
 import { QuestionSettingsToolbar } from "./QuestionSettingsToolbar";
+
+afterEach(() => {
+  cleanup();
+});
 
 function baseQuestion(overrides: Partial<QuestionForm> = {}): QuestionForm {
   return {
@@ -25,6 +29,7 @@ function baseQuestion(overrides: Partial<QuestionForm> = {}): QuestionForm {
 const toolbarHandlers = {
   updateQuestionShowVoteCount: vi.fn(),
   updateQuestionGeoPollShowAnswerList: vi.fn(),
+  updateQuestionGeoPollRegionHeatEnabled: vi.fn(),
   updateQuestionShowCorrectOption: vi.fn(),
   openTagInputDialog: vi.fn(),
   confirmResetQuestionAnswersByIndex: vi.fn(),
@@ -80,6 +85,7 @@ describe("QuestionSettingsToolbar", () => {
     expect(screen.queryByLabelText("Показывать правильный ответ на проекторе")).toBeNull();
     expect(screen.queryByLabelText(/результаты в интерфейсе пользователя/)).toBeNull();
     expect(screen.getByLabelText("Показывать список ответов геоопроса на проекторе")).toBeTruthy();
+    expect(screen.getByLabelText("Интенсивность заливки регионов геоопроса")).toBeTruthy();
   });
 
   it("hides vote count and correct answer for debate poll", () => {

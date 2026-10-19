@@ -17,6 +17,7 @@ export type AdminQuestionsSectionSharedBindings = Pick<
   | "setPublicResultsView"
   | "updateQuestionShowVoteCount"
   | "updateQuestionGeoPollShowAnswerList"
+  | "updateQuestionGeoPollRegionHeatEnabled"
   | "updateQuestionShowCorrectOption"
   | "openTagInputDialog"
   | "openTagResultsDialog"
@@ -52,6 +53,7 @@ type Source = {
   setPublicResultsView: AdminQuestionsSectionSharedBindings["setPublicResultsView"];
   updateQuestionShowVoteCount: AdminQuestionsSectionSharedBindings["updateQuestionShowVoteCount"];
   updateQuestionGeoPollShowAnswerList: AdminQuestionsSectionSharedBindings["updateQuestionGeoPollShowAnswerList"];
+  updateQuestionGeoPollRegionHeatEnabled: AdminQuestionsSectionSharedBindings["updateQuestionGeoPollRegionHeatEnabled"];
   updateQuestionShowCorrectOption: AdminQuestionsSectionSharedBindings["updateQuestionShowCorrectOption"];
   openTagInputDialog: (globalIndex: number) => void;
   openTagResultsDialog: (globalIndex: number) => void;
@@ -90,6 +92,7 @@ export function buildAdminQuestionsSectionSharedBindings(
     setPublicResultsView: source.setPublicResultsView,
     updateQuestionShowVoteCount: source.updateQuestionShowVoteCount,
     updateQuestionGeoPollShowAnswerList: source.updateQuestionGeoPollShowAnswerList,
+    updateQuestionGeoPollRegionHeatEnabled: source.updateQuestionGeoPollRegionHeatEnabled,
     updateQuestionShowCorrectOption: source.updateQuestionShowCorrectOption,
     openTagInputDialog: source.openTagInputDialog,
     openTagResultsDialog: source.openTagResultsDialog,

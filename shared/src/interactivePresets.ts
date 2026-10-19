@@ -1,7 +1,4 @@
-import {
-  GEO_POLL_DICTIONARY_WORLD_CITIES,
-  GEO_POLL_DICTIONARY_WORLD_COUNTRIES,
-} from "./geoPollDictionaries.js";
+import { GEO_POLL_DICTIONARY_WORLD_CITIES, isGeoPollDictionary } from "./geoPollDictionaries.js";
 import { debateDefaultOptionColor, sanitizeOptionColor } from "./optionColor.js";
 
 export const GEO_POLL_DEFAULT_QUESTION_TEXT = "Откуда вы?";
@@ -27,10 +24,7 @@ export function isGeoPollPreset(input: {
   if (input.type !== "single" && input.type !== "SINGLE") return false;
   if (input.subQuizId != null) return false;
   if (input.editorQuizMode) return false;
-  return (
-    input.geoPollDictionary === GEO_POLL_DICTIONARY_WORLD_CITIES ||
-    input.geoPollDictionary === GEO_POLL_DICTIONARY_WORLD_COUNTRIES
-  );
+  return isGeoPollDictionary(input.geoPollDictionary);
 }
 
 export function isDebatePollPreset(input: {

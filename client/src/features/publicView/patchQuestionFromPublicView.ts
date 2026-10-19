@@ -6,6 +6,7 @@ type PatchableQuestion = {
   id?: string;
   showVoteCount?: boolean;
   geoPollShowAnswerList?: boolean;
+  geoPollRegionHeatEnabled?: boolean;
   showCorrectOption?: boolean;
   showQuestionTitle?: boolean;
   hiddenTagTexts?: string[];
@@ -34,6 +35,10 @@ export function patchQuestionsFromPublicView<TQuestion extends PatchableQuestion
             (typeof publicView.geoPollShowAnswerList === "boolean"
               ? publicView.geoPollShowAnswerList
               : q.geoPollShowAnswerList) ?? true,
+          geoPollRegionHeatEnabled:
+            (typeof publicView.geoPollRegionHeatEnabled === "boolean"
+              ? publicView.geoPollRegionHeatEnabled
+              : q.geoPollRegionHeatEnabled) ?? false,
           showCorrectOption:
             (typeof publicView.showCorrectOption === "boolean"
               ? publicView.showCorrectOption

@@ -72,6 +72,8 @@ export function useAdminBrandingVisual({ emitBrandingPatchRef, tileBrandSettersR
     setGeoPollRegionStrokeIdle: editor.setGeoPollRegionStrokeIdle,
     geoPollRegionStrokeVoted: editor.geoPollRegionStrokeVoted,
     setGeoPollRegionStrokeVoted: editor.setGeoPollRegionStrokeVoted,
+    geoPollRegionHeatScale: editor.geoPollRegionHeatScale,
+    setGeoPollRegionHeatScale: editor.setGeoPollRegionHeatScale,
     geoPollScreenBackground: editor.geoPollScreenBackground,
     setGeoPollScreenBackground: editor.setGeoPollScreenBackground,
     playerVoteOptionTextColor: editor.playerVoteOptionTextColor,

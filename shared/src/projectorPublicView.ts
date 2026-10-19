@@ -112,6 +112,7 @@ const BRANDING_EMIT_GUARD_KEYS = [
   "geoPollRegionFillVoted",
   "geoPollRegionStrokeIdle",
   "geoPollRegionStrokeVoted",
+  "geoPollRegionHeatScale",
   "geoPollScreenBackground",
 ] as const satisfies ReadonlyArray<keyof PublicViewState>;
 
@@ -122,6 +123,7 @@ const QUESTION_MODE_KEYS = [
   "questionRevealStage",
   "showVoteCount",
   "geoPollShowAnswerList",
+  "geoPollRegionHeatEnabled",
   "showCorrectOption",
   "showQuestionTitle",
   "hiddenTagTexts",
@@ -145,6 +147,7 @@ const QUESTION_MODE_KEYS = [
   "geoPollRegionFillVoted",
   "geoPollRegionStrokeIdle",
   "geoPollRegionStrokeVoted",
+  "geoPollRegionHeatScale",
   "geoPollScreenBackground",
   "showFirstCorrectAnswerer",
   "firstCorrectWinnersCount",

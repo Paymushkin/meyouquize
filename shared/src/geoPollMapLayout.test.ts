@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { buildGeoPollMapMarkers, geoPollMapKind, projectGeoLatLon } from "./geoPollMapLayout.js";
 import {
+  GEO_POLL_DICTIONARY_CENTRAL_ASIA_COUNTRIES,
   GEO_POLL_DICTIONARY_WORLD_CITIES,
   GEO_POLL_DICTIONARY_WORLD_COUNTRIES,
 } from "./geoPollDictionaries.js";
@@ -9,12 +10,16 @@ describe("geoPollMapLayout", () => {
   it("maps dictionary to map kind", () => {
     expect(geoPollMapKind(GEO_POLL_DICTIONARY_WORLD_CITIES)).toBe("russia");
     expect(geoPollMapKind(GEO_POLL_DICTIONARY_WORLD_COUNTRIES)).toBe("world");
+    expect(geoPollMapKind(GEO_POLL_DICTIONARY_CENTRAL_ASIA_COUNTRIES)).toBe("centralAsia");
   });
 
   it("projects coordinates", () => {
     const point = projectGeoLatLon(55.75, 37.62, "russia");
     expect(point.x).toBeGreaterThan(0);
     expect(point.y).toBeGreaterThan(0);
+    const almaty = projectGeoLatLon(43.24, 76.95, "centralAsia");
+    expect(almaty.x).toBeGreaterThan(0);
+    expect(almaty.y).toBeGreaterThan(0);
   });
 
   it("builds markers from stats with lat/lon", () => {

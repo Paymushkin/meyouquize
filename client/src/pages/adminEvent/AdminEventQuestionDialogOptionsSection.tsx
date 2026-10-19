@@ -10,8 +10,6 @@ import {
   MenuItem,
   Stack,
   TextField,
-  ToggleButton,
-  ToggleButtonGroup,
   Tooltip,
   Typography,
 } from "@mui/material";
@@ -20,10 +18,12 @@ import {
   buildDebatePollQuestionPatch,
   buildGeoPollQuestionPatch,
   debateDefaultOptionColor,
+  GEO_POLL_DICTIONARY_OPTIONS,
   GEO_POLL_DICTIONARY_WORLD_CITIES,
-  GEO_POLL_DICTIONARY_WORLD_COUNTRIES,
+  geoPollDictionaryInputLabel,
   geoPollDictionaryLabel,
   isDebatePollPreset,
+  normalizeGeoPollDictionaryId,
   sanitizeOptionColor,
 } from "@meyouquize/shared";
 import {
@@ -77,7 +77,9 @@ export function AdminEventQuestionDialogOptionsSection({
       {getQuestionTypeSelectValue(question) === "geo_poll" ? (
         <Alert severity="info" icon={<InfoOutlinedIcon fontSize="inherit" />}>
           Участник вводит{" "}
-          {question.geoPollDictionary === GEO_POLL_DICTIONARY_WORLD_COUNTRIES ? "страну" : "город"}{" "}
+          {geoPollDictionaryInputLabel(
+            question.geoPollDictionary ?? GEO_POLL_DICTIONARY_WORLD_CITIES,
+          ).toLowerCase()}{" "}
           с автодополнением по словарю «
           {geoPollDictionaryLabel(question.geoPollDictionary ?? GEO_POLL_DICTIONARY_WORLD_CITIES)}».
           На проекторе — карта с ответами.
@@ -401,34 +403,29 @@ export function AdminEventQuestionDialogOptionsSection({
           ) : null}
         </TextField>
         {getQuestionTypeSelectValue(question) === "geo_poll" ? (
-          <Stack spacing={0.5} sx={{ flex: "0 1 auto", minWidth: { xs: "100%", sm: 200 } }}>
-            <Typography variant="caption" color="text.secondary">
-              Словарь
-            </Typography>
-            <ToggleButtonGroup
-              exclusive
-              size="small"
-              value={question.geoPollDictionary ?? GEO_POLL_DICTIONARY_WORLD_CITIES}
-              onChange={(_event, nextDictionary) => {
-                if (!nextDictionary) return;
-                onUpdateQuestion({ geoPollDictionary: nextDictionary });
-              }}
-              sx={{ width: { xs: "100%", sm: "auto" } }}
-            >
-              <ToggleButton
-                value={GEO_POLL_DICTIONARY_WORLD_CITIES}
-                sx={{ flex: { xs: 1, sm: "none" }, px: 2 }}
-              >
-                Города
-              </ToggleButton>
-              <ToggleButton
-                value={GEO_POLL_DICTIONARY_WORLD_COUNTRIES}
-                sx={{ flex: { xs: 1, sm: "none" }, px: 2 }}
-              >
-                Страны
-              </ToggleButton>
-            </ToggleButtonGroup>
-          </Stack>
+          <TextField
+            select
+            label="Словарь"
+            value={normalizeGeoPollDictionaryId(
+              question.geoPollDictionary ?? GEO_POLL_DICTIONARY_WORLD_CITIES,
+            )}
+            onChange={(e) => {
+              onUpdateQuestion({ geoPollDictionary: e.target.value });
+            }}
+            size="small"
+            slotProps={{ inputLabel: { shrink: true } }}
+            sx={{
+              flex: "1 1 220px",
+              minWidth: { xs: "100%", sm: 220 },
+              maxWidth: "100%",
+            }}
+          >
+            {GEO_POLL_DICTIONARY_OPTIONS.map((option) => (
+              <MenuItem key={option.id} value={option.id}>
+                {option.label}
+              </MenuItem>
+            ))}
+          </TextField>
         ) : null}
         {question.type === "tag_cloud" || question.type === "multi" ? (
           <TextField

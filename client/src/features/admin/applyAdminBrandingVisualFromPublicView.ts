@@ -1,4 +1,8 @@
-import { normalizePublicViewState, type BrandThemeId } from "@meyouquize/shared";
+import {
+  normalizePublicViewState,
+  type BrandThemeId,
+  type GeoPollRegionHeatScale,
+} from "@meyouquize/shared";
 import type { ProjectorJoinQrOverlayCorner, PublicViewPayload } from "../../publicViewContract";
 import { toBrandingState } from "../../publicViewContract";
 
@@ -26,6 +30,7 @@ export type AdminBrandingVisualSetters = {
   setGeoPollRegionFillVoted: (value: string) => void;
   setGeoPollRegionStrokeIdle: (value: string) => void;
   setGeoPollRegionStrokeVoted: (value: string) => void;
+  setGeoPollRegionHeatScale: (value: GeoPollRegionHeatScale) => void;
   setGeoPollScreenBackground: (value: string) => void;
   setPlayerVoteOptionTextColor: (value: string) => void;
   setPlayerVoteProgressTrackColor: (value: string) => void;
@@ -93,6 +98,7 @@ export function applyAdminBrandingVisualFromPublicView(
   setters.setGeoPollRegionFillVoted(b.geoPollRegionFillVoted);
   setters.setGeoPollRegionStrokeIdle(b.geoPollRegionStrokeIdle);
   setters.setGeoPollRegionStrokeVoted(b.geoPollRegionStrokeVoted);
+  setters.setGeoPollRegionHeatScale(b.geoPollRegionHeatScale);
   setters.setGeoPollScreenBackground(b.geoPollScreenBackground);
   setters.setPlayerVoteOptionTextColor(b.playerVoteOptionTextColor);
   setters.setPlayerVoteProgressTrackColor(b.playerVoteProgressTrackColor);

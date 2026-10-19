@@ -1,4 +1,6 @@
 import type { BrandThemeId } from "./brandThemes.js";
+import type { GeoPollRegionHeatScale } from "./geoPollRegionHeatScale.js";
+import { normalizeGeoPollRegionHeatScale } from "./geoPollRegionHeatScale.js";
 
 export type ProjectorJoinQrOverlayCorner =
   | "top_right"
@@ -27,6 +29,7 @@ export type EventThemeBranding = {
   geoPollRegionFillVoted: string;
   geoPollRegionStrokeIdle: string;
   geoPollRegionStrokeVoted: string;
+  geoPollRegionHeatScale: GeoPollRegionHeatScale;
   geoPollScreenBackground: string;
   playerVoteOptionTextColor: string;
   playerVoteProgressTrackColor: string;
@@ -92,6 +95,7 @@ export function pickEventThemeBrandingFromPublicView(view: unknown): EventThemeB
     geoPollRegionFillVoted: String(value.geoPollRegionFillVoted ?? ""),
     geoPollRegionStrokeIdle: String(value.geoPollRegionStrokeIdle ?? ""),
     geoPollRegionStrokeVoted: String(value.geoPollRegionStrokeVoted ?? ""),
+    geoPollRegionHeatScale: normalizeGeoPollRegionHeatScale(value.geoPollRegionHeatScale),
     geoPollScreenBackground: String(value.geoPollScreenBackground ?? ""),
     playerVoteOptionTextColor: String(value.playerVoteOptionTextColor ?? ""),
     playerVoteProgressTrackColor: String(value.playerVoteProgressTrackColor ?? ""),

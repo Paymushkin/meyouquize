@@ -1,6 +1,10 @@
-import { GEO_POLL_DICTIONARY_WORLD_COUNTRIES } from "./geoPollDictionaries.js";
+import {
+  GEO_POLL_DICTIONARY_CENTRAL_ASIA_COUNTRIES,
+  GEO_POLL_DICTIONARY_WORLD_COUNTRIES,
+  normalizeGeoPollDictionaryId,
+} from "./geoPollDictionaries.js";
 
-export type GeoPollMapKind = "world" | "russia";
+export type GeoPollMapKind = "world" | "russia" | "centralAsia";
 
 export type GeoPollMapPoint = {
   name: string;
@@ -11,7 +15,10 @@ export type GeoPollMapPoint = {
 };
 
 export function geoPollMapKind(dictionaryId: string): GeoPollMapKind {
-  return dictionaryId === GEO_POLL_DICTIONARY_WORLD_COUNTRIES ? "world" : "russia";
+  const id = normalizeGeoPollDictionaryId(dictionaryId);
+  if (id === GEO_POLL_DICTIONARY_WORLD_COUNTRIES) return "world";
+  if (id === GEO_POLL_DICTIONARY_CENTRAL_ASIA_COUNTRIES) return "centralAsia";
+  return "russia";
 }
 
 export function geoPollMapViewBox(kind: GeoPollMapKind): string {
@@ -27,6 +34,18 @@ export function projectGeoLatLon(
     return {
       x: ((lon + 180) / 360) * 960,
       y: ((90 - lat) / 180) * 500,
+    };
+  }
+  if (kind === "centralAsia") {
+    const minLon = 46;
+    const maxLon = 88;
+    const minLat = 35;
+    const maxLat = 56;
+    const rawX = ((lon - minLon) / (maxLon - minLon)) * 960;
+    const rawY = ((maxLat - lat) / (maxLat - minLat)) * 500;
+    return {
+      x: Math.max(24, Math.min(936, rawX)),
+      y: Math.max(24, Math.min(476, rawY)),
     };
   }
   const minLon = 20;

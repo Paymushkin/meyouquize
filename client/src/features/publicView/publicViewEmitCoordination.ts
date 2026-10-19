@@ -12,6 +12,7 @@ const PROJECTOR_DEDUPE_KEYS = [
   "showFirstCorrectAnswerer",
   "showVoteCount",
   "geoPollShowAnswerList",
+  "geoPollRegionHeatEnabled",
   "showQuestionTitle",
   "leaderboardSubQuizId",
   "highlightedLeadersCount",

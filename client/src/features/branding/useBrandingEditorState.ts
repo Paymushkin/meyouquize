@@ -1,5 +1,6 @@
-import type { BrandThemeId } from "@meyouquize/shared";
+import type { BrandThemeId, GeoPollRegionHeatScale } from "@meyouquize/shared";
 import {
+  DEFAULT_GEO_POLL_REGION_HEAT_SCALE,
   DEFAULT_PROJECTOR_BROWSER_ZOOM,
   DEFAULT_PROJECTOR_CONTENT_MAX_WIDTH_PX,
   DEFAULT_PROJECTOR_JOIN_QR_OVERLAY_CORNER,
@@ -61,6 +62,9 @@ export function useBrandingEditorState() {
   const [geoPollRegionFillVoted, setGeoPollRegionFillVoted] = useState("#5d5d5d");
   const [geoPollRegionStrokeIdle, setGeoPollRegionStrokeIdle] = useState("#4a4a4a");
   const [geoPollRegionStrokeVoted, setGeoPollRegionStrokeVoted] = useState("#ffffff");
+  const [geoPollRegionHeatScale, setGeoPollRegionHeatScale] = useState<GeoPollRegionHeatScale>(
+    DEFAULT_GEO_POLL_REGION_HEAT_SCALE,
+  );
   const [geoPollScreenBackground, setGeoPollScreenBackground] = useState("#111111");
   const [playerVoteOptionTextColor, setPlayerVoteOptionTextColor] = useState("#ffffff");
   const [playerVoteProgressTrackColor, setPlayerVoteProgressTrackColor] = useState("#6a5600");
@@ -126,6 +130,7 @@ export function useBrandingEditorState() {
     setGeoPollRegionFillVoted,
     setGeoPollRegionStrokeIdle,
     setGeoPollRegionStrokeVoted,
+    setGeoPollRegionHeatScale,
     setGeoPollScreenBackground,
     setPlayerVoteOptionTextColor,
     setPlayerVoteProgressTrackColor,
@@ -164,6 +169,7 @@ export function useBrandingEditorState() {
     setGeoPollRegionFillVoted,
     setGeoPollRegionStrokeIdle,
     setGeoPollRegionStrokeVoted,
+    setGeoPollRegionHeatScale,
     setGeoPollScreenBackground,
     setPlayerVoteOptionTextColor,
     setPlayerVoteProgressTrackColor,
@@ -325,6 +331,7 @@ export function useBrandingEditorState() {
       geoPollRegionFillVoted,
       geoPollRegionStrokeIdle,
       geoPollRegionStrokeVoted,
+      geoPollRegionHeatScale,
       geoPollScreenBackground,
       playerVoteOptionTextColor,
       playerVoteProgressTrackColor,
@@ -375,6 +382,7 @@ export function useBrandingEditorState() {
     geoPollRegionFillVoted,
     geoPollRegionStrokeIdle,
     geoPollRegionStrokeVoted,
+    geoPollRegionHeatScale,
     geoPollScreenBackground,
     playerVoteOptionTextColor,
     playerVoteProgressTrackColor,
@@ -445,6 +453,8 @@ export function useBrandingEditorState() {
     setGeoPollRegionStrokeIdle,
     geoPollRegionStrokeVoted,
     setGeoPollRegionStrokeVoted,
+    geoPollRegionHeatScale,
+    setGeoPollRegionHeatScale,
     geoPollScreenBackground,
     setGeoPollScreenBackground,
     playerVoteOptionTextColor,

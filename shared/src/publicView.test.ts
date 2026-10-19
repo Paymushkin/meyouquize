@@ -328,6 +328,7 @@ describe("geo poll branding colors", () => {
     expect(state.geoPollRegionFillVoted).toBe("#5d5d5d");
     expect(state.geoPollRegionStrokeIdle).toBe("#4a4a4a");
     expect(state.geoPollRegionStrokeVoted).toBe("#ffffff");
+    expect(state.geoPollRegionHeatScale).toBe("region");
     expect(state.geoPollScreenBackground).toBe("#111111");
   });
 
@@ -338,6 +339,7 @@ describe("geo poll branding colors", () => {
       geoPollRegionFillVoted: "#abcdef",
       geoPollRegionStrokeIdle: "#00ff00",
       geoPollRegionStrokeVoted: "#fff",
+      geoPollRegionHeatScale: "magma",
       geoPollScreenBackground: "transparent",
     });
     expect(state.geoPollMarkerColor).toBe("#112233");
@@ -345,7 +347,11 @@ describe("geo poll branding colors", () => {
     expect(state.geoPollRegionFillVoted).toBe("#abcdef");
     expect(state.geoPollRegionStrokeIdle).toBe("#00ff00");
     expect(state.geoPollRegionStrokeVoted).toBe("#ffffff");
+    expect(state.geoPollRegionHeatScale).toBe("magma");
     expect(state.geoPollScreenBackground).toBe("transparent");
+    expect(
+      normalizePublicViewState({ geoPollRegionHeatScale: "nope" }).geoPollRegionHeatScale,
+    ).toBe("region");
   });
 
   it("rejects invalid geo poll screen background", () => {
@@ -430,6 +436,8 @@ describe("DEFAULT_PUBLIC_VIEW_STATE", () => {
     expect(DEFAULT_PUBLIC_VIEW_STATE.projectorJoinQrOverlayVisible).toBe(false);
     expect(DEFAULT_PUBLIC_VIEW_STATE.speakerTileVisible).toBe(false);
     expect(DEFAULT_PUBLIC_VIEW_STATE.playerTilesGridColumns).toBe(3);
+    expect(DEFAULT_PUBLIC_VIEW_STATE.geoPollRegionHeatEnabled).toBe(false);
+    expect(DEFAULT_PUBLIC_VIEW_STATE.geoPollRegionHeatScale).toBe("region");
   });
 });
 

@@ -420,6 +420,7 @@ export const setPublicViewSchema = z.object({
   leaderboardSubQuizId: z.string().trim().max(80).optional(),
   showVoteCount: z.boolean().optional(),
   geoPollShowAnswerList: z.boolean().optional(),
+  geoPollRegionHeatEnabled: z.boolean().optional(),
   showCorrectOption: z.boolean().optional(),
   showQuestionTitle: z.boolean().optional(),
   hiddenTagTexts: z.array(z.string().min(1).max(120)).max(300).optional(),
@@ -540,6 +541,9 @@ export const setPublicViewSchema = z.object({
   geoPollRegionStrokeVoted: z
     .string()
     .regex(/^#([0-9a-fA-F]{6})$/)
+    .optional(),
+  geoPollRegionHeatScale: z
+    .enum(["region", "cold_warm", "magma", "teal_amber", "violet_gold"])
     .optional(),
   geoPollScreenBackground: z
     .string()

@@ -27,6 +27,7 @@ type QuestionFormPatchable = {
   isActive?: boolean;
   showVoteCount?: boolean;
   geoPollShowAnswerList?: boolean;
+  geoPollRegionHeatEnabled?: boolean;
   showCorrectOption?: boolean;
   showQuestionTitle?: boolean;
   hiddenTagTexts?: string[];
@@ -66,6 +67,7 @@ type Params = {
   setGeoPollRegionFillVoted: (value: string) => void;
   setGeoPollRegionStrokeIdle: (value: string) => void;
   setGeoPollRegionStrokeVoted: (value: string) => void;
+  setGeoPollRegionHeatScale: (value: import("@meyouquize/shared").GeoPollRegionHeatScale) => void;
   setGeoPollScreenBackground: (value: string) => void;
   setBrandPrimaryColor: (value: string) => void;
   setBrandAccentColor: (value: string) => void;
@@ -148,6 +150,7 @@ export function useAdminEventSocket<TQuestion extends QuestionFormPatchable>(
     setGeoPollRegionFillVoted,
     setGeoPollRegionStrokeIdle,
     setGeoPollRegionStrokeVoted,
+    setGeoPollRegionHeatScale,
     setGeoPollScreenBackground,
     setBrandPrimaryColor,
     setBrandAccentColor,
@@ -224,6 +227,7 @@ export function useAdminEventSocket<TQuestion extends QuestionFormPatchable>(
       setGeoPollRegionFillVoted(nextBranding.geoPollRegionFillVoted);
       setGeoPollRegionStrokeIdle(nextBranding.geoPollRegionStrokeIdle);
       setGeoPollRegionStrokeVoted(nextBranding.geoPollRegionStrokeVoted);
+      setGeoPollRegionHeatScale(nextBranding.geoPollRegionHeatScale);
       setGeoPollScreenBackground(nextBranding.geoPollScreenBackground);
       setBrandPrimaryColor(nextBranding.brandPrimaryColor);
       setBrandAccentColor(nextBranding.brandAccentColor);
@@ -291,6 +295,7 @@ export function useAdminEventSocket<TQuestion extends QuestionFormPatchable>(
       setGeoPollRegionFillVoted,
       setGeoPollRegionStrokeIdle,
       setGeoPollRegionStrokeVoted,
+      setGeoPollRegionHeatScale,
       setGeoPollScreenBackground,
       setBrandPrimaryColor,
       setBrandAccentColor,
@@ -383,6 +388,7 @@ export function useAdminEventSocket<TQuestion extends QuestionFormPatchable>(
         showFirstCorrectAnswerer: payload.showFirstCorrectAnswerer,
         showVoteCount: payload.showVoteCount,
         geoPollShowAnswerList: payload.geoPollShowAnswerList,
+        geoPollRegionHeatEnabled: payload.geoPollRegionHeatEnabled,
         showQuestionTitle: payload.showQuestionTitle,
         leaderboardSubQuizId: payload.leaderboardSubQuizId,
         highlightedLeadersCount: payload.highlightedLeadersCount,

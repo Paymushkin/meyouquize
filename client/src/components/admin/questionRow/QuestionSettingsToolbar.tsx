@@ -4,6 +4,7 @@ import RestartAltIcon from "@mui/icons-material/RestartAlt";
 import RestoreIcon from "@mui/icons-material/Restore";
 import TaskAltIcon from "@mui/icons-material/TaskAlt";
 import TuneIcon from "@mui/icons-material/Tune";
+import GradientIcon from "@mui/icons-material/Gradient";
 import VisibilityIcon from "@mui/icons-material/Visibility";
 import VisibilityOffIcon from "@mui/icons-material/VisibilityOff";
 import { isDebatePollPreset, isGeoPollPreset } from "@meyouquize/shared";
@@ -15,6 +16,7 @@ type Props = {
   globalIndex: number;
   updateQuestionShowVoteCount: (globalIndex: number, next: boolean) => void;
   updateQuestionGeoPollShowAnswerList: (globalIndex: number, next: boolean) => void;
+  updateQuestionGeoPollRegionHeatEnabled: (globalIndex: number, next: boolean) => void;
   updateQuestionShowCorrectOption: (globalIndex: number, next: boolean) => void;
   openTagInputDialog: (globalIndex: number) => void;
   confirmResetQuestionAnswersByIndex: (globalIndex: number) => void;
@@ -35,6 +37,7 @@ export function QuestionSettingsToolbar(props: Props) {
     globalIndex,
     updateQuestionShowVoteCount,
     updateQuestionGeoPollShowAnswerList,
+    updateQuestionGeoPollRegionHeatEnabled,
     updateQuestionShowCorrectOption,
     openTagInputDialog,
     confirmResetQuestionAnswersByIndex,
@@ -103,6 +106,30 @@ export function QuestionSettingsToolbar(props: Props) {
               ) : (
                 <VisibilityOffIcon fontSize="small" color="action" />
               )}
+            </IconButton>
+          </Tooltip>
+        ) : null}
+        {isGeoPoll ? (
+          <Tooltip
+            title={
+              (question.geoPollRegionHeatEnabled ?? false)
+                ? "Выключить интенсивность заливки регионов"
+                : "Включить интенсивность заливки регионов (больше голосов — менее прозрачно)"
+            }
+          >
+            <IconButton
+              size="small"
+              onClick={() =>
+                updateQuestionGeoPollRegionHeatEnabled(
+                  globalIndex,
+                  !(question.geoPollRegionHeatEnabled ?? false),
+                )
+              }
+              aria-label="Интенсивность заливки регионов геоопроса"
+              aria-pressed={question.geoPollRegionHeatEnabled ?? false}
+              color={(question.geoPollRegionHeatEnabled ?? false) ? "primary" : "default"}
+            >
+              <GradientIcon fontSize="small" />
             </IconButton>
           </Tooltip>
         ) : null}

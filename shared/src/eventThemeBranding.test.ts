@@ -27,6 +27,9 @@ describe("eventThemeBranding", () => {
     expect(normalized.geoPollRegionStrokeVoted).toBe(
       DEFAULT_PUBLIC_VIEW_STATE.geoPollRegionStrokeVoted,
     );
+    expect(normalized.geoPollRegionHeatScale).toBe(
+      DEFAULT_PUBLIC_VIEW_STATE.geoPollRegionHeatScale,
+    );
     expect(normalized.geoPollScreenBackground).toBe(
       DEFAULT_PUBLIC_VIEW_STATE.geoPollScreenBackground,
     );

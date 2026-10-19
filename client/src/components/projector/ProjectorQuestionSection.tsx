@@ -234,6 +234,7 @@ export function ProjectorQuestionSection(props: ProjectorQuestionSectionProps) {
                 question={selectedQuestion}
                 showVoteCount={view.showVoteCount}
                 geoPollShowAnswerList={view.geoPollShowAnswerList}
+                geoPollRegionHeatEnabled={view.geoPollRegionHeatEnabled}
                 showCorrectOption={view.showCorrectOption}
                 questionRevealStage={view.questionRevealStage}
                 fillHeight={fullScreenCloud}
@@ -256,6 +257,7 @@ export function ProjectorQuestionSection(props: ProjectorQuestionSectionProps) {
                 geoPollRegionFillVoted={view.geoPollRegionFillVoted}
                 geoPollRegionStrokeIdle={view.geoPollRegionStrokeIdle}
                 geoPollRegionStrokeVoted={view.geoPollRegionStrokeVoted}
+                geoPollRegionHeatScale={view.geoPollRegionHeatScale}
                 brandPrimaryColor={view.brandPrimaryColor}
                 brandFontFamily={view.brandFontFamily}
                 cloudHeader={tagCloudHeader}

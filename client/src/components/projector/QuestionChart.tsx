@@ -66,6 +66,8 @@ export type QuestionChartProps = {
   showVoteCount: boolean;
   /** Геоопрос: боковой список ответов на проекторе. */
   geoPollShowAnswerList?: boolean;
+  /** Геоопрос: интенсивность заливки регионов по голосам. */
+  geoPollRegionHeatEnabled?: boolean;
   showCorrectOption?: boolean;
   questionRevealStage?: "options" | "results";
   fillHeight?: boolean;
@@ -90,6 +92,7 @@ export type QuestionChartProps = {
   geoPollRegionFillVoted?: string;
   geoPollRegionStrokeIdle?: string;
   geoPollRegionStrokeVoted?: string;
+  geoPollRegionHeatScale?: import("@meyouquize/shared").GeoPollRegionHeatScale;
   brandPrimaryColor?: string;
   brandFontFamily?: string;
   /** Заголовок вопроса внутри блока облака (вместо отдельной строки над областью чарта) */
@@ -101,6 +104,7 @@ export function QuestionChart(props: QuestionChartProps) {
     question,
     showVoteCount,
     geoPollShowAnswerList = true,
+    geoPollRegionHeatEnabled = false,
     showCorrectOption = false,
     questionRevealStage = "results",
     fillHeight = false,
@@ -124,6 +128,7 @@ export function QuestionChart(props: QuestionChartProps) {
     geoPollRegionFillVoted = "#5d5d5d",
     geoPollRegionStrokeIdle = "#4a4a4a",
     geoPollRegionStrokeVoted = "#ffffff",
+    geoPollRegionHeatScale = "region",
     brandPrimaryColor = "#1976d2",
     brandFontFamily,
     cloudHeader,
@@ -528,6 +533,8 @@ export function QuestionChart(props: QuestionChartProps) {
         voteOptionTextColor={voteOptionTextColor}
         brandFontFamily={brandFontFamily}
         showAnswerList={geoPollShowAnswerList}
+        regionHeatEnabled={geoPollRegionHeatEnabled}
+        regionHeatScale={geoPollRegionHeatScale}
         markerColor={geoPollMarkerColor}
         regionFillIdle={geoPollRegionFillIdle}
         regionFillVoted={geoPollRegionFillVoted}

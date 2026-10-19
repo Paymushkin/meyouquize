@@ -5,7 +5,16 @@ import { useId, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { feature } from "topojson-client";
 import type { Feature, FeatureCollection, Geometry, MultiPolygon, Position } from "geojson";
 import countries110m from "world-atlas/countries-110m.json";
-import { geoPollMapKind, optionText } from "@meyouquize/shared";
+import {
+  DEFAULT_GEO_POLL_REGION_HEAT_SCALE,
+  geoPollMapKind,
+  geoPollRegionHeatIntensity,
+  geoPollRegionHeatLegendCssGradient,
+  optionText,
+  resolveGeoPollRegionHeatFillColor,
+  resolveGeoPollRegionHeatFillOpacity,
+  type GeoPollRegionHeatScale,
+} from "@meyouquize/shared";
 import russiaWorldExtraTerritories from "../../data/russia-world-extra-territories.json";
 import ukraineWorldWithoutExtras from "../../data/ukraine-world-without-extras.json";
 import { projectRussiaLatLon, russiaSvgMap } from "./russiaMapGeometry";
@@ -18,6 +27,10 @@ type ProjectorGeoPollMapProps = {
   brandFontFamily?: string;
   /** Боковой список ответов на проекторе (админка). */
   showAnswerList?: boolean;
+  /** Интенсивность заливки регионов по числу голосов (выкл. по умолчанию). */
+  regionHeatEnabled?: boolean;
+  /** Пресет шкалы интенсивности (брендирование). */
+  regionHeatScale?: GeoPollRegionHeatScale;
   markerColor?: string;
   regionFillIdle?: string;
   regionFillVoted?: string;
@@ -69,11 +82,14 @@ type MapMarker = {
 };
 
 type MapLayout = {
-  mapKind: "world" | "russia";
+  mapKind: "world" | "russia" | "centralAsia";
   viewBox: string;
   landPaths: MapLandPath[];
   markers: MapMarker[];
 };
+
+/** ISO numeric: KZ, KG, TJ, TM, UZ. */
+const CENTRAL_ASIA_WORLD_IDS = new Set(["398", "417", "762", "795", "860"]);
 
 /** «Екатеринбург, Россия» → «Екатеринбург»; страны без запятой остаются как есть. */
 function markerDisplayName(label: string): string {
@@ -287,6 +303,56 @@ function buildWorldMapLayout(
   };
 }
 
+function buildCentralAsiaMapLayout(
+  world: FeatureCollection<Geometry>,
+  optionStats: ProjectorGeoPollMapProps["optionStats"],
+  width: number,
+  height: number,
+): MapLayout {
+  const region: FeatureCollection<Geometry> = {
+    type: "FeatureCollection",
+    features: world.features.filter((f) => CENTRAL_ASIA_WORLD_IDS.has(String(f.id ?? ""))),
+  };
+  const projection = geoMercator().fitExtent(
+    [
+      [WORLD_MAP_PADDING, WORLD_MAP_PADDING],
+      [width - WORLD_MAP_PADDING, height - WORLD_MAP_PADDING],
+    ],
+    region,
+  );
+  const pathGen = geoPath(projection);
+  const landPaths = region.features
+    .map((f) => {
+      const d = pathGen(f);
+      if (!d) return null;
+      return { id: String(f.id ?? d.slice(0, 24)), d };
+    })
+    .filter((row): row is MapLandPath => row != null);
+  const markers = optionStats
+    .filter(
+      (row) =>
+        row.lat != null && row.lon != null && Number.isFinite(row.lat) && Number.isFinite(row.lon),
+    )
+    .map((row) => {
+      const projected = projection([row.lon!, row.lat!]);
+      if (!projected) return null;
+      return {
+        name: optionText(row.text),
+        count: row.count,
+        x: projected[0],
+        y: projected[1],
+      };
+    })
+    .filter((row): row is MapMarker => row != null);
+
+  return {
+    mapKind: "centralAsia",
+    viewBox: `0 0 ${width} ${height}`,
+    landPaths,
+    markers,
+  };
+}
+
 function buildRussiaOnlyMapLayout(optionStats: ProjectorGeoPollMapProps["optionStats"]): MapLayout {
   return {
     mapKind: "russia",
@@ -305,7 +371,11 @@ function useGeoPollMapModel(
     if (mapKind === "russia") {
       return buildRussiaOnlyMapLayout(optionStats);
     }
-    return buildWorldMapLayout(loadWorldFeatures(), optionStats, 960, 500);
+    const world = loadWorldFeatures();
+    if (mapKind === "centralAsia") {
+      return buildCentralAsiaMapLayout(world, optionStats, 960, 500);
+    }
+    return buildWorldMapLayout(world, optionStats, 960, 500);
   }, [dictionaryId, optionStats]);
 }
 
@@ -529,24 +599,88 @@ function findLandPathIdAt(metas: PathHitMeta[], x: number, y: number): string | 
   return nearest?.id ?? null;
 }
 
-/** Непрозрачный силуэт + подсветка проголосовавших регионов (страны / субъекты РФ). */
+/** Легенда интенсивности заливки: слева меньше голосов, справа больше. */
+function GeoPollRegionHeatLegend({
+  scale,
+  fillColor,
+  textColor,
+  fontFamily,
+}: {
+  scale: GeoPollRegionHeatScale;
+  fillColor: string;
+  textColor: string;
+  fontFamily?: string;
+}) {
+  return (
+    <Stack
+      direction="row"
+      alignItems="center"
+      spacing={2}
+      sx={{ width: "100%" }}
+      aria-label="Легенда интенсивности заливки регионов"
+    >
+      <Typography
+        variant="h6"
+        sx={{
+          color: alpha(textColor, 0.85),
+          fontFamily,
+          flexShrink: 0,
+          whiteSpace: "nowrap",
+          fontWeight: 500,
+          fontSize: { xs: "1rem", md: "1.25rem" },
+        }}
+      >
+        меньше голосов
+      </Typography>
+      <Box
+        sx={{
+          flex: 1,
+          height: { xs: 14, md: 18 },
+          borderRadius: 1.5,
+          background: geoPollRegionHeatLegendCssGradient(scale, fillColor),
+          border: `1px solid ${alpha(textColor, 0.25)}`,
+        }}
+      />
+      <Typography
+        variant="h6"
+        sx={{
+          color: alpha(textColor, 0.85),
+          fontFamily,
+          flexShrink: 0,
+          whiteSpace: "nowrap",
+          fontWeight: 500,
+          fontSize: { xs: "1rem", md: "1.25rem" },
+        }}
+      >
+        больше голосов
+      </Typography>
+    </Stack>
+  );
+}
+
+/** Idle-силуэт + заливка проголосовавших регионов (опционально opacity/цвет ∝ числу ответов). */
 function MapLandBackground({
   landPaths,
-  votedPathIds,
+  pathVoteCounts,
+  regionHeatEnabled,
+  regionHeatScale,
   regionFillIdle,
   regionFillVoted,
   regionStrokeIdle,
   regionStrokeVoted,
 }: {
   landPaths: MapLandPath[];
-  votedPathIds: Set<string>;
+  pathVoteCounts: Map<string, number>;
+  regionHeatEnabled: boolean;
+  regionHeatScale: GeoPollRegionHeatScale;
   regionFillIdle: string;
   regionFillVoted: string;
   regionStrokeIdle: string;
   regionStrokeVoted: string;
 }) {
   const idleSilhouetteD = landPaths.map((land) => land.d).join(" ");
-  const highlightTransition = `fill ${REGION_HIGHLIGHT_MS}ms ease-in-out, stroke ${REGION_HIGHLIGHT_MS}ms ease-in-out, stroke-width ${REGION_HIGHLIGHT_MS}ms ease-in-out`;
+  const maxVotes = Math.max(0, ...pathVoteCounts.values());
+  const highlightTransition = `fill ${REGION_HIGHLIGHT_MS}ms ease-in-out, fill-opacity ${REGION_HIGHLIGHT_MS}ms ease-in-out, stroke ${REGION_HIGHLIGHT_MS}ms ease-in-out, stroke-width ${REGION_HIGHLIGHT_MS}ms ease-in-out, opacity ${REGION_HIGHLIGHT_MS}ms ease-in-out`;
 
   return (
     <>
@@ -561,7 +695,8 @@ function MapLandBackground({
         }}
       />
       {landPaths.map((land) => {
-        const voted = votedPathIds.has(land.id);
+        const votes = pathVoteCounts.get(land.id) ?? 0;
+        const voted = votes > 0;
         return (
           <path
             key={`fill-${land.id}`}
@@ -569,7 +704,7 @@ function MapLandBackground({
             strokeLinejoin="round"
             strokeLinecap="round"
             style={{
-              fill: voted ? regionFillVoted : regionFillIdle,
+              fill: regionFillIdle,
               stroke: voted ? "none" : regionStrokeIdle,
               strokeWidth: voted ? 0 : REGION_STROKE_WIDTH_IDLE,
               transition: highlightTransition,
@@ -578,7 +713,31 @@ function MapLandBackground({
         );
       })}
       {landPaths.map((land) => {
-        const voted = votedPathIds.has(land.id);
+        const votes = pathVoteCounts.get(land.id) ?? 0;
+        if (votes <= 0) return null;
+        const intensity = geoPollRegionHeatIntensity(votes, maxVotes);
+        return (
+          <path
+            key={`heat-${land.id}`}
+            d={land.d}
+            strokeLinejoin="round"
+            strokeLinecap="round"
+            style={{
+              fill: regionHeatEnabled
+                ? resolveGeoPollRegionHeatFillColor(regionHeatScale, intensity, regionFillVoted)
+                : regionFillVoted,
+              fillOpacity: regionHeatEnabled
+                ? resolveGeoPollRegionHeatFillOpacity(regionHeatScale, intensity)
+                : 1,
+              stroke: "none",
+              pointerEvents: "none",
+              transition: highlightTransition,
+            }}
+          />
+        );
+      })}
+      {landPaths.map((land) => {
+        const voted = (pathVoteCounts.get(land.id) ?? 0) > 0;
         return (
           <path
             key={`stroke-${land.id}`}
@@ -790,6 +949,8 @@ export function ProjectorGeoPollMap({
   voteOptionTextColor = "#ffffff",
   brandFontFamily,
   showAnswerList = true,
+  regionHeatEnabled = false,
+  regionHeatScale = DEFAULT_GEO_POLL_REGION_HEAT_SCALE,
   markerColor = DEFAULT_MARKER_COLOR,
   regionFillIdle = DEFAULT_REGION_FILL_IDLE,
   regionFillVoted = DEFAULT_REGION_FILL_VOTED,
@@ -800,14 +961,15 @@ export function ProjectorGeoPollMap({
   const { viewBox, landPaths, markers } = useGeoPollMapModel(dictionaryId, optionStats);
   const appearingKeys = useAppearingMarkerKeys(markers);
   const pathHitMetas = useMemo(() => landPaths.map(buildPathHitMeta), [landPaths]);
-  const votedPathIds = useMemo(() => {
-    const ids = new Set<string>();
-    if (pathHitMetas.length === 0) return ids;
+  const pathVoteCounts = useMemo(() => {
+    const counts = new Map<string, number>();
+    if (pathHitMetas.length === 0) return counts;
     for (const marker of markers) {
       const pathId = findLandPathIdAt(pathHitMetas, marker.x, marker.y);
-      if (pathId) ids.add(pathId);
+      if (!pathId) continue;
+      counts.set(pathId, (counts.get(pathId) ?? 0) + marker.count);
     }
-    return ids;
+    return counts;
   }, [markers, pathHitMetas]);
   const [appearanceOrder, setAppearanceOrder] = useState<string[]>([]);
   useLayoutEffect(() => {
@@ -850,7 +1012,7 @@ export function ProjectorGeoPollMap({
     const ro = new ResizeObserver(updateMapHeight);
     ro.observe(mapEl);
     return () => ro.disconnect();
-  }, [viewBox, markers.length, showAnswerList]);
+  }, [viewBox, markers.length, showAnswerList, regionHeatEnabled]);
 
   useLayoutEffect(() => {
     if (!showAnswerList) return;
@@ -878,7 +1040,11 @@ export function ProjectorGeoPollMap({
         bgcolor: "transparent",
       }}
     >
-      <Box ref={mapBoxRef} sx={{ flex: 1, width: "100%", minWidth: 0, overflow: "hidden" }}>
+      <Stack
+        ref={mapBoxRef}
+        spacing={regionHeatEnabled ? 1.5 : 0}
+        sx={{ flex: 1, width: "100%", minWidth: 0, overflow: "hidden" }}
+      >
         <Box
           component="svg"
           viewBox={viewBox}
@@ -938,7 +1104,9 @@ export function ProjectorGeoPollMap({
           </defs>
           <MapLandBackground
             landPaths={landPaths}
-            votedPathIds={votedPathIds}
+            pathVoteCounts={pathVoteCounts}
+            regionHeatEnabled={regionHeatEnabled}
+            regionHeatScale={regionHeatScale}
             regionFillIdle={regionFillIdle}
             regionFillVoted={regionFillVoted}
             regionStrokeIdle={regionStrokeIdle}
@@ -970,7 +1138,15 @@ export function ProjectorGeoPollMap({
             );
           })}
         </Box>
-      </Box>
+        {regionHeatEnabled ? (
+          <GeoPollRegionHeatLegend
+            scale={regionHeatScale}
+            fillColor={regionFillVoted}
+            textColor={voteOptionTextColor}
+            fontFamily={brandFontFamily}
+          />
+        ) : null}
+      </Stack>
       {showAnswerList ? (
         <Stack
           ref={sidebarRef}

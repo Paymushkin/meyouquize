@@ -44,6 +44,8 @@ type Props = {
   setGeoPollRegionStrokeIdle: (value: string) => void;
   geoPollRegionStrokeVoted: string;
   setGeoPollRegionStrokeVoted: (value: string) => void;
+  geoPollRegionHeatScale: import("@meyouquize/shared").GeoPollRegionHeatScale;
+  setGeoPollRegionHeatScale: (value: import("@meyouquize/shared").GeoPollRegionHeatScale) => void;
   geoPollScreenBackground: string;
   setGeoPollScreenBackground: (value: string) => void;
   playerVoteOptionTextColor: string;
@@ -152,6 +154,8 @@ export function AdminBrandingSection(props: Props) {
     setGeoPollRegionStrokeIdle,
     geoPollRegionStrokeVoted,
     setGeoPollRegionStrokeVoted,
+    geoPollRegionHeatScale,
+    setGeoPollRegionHeatScale,
     geoPollScreenBackground,
     setGeoPollScreenBackground,
     playerVoteOptionTextColor,
@@ -272,6 +276,8 @@ export function AdminBrandingSection(props: Props) {
             setGeoPollRegionStrokeIdle={setGeoPollRegionStrokeIdle}
             geoPollRegionStrokeVoted={geoPollRegionStrokeVoted}
             setGeoPollRegionStrokeVoted={setGeoPollRegionStrokeVoted}
+            geoPollRegionHeatScale={geoPollRegionHeatScale}
+            setGeoPollRegionHeatScale={setGeoPollRegionHeatScale}
             geoPollScreenBackground={geoPollScreenBackground}
             setGeoPollScreenBackground={setGeoPollScreenBackground}
             emitPatch={emitBrandingPatch}
