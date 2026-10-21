@@ -87,7 +87,8 @@ export function buildQuizPlayContainerSx(params: QuizPlayContainerSxParams): SxP
   const brandBg = buildBrandBackground({
     backgroundImageUrl: normalizedImageUrl || undefined,
     backgroundAnchor: "bottom",
-    backgroundAttachment: "scroll",
+    // После join длинный скролл (гости/чаты) не должен «уезжать» от брендового фона.
+    backgroundAttachment: joined ? "fixed" : "scroll",
   });
   return {
     position: "relative",
@@ -101,6 +102,7 @@ export function buildQuizPlayContainerSx(params: QuizPlayContainerSxParams): SxP
     backgroundColor: backgroundColor ?? "transparent",
     ...brandBg,
     backgroundRepeat: "no-repeat",
+    backgroundClip: "border-box",
     fontFamily: brandFontFamily,
     fontStyle: "normal",
     "&, & *": {

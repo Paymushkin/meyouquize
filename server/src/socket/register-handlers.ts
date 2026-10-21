@@ -9,6 +9,8 @@ import { cleanupQuizPlaySocketState, registerQuizPlayHandlers } from "./handlers
 import { registerResultsDashboardHandlers } from "./handlers/results-dashboard.js";
 import { registerSpeakerQuestionsHandlers } from "./handlers/speaker-questions.js";
 import { registerFeedbackHandlers } from "./handlers/feedback.js";
+import { registerProjectorTimelineHandlers } from "./handlers/projector-timeline.js";
+import { registerNetworkingHandlers } from "./handlers/networking.js";
 import { emitQuizOnlineCount } from "./quiz-rooms.js";
 
 export function registerSocketHandlers(io: Server) {
@@ -27,6 +29,8 @@ export function registerSocketHandlers(io: Server) {
     registerQuizAdminHandlers(enrichedSocket, io);
     registerSpeakerQuestionsHandlers(enrichedSocket, io);
     registerFeedbackHandlers(enrichedSocket, io);
+    registerProjectorTimelineHandlers(enrichedSocket, io);
+    registerNetworkingHandlers(enrichedSocket, io);
 
     enrichedSocket.on("disconnect", (reason) => {
       clearSubmitRateLimit(enrichedSocket.id);

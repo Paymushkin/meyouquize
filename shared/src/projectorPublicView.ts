@@ -114,6 +114,8 @@ const BRANDING_EMIT_GUARD_KEYS = [
   "geoPollRegionStrokeVoted",
   "geoPollRegionHeatScale",
   "geoPollScreenBackground",
+  "projectorTimeline",
+  "networkingEnabled",
 ] as const satisfies ReadonlyArray<keyof PublicViewState>;
 
 const BRANDING_EMIT_GUARD_KEY_SET = new Set<string>(BRANDING_EMIT_GUARD_KEYS);
@@ -149,6 +151,7 @@ const QUESTION_MODE_KEYS = [
   "geoPollRegionStrokeVoted",
   "geoPollRegionHeatScale",
   "geoPollScreenBackground",
+  "projectorTimeline",
   "showFirstCorrectAnswerer",
   "firstCorrectWinnersCount",
 ] as const satisfies ReadonlyArray<keyof PublicViewState>;

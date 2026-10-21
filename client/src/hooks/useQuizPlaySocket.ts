@@ -165,7 +165,11 @@ export function useQuizPlaySocket({
       if (pendingQuestionId) {
         clearSubmitInFlight?.(pendingQuestionId);
       }
-      if (message === "Participant not found" || code === "NOT_JOINED") {
+      if (
+        message === "Participant not found" ||
+        message.includes("rejoin the event") ||
+        code === "NOT_JOINED"
+      ) {
         onParticipantMissing?.();
         setError("");
         return;
@@ -173,6 +177,10 @@ export function useQuizPlaySocket({
       if (message === "Not joined") {
         onParticipantMissing?.();
         setError("");
+        return;
+      }
+      if (message === "Guest not found") {
+        setError("Гость не найден. Обновите список гостей.");
         return;
       }
       if (message === "Question is not open") {

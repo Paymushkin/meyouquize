@@ -551,6 +551,39 @@ export const setPublicViewSchema = z.object({
       message: "Must be transparent or #RRGGBB",
     })
     .optional(),
+  networkingEnabled: z.boolean().optional(),
+  projectorTimeline: z
+    .object({
+      enabled: z.boolean(),
+      playing: z.boolean(),
+      cursor: z.number().int().min(0),
+      stepStartedAt: z.number().nullable(),
+      steps: z
+        .array(
+          z.object({
+            id: z.string().trim().min(1).max(80),
+            mode: z.enum([
+              "title",
+              "question",
+              "leaderboard",
+              "speaker_questions",
+              "reactions",
+              "randomizer",
+              "photo_wall",
+              "video_wall",
+              "debate_compare",
+              "debate_series",
+            ]),
+            questionId: z.string().trim().min(1).max(80).optional(),
+            debateCompareQuestionId: z.string().trim().min(1).max(80).optional(),
+            debateSeriesId: z.string().trim().min(1).max(80).optional(),
+            leaderboardSubQuizId: z.string().trim().min(1).max(80).optional(),
+            durationSec: z.number().int().min(3).max(600),
+          }),
+        )
+        .max(100),
+    })
+    .optional(),
   showFirstCorrectAnswerer: z.boolean().optional(),
   firstCorrectWinnersCount: z.number().int().min(1).max(20).optional(),
   speakerQuestionsEnabled: z.boolean().optional(),

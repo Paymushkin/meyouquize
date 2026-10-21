@@ -104,6 +104,8 @@ export type QuizState = {
   title: string;
   showEventTitleOnPlayer?: boolean;
   playerAutoJoinRandomNickname?: boolean;
+  /** Опциональный модуль нетворкинга внутри квиза. */
+  networkingEnabled?: boolean;
   playerBanners?: Array<{
     id: string;
     linkUrl: string;

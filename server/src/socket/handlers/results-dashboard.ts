@@ -27,6 +27,8 @@ import {
   shouldSkipAdminViewSetDedupe,
   type AdminViewSetDedupeState,
 } from "../admin-view-set-dedupe.js";
+import { markTimelineInactive } from "../../projector-timeline-sequencer.js";
+import { normalizeProjectorTimelineState } from "@meyouquize/shared";
 
 export function registerResultsDashboardHandlers(socket: EnrichedSocket, io: Server) {
   socket.on("results:subscribe", async (raw: unknown) => {
@@ -147,8 +149,26 @@ export function registerResultsDashboardHandlers(socket: EnrichedSocket, io: Ser
           data: { isOnScreen: false },
         });
       }
-      await saveStoredPublicView(payload.quizId, nextView);
-      const removedMediaUrls = findRemovedLocalMediaUrls(prevView, nextView);
+      const timelineWasPlaying = normalizeProjectorTimelineState(
+        prevView.projectorTimeline,
+      ).playing;
+      const manualModeChange = typeof payload.mode === "string" && payload.mode !== prevView.mode;
+      const nextViewFinal =
+        timelineWasPlaying && manualModeChange
+          ? {
+              ...nextView,
+              projectorTimeline: {
+                ...normalizeProjectorTimelineState(nextView.projectorTimeline),
+                playing: false,
+                stepStartedAt: null,
+              },
+            }
+          : nextView;
+      await saveStoredPublicView(payload.quizId, nextViewFinal);
+      if (timelineWasPlaying && manualModeChange) {
+        await markTimelineInactive(payload.quizId);
+      }
+      const removedMediaUrls = findRemovedLocalMediaUrls(prevView, nextViewFinal);
       if (removedMediaUrls.length > 0) {
         void cleanupUnusedQuestionMedia(removedMediaUrls).catch((error) => {
           console.warn("[media-cleanup] failed after public view update", {
@@ -159,19 +179,19 @@ export function registerResultsDashboardHandlers(socket: EnrichedSocket, io: Ser
       }
       console.info("[mq-winners] admin:results:view:set merged", {
         quizId: payload.quizId,
-        mode: nextView.mode,
-        questionId: nextView.questionId,
-        showFirstCorrectAnswerer: nextView.showFirstCorrectAnswerer,
+        mode: nextViewFinal.mode,
+        questionId: nextViewFinal.questionId,
+        showFirstCorrectAnswerer: nextViewFinal.showFirstCorrectAnswerer,
       });
       if (
         !isPlayerOnlyPublicViewPatch(payload as Record<string, unknown>) &&
-        projectorPublicViewChanged(prevView, nextView)
+        projectorPublicViewChanged(prevView, nextViewFinal)
       ) {
         emitToQuizDashboard(
           io,
           payload.quizId,
           "results:public:view",
-          toPublicViewPayload(nextView, quiz.title),
+          toPublicViewPayload(nextViewFinal, quiz.title),
         );
       }
       const updatedQuizState = await getQuizPublicState(payload.quizId);

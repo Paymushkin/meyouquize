@@ -1099,6 +1099,7 @@ export async function getQuizPublicState(quizId: string) {
     status: quiz.status,
     showEventTitleOnPlayer: view.showEventTitleOnPlayer,
     playerAutoJoinRandomNickname: view.playerAutoJoinRandomNickname,
+    networkingEnabled: Boolean(view.networkingEnabled),
     playerBanners: view.playerBanners,
     activePlayerBannerId: view.activePlayerBannerId,
     speakerTileText: view.speakerTileText,

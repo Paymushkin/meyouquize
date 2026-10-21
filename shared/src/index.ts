@@ -20,6 +20,11 @@ import {
   DEFAULT_GEO_POLL_REGION_HEAT_SCALE,
   normalizeGeoPollRegionHeatScale,
 } from "./geoPollRegionHeatScale.js";
+import type { ProjectorTimelineState } from "./projectorTimeline.js";
+import {
+  DEFAULT_PROJECTOR_TIMELINE_STATE,
+  normalizeProjectorTimelineState,
+} from "./projectorTimeline.js";
 import {
   eventThemeBrandingToPublicViewPatch,
   sanitizeAppliedEventThemeKey,
@@ -233,6 +238,16 @@ export {
   resolveGeoPollRegionHeatFillColor,
   resolveGeoPollRegionHeatFillOpacity,
 } from "./geoPollRegionHeatScale.js";
+export type {
+  ProjectorTimelineMode,
+  ProjectorTimelineState,
+  ProjectorTimelineStep,
+} from "./projectorTimeline.js";
+export {
+  DEFAULT_PROJECTOR_TIMELINE_STATE,
+  normalizeProjectorTimelineState,
+  projectorTimelineStepToPublicViewPatch,
+} from "./projectorTimeline.js";
 export {
   DEBATE_POLL_DEFAULT_QUESTION_TEXT,
   GEO_POLL_DEFAULT_QUESTION_TEXT,
@@ -380,6 +395,13 @@ export interface PublicViewState {
    * `region` — цвет «Подсветка региона» + прозрачность; остальные — цветовые пресеты.
    */
   geoPollRegionHeatScale: GeoPollRegionHeatScale;
+  /**
+   * Серверный плейлист проектора (эксперимент).
+   * Хранится в publicView JSON; откат — удалить ключ / задеплоить код без поля.
+   */
+  projectorTimeline: ProjectorTimelineState;
+  /** Опциональный модуль нетворкинга гостей внутри квиза (эксперимент). */
+  networkingEnabled: boolean;
   /** Показывать подсветку правильного ответа в вариантах на проекторе */
   showCorrectOption: boolean;
   showQuestionTitle: boolean;
@@ -764,6 +786,8 @@ export const DEFAULT_PUBLIC_VIEW_STATE: PublicViewState = {
   geoPollShowAnswerList: true,
   geoPollRegionHeatEnabled: false,
   geoPollRegionHeatScale: DEFAULT_GEO_POLL_REGION_HEAT_SCALE,
+  projectorTimeline: { ...DEFAULT_PROJECTOR_TIMELINE_STATE, steps: [] },
+  networkingEnabled: false,
   showCorrectOption: false,
   showQuestionTitle: true,
   hiddenTagTexts: [],
@@ -1606,6 +1630,14 @@ export function normalizePublicViewState(
       value?.geoPollRegionHeatScale,
       base.geoPollRegionHeatScale,
     ),
+    projectorTimeline: normalizeProjectorTimelineState(
+      value?.projectorTimeline,
+      base.projectorTimeline,
+    ),
+    networkingEnabled:
+      typeof value?.networkingEnabled === "boolean"
+        ? value.networkingEnabled
+        : base.networkingEnabled,
     showCorrectOption:
       typeof value?.showCorrectOption === "boolean"
         ? value.showCorrectOption

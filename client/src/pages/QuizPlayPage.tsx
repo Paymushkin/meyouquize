@@ -79,6 +79,16 @@ import {
 import type { QuizState, ReactionType } from "./quiz-play/types";
 import type { SpeakerQuestionsPayload } from "../types/speakerQuestions";
 import { resolveClientAssetUrl } from "../utils/resolveClientAssetUrl";
+import { usePlayerNetworking } from "../features/quizPlay/usePlayerNetworking";
+import {
+  PlayerNetworkingShell,
+  readStoredNetworkingTab,
+  storeNetworkingTab,
+  type PlayerNetworkingTab,
+} from "../components/quiz/networking/PlayerNetworkingShell";
+import { PlayerNetworkingGuestsPanel } from "../components/quiz/networking/PlayerNetworkingGuestsPanel";
+import { PlayerNetworkingChatsPanel } from "../components/quiz/networking/PlayerNetworkingChatsPanel";
+import { PlayerNetworkingProfileDialog } from "../components/quiz/networking/PlayerNetworkingProfileDialog";
 
 const REACTION_WINDOW_MS = 1000;
 const REACTION_MAX_PER_WINDOW = 10;
@@ -113,6 +123,10 @@ export function QuizPlayPage() {
   const [photoWallDialogOpen, setPhotoWallDialogOpen] = useState(false);
   const [videoWallDialogOpen, setVideoWallDialogOpen] = useState(false);
   const [bootLoading, setBootLoading] = useState(() => Boolean(slug));
+  const [networkingTab, setNetworkingTab] = useState<PlayerNetworkingTab>(() =>
+    readStoredNetworkingTab(slug),
+  );
+  const [networkingProfileOpen, setNetworkingProfileOpen] = useState(false);
   const nicknameInputRef = useRef<HTMLInputElement | null>(null);
   const autoJoinStartedRef = useRef(false);
   const rankRowRefs = useRef<Map<string, HTMLDivElement>>(new Map());
@@ -250,6 +264,14 @@ export function QuizPlayPage() {
   }, [slug]);
 
   useEffect(() => {
+    setNetworkingTab(readStoredNetworkingTab(slug));
+  }, [slug]);
+
+  useEffect(() => {
+    storeNetworkingTab(slug, networkingTab);
+  }, [slug, networkingTab]);
+
+  useEffect(() => {
     if (!joined) {
       setPlayerAnswersHydrated(false);
     }
@@ -273,6 +295,7 @@ export function QuizPlayPage() {
       shouldShowFeedbackPopup ||
       speakerDialogOpen ||
       nicknameDialogOpen ||
+      networkingProfileOpen ||
       photoWallDialogOpen ||
       videoWallDialogOpen ||
       quizReportOpen ||
@@ -404,6 +427,10 @@ export function QuizPlayPage() {
 
   function editNickname() {
     if (!joined || !quiz?.id) return;
+    if (quiz.networkingEnabled) {
+      setNetworkingProfileOpen(true);
+      return;
+    }
     setNicknameDraft(nickname.trim());
     setNicknameDialogOpen(true);
   }
@@ -480,6 +507,12 @@ export function QuizPlayPage() {
   }, [persistNickname]);
 
   const shouldShowEventTitle = quiz?.showEventTitleOnPlayer ?? true;
+  const networkingEnabled = Boolean(quiz?.networkingEnabled);
+  const networking = usePlayerNetworking({
+    quizId: quiz?.id,
+    enabled: networkingEnabled,
+    joined,
+  });
   const visiblePlayerBanners = useMemo(
     () => getVisiblePlayerBanners(quiz?.playerBanners),
     [quiz?.playerBanners],
@@ -658,13 +691,21 @@ export function QuizPlayPage() {
       <Container
         maxWidth={false}
         disableGutters
-        sx={buildQuizPlayContainerSx({
-          brandFontFamily,
-          isJoinScreen,
-          joined,
-          backgroundColor: brandBodyBackgroundColor,
-          backgroundImageUrl: brandPlayerBackgroundImageUrl,
-        })}
+        sx={{
+          ...buildQuizPlayContainerSx({
+            brandFontFamily,
+            isJoinScreen,
+            joined,
+            backgroundColor: brandBodyBackgroundColor,
+            backgroundImageUrl: brandPlayerBackgroundImageUrl,
+          }),
+          ...(joined && networkingEnabled && networkingTab === "guests"
+            ? {
+                overflowY: "hidden",
+                pb: "env(safe-area-inset-bottom, 0px)",
+              }
+            : null),
+        }}
       >
         {bootLoading ? (
           <Box
@@ -695,7 +736,9 @@ export function QuizPlayPage() {
                 brandPrimaryColor={brandPrimaryColor}
               />
             ) : null}
-            {!(joinPending && !joined) && (isJoinScreen || shouldShowEventTitle) ? (
+            {!(joinPending && !joined) &&
+            (isJoinScreen || shouldShowEventTitle) &&
+            !(networkingEnabled && networkingTab !== "feed") ? (
               <EventTitleBlock
                 joined={joined}
                 isJoinScreen={isJoinScreen}
@@ -708,45 +751,154 @@ export function QuizPlayPage() {
               />
             ) : null}
             {joined ? (
-              <PlayerTilesGrid
-                tileOrder={tileOrder}
-                gridColumns={
-                  quiz?.playerTilesGridColumns === 2 || quiz?.playerTilesGridColumns === 3
-                    ? quiz.playerTilesGridColumns
-                    : 3
-                }
-                visibleBannerById={visibleBannerById}
-                speakerTileVisible={speakerTileVisible}
-                onSpeakerOpen={() => setSpeakerDialogOpen(true)}
-                speakerTileBackgroundColor={speakerTileBackgroundColor}
-                speakerTileTextColor={speakerTileTextColor}
-                brandPrimaryColor={brandPrimaryColor}
-                speakerTileText={speakerTileText}
-                programTileText={programTileText}
-                programTileBackgroundColor={programTileBackgroundColor}
-                programTileTextColor={programTileTextColor}
-                programTileLinkUrl={programTileLinkUrl}
-                programTileVisible={programTileVisible}
-                photoWallTileVisible={photoWallTileVisible}
-                photoWallCollageSrcs={photoWallCollageSrcs}
-                onOpenPhotoWall={() => setPhotoWallDialogOpen(true)}
-                videoWallTileVisible={videoWallTileVisible}
-                videoWallTileCoverUrl={videoWallTileCoverUrl}
-                onOpenVideoWall={() => setVideoWallDialogOpen(true)}
-                playerQuizResultsTilesBySubQuizId={playerQuizResultsTilesBySubQuizId}
-                onOpenQuizReport={(subQuizId) => {
-                  setQuizReportSubQuizId(subQuizId);
-                  setQuizReportOpen(true);
-                }}
-                playerVoteOptionTextColor={playerVoteOptionTextColor}
-                playerVoteProgressBarColor={playerVoteProgressBarColor}
-                visibleResultTiles={visibleResultTiles}
-                onSelectQuestion={setResultsDialogQuestionId}
-                onBannerClick={(bannerId) => {
-                  if (!quiz?.id) return;
-                  socket.emit("banner:click", { quizId: quiz.id, bannerId });
-                }}
-              />
+              networkingEnabled ? (
+                <PlayerNetworkingShell
+                  tab={networkingTab}
+                  onTabChange={setNetworkingTab}
+                  unreadTotal={networking.unreadTotal}
+                  buttonBackgroundColor={formBackgroundColor}
+                  buttonTextColor={formTextColor}
+                >
+                  {networkingTab === "feed" ? (
+                    <PlayerTilesGrid
+                      tileOrder={tileOrder}
+                      gridColumns={
+                        quiz?.playerTilesGridColumns === 2 || quiz?.playerTilesGridColumns === 3
+                          ? quiz.playerTilesGridColumns
+                          : 3
+                      }
+                      visibleBannerById={visibleBannerById}
+                      speakerTileVisible={speakerTileVisible}
+                      onSpeakerOpen={() => setSpeakerDialogOpen(true)}
+                      speakerTileBackgroundColor={speakerTileBackgroundColor}
+                      speakerTileTextColor={speakerTileTextColor}
+                      brandPrimaryColor={brandPrimaryColor}
+                      speakerTileText={speakerTileText}
+                      programTileText={programTileText}
+                      programTileBackgroundColor={programTileBackgroundColor}
+                      programTileTextColor={programTileTextColor}
+                      programTileLinkUrl={programTileLinkUrl}
+                      programTileVisible={programTileVisible}
+                      photoWallTileVisible={photoWallTileVisible}
+                      photoWallCollageSrcs={photoWallCollageSrcs}
+                      onOpenPhotoWall={() => setPhotoWallDialogOpen(true)}
+                      videoWallTileVisible={videoWallTileVisible}
+                      videoWallTileCoverUrl={videoWallTileCoverUrl}
+                      onOpenVideoWall={() => setVideoWallDialogOpen(true)}
+                      playerQuizResultsTilesBySubQuizId={playerQuizResultsTilesBySubQuizId}
+                      onOpenQuizReport={(subQuizId) => {
+                        setQuizReportSubQuizId(subQuizId);
+                        setQuizReportOpen(true);
+                      }}
+                      playerVoteOptionTextColor={playerVoteOptionTextColor}
+                      playerVoteProgressBarColor={playerVoteProgressBarColor}
+                      visibleResultTiles={visibleResultTiles}
+                      onSelectQuestion={setResultsDialogQuestionId}
+                      onBannerClick={(bannerId) => {
+                        if (!quiz?.id) return;
+                        socket.emit("banner:click", { quizId: quiz.id, bannerId });
+                      }}
+                    />
+                  ) : null}
+                  {networkingTab === "guests" ? (
+                    <PlayerNetworkingGuestsPanel
+                      quizId={quiz?.id ?? ""}
+                      guests={networking.guests}
+                      guestsTotal={networking.guestsTotal}
+                      guestsPage={networking.guestsPage}
+                      guestsPageCount={networking.guestsPageCount}
+                      guestsQuery={networking.guestsQuery}
+                      onQueryChange={networking.setGuestsQuery}
+                      onSearch={(query) =>
+                        networking.refreshGuests(
+                          typeof query === "string" ? query : networking.guestsQuery,
+                          0,
+                        )
+                      }
+                      onGuestsPageChange={networking.goToGuestsPage}
+                      selfParticipantId={networking.selfParticipantId}
+                      onOpenProfile={() => setNetworkingProfileOpen(true)}
+                      onOpenChat={(peerId, peerMeta) => {
+                        setNetworkingTab("chats");
+                        networking.openChatWithPeer(peerId, undefined, {
+                          ...peerMeta,
+                          returnTab: "guests",
+                        });
+                      }}
+                      brandFontFamily={brandFontFamily}
+                      brandPrimaryColor={brandPrimaryColor}
+                      brandAccentColor={formBackgroundColor}
+                      formBackgroundColor={formBackgroundColor}
+                      formTextColor={formTextColor}
+                      formInputTextColor={formInputTextColor}
+                    />
+                  ) : null}
+                  {networkingTab === "chats" ? (
+                    <PlayerNetworkingChatsPanel
+                      threads={networking.threads}
+                      activePeerId={networking.activePeerId}
+                      activeThreadId={networking.activeThreadId}
+                      activePeerLabel={networking.activePeerLabel}
+                      activePeerAvatarUrl={networking.activePeerAvatarUrl}
+                      messages={networking.messages}
+                      selfParticipantId={networking.selfParticipantId}
+                      onOpenThread={(peerId, threadId) =>
+                        networking.openChatWithPeer(peerId, threadId, { returnTab: "chats" })
+                      }
+                      onSend={networking.sendDm}
+                      onCloseChat={() => {
+                        const returnTab = networking.chatReturnTab;
+                        networking.closeChat();
+                        if (returnTab) setNetworkingTab(returnTab);
+                      }}
+                      brandFontFamily={brandFontFamily}
+                      brandPrimaryColor={brandPrimaryColor}
+                      buttonBackgroundColor={formBackgroundColor}
+                      buttonTextColor={formTextColor}
+                    />
+                  ) : null}
+                </PlayerNetworkingShell>
+              ) : (
+                <PlayerTilesGrid
+                  tileOrder={tileOrder}
+                  gridColumns={
+                    quiz?.playerTilesGridColumns === 2 || quiz?.playerTilesGridColumns === 3
+                      ? quiz.playerTilesGridColumns
+                      : 3
+                  }
+                  visibleBannerById={visibleBannerById}
+                  speakerTileVisible={speakerTileVisible}
+                  onSpeakerOpen={() => setSpeakerDialogOpen(true)}
+                  speakerTileBackgroundColor={speakerTileBackgroundColor}
+                  speakerTileTextColor={speakerTileTextColor}
+                  brandPrimaryColor={brandPrimaryColor}
+                  speakerTileText={speakerTileText}
+                  programTileText={programTileText}
+                  programTileBackgroundColor={programTileBackgroundColor}
+                  programTileTextColor={programTileTextColor}
+                  programTileLinkUrl={programTileLinkUrl}
+                  programTileVisible={programTileVisible}
+                  photoWallTileVisible={photoWallTileVisible}
+                  photoWallCollageSrcs={photoWallCollageSrcs}
+                  onOpenPhotoWall={() => setPhotoWallDialogOpen(true)}
+                  videoWallTileVisible={videoWallTileVisible}
+                  videoWallTileCoverUrl={videoWallTileCoverUrl}
+                  onOpenVideoWall={() => setVideoWallDialogOpen(true)}
+                  playerQuizResultsTilesBySubQuizId={playerQuizResultsTilesBySubQuizId}
+                  onOpenQuizReport={(subQuizId) => {
+                    setQuizReportSubQuizId(subQuizId);
+                    setQuizReportOpen(true);
+                  }}
+                  playerVoteOptionTextColor={playerVoteOptionTextColor}
+                  playerVoteProgressBarColor={playerVoteProgressBarColor}
+                  visibleResultTiles={visibleResultTiles}
+                  onSelectQuestion={setResultsDialogQuestionId}
+                  onBannerClick={(bannerId) => {
+                    if (!quiz?.id) return;
+                    socket.emit("banner:click", { quizId: quiz.id, bannerId });
+                  }}
+                />
+              )
             ) : null}
             {!joined && !joinPending && showNicknameJoinForm && (
               <Box sx={JOIN_SCREEN_MAIN_SX}>
@@ -930,6 +1082,20 @@ export function QuizPlayPage() {
                 </Button>
               </DialogActions>
             </Dialog>
+            {networkingEnabled ? (
+              <PlayerNetworkingProfileDialog
+                open={networkingProfileOpen}
+                onClose={() => setNetworkingProfileOpen(false)}
+                quizId={quiz?.id ?? ""}
+                profile={networking.profile}
+                onSave={networking.saveProfile}
+                brandFontFamily={brandFontFamily}
+                brandPrimaryColor={brandPrimaryColor}
+                formBackgroundColor={formBackgroundColor}
+                formTextColor={formTextColor}
+                formInputTextColor={formInputTextColor}
+              />
+            ) : null}
           </>
         ) : null}
       </Container>

@@ -21,6 +21,7 @@ import {
   type AdminSetPublicResultsView,
 } from "../features/admin/useAdminRandomizer";
 import { useAdminPhotoWall } from "../features/admin/useAdminPhotoWall";
+import { useAdminProjectorTimeline } from "../features/admin/useAdminProjectorTimeline";
 import { useAdminVideoWall } from "../features/admin/useAdminVideoWall";
 import { useAdminReport } from "../features/admin/useAdminReport";
 import { useAdminReactions } from "../features/admin/useAdminReactions";
@@ -377,6 +378,8 @@ export function AdminEventPage() {
       setPublicResultsViewRef.current(mode, questionId, patch),
   });
 
+  const projectorTimeline = useAdminProjectorTimeline(quizId);
+
   const videoWall = useAdminVideoWall({
     emitPublicViewPatch: (patch) => emitPublicViewPatchRef.current(patch),
     setPublicResultsView: (mode, questionId, patch) =>
@@ -431,6 +434,7 @@ export function AdminEventPage() {
   };
   onPublicViewSocketExtrasRef.current = (payload) => {
     adminReactions.applyFromPublicView(payload);
+    projectorTimeline.applyFromPublicView(payload);
     playerTiles.applyBannerClickStatsFromPublicView(payload);
     applyPublicViewReportRandomizerRef.current(payload);
     const normalizedView = normalizePublicViewState(payload);
@@ -1158,6 +1162,7 @@ export function AdminEventPage() {
     videoWall.applyFromPublicView(pv);
     adminReport.applyFromPublicView(pv);
     adminReactions.applyFromPublicView(pv);
+    projectorTimeline.applyFromPublicView(pv);
     const nextBanners = getPublicBanners(pv.playerBanners);
     playerTiles.applyFromPublicView(pv, nextBanners);
     if (Array.isArray(pv.playerVisibleResultQuestionIds)) {
@@ -1831,6 +1836,17 @@ export function AdminEventPage() {
                     projectorJoinQrTextColor: branding.projectorJoinQrTextColor,
                     setProjectorJoinQrTextColor: branding.setProjectorJoinQrTextColor,
                     emitBrandingPatch,
+                    timeline: projectorTimeline,
+                    timelineQuestions: questionForms
+                      .map((q, i) => ({
+                        id: q.id ?? `draft-${i}`,
+                        label: `${i + 1}. ${(q.text ?? "").trim() || "Без текста"}`,
+                      }))
+                      .filter((q) => !q.id.startsWith("draft-")),
+                    timelineSubQuizzes: subQuizSheets.map((s) => ({
+                      id: s.id,
+                      label: s.title.trim() || "Без названия",
+                    })),
                   }}
                   questions={{
                     roomQuestionsTab,

@@ -132,9 +132,60 @@ model Participant {
   speakerQuestions SpeakerQuestion[]
   speakerQuestionReactions SpeakerQuestionReaction[]
   feedbackResponses FeedbackResponse[]
+  /** Эксперимент: профиль нетворкинга внутри ивента */
+  networkingProfile ParticipantProfile?
+  networkingThreadsAsA NetworkingThread[] @relation("NetworkingThreadA")
+  networkingThreadsAsB NetworkingThread[] @relation("NetworkingThreadB")
+  networkingMessagesSent NetworkingMessage[]
 
   @@unique([quizId, deviceId])
   @@index([quizId])
+}
+
+/** Профиль гостя для модуля нетворкинга (только внутри квиза). Откат: DROP TABLE. */
+model ParticipantProfile {
+  participantId String      @id
+  participant   Participant @relation(fields: [participantId], references: [id], onDelete: Cascade)
+  fullName      String      @default("")
+  company       String      @default("")
+  avatarUrl     String      @default("")
+  /** Чем полезен */
+  offers        String      @default("")
+  /** Что ищет */
+  seeking       String      @default("")
+  visibleInDirectory Boolean @default(true)
+  updatedAt     DateTime    @updatedAt
+}
+
+model NetworkingThread {
+  id             String   @id @default(cuid())
+  quizId         String
+  participantAId String
+  participantBId String
+  participantA   Participant @relation("NetworkingThreadA", fields: [participantAId], references: [id], onDelete: Cascade)
+  participantB   Participant @relation("NetworkingThreadB", fields: [participantBId], references: [id], onDelete: Cascade)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  messages       NetworkingMessage[]
+
+  @@unique([quizId, participantAId, participantBId])
+  @@index([quizId])
+  @@index([participantAId])
+  @@index([participantBId])
+}
+
+model NetworkingMessage {
+  id        String   @id @default(cuid())
+  threadId  String
+  thread    NetworkingThread @relation(fields: [threadId], references: [id], onDelete: Cascade)
+  senderId  String
+  sender    Participant @relation(fields: [senderId], references: [id], onDelete: Cascade)
+  text      String
+  createdAt DateTime @default(now())
+  readAt    DateTime?
+
+  @@index([threadId, createdAt])
+  @@index([senderId])
 }
 
 model SpeakerQuestion {

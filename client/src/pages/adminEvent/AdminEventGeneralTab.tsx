@@ -1,5 +1,11 @@
 import { Stack } from "@mui/material";
 import { AdminGeneralSection } from "../../components/admin/AdminGeneralSection";
+import {
+  AdminProjectorTimelineSection,
+  type TimelineQuestionOption,
+  type TimelineSubQuizOption,
+} from "../../components/admin/AdminProjectorTimelineSection";
+import type { useAdminProjectorTimeline } from "../../features/admin/useAdminProjectorTimeline";
 
 import type { PublicViewSetPatch } from "../../publicViewContract";
 
@@ -23,6 +29,9 @@ export type AdminEventGeneralTabProps = {
   projectorJoinQrTextColor: string;
   setProjectorJoinQrTextColor: (value: string) => void;
   emitBrandingPatch: (patch: PublicViewSetPatch) => void;
+  timeline: ReturnType<typeof useAdminProjectorTimeline>;
+  timelineQuestions: TimelineQuestionOption[];
+  timelineSubQuizzes: TimelineSubQuizOption[];
 };
 
 export function AdminEventGeneralTab({
@@ -45,6 +54,9 @@ export function AdminEventGeneralTab({
   projectorJoinQrTextColor,
   setProjectorJoinQrTextColor,
   emitBrandingPatch,
+  timeline,
+  timelineQuestions,
+  timelineSubQuizzes,
 }: AdminEventGeneralTabProps) {
   return (
     <Stack spacing={2}>
@@ -68,6 +80,21 @@ export function AdminEventGeneralTab({
         projectorJoinQrTextColor={projectorJoinQrTextColor}
         setProjectorJoinQrTextColor={setProjectorJoinQrTextColor}
         emitBrandingPatch={emitBrandingPatch}
+      />
+      <AdminProjectorTimelineSection
+        timeline={timeline.timeline}
+        networkingEnabled={timeline.networkingEnabled}
+        onNetworkingEnabledChange={timeline.setNetworkingEnabledRemote}
+        questions={timelineQuestions}
+        subQuizzes={timelineSubQuizzes}
+        onAddStep={() => timeline.addStep()}
+        onUpdateStep={timeline.updateStep}
+        onRemoveStep={timeline.removeStep}
+        onMoveStep={timeline.moveStep}
+        onPlay={timeline.play}
+        onPause={timeline.pause}
+        onSkip={timeline.skip}
+        onStop={timeline.stop}
       />
     </Stack>
   );
