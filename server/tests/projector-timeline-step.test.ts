@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  DEFAULT_JOIN_QR_TIMELINE_STEP,
   normalizeProjectorTimelineState,
   projectorTimelineStepToPublicViewPatch,
 } from "@meyouquize/shared";
@@ -41,9 +42,9 @@ describe("projector timeline thin patches", () => {
     ).toEqual({ mode: "leaderboard", leaderboardSubQuizId: "sq1" });
   });
 
-  it("normalizes empty timeline as not playing", () => {
+  it("fills empty timeline with default join_qr", () => {
     const t = normalizeProjectorTimelineState({ playing: true, steps: [] });
-    expect(t.steps).toEqual([]);
+    expect(t.steps).toEqual([DEFAULT_JOIN_QR_TIMELINE_STEP]);
     expect(t.cursor).toBe(0);
   });
 });
