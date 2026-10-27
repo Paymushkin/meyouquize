@@ -64,6 +64,7 @@ import {
   getQuizBySlug,
   getPublicReportBySlug,
   getQuizPublicState,
+  getDashboardResults,
   getResults,
   getRoomByEventName,
   listParticipantNicknamesByEventName,
@@ -849,6 +850,56 @@ export function buildApp() {
     return res.json({ nicknames });
   });
 
+  app.get(
+    "/api/admin/rooms/:eventName/networking-guests",
+    adminAuthMiddleware,
+    async (req, res) => {
+      const eventName = Array.isArray(req.params.eventName)
+        ? req.params.eventName[0]
+        : req.params.eventName;
+      const room = await getRoomByEventName(eventName);
+      if (!room) return res.status(404).json({ error: "Not found" });
+      const { listAdminNetworkingGuests } = await import("./networking-service.js");
+      const guests = await listAdminNetworkingGuests(room.id);
+      return res.json({ guests });
+    },
+  );
+
+  app.patch(
+    "/api/admin/rooms/:eventName/networking-guests/:participantId",
+    adminAuthMiddleware,
+    async (req, res) => {
+      const eventName = Array.isArray(req.params.eventName)
+        ? req.params.eventName[0]
+        : req.params.eventName;
+      const participantId = Array.isArray(req.params.participantId)
+        ? req.params.participantId[0]
+        : req.params.participantId;
+      const room = await getRoomByEventName(eventName);
+      if (!room) return res.status(404).json({ error: "Not found" });
+      const body =
+        req.body && typeof req.body === "object" ? (req.body as Record<string, unknown>) : {};
+      try {
+        const { adminUpdateNetworkingGuest } = await import("./networking-service.js");
+        const guest = await adminUpdateNetworkingGuest(room.id, participantId, {
+          ...(typeof body.nickname === "string" ? { nickname: body.nickname } : {}),
+          ...(typeof body.fullName === "string" ? { fullName: body.fullName } : {}),
+          ...(typeof body.jobTitle === "string" ? { jobTitle: body.jobTitle } : {}),
+          ...(typeof body.company === "string" ? { company: body.company } : {}),
+          ...(typeof body.offers === "string" ? { offers: body.offers } : {}),
+          ...(typeof body.seeking === "string" ? { seeking: body.seeking } : {}),
+          ...(typeof body.visibleInDirectory === "boolean"
+            ? { visibleInDirectory: body.visibleInDirectory }
+            : {}),
+        });
+        return res.json({ guest });
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "Update failed";
+        return res.status(message === "Participant not found" ? 404 : 400).json({ error: message });
+      }
+    },
+  );
+
   app.patch("/api/admin/rooms/:eventName", adminAuthMiddleware, async (req, res) => {
     const eventName = Array.isArray(req.params.eventName)
       ? req.params.eventName[0]
@@ -1046,6 +1097,19 @@ export function buildApp() {
     },
   );
 
+  app.get("/api/admin/rooms/:eventName/leaderboards", adminAuthMiddleware, async (req, res) => {
+    const eventName = Array.isArray(req.params.eventName)
+      ? req.params.eventName[0]
+      : req.params.eventName;
+    const room = await getRoomByEventName(eventName);
+    if (!room) return res.status(404).json({ error: "Not found" });
+    const dash = await getDashboardResults(room.id);
+    return res.json({
+      leaderboard: dash.leaderboard,
+      leaderboardsBySubQuiz: dash.leaderboardsBySubQuiz,
+    });
+  });
+
   app.get("/api/admin/rooms/:eventName/feedback", adminAuthMiddleware, async (req, res) => {
     const eventName = Array.isArray(req.params.eventName)
       ? req.params.eventName[0]
@@ -1206,6 +1270,12 @@ export function buildApp() {
       brandFontUrl: view.brandFontUrl,
       brandFontUrls: view.brandFontUrls,
       playerAutoJoinRandomNickname: view.playerAutoJoinRandomNickname,
+      networkingEnabled: Boolean(view.networkingEnabled),
+      networkingJoinFormMode: view.networkingJoinFormMode,
+      networkingJoinFormFields: view.networkingJoinFormFields,
+      networkingProfileBackgroundColor: view.networkingProfileBackgroundColor,
+      networkingProfileTextColor: view.networkingProfileTextColor,
+      networkingNavIconColor: view.networkingNavIconColor,
     });
   });
 
@@ -1326,7 +1396,8 @@ export async function buildServer() {
   registerSocketHandlers(io);
   const { startProjectorTimelineSequencer, hydrateTimelineActiveFromDb } =
     await import("./projector-timeline-sequencer.js");
-  await hydrateTimelineActiveFromDb();
+  // Сначала sequencer (ioRef), затем hydrate — чтобы apply шагов на boot работал.
   startProjectorTimelineSequencer(io);
+  await hydrateTimelineActiveFromDb();
   return { app, io, httpServer };
 }

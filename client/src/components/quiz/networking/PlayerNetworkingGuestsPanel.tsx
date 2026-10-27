@@ -2,6 +2,7 @@ import ChatBubbleOutlineIcon from "@mui/icons-material/ChatBubbleOutline";
 import ChevronLeftIcon from "@mui/icons-material/ChevronLeft";
 import ChevronRightIcon from "@mui/icons-material/ChevronRight";
 import CloseIcon from "@mui/icons-material/Close";
+import EditOutlinedIcon from "@mui/icons-material/EditOutlined";
 import SearchIcon from "@mui/icons-material/Search";
 import StarIcon from "@mui/icons-material/Star";
 import StarBorderIcon from "@mui/icons-material/StarBorder";
@@ -17,32 +18,14 @@ import {
   ToggleButtonGroup,
   Typography,
 } from "@mui/material";
+import { formatNetworkingGuestIdentity } from "@meyouquize/shared";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { NetworkingGuest } from "../../../features/quizPlay/usePlayerNetworking";
 import { resolveClientAssetUrl } from "../../../utils/resolveClientAssetUrl";
 import { buildPlayerDialogTextFieldSx } from "../playerDialogStyles";
+import { loadFavoriteGuests, saveFavoriteGuests } from "./networkingFavorites";
 
 type GuestsFilter = "all" | "favorites";
-
-function favoritesStorageKey(quizId: string): string {
-  return `mq:networking:favorites:${quizId}`;
-}
-
-function loadFavoriteGuests(quizId: string): Record<string, NetworkingGuest> {
-  try {
-    const raw = localStorage.getItem(favoritesStorageKey(quizId));
-    if (!raw) return {};
-    const parsed = JSON.parse(raw) as unknown;
-    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return {};
-    return parsed as Record<string, NetworkingGuest>;
-  } catch {
-    return {};
-  }
-}
-
-function saveFavoriteGuests(quizId: string, map: Record<string, NetworkingGuest>): void {
-  localStorage.setItem(favoritesStorageKey(quizId), JSON.stringify(map));
-}
 
 type Props = {
   quizId: string;
@@ -62,23 +45,22 @@ type Props = {
   /** Акцентный цвет бренда (низ карточки). */
   brandAccentColor: string;
   formBackgroundColor: string;
+  /** Фон страницы — под sticky-панелью фильтров. */
+  pageBackgroundColor: string;
   formTextColor: string;
   formInputTextColor: string;
+  /** Фон тела карточки профиля. */
+  profileBackgroundColor: string;
+  /** Текст на теле карточки профиля. */
+  profileTextColor: string;
 };
-
-function guestIdentityLine(g: NetworkingGuest): string {
-  const name = g.fullName.trim() || g.nickname;
-  const company = g.company.trim();
-  return company ? `${name} · ${company}` : name;
-}
 
 function GuestCard(props: {
   guest: NetworkingGuest;
   isSelf: boolean;
   isFavorite: boolean;
-  brandPrimaryColor: string;
-  brandAccentColor: string;
-  accentTextColor: string;
+  profileBackgroundColor: string;
+  profileTextColor: string;
   onOpenChat: (peerId: string, peerMeta?: { label?: string; avatarUrl?: string }) => void;
   onToggleFavorite: (guest: NetworkingGuest) => void;
   onEditProfile?: () => void;
@@ -87,16 +69,26 @@ function GuestCard(props: {
     guest: g,
     isSelf,
     isFavorite,
-    brandPrimaryColor,
-    brandAccentColor,
-    accentTextColor,
+    profileBackgroundColor,
+    profileTextColor,
     onOpenChat,
     onToggleFavorite,
     onEditProfile,
   } = props;
   const title = g.fullName.trim() || g.nickname;
-  const avatarSrc = g.avatarUrl ? resolveClientAssetUrl(g.avatarUrl) : undefined;
-  const topBandHeight = 56;
+  const [avatarBroken, setAvatarBroken] = useState(false);
+  const avatarSrc = !avatarBroken && g.avatarUrl ? resolveClientAssetUrl(g.avatarUrl) : undefined;
+  useEffect(() => {
+    setAvatarBroken(false);
+  }, [g.avatarUrl]);
+  const avatarSize = 56;
+  const cardRadius = 1.5;
+  // «Фон профиля» / «Шрифт профиля» — полоса с ФИО и иконками избранного/чата.
+  const nameBarBg =
+    isSelf || !/^#[0-9a-fA-F]{6}$/i.test(profileBackgroundColor)
+      ? profileBackgroundColor
+      : `${profileBackgroundColor}B8`;
+  const nameBarFg = profileTextColor;
 
   function openChat() {
     onOpenChat(g.participantId, {
@@ -105,266 +97,272 @@ function GuestCard(props: {
     });
   }
 
+  function handleCardActivate() {
+    if (isSelf) onEditProfile?.();
+    else openChat();
+  }
+
   return (
     <Box
-      onClick={!isSelf ? openChat : undefined}
-      role={!isSelf ? "button" : undefined}
-      tabIndex={!isSelf ? 0 : undefined}
-      onKeyDown={
-        !isSelf
-          ? (e) => {
-              if (e.key === "Enter" || e.key === " ") {
-                e.preventDefault();
-                openChat();
-              }
-            }
-          : undefined
-      }
+      onClick={handleCardActivate}
+      role="button"
+      tabIndex={0}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          handleCardActivate();
+        }
+      }}
       sx={{
         position: "relative",
-        borderRadius: 2,
-        overflow: "visible",
-        boxShadow: "0 1px 4px rgba(0,0,0,0.12)",
-        cursor: !isSelf ? "pointer" : undefined,
+        pt: `${avatarSize / 2 + 18}px`,
+        cursor: "pointer",
       }}
     >
-      <Box
-        sx={{
-          position: "relative",
-          display: "grid",
-          gridTemplateColumns: "1fr 64px 1fr",
-          alignItems: "center",
-          gap: 0.75,
-          px: 1.25,
-          height: topBandHeight,
-          bgcolor: "rgba(0,0,0,0.55)",
-          color: "#fff",
-          borderTopLeftRadius: 8,
-          borderTopRightRadius: 8,
-        }}
-      >
-        <Box
+      <Box sx={{ position: "relative" }}>
+        <Typography
+          variant="caption"
           sx={{
-            position: "relative",
-            minWidth: 0,
-            textAlign: "left",
-            alignSelf: "stretch",
-            display: "flex",
-            alignItems: "center",
-          }}
-        >
-          <Typography
-            variant="caption"
-            sx={{
-              position: "absolute",
-              left: 0,
-              top: -14,
-              lineHeight: 1,
-              fontSize: "0.65rem",
-              opacity: 0.85,
-              color: "#fff",
-              whiteSpace: "nowrap",
-              pointerEvents: "none",
-            }}
-          >
-            Чем полезен
-          </Typography>
-          <Typography
-            variant="body2"
-            sx={{
-              display: "-webkit-box",
-              WebkitLineClamp: 2,
-              WebkitBoxOrient: "vertical",
-              overflow: "hidden",
-              wordBreak: "break-word",
-              fontSize: "0.875rem",
-              lineHeight: 1.25,
-            }}
-          >
-            {g.offers.trim() || "ничем не полезен"}
-          </Typography>
-        </Box>
-
-        <Box aria-hidden sx={{ width: 64 }} />
-
-        <Box
-          sx={{
-            position: "relative",
-            minWidth: 0,
-            textAlign: "right",
-            alignSelf: "stretch",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "flex-end",
-          }}
-        >
-          <Typography
-            variant="caption"
-            sx={{
-              position: "absolute",
-              right: 0,
-              top: -14,
-              lineHeight: 1,
-              fontSize: "0.65rem",
-              opacity: 0.85,
-              color: "#fff",
-              whiteSpace: "nowrap",
-              pointerEvents: "none",
-            }}
-          >
-            Что ищу
-          </Typography>
-          <Typography
-            variant="body2"
-            sx={{
-              display: "-webkit-box",
-              WebkitLineClamp: 2,
-              WebkitBoxOrient: "vertical",
-              overflow: "hidden",
-              wordBreak: "break-word",
-              fontSize: "0.875rem",
-              lineHeight: 1.25,
-            }}
-          >
-            {g.seeking.trim() || "ничего не ищу"}
-          </Typography>
-        </Box>
-      </Box>
-
-      <Box
-        sx={{
-          position: "absolute",
-          left: "50%",
-          top: topBandHeight,
-          transform: "translate(-50%, -70%)",
-          zIndex: 2,
-        }}
-      >
-        <Avatar
-          src={avatarSrc}
-          sx={{
-            width: 56,
-            height: 56,
-            border: "2px solid",
-            borderColor: brandAccentColor,
-            bgcolor: "grey.200",
-            color: "#111",
-            fontSize: "1.1rem",
+            position: "absolute",
+            left: 14,
+            top: 0,
+            transform: "translateY(calc(-100% - 4px))",
+            zIndex: 2,
             fontWeight: 700,
-            boxShadow: "0 2px 8px rgba(0,0,0,0.25)",
+            fontSize: "0.7rem",
+            color: "#fff",
+            opacity: 0.92,
+            pointerEvents: "none",
+            lineHeight: 1.2,
           }}
         >
-          {title.slice(0, 1).toUpperCase()}
-        </Avatar>
-        {g.online ? (
+          Полезен
+        </Typography>
+        <Typography
+          variant="caption"
+          sx={{
+            position: "absolute",
+            right: 14,
+            top: 0,
+            transform: "translateY(calc(-100% - 4px))",
+            zIndex: 2,
+            fontWeight: 700,
+            fontSize: "0.7rem",
+            color: "#fff",
+            opacity: 0.92,
+            pointerEvents: "none",
+            lineHeight: 1.2,
+          }}
+        >
+          Ищу
+        </Typography>
+
+        <Box
+          sx={{
+            position: "absolute",
+            left: "50%",
+            top: 0,
+            transform: "translate(-50%, -50%)",
+            zIndex: 2,
+          }}
+        >
+          <Avatar
+            src={avatarSrc}
+            imgProps={{ onError: () => setAvatarBroken(true) }}
+            sx={{
+              width: avatarSize,
+              height: avatarSize,
+              border: "2px solid #111",
+              bgcolor: "grey.200",
+              color: "#111",
+              fontSize: "1.1rem",
+              fontWeight: 700,
+              boxShadow: "0 2px 8px rgba(0,0,0,0.2)",
+            }}
+          >
+            {title.slice(0, 1).toUpperCase()}
+          </Avatar>
+          {g.online ? (
+            <Box
+              sx={{
+                position: "absolute",
+                right: 2,
+                bottom: 2,
+                width: 11,
+                height: 11,
+                borderRadius: "50%",
+                bgcolor: "success.main",
+                border: "2px solid #fff",
+              }}
+            />
+          ) : null}
+        </Box>
+
+        <Box
+          sx={{
+            borderRadius: cardRadius,
+            overflow: "hidden",
+            bgcolor: "#ffffff",
+            boxShadow: "0 2px 12px rgba(0,0,0,0.14)",
+          }}
+        >
           <Box
             sx={{
-              position: "absolute",
-              right: 2,
-              bottom: 2,
-              width: 11,
-              height: 11,
-              borderRadius: "50%",
-              bgcolor: "success.main",
-              border: "2px solid #fff",
+              display: "grid",
+              gridTemplateColumns: "1fr 1fr",
+              alignItems: "start",
+              alignContent: "start",
+              gap: 2,
+              px: 1.75,
+              py: 1.25,
+              height: "fit-content",
+              color: "#111111",
             }}
-          />
-        ) : null}
-      </Box>
+          >
+            <Typography
+              variant="body2"
+              sx={{
+                display: "-webkit-box",
+                WebkitLineClamp: 4,
+                WebkitBoxOrient: "vertical",
+                overflow: "hidden",
+                wordBreak: "break-word",
+                whiteSpace: "pre-line",
+                fontSize: "0.875rem",
+                lineHeight: 1.3,
+                textAlign: "left",
+              }}
+            >
+              {g.offers.trim() || "ничем не полезен"}
+            </Typography>
+            <Typography
+              variant="body2"
+              sx={{
+                display: "-webkit-box",
+                WebkitLineClamp: 4,
+                WebkitBoxOrient: "vertical",
+                overflow: "hidden",
+                wordBreak: "break-word",
+                whiteSpace: "pre-line",
+                fontSize: "0.875rem",
+                lineHeight: 1.3,
+                textAlign: "right",
+              }}
+            >
+              {g.seeking.trim() || "ничего не ищу"}
+            </Typography>
+          </Box>
 
-      <Box
-        sx={{
-          position: "relative",
-          px: 1.5,
-          pt: 2.75,
-          pb: 1.1,
-          minHeight: 52,
-          bgcolor: brandAccentColor,
-          color: accentTextColor,
-          borderBottomLeftRadius: 8,
-          borderBottomRightRadius: 8,
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-        }}
-      >
-        <Typography
-          fontWeight={700}
-          textAlign="center"
-          sx={{
-            wordBreak: "break-word",
-            lineHeight: 1.25,
-            fontSize: "0.95rem",
-            px: isSelf ? 5 : 5.5,
-          }}
-        >
-          {guestIdentityLine(g)}
-        </Typography>
-        {!isSelf ? (
-          <IconButton
-            aria-label={isFavorite ? "Убрать из избранного" : "В избранное"}
-            onClick={(e) => {
-              e.stopPropagation();
-              onToggleFavorite(g);
-            }}
+          <Box
             sx={{
-              position: "absolute",
-              left: 6,
-              top: "50%",
-              transform: "translateY(-50%)",
-              width: 36,
-              height: 36,
-              color: "inherit",
-              bgcolor: "transparent",
-              "&:hover": { bgcolor: "transparent", opacity: 0.8 },
-              "& .MuiSvgIcon-root": { color: "inherit" },
+              position: "relative",
+              px: 1.5,
+              py: 1,
+              minHeight: 48,
+              bgcolor: nameBarBg,
+              color: nameBarFg,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              "&::before": {
+                content: '""',
+                position: "absolute",
+                left: "50%",
+                top: 0,
+                transform: "translate(-50%, -100%)",
+                width: 0,
+                height: 0,
+                borderLeft: "7px solid transparent",
+                borderRight: "7px solid transparent",
+                borderBottom: `8px solid ${nameBarBg}`,
+              },
             }}
           >
-            {isFavorite ? (
-              <StarIcon sx={{ fontSize: 22 }} />
+            <Typography
+              fontWeight={700}
+              textAlign="center"
+              sx={{
+                wordBreak: "break-word",
+                lineHeight: 1.25,
+                fontSize: "0.95rem",
+                px: isSelf ? 5 : 5.5,
+                color: "inherit",
+              }}
+            >
+              {formatNetworkingGuestIdentity(g)}
+            </Typography>
+            {isSelf ? (
+              <Chip
+                size="small"
+                icon={<EditOutlinedIcon sx={{ fontSize: "16px !important" }} />}
+                label="Это вы"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onEditProfile?.();
+                }}
+                sx={{
+                  position: "absolute",
+                  right: 8,
+                  top: "50%",
+                  transform: "translateY(-50%)",
+                  bgcolor: "rgba(0,0,0,0.12)",
+                  color: "inherit",
+                  cursor: "pointer",
+                  "& .MuiChip-icon": { color: "inherit" },
+                }}
+              />
             ) : (
-              <StarBorderIcon sx={{ fontSize: 22 }} />
+              <>
+                <IconButton
+                  aria-label={isFavorite ? "Убрать из избранного" : "В избранное"}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onToggleFavorite(g);
+                  }}
+                  sx={{
+                    position: "absolute",
+                    left: 6,
+                    top: "50%",
+                    transform: "translateY(-50%)",
+                    width: 36,
+                    height: 36,
+                    color: "inherit",
+                    bgcolor: "transparent",
+                    "&:hover": { bgcolor: "transparent", opacity: 0.8 },
+                    "& .MuiSvgIcon-root": { color: "inherit" },
+                  }}
+                >
+                  {isFavorite ? (
+                    <StarIcon sx={{ fontSize: 22 }} />
+                  ) : (
+                    <StarBorderIcon sx={{ fontSize: 22 }} />
+                  )}
+                </IconButton>
+                <IconButton
+                  aria-label="Написать"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    openChat();
+                  }}
+                  sx={{
+                    position: "absolute",
+                    right: 6,
+                    top: "50%",
+                    transform: "translateY(-50%)",
+                    width: 36,
+                    height: 36,
+                    color: "inherit",
+                    bgcolor: "transparent",
+                    "&:hover": { bgcolor: "transparent", opacity: 0.8 },
+                    "& .MuiSvgIcon-root": { color: "inherit" },
+                  }}
+                >
+                  <ChatBubbleOutlineIcon sx={{ fontSize: 22 }} />
+                </IconButton>
+              </>
             )}
-          </IconButton>
-        ) : null}
-        {isSelf ? (
-          <Chip
-            size="small"
-            label="Мой профиль"
-            onClick={onEditProfile}
-            sx={{
-              position: "absolute",
-              right: 8,
-              top: "50%",
-              transform: "translateY(-50%)",
-              bgcolor: "rgba(0,0,0,0.12)",
-              color: accentTextColor,
-              cursor: "pointer",
-            }}
-          />
-        ) : (
-          <IconButton
-            aria-label="Написать"
-            onClick={(e) => {
-              e.stopPropagation();
-              openChat();
-            }}
-            sx={{
-              position: "absolute",
-              right: 6,
-              top: "50%",
-              transform: "translateY(-50%)",
-              width: 36,
-              height: 36,
-              color: "inherit",
-              bgcolor: "transparent",
-              "&:hover": { bgcolor: "transparent", opacity: 0.8 },
-              "& .MuiSvgIcon-root": { color: "inherit" },
-            }}
-          >
-            <ChatBubbleOutlineIcon sx={{ fontSize: 22 }} />
-          </IconButton>
-        )}
+          </Box>
+        </Box>
       </Box>
     </Box>
   );
@@ -388,8 +386,11 @@ export function PlayerNetworkingGuestsPanel(props: Props) {
     brandPrimaryColor,
     brandAccentColor,
     formBackgroundColor,
+    pageBackgroundColor,
     formTextColor,
     formInputTextColor,
+    profileBackgroundColor,
+    profileTextColor,
   } = props;
   const [searchOpen, setSearchOpen] = useState(false);
   const [guestsFilter, setGuestsFilter] = useState<GuestsFilter>("all");
@@ -415,7 +416,12 @@ export function PlayerNetworkingGuestsPanel(props: Props) {
       skipScrollOnMountRef.current = false;
       return;
     }
-    listRef.current?.scrollTo({ top: 0, behavior: "smooth" });
+    const scroller = listRef.current?.closest(".MuiContainer-root");
+    if (scroller instanceof HTMLElement) {
+      scroller.scrollTo({ top: 0, behavior: "smooth" });
+    } else {
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
   }, [guestsPage]);
 
   useEffect(() => {
@@ -427,6 +433,7 @@ export function PlayerNetworkingGuestsPanel(props: Props) {
         if (!existing) continue;
         if (
           existing.fullName !== g.fullName ||
+          existing.jobTitle !== g.jobTitle ||
           existing.company !== g.company ||
           existing.avatarUrl !== g.avatarUrl ||
           existing.offers !== g.offers ||
@@ -480,28 +487,29 @@ export function PlayerNetworkingGuestsPanel(props: Props) {
   );
 
   const showPager = guestsFilter === "all" && guestsPageCount > 1;
-  const bottomNavHeight = 56;
-  const gapAboveNav = 50;
-  const pagerHeight = 56;
 
   return (
-    <Box
-      sx={{
-        display: "flex",
-        flexDirection: "column",
-        flex: 1,
-        minHeight: 0,
-        mt: 1,
-        // 50px над навигацией (+ высота пагинации, если она есть)
-        pb: `${bottomNavHeight + gapAboveNav + (showPager ? pagerHeight : 0)}px`,
-      }}
-    >
+    <Box ref={listRef} sx={{ mt: -2 }}>
       <Stack
         direction="row"
         spacing={1}
         alignItems="center"
         justifyContent="space-between"
-        sx={{ flexShrink: 0 }}
+        sx={{
+          position: "fixed",
+          top: 0,
+          left: "50%",
+          transform: "translateX(-50%)",
+          width: "100%",
+          maxWidth: 576,
+          minHeight: 56,
+          py: 1,
+          px: 2,
+          zIndex: 10,
+          boxSizing: "border-box",
+          bgcolor: pageBackgroundColor,
+          backgroundImage: "none",
+        }}
       >
         {searchOpen ? (
           <TextField
@@ -574,20 +582,9 @@ export function PlayerNetworkingGuestsPanel(props: Props) {
         )}
       </Stack>
 
-      <Stack
-        ref={listRef}
-        spacing={4}
-        sx={{
-          flex: 1,
-          minHeight: 0,
-          overflowY: "auto",
-          overflowX: "visible",
-          pt: 2.5,
-          pb: 1,
-          bgcolor: "transparent",
-          WebkitOverflowScrolling: "touch",
-        }}
-      >
+      <Box aria-hidden sx={{ height: 56, mb: 2.5 }} />
+
+      <Stack spacing={4} sx={{ pt: 1, pb: 1 }}>
         {displayedGuests.length === 0 && guestsFilter === "favorites" ? (
           <Typography
             variant="body2"
@@ -604,9 +601,8 @@ export function PlayerNetworkingGuestsPanel(props: Props) {
               guest={g}
               isSelf={isSelf}
               isFavorite={Boolean(favoriteGuests[g.participantId])}
-              brandPrimaryColor={brandPrimaryColor}
-              brandAccentColor={brandAccentColor}
-              accentTextColor={formTextColor}
+              profileBackgroundColor={profileBackgroundColor}
+              profileTextColor={profileTextColor}
               onOpenChat={onOpenChat}
               onToggleFavorite={toggleFavorite}
               onEditProfile={onOpenProfile}
@@ -630,18 +626,7 @@ export function PlayerNetworkingGuestsPanel(props: Props) {
           spacing={1}
           alignItems="center"
           justifyContent="center"
-          sx={{
-            position: "fixed",
-            left: "50%",
-            transform: "translateX(-50%)",
-            bottom: bottomNavHeight + gapAboveNav,
-            width: "100%",
-            maxWidth: 576,
-            height: pagerHeight,
-            zIndex: 19,
-            px: 2,
-            boxSizing: "border-box",
-          }}
+          sx={{ py: 1.5 }}
         >
           <IconButton
             aria-label="Предыдущая страница"

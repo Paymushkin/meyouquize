@@ -62,6 +62,10 @@ type BrandingKeys =
   | "geoPollRegionStrokeVoted"
   | "geoPollRegionHeatScale"
   | "geoPollScreenBackground"
+  | "networkingProfileBackgroundColor"
+  | "networkingProfileTextColor"
+  | "networkingProjectorIconColor"
+  | "networkingNavIconColor"
   | "brandPrimaryColor"
   | "brandAccentColor"
   | "brandSurfaceColor"
@@ -200,6 +204,10 @@ export function toBrandingState(payload: Partial<PublicViewPayload>): BrandingSt
     geoPollRegionStrokeVoted: view.geoPollRegionStrokeVoted,
     geoPollRegionHeatScale: view.geoPollRegionHeatScale,
     geoPollScreenBackground: view.geoPollScreenBackground,
+    networkingProfileBackgroundColor: view.networkingProfileBackgroundColor,
+    networkingProfileTextColor: view.networkingProfileTextColor,
+    networkingProjectorIconColor: view.networkingProjectorIconColor,
+    networkingNavIconColor: view.networkingNavIconColor,
     brandPrimaryColor: view.brandPrimaryColor,
     brandAccentColor: view.brandAccentColor,
     brandSurfaceColor: view.brandSurfaceColor,

@@ -19,6 +19,11 @@ type Params = {
   onJoinTimeout?: () => void;
 };
 
+function persistedNickForSlug(slug: string): string {
+  const roomNickname = localStorage.getItem(getRoomNickKey(slug)) || "";
+  return (roomNickname || getNickname() || "").trim();
+}
+
 export function useQuizPlayJoin({
   slug,
   nickname,
@@ -30,6 +35,7 @@ export function useQuizPlayJoin({
 }: Params) {
   const joinedRef = useRef(false);
   const restoreJoinAttemptedRef = useRef(false);
+  const restoreRetryCountRef = useRef(0);
 
   useEffect(() => {
     joinedRef.current = joined;
@@ -61,18 +67,30 @@ export function useQuizPlayJoin({
     }
   };
 
+  // Как можно раньше поднимаем сокет при restore — не ждём прочих эффектов.
+  useEffect(() => {
+    if (!slug || !shouldRestoreJoin(slug, getNickname())) return;
+    if (socket.connected || socket.active) return;
+    socket.connect();
+  }, [slug]);
+
   useEffect(() => {
     if (!slug) return;
-    // После клика по баннеру (target=_blank) вкладка теряет/возвращает focus —
-    // не шлём quiz:join, если сокет уже жив. Иначе упираемся в rate-limit.
     const reconnectIfNeeded = () => {
       if (typeof document !== "undefined" && document.visibilityState !== "visible") return;
-      if (!joined) return;
-      if (!socket.connected) socket.connect();
+      if (!joined && !joinPending) return;
+      if (socket.connected || socket.active) return;
+      socket.connect();
     };
     const onSocketConnect = () => {
-      if (!joined) return;
-      requestJoin("restore");
+      if (joinedRef.current) {
+        requestJoin("restore");
+        return;
+      }
+      if (joinPending && shouldRestoreJoin(slug, getNickname())) {
+        const nick = persistedNickForSlug(slug);
+        if (nick) emitQuizJoin(slug, "restore", nick);
+      }
     };
     socket.on("connect", onSocketConnect);
     document.addEventListener("visibilitychange", reconnectIfNeeded);
@@ -84,22 +102,31 @@ export function useQuizPlayJoin({
       window.removeEventListener("pageshow", reconnectIfNeeded);
       window.removeEventListener("online", reconnectIfNeeded);
     };
-  }, [joined, nickname, slug]);
+  }, [joined, joinPending, nickname, slug]);
 
   useEffect(() => {
     if (!slug || restoreJoinAttemptedRef.current) return;
     if (!shouldRestoreJoin(slug, getNickname())) return;
-    const roomNickname = localStorage.getItem(getRoomNickKey(slug)) || "";
-    const persistedNick = roomNickname || getNickname() || "";
+    const persistedNick = persistedNickForSlug(slug);
     setJoinPending(true);
-    setBootLoading(true);
-    /** После всех useEffect на странице — иначе quiz:joined приходит до socket.on в useQuizPlaySocket. */
-    const timer = window.setTimeout(() => {
-      restoreJoinAttemptedRef.current = true;
-      emitQuizJoin(slug, "restore", persistedNick.trim());
-    }, 0);
-    return () => window.clearTimeout(timer);
+    setBootLoading(false);
+    restoreJoinAttemptedRef.current = true;
+    emitQuizJoin(slug, "restore", persistedNick);
   }, [setBootLoading, setJoinPending, slug]);
+
+  // Быстрые повторы, если ack потерялся на transport error.
+  useEffect(() => {
+    if (!joinPending || joined || !slug) return;
+    const tick = window.setInterval(() => {
+      if (joinedRef.current) return;
+      if (restoreRetryCountRef.current >= 6) return;
+      if (!shouldRestoreJoin(slug, getNickname())) return;
+      restoreRetryCountRef.current += 1;
+      const nick = persistedNickForSlug(slug);
+      if (nick) emitQuizJoin(slug, "restore", nick);
+    }, 700);
+    return () => window.clearInterval(tick);
+  }, [joinPending, joined, slug]);
 
   useEffect(() => {
     if (!joinPending || joined) return;
@@ -107,7 +134,7 @@ export function useQuizPlayJoin({
       setJoinPending(false);
       setBootLoading(false);
       onJoinTimeout?.();
-    }, 50_000);
+    }, 12_000);
     return () => window.clearTimeout(timer);
   }, [joinPending, joined, onJoinTimeout, setBootLoading, setJoinPending]);
 

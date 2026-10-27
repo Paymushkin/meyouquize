@@ -1100,6 +1100,8 @@ export async function getQuizPublicState(quizId: string) {
     showEventTitleOnPlayer: view.showEventTitleOnPlayer,
     playerAutoJoinRandomNickname: view.playerAutoJoinRandomNickname,
     networkingEnabled: Boolean(view.networkingEnabled),
+    networkingJoinFormMode: view.networkingJoinFormMode,
+    networkingJoinFormFields: view.networkingJoinFormFields,
     playerBanners: view.playerBanners,
     activePlayerBannerId: view.activePlayerBannerId,
     speakerTileText: view.speakerTileText,
@@ -1153,6 +1155,9 @@ export async function getQuizPublicState(quizId: string) {
     brandPlayerBackgroundImageUrl: view.brandPlayerBackgroundImageUrl,
     brandProjectorBackgroundImageUrl: view.brandProjectorBackgroundImageUrl,
     brandBodyBackgroundColor: view.brandBodyBackgroundColor,
+    networkingProfileBackgroundColor: view.networkingProfileBackgroundColor,
+    networkingProfileTextColor: view.networkingProfileTextColor,
+    networkingNavIconColor: view.networkingNavIconColor,
     reactionSession: await getReactionSessionPublic(quiz.id),
     quizProgress,
     activeQuestions: activeQuestions.map((q) => ({

@@ -147,6 +147,8 @@ model ParticipantProfile {
   participantId String      @id
   participant   Participant @relation(fields: [participantId], references: [id], onDelete: Cascade)
   fullName      String      @default("")
+  /** Должность (форма фармы и профиль). */
+  jobTitle      String      @default("")
   company       String      @default("")
   avatarUrl     String      @default("")
   /** Чем полезен */

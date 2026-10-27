@@ -13,6 +13,7 @@ import {
   listOnlineParticipantIds,
   markThreadRead,
   sendNetworkingMessage,
+  toPublicNetworkingProfile,
   touchNetworkingPresence,
   upsertParticipantProfile,
 } from "../../networking-service.js";
@@ -69,6 +70,7 @@ export function registerNetworkingHandlers(socket: EnrichedSocket, io: Server) {
       socket.emit("admin:networking:updated", {
         quizId: payload.quizId,
         networkingEnabled: payload.enabled,
+        networkingJoinFormMode: next.networkingJoinFormMode,
       });
     } catch (error) {
       fail(socket, error instanceof Error ? error.message : "Set networking failed");
@@ -133,16 +135,7 @@ export function registerNetworkingHandlers(socket: EnrichedSocket, io: Server) {
       const profile = await getParticipantProfile(targetId);
       socket.emit("networking:profile", {
         participantId: targetId,
-        profile: profile
-          ? {
-              fullName: profile.fullName,
-              company: profile.company,
-              avatarUrl: profile.avatarUrl,
-              offers: profile.offers,
-              seeking: profile.seeking,
-              visibleInDirectory: profile.visibleInDirectory,
-            }
-          : null,
+        profile: profile ? toPublicNetworkingProfile(profile, targetId) : null,
       });
     } catch (error) {
       fail(socket, error instanceof Error ? error.message : "Get profile failed");
@@ -165,6 +158,7 @@ export function registerNetworkingHandlers(socket: EnrichedSocket, io: Server) {
         .object({
           quizId: z.string().min(1),
           fullName: z.string().max(120).optional(),
+          jobTitle: z.string().max(120).optional(),
           company: z.string().max(120).optional(),
           avatarUrl: z.string().max(500).optional(),
           offers: z.string().max(500).optional(),
@@ -177,14 +171,7 @@ export function registerNetworkingHandlers(socket: EnrichedSocket, io: Server) {
       const profile = await upsertParticipantProfile(participantId, payload);
       socket.emit("networking:profile", {
         participantId,
-        profile: {
-          fullName: profile.fullName,
-          company: profile.company,
-          avatarUrl: profile.avatarUrl,
-          offers: profile.offers,
-          seeking: profile.seeking,
-          visibleInDirectory: profile.visibleInDirectory,
-        },
+        profile: toPublicNetworkingProfile(profile, participantId),
       });
     } catch (error) {
       fail(socket, error instanceof Error ? error.message : "Set profile failed");
@@ -227,11 +214,20 @@ export function registerNetworkingHandlers(socket: EnrichedSocket, io: Server) {
 
   socket.on("networking:threads:list", async (raw: unknown) => {
     try {
-      const payload = z.object({ quizId: z.string().min(1) }).parse(raw);
+      const payload = z
+        .object({
+          quizId: z.string().min(1),
+          limit: z.number().int().min(1).max(50).optional(),
+          offset: z.number().int().min(0).optional(),
+        })
+        .parse(raw);
       const participantId = await requireLiveParticipant(socket, payload.quizId);
       await assertNetworkingEnabled(payload.quizId);
-      const threads = await listThreadsForParticipant(payload.quizId, participantId);
-      socket.emit("networking:threads", { quizId: payload.quizId, threads });
+      const result = await listThreadsForParticipant(payload.quizId, participantId, {
+        limit: payload.limit,
+        offset: payload.offset,
+      });
+      socket.emit("networking:threads", { quizId: payload.quizId, ...result });
     } catch (error) {
       fail(socket, error instanceof Error ? error.message : "List threads failed");
     }

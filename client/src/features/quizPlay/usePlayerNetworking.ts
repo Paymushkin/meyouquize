@@ -1,12 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { socket } from "../../socket";
 
-export type NetworkingProfile = {
-  fullName: string;
-  company: string;
+import type { NetworkingProfileTextFields } from "@meyouquize/shared";
+
+export type NetworkingProfile = NetworkingProfileTextFields & {
   avatarUrl: string;
-  offers: string;
-  seeking: string;
   visibleInDirectory: boolean;
 };
 
@@ -14,6 +12,7 @@ export type NetworkingGuest = {
   participantId: string;
   nickname: string;
   fullName: string;
+  jobTitle: string;
   company: string;
   avatarUrl: string;
   offers: string;
@@ -51,6 +50,45 @@ export type NetworkingMessage = {
 
 const PRESENCE_INTERVAL_MS = 12_000;
 export const NETWORKING_GUESTS_PAGE_SIZE = 25;
+export const NETWORKING_THREADS_PAGE_SIZE = 15;
+
+function profileHasContent(profile: NetworkingProfile | null | undefined): boolean {
+  if (!profile) return false;
+  return Boolean(
+    profile.fullName.trim() ||
+    profile.jobTitle.trim() ||
+    profile.company.trim() ||
+    profile.offers.trim() ||
+    profile.seeking.trim(),
+  );
+}
+
+function applySelfProfileToGuests(
+  list: NetworkingGuest[],
+  selfId: string,
+  nextProfile: NetworkingProfile,
+): NetworkingGuest[] {
+  const patched = list.map((g) =>
+    g.participantId === selfId
+      ? {
+          ...g,
+          fullName: nextProfile.fullName,
+          jobTitle: nextProfile.jobTitle,
+          company: nextProfile.company,
+          avatarUrl: nextProfile.avatarUrl,
+          offers: nextProfile.offers,
+          seeking: nextProfile.seeking,
+          hasProfile: true,
+        }
+      : g,
+  );
+  const selfIdx = patched.findIndex((g) => g.participantId === selfId);
+  if (selfIdx <= 0) return patched;
+  const next = [...patched];
+  const [self] = next.splice(selfIdx, 1);
+  next.unshift(self!);
+  return next;
+}
 
 export function usePlayerNetworking(options: {
   quizId: string | undefined;
@@ -65,6 +103,10 @@ export function usePlayerNetworking(options: {
   const [guestsQuery, setGuestsQuery] = useState("");
   const [guestsPage, setGuestsPage] = useState(0);
   const [threads, setThreads] = useState<NetworkingThread[]>([]);
+  const [threadsTotal, setThreadsTotal] = useState(0);
+  const [threadsHasMore, setThreadsHasMore] = useState(false);
+  const [threadsLoadingMore, setThreadsLoadingMore] = useState(false);
+  const [unreadTotal, setUnreadTotal] = useState(0);
   const [activeThreadId, setActiveThreadId] = useState<string | null>(null);
   const [activePeerId, setActivePeerId] = useState<string | null>(null);
   const [activePeerLabel, setActivePeerLabel] = useState("");
@@ -75,22 +117,36 @@ export function usePlayerNetworking(options: {
   const activeThreadIdRef = useRef<string | null>(null);
   const activePeerIdRef = useRef<string | null>(null);
   const selfIdRef = useRef<string | null>(null);
+  const profileRef = useRef<NetworkingProfile | null>(null);
+  const threadsLenRef = useRef(0);
+  const threadsHasMoreRef = useRef(false);
+  const threadsLoadingMoreRef = useRef(false);
   activeThreadIdRef.current = activeThreadId;
   activePeerIdRef.current = activePeerId;
   selfIdRef.current = selfParticipantId;
+  // Не затирать profileRef «старым» null между saveProfile и следующим commit state.
+  if (profile) profileRef.current = profile;
+  threadsLenRef.current = threads.length;
+  threadsHasMoreRef.current = threadsHasMore;
+  threadsLoadingMoreRef.current = threadsLoadingMore;
 
   useEffect(() => {
     if (!enabled || !joined || !quizId) return;
 
     socket.emit("networking:join", { quizId });
     socket.emit("networking:profile:get", { quizId });
-    socket.emit("networking:threads:list", { quizId });
+    socket.emit("networking:threads:list", {
+      quizId,
+      limit: NETWORKING_THREADS_PAGE_SIZE,
+      offset: 0,
+    });
     socket.emit("networking:guests:list", {
       quizId,
       limit: NETWORKING_GUESTS_PAGE_SIZE,
       offset: 0,
     });
     setGuestsPage(0);
+    setThreadsLoadingMore(false);
 
     const onJoined = (payload: { quizId?: string; participantId?: string }) => {
       if (payload.quizId !== quizId) return;
@@ -100,36 +156,24 @@ export function usePlayerNetworking(options: {
       const selfId = selfIdRef.current;
       if (selfId && payload.participantId && payload.participantId !== selfId) return;
       const nextProfile = payload.profile ?? null;
+      // profile:get часто приходит пустым уже после локального save с формы входа.
+      if (!profileHasContent(nextProfile) && profileHasContent(profileRef.current)) {
+        return;
+      }
+      profileRef.current = nextProfile;
       setProfile(nextProfile);
       if (selfId && nextProfile) {
-        setGuests((prev) => {
-          const patched = prev.map((g) =>
-            g.participantId === selfId
-              ? {
-                  ...g,
-                  fullName: nextProfile.fullName,
-                  company: nextProfile.company,
-                  avatarUrl: nextProfile.avatarUrl,
-                  offers: nextProfile.offers,
-                  seeking: nextProfile.seeking,
-                  hasProfile: true,
-                }
-              : g,
-          );
-          const selfIdx = patched.findIndex((g) => g.participantId === selfId);
-          if (selfIdx <= 0) return patched;
-          const next = [...patched];
-          const [self] = next.splice(selfIdx, 1);
-          next.unshift(self!);
-          return next;
-        });
+        setGuests((prev) => applySelfProfileToGuests(prev, selfId, nextProfile));
       }
     };
     const onGuests = (payload: { quizId?: string; total?: number; guests?: NetworkingGuest[] }) => {
       if (payload.quizId !== quizId) return;
       let next = Array.isArray(payload.guests) ? payload.guests : [];
       const selfId = selfIdRef.current;
-      if (selfId) {
+      const selfProfile = profileRef.current;
+      if (selfId && selfProfile) {
+        next = applySelfProfileToGuests(next, selfId, selfProfile);
+      } else if (selfId) {
         const selfIdx = next.findIndex((g) => g.participantId === selfId);
         if (selfIdx > 0) {
           next = [...next];
@@ -140,9 +184,32 @@ export function usePlayerNetworking(options: {
       setGuests(next);
       setGuestsTotal(typeof payload.total === "number" ? payload.total : next.length);
     };
-    const onThreads = (payload: { quizId?: string; threads?: NetworkingThread[] }) => {
+    const onThreads = (payload: {
+      quizId?: string;
+      threads?: NetworkingThread[];
+      total?: number;
+      offset?: number;
+      hasMore?: boolean;
+      unreadTotal?: number;
+    }) => {
       if (payload.quizId !== quizId) return;
-      setThreads(Array.isArray(payload.threads) ? payload.threads : []);
+      const activeId = activeThreadIdRef.current;
+      const next = (Array.isArray(payload.threads) ? payload.threads : []).map((t) =>
+        activeId && t.threadId === activeId ? { ...t, unread: 0 } : t,
+      );
+      const offset = typeof payload.offset === "number" ? payload.offset : 0;
+      if (offset > 0) {
+        setThreads((prev) => {
+          const seen = new Set(prev.map((t) => t.threadId));
+          return [...prev, ...next.filter((t) => !seen.has(t.threadId))];
+        });
+      } else {
+        setThreads(next);
+      }
+      if (typeof payload.total === "number") setThreadsTotal(payload.total);
+      setThreadsHasMore(Boolean(payload.hasMore));
+      if (typeof payload.unreadTotal === "number") setUnreadTotal(payload.unreadTotal);
+      setThreadsLoadingMore(false);
     };
     const onHistory = (payload: { threadId?: string; messages?: NetworkingMessage[] }) => {
       if (!payload.threadId || payload.threadId !== activeThreadIdRef.current) return;
@@ -154,11 +221,22 @@ export function usePlayerNetworking(options: {
       const selfId = selfIdRef.current;
       if (activeId && dto.threadId === activeId) {
         setMessages((prev) => (prev.some((m) => m.id === dto.id) ? prev : [...prev, dto]));
+        // Чат открыт — сразу помечаем прочитанным, чтобы бейдж не вспыхивал.
+        if (dto.senderId !== selfId) {
+          socket.emit("networking:dm:read", { quizId, threadId: activeId });
+        }
       } else if (!activeId && peerId && (dto.senderId === peerId || dto.senderId === selfId)) {
         setActiveThreadId(dto.threadId);
         setMessages((prev) => (prev.some((m) => m.id === dto.id) ? prev : [...prev, dto]));
+        if (dto.senderId !== selfId) {
+          socket.emit("networking:dm:read", { quizId, threadId: dto.threadId });
+        }
       }
-      socket.emit("networking:threads:list", { quizId });
+      socket.emit("networking:threads:list", {
+        quizId,
+        limit: Math.max(NETWORKING_THREADS_PAGE_SIZE, threadsLenRef.current),
+        offset: 0,
+      });
     };
 
     socket.on("networking:joined", onJoined);
@@ -201,6 +279,11 @@ export function usePlayerNetworking(options: {
     [enabled, guestsQuery, quizId],
   );
 
+  const refreshProfile = useCallback(() => {
+    if (!quizId || !enabled) return;
+    socket.emit("networking:profile:get", { quizId });
+  }, [enabled, quizId]);
+
   const goToGuestsPage = useCallback(
     (page: number) => {
       refreshGuests(guestsQuery, page);
@@ -212,64 +295,46 @@ export function usePlayerNetworking(options: {
     (patch: Partial<NetworkingProfile>) => {
       if (!quizId || !enabled) return;
       const selfId = selfIdRef.current;
+      const nextProfile: NetworkingProfile = {
+        fullName: patch.fullName ?? profileRef.current?.fullName ?? "",
+        jobTitle: patch.jobTitle ?? profileRef.current?.jobTitle ?? "",
+        company: patch.company ?? profileRef.current?.company ?? "",
+        avatarUrl: patch.avatarUrl ?? profileRef.current?.avatarUrl ?? "",
+        offers: patch.offers ?? profileRef.current?.offers ?? "",
+        seeking: patch.seeking ?? profileRef.current?.seeking ?? "",
+        visibleInDirectory:
+          patch.visibleInDirectory ?? profileRef.current?.visibleInDirectory ?? true,
+      };
+      profileRef.current = nextProfile;
+      setProfile(nextProfile);
       if (selfId) {
-        setProfile((prev) => ({
-          fullName: patch.fullName ?? prev?.fullName ?? "",
-          company: patch.company ?? prev?.company ?? "",
-          avatarUrl: patch.avatarUrl ?? prev?.avatarUrl ?? "",
-          offers: patch.offers ?? prev?.offers ?? "",
-          seeking: patch.seeking ?? prev?.seeking ?? "",
-          visibleInDirectory: patch.visibleInDirectory ?? prev?.visibleInDirectory ?? true,
-        }));
         setGuests((prev) => {
-          const patched = prev.map((g) =>
-            g.participantId === selfId
-              ? {
-                  ...g,
-                  fullName: patch.fullName ?? g.fullName,
-                  company: patch.company ?? g.company,
-                  avatarUrl: patch.avatarUrl ?? g.avatarUrl,
-                  offers: patch.offers ?? g.offers,
-                  seeking: patch.seeking ?? g.seeking,
-                  hasProfile: true,
-                }
-              : g,
-          );
-          const selfIdx = patched.findIndex((g) => g.participantId === selfId);
-          if (selfIdx <= 0) {
-            if (selfIdx < 0 && guestsPage === 0) {
-              return [
-                {
-                  participantId: selfId,
-                  nickname: "",
-                  fullName: patch.fullName ?? "",
-                  company: patch.company ?? "",
-                  avatarUrl: patch.avatarUrl ?? "",
-                  offers: patch.offers ?? "",
-                  seeking: patch.seeking ?? "",
-                  online: true,
-                  hasProfile: true,
-                },
-                ...patched,
-              ];
-            }
+          const patched = applySelfProfileToGuests(prev, selfId, nextProfile);
+          if (patched.some((g) => g.participantId === selfId) || guestsPage !== 0) {
             return patched;
           }
-          const next = [...patched];
-          const [self] = next.splice(selfIdx, 1);
-          next.unshift(self!);
-          return next;
+          return [
+            {
+              participantId: selfId,
+              nickname: "",
+              fullName: nextProfile.fullName,
+              jobTitle: nextProfile.jobTitle,
+              company: nextProfile.company,
+              avatarUrl: nextProfile.avatarUrl,
+              offers: nextProfile.offers,
+              seeking: nextProfile.seeking,
+              online: true,
+              hasProfile: true,
+            },
+            ...patched,
+          ];
         });
       }
+      // Не дергаем guests:list сразу — ответ может прийти раньше commit profile:set
+      // и затереть «Ищу»/«Полезен» пустыми значениями (ФИО при этом видно из ника).
       socket.emit("networking:profile:set", { quizId, ...patch });
-      socket.emit("networking:guests:list", {
-        quizId,
-        query: guestsQuery,
-        limit: NETWORKING_GUESTS_PAGE_SIZE,
-        offset: guestsPage * NETWORKING_GUESTS_PAGE_SIZE,
-      });
     },
-    [enabled, guestsPage, guestsQuery, quizId],
+    [enabled, guestsPage, quizId],
   );
 
   const openChatWithPeer = useCallback(
@@ -294,10 +359,26 @@ export function usePlayerNetworking(options: {
         peerMeta?.avatarUrl?.trim() || fromThread?.peer.avatarUrl || fromGuest?.avatarUrl || "";
       setActivePeerLabel(label);
       setActivePeerAvatarUrl(avatarUrl);
+      const markThreadSeen = (id: string) => {
+        setThreads((prev) => {
+          let cleared = 0;
+          const next = prev.map((t) => {
+            if (t.threadId !== id || !t.unread) return t;
+            cleared = t.unread;
+            return { ...t, unread: 0 };
+          });
+          if (cleared > 0) {
+            setUnreadTotal((total) => Math.max(0, total - cleared));
+          }
+          return next;
+        });
+        socket.emit("networking:dm:read", { quizId, threadId: id });
+      };
+
       if (threadId) {
         setActiveThreadId(threadId);
         socket.emit("networking:dm:history", { quizId, threadId, limit: 40 });
-        socket.emit("networking:dm:read", { quizId, threadId });
+        markThreadSeen(threadId);
       } else if (fromThread) {
         setActiveThreadId(fromThread.threadId);
         socket.emit("networking:dm:history", {
@@ -305,7 +386,7 @@ export function usePlayerNetworking(options: {
           threadId: fromThread.threadId,
           limit: 40,
         });
-        socket.emit("networking:dm:read", { quizId, threadId: fromThread.threadId });
+        markThreadSeen(fromThread.threadId);
       } else {
         setActiveThreadId(null);
         setMessages([]);
@@ -333,7 +414,16 @@ export function usePlayerNetworking(options: {
     setMessages([]);
   }, []);
 
-  const unreadTotal = threads.reduce((sum, t) => sum + (t.unread || 0), 0);
+  const loadMoreThreads = useCallback(() => {
+    if (!quizId || !enabled) return;
+    if (!threadsHasMoreRef.current || threadsLoadingMoreRef.current) return;
+    setThreadsLoadingMore(true);
+    socket.emit("networking:threads:list", {
+      quizId,
+      limit: NETWORKING_THREADS_PAGE_SIZE,
+      offset: threadsLenRef.current,
+    });
+  }, [enabled, quizId]);
 
   return {
     selfParticipantId,
@@ -346,9 +436,14 @@ export function usePlayerNetworking(options: {
     guestsPageSize: NETWORKING_GUESTS_PAGE_SIZE,
     setGuestsQuery,
     refreshGuests,
+    refreshProfile,
     goToGuestsPage,
     saveProfile,
     threads,
+    threadsTotal,
+    threadsHasMore,
+    threadsLoadingMore,
+    loadMoreThreads,
     activeThreadId,
     activePeerId,
     activePeerLabel,

@@ -6,26 +6,58 @@ import {
   resolvePlayerFacingOrigin,
 } from "./publicAppOrigin";
 
-/** Пустая строка отключает import.meta.env.VITE_PUBLIC_PLAYER_ORIGIN из .env.local. */
-const noEnvOverride = { vitePublicPlayerOrigin: "" } as const;
+/** Пустые строки отключают import.meta.env.* из .env.local. */
+const noEnvOverride = { vitePublicPlayerOrigin: "", lanHost: "" } as const;
 
 describe("resolvePlayerFacingOrigin", () => {
-  it("prefers window origin in browser context", () => {
+  it("prefers window origin when not on loopback", () => {
     expect(
       resolvePlayerFacingOrigin({
         ...noEnvOverride,
-        windowOrigin: "http://192.168.0.154",
+        windowOrigin: "http://192.168.0.154:5173",
+        lanHost: "192.168.1.23",
       }),
-    ).toBe("http://192.168.0.154");
+    ).toBe("http://192.168.0.154:5173");
   });
 
-  it("uses VITE_PUBLIC_PLAYER_ORIGIN override when set", () => {
+  it("rewrites localhost to LAN_HOST for phone QR", () => {
+    expect(
+      resolvePlayerFacingOrigin({
+        vitePublicPlayerOrigin: "",
+        windowOrigin: "http://localhost:5173",
+        lanHost: "192.168.1.23",
+      }),
+    ).toBe("http://192.168.1.23:5173");
+  });
+
+  it("rewrites 127.0.0.1 keeping the vite port", () => {
+    expect(
+      resolvePlayerFacingOrigin({
+        vitePublicPlayerOrigin: "",
+        windowOrigin: "http://127.0.0.1:5174",
+        lanHost: "192.168.1.23",
+      }),
+    ).toBe("http://192.168.1.23:5174");
+  });
+
+  it("uses VITE_PUBLIC_PLAYER_ORIGIN when admin is on localhost", () => {
     expect(
       resolvePlayerFacingOrigin({
         windowOrigin: "http://localhost:5173",
-        vitePublicPlayerOrigin: "http://192.168.0.154",
+        vitePublicPlayerOrigin: "http://192.168.0.154:5173",
+        lanHost: "10.0.0.1",
       }),
-    ).toBe("http://192.168.0.154");
+    ).toBe("http://192.168.0.154:5173");
+  });
+
+  it("ignores override when window is already on LAN", () => {
+    expect(
+      resolvePlayerFacingOrigin({
+        windowOrigin: "http://192.168.1.23:5173",
+        vitePublicPlayerOrigin: "http://192.168.0.154:5173",
+        lanHost: "192.168.0.154",
+      }),
+    ).toBe("http://192.168.1.23:5173");
   });
 
   it("returns empty without window or override", () => {
@@ -34,10 +66,14 @@ describe("resolvePlayerFacingOrigin", () => {
 });
 
 describe("buildPlayerJoinUrl", () => {
-  it("builds join path", () => {
+  it("builds join path on LAN when admin is on localhost", () => {
     expect(
-      buildPlayerJoinUrl("demo", { ...noEnvOverride, windowOrigin: "http://192.168.0.154" }),
-    ).toBe("http://192.168.0.154/q/demo");
+      buildPlayerJoinUrl("demo", {
+        vitePublicPlayerOrigin: "",
+        windowOrigin: "http://localhost:5173",
+        lanHost: "192.168.1.23",
+      }),
+    ).toBe("http://192.168.1.23:5173/q/demo");
   });
 });
 
@@ -46,9 +82,9 @@ describe("buildProjectorScreenUrl", () => {
     expect(
       buildProjectorScreenUrl("demo", {
         ...noEnvOverride,
-        windowOrigin: "http://192.168.0.154",
+        windowOrigin: "http://192.168.0.154:5173",
       }),
-    ).toBe("http://192.168.0.154/p/demo");
+    ).toBe("http://192.168.0.154:5173/p/demo");
   });
 });
 
@@ -57,8 +93,8 @@ describe("buildSpeakerModeratorUrl", () => {
     expect(
       buildSpeakerModeratorUrl("demo", {
         ...noEnvOverride,
-        windowOrigin: "http://192.168.0.154",
+        windowOrigin: "http://192.168.0.154:5173",
       }),
-    ).toBe("http://192.168.0.154/s/demo");
+    ).toBe("http://192.168.0.154:5173/s/demo");
   });
 });

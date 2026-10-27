@@ -3,8 +3,54 @@ import { normalizePublicViewState } from "@meyouquize/shared";
 import { env } from "./env.js";
 import { networkingPresenceMemberKey } from "./experiment-redis-keys.js";
 import { logError, logWarn, formatErrorForLog } from "./logging.js";
+import { extractLocalMediaFilename, localMediaUrlIfFileExists } from "./media-cleanup.js";
 import { prisma } from "./prisma.js";
 import { publicViewJsonToState } from "./socket/public-view-store.js";
+
+/** Не отдавать клиенту битый /media/...; подчистить профиль в фоне. */
+export function publicNetworkingAvatarUrl(
+  avatarUrl: string | null | undefined,
+  participantId?: string,
+): string {
+  const raw = typeof avatarUrl === "string" ? avatarUrl.trim() : "";
+  if (!raw) return "";
+  const existing = localMediaUrlIfFileExists(raw);
+  if (existing) return existing;
+  if (participantId && extractLocalMediaFilename(raw)) {
+    void prisma.participantProfile
+      .updateMany({
+        where: { participantId, avatarUrl: raw },
+        data: { avatarUrl: "" },
+      })
+      .catch((err) => {
+        logWarn("[networking] clear missing avatarUrl failed", formatErrorForLog(err));
+      });
+  }
+  return "";
+}
+
+export function toPublicNetworkingProfile(
+  profile: {
+    fullName: string;
+    jobTitle: string;
+    company: string;
+    avatarUrl: string;
+    offers: string;
+    seeking: string;
+    visibleInDirectory: boolean;
+  },
+  participantId: string,
+) {
+  return {
+    fullName: profile.fullName,
+    jobTitle: profile.jobTitle,
+    company: profile.company,
+    avatarUrl: publicNetworkingAvatarUrl(profile.avatarUrl, participantId),
+    offers: profile.offers,
+    seeking: profile.seeking,
+    visibleInDirectory: profile.visibleInDirectory,
+  };
+}
 
 const PRESENCE_TTL_SEC = 45;
 const MAX_MESSAGE_LEN = 2000;
@@ -99,6 +145,7 @@ export async function upsertParticipantProfile(
   participantId: string,
   patch: {
     fullName?: string;
+    jobTitle?: string;
     company?: string;
     avatarUrl?: string;
     offers?: string;
@@ -106,13 +153,36 @@ export async function upsertParticipantProfile(
     visibleInDirectory?: boolean;
   },
 ) {
+  const existing = await prisma.participantProfile.findUnique({ where: { participantId } });
   const data = {
-    fullName: (patch.fullName ?? "").trim().slice(0, 120),
-    company: (patch.company ?? "").trim().slice(0, 120),
-    avatarUrl: (patch.avatarUrl ?? "").trim().slice(0, 500),
-    offers: (patch.offers ?? "").trim().slice(0, 500),
-    seeking: (patch.seeking ?? "").trim().slice(0, 500),
-    visibleInDirectory: patch.visibleInDirectory ?? true,
+    fullName:
+      typeof patch.fullName === "string"
+        ? patch.fullName.trim().slice(0, 120)
+        : (existing?.fullName ?? ""),
+    jobTitle:
+      typeof patch.jobTitle === "string"
+        ? patch.jobTitle.trim().slice(0, 120)
+        : (existing?.jobTitle ?? ""),
+    company:
+      typeof patch.company === "string"
+        ? patch.company.trim().slice(0, 120)
+        : (existing?.company ?? ""),
+    avatarUrl:
+      typeof patch.avatarUrl === "string"
+        ? patch.avatarUrl.trim().slice(0, 500)
+        : (existing?.avatarUrl ?? ""),
+    offers:
+      typeof patch.offers === "string"
+        ? patch.offers.trim().slice(0, 500)
+        : (existing?.offers ?? ""),
+    seeking:
+      typeof patch.seeking === "string"
+        ? patch.seeking.trim().slice(0, 500)
+        : (existing?.seeking ?? ""),
+    visibleInDirectory:
+      typeof patch.visibleInDirectory === "boolean"
+        ? patch.visibleInDirectory
+        : (existing?.visibleInDirectory ?? true),
   };
   return prisma.participantProfile.upsert({
     where: { participantId },
@@ -155,8 +225,9 @@ export async function listNetworkingGuests(input: {
       participantId: p.id,
       nickname: p.nickname,
       fullName: p.networkingProfile?.fullName ?? "",
+      jobTitle: p.networkingProfile?.jobTitle ?? "",
       company: p.networkingProfile?.company ?? "",
-      avatarUrl: p.networkingProfile?.avatarUrl ?? "",
+      avatarUrl: publicNetworkingAvatarUrl(p.networkingProfile?.avatarUrl, p.id),
       offers: p.networkingProfile?.offers ?? "",
       seeking: p.networkingProfile?.seeking ?? "",
       online: online.has(p.id),
@@ -167,7 +238,9 @@ export async function listNetworkingGuests(input: {
     rows = rows.filter((r) => {
       if (viewerId && r.participantId === viewerId) return true;
       const hay =
-        `${r.nickname} ${r.fullName} ${r.company} ${r.offers} ${r.seeking}`.toLocaleLowerCase("ru");
+        `${r.nickname} ${r.fullName} ${r.jobTitle} ${r.company} ${r.offers} ${r.seeking}`.toLocaleLowerCase(
+          "ru",
+        );
       return hay.includes(q);
     });
   }
@@ -223,21 +296,41 @@ export async function getOrCreateThread(quizId: string, aId: string, bId: string
   });
 }
 
-export async function listThreadsForParticipant(quizId: string, participantId: string) {
-  const threads = await prisma.networkingThread.findMany({
-    where: {
-      quizId,
-      OR: [{ participantAId: participantId }, { participantBId: participantId }],
-    },
-    include: {
-      messages: { orderBy: { createdAt: "desc" }, take: 1 },
-      participantA: { select: { id: true, nickname: true, networkingProfile: true } },
-      participantB: { select: { id: true, nickname: true, networkingProfile: true } },
-    },
-    orderBy: { updatedAt: "desc" },
-  });
+export async function listThreadsForParticipant(
+  quizId: string,
+  participantId: string,
+  opts?: { limit?: number; offset?: number },
+) {
+  const limit = Math.max(1, Math.min(50, opts?.limit ?? 20));
+  const offset = Math.max(0, opts?.offset ?? 0);
+  const where = {
+    quizId,
+    OR: [{ participantAId: participantId }, { participantBId: participantId }],
+  };
 
-  return Promise.all(
+  const [total, unreadTotal, threads] = await Promise.all([
+    prisma.networkingThread.count({ where }),
+    prisma.networkingMessage.count({
+      where: {
+        senderId: { not: participantId },
+        readAt: null,
+        thread: { quizId, OR: where.OR },
+      },
+    }),
+    prisma.networkingThread.findMany({
+      where,
+      include: {
+        messages: { orderBy: { createdAt: "desc" }, take: 1 },
+        participantA: { select: { id: true, nickname: true, networkingProfile: true } },
+        participantB: { select: { id: true, nickname: true, networkingProfile: true } },
+      },
+      orderBy: { updatedAt: "desc" },
+      skip: offset,
+      take: limit,
+    }),
+  ]);
+
+  const items = await Promise.all(
     threads.map(async (t) => {
       const peer = t.participantAId === participantId ? t.participantB : t.participantA;
       const unread = await prisma.networkingMessage.count({
@@ -254,7 +347,7 @@ export async function listThreadsForParticipant(quizId: string, participantId: s
           participantId: peer.id,
           nickname: peer.nickname,
           fullName: peer.networkingProfile?.fullName ?? "",
-          avatarUrl: peer.networkingProfile?.avatarUrl ?? "",
+          avatarUrl: publicNetworkingAvatarUrl(peer.networkingProfile?.avatarUrl, peer.id),
         },
         lastMessage: last
           ? {
@@ -269,6 +362,15 @@ export async function listThreadsForParticipant(quizId: string, participantId: s
       };
     }),
   );
+
+  return {
+    threads: items,
+    total,
+    offset,
+    limit,
+    hasMore: offset + items.length < total,
+    unreadTotal,
+  };
 }
 
 export async function sendNetworkingMessage(input: {
@@ -333,4 +435,242 @@ export async function markThreadRead(threadId: string, readerId: string) {
 /** Re-export for tests / admin toggles that merge publicView. */
 export function networkingEnabledFromUnknown(view: unknown): boolean {
   return Boolean(normalizePublicViewState(view as never).networkingEnabled);
+}
+
+export type ProjectorGuestKind = "complete" | "incomplete";
+
+type SpotlightGuestRow = {
+  participantId: string;
+  nickname: string;
+  fullName: string;
+  jobTitle: string;
+  company: string;
+  avatarUrl: string;
+  offers: string;
+  seeking: string;
+};
+
+function isCompleteNetworkingProfile(row: {
+  nickname: string;
+  fullName: string;
+  offers: string;
+  seeking: string;
+}): boolean {
+  const name = row.fullName.trim() || row.nickname.trim();
+  return Boolean(name && row.offers.trim() && row.seeking.trim());
+}
+
+function shuffleInPlace<T>(items: T[]): T[] {
+  for (let i = items.length - 1; i > 0; i -= 1) {
+    const j = Math.floor(Math.random() * (i + 1));
+    const tmp = items[i]!;
+    items[i] = items[j]!;
+    items[j] = tmp;
+  }
+  return items;
+}
+
+/** Гости для ротации на проекторе (complete / incomplete offers|seeking). */
+export async function listProjectorNetworkingGuests(
+  quizId: string,
+  opts: { kind: ProjectorGuestKind; limit: number; shuffle?: boolean },
+): Promise<SpotlightGuestRow[]> {
+  const limit = Math.max(1, Math.min(40, opts.limit));
+  const participants = await prisma.participant.findMany({
+    where: { quizId },
+    include: { networkingProfile: true },
+    orderBy: { createdAt: "asc" },
+  });
+
+  const rows: SpotlightGuestRow[] = participants
+    .filter((p) => p.networkingProfile?.visibleInDirectory !== false)
+    .map((p) => ({
+      participantId: p.id,
+      nickname: p.nickname,
+      fullName: p.networkingProfile?.fullName ?? "",
+      jobTitle: p.networkingProfile?.jobTitle ?? "",
+      company: p.networkingProfile?.company ?? "",
+      avatarUrl: publicNetworkingAvatarUrl(p.networkingProfile?.avatarUrl, p.id),
+      offers: p.networkingProfile?.offers ?? "",
+      seeking: p.networkingProfile?.seeking ?? "",
+    }))
+    .filter((r) => {
+      const complete = isCompleteNetworkingProfile(r);
+      return opts.kind === "complete" ? complete : !complete;
+    });
+
+  if (opts.shuffle === false) return rows.slice(0, limit);
+  return shuffleInPlace(rows).slice(0, limit);
+}
+
+/**
+ * Обновить список спотлайта без перетасовки: сохранить порядок prev,
+ * обновить поля, дописать новых в конец.
+ */
+export function mergeProjectorSpotlightGuests(
+  prev: SpotlightGuestRow[],
+  nextPool: SpotlightGuestRow[],
+  limit: number,
+): SpotlightGuestRow[] {
+  const capped = Math.max(1, Math.min(40, limit));
+  const byId = new Map(nextPool.map((g) => [g.participantId, g]));
+  const kept: SpotlightGuestRow[] = [];
+  for (const g of prev) {
+    const fresh = byId.get(g.participantId);
+    if (fresh) kept.push(fresh);
+  }
+  const keptIds = new Set(kept.map((g) => g.participantId));
+  const additions = nextPool.filter((g) => !keptIds.has(g.participantId));
+  shuffleInPlace(additions);
+  return [...kept, ...additions].slice(0, capped);
+}
+
+export type AdminNetworkingGuestRow = {
+  participantId: string;
+  nickname: string;
+  fullName: string;
+  jobTitle: string;
+  company: string;
+  avatarUrl: string;
+  offers: string;
+  seeking: string;
+  visibleInDirectory: boolean;
+  chatsCount: number;
+  messagesCount: number;
+};
+
+/** Список гостей ивента для админки: профиль + число чатов/сообщений. */
+export async function listAdminNetworkingGuests(
+  quizId: string,
+): Promise<AdminNetworkingGuestRow[]> {
+  const participants = await prisma.participant.findMany({
+    where: { quizId },
+    include: {
+      networkingProfile: true,
+      _count: {
+        select: {
+          networkingThreadsAsA: true,
+          networkingThreadsAsB: true,
+          networkingMessagesSent: true,
+        },
+      },
+    },
+    orderBy: { createdAt: "asc" },
+  });
+
+  return participants.map((p) => ({
+    participantId: p.id,
+    nickname: p.nickname,
+    fullName: p.networkingProfile?.fullName ?? "",
+    jobTitle: p.networkingProfile?.jobTitle ?? "",
+    company: p.networkingProfile?.company ?? "",
+    avatarUrl: publicNetworkingAvatarUrl(p.networkingProfile?.avatarUrl, p.id),
+    offers: p.networkingProfile?.offers ?? "",
+    seeking: p.networkingProfile?.seeking ?? "",
+    visibleInDirectory: p.networkingProfile?.visibleInDirectory ?? true,
+    chatsCount: p._count.networkingThreadsAsA + p._count.networkingThreadsAsB,
+    messagesCount: p._count.networkingMessagesSent,
+  }));
+}
+
+/** Админ правит текст профиля; avatarUrl не трогаем. */
+export async function adminUpdateNetworkingGuest(
+  quizId: string,
+  participantId: string,
+  patch: {
+    nickname?: string;
+    fullName?: string;
+    jobTitle?: string;
+    company?: string;
+    offers?: string;
+    seeking?: string;
+    visibleInDirectory?: boolean;
+  },
+): Promise<AdminNetworkingGuestRow> {
+  const participant = await prisma.participant.findFirst({
+    where: { id: participantId, quizId },
+    include: { networkingProfile: true },
+  });
+  if (!participant) throw new Error("Participant not found");
+
+  if (typeof patch.nickname === "string") {
+    const nick = patch.nickname.trim().slice(0, 80);
+    if (!nick) throw new Error("Nickname required");
+    await prisma.participant.update({
+      where: { id: participantId },
+      data: { nickname: nick },
+    });
+  }
+
+  const existing = participant.networkingProfile;
+  const fullName =
+    typeof patch.fullName === "string"
+      ? patch.fullName.trim().slice(0, 120)
+      : (existing?.fullName ?? "");
+  const jobTitle =
+    typeof patch.jobTitle === "string"
+      ? patch.jobTitle.trim().slice(0, 120)
+      : (existing?.jobTitle ?? "");
+  const company =
+    typeof patch.company === "string"
+      ? patch.company.trim().slice(0, 120)
+      : (existing?.company ?? "");
+  const offers =
+    typeof patch.offers === "string" ? patch.offers.trim().slice(0, 500) : (existing?.offers ?? "");
+  const seeking =
+    typeof patch.seeking === "string"
+      ? patch.seeking.trim().slice(0, 500)
+      : (existing?.seeking ?? "");
+  const visibleInDirectory =
+    typeof patch.visibleInDirectory === "boolean"
+      ? patch.visibleInDirectory
+      : (existing?.visibleInDirectory ?? true);
+
+  await prisma.participantProfile.upsert({
+    where: { participantId },
+    create: {
+      participantId,
+      fullName,
+      jobTitle,
+      company,
+      offers,
+      seeking,
+      visibleInDirectory,
+      avatarUrl: existing?.avatarUrl ?? "",
+    },
+    update: {
+      fullName,
+      jobTitle,
+      company,
+      offers,
+      seeking,
+      visibleInDirectory,
+    },
+  });
+
+  const rows = await listAdminNetworkingGuests(quizId);
+  const row = rows.find((r) => r.participantId === participantId);
+  if (!row) throw new Error("Participant not found");
+  return row;
+}
+
+/** Агрегаты нетворкинга для режима networking_stats. */
+export async function getNetworkingQuizStats(quizId: string): Promise<{
+  messages: number;
+  guests: number;
+  acquaintances: number;
+}> {
+  const [guests, acquaintances, messages] = await Promise.all([
+    prisma.participant.count({
+      where: {
+        quizId,
+        OR: [{ networkingProfile: null }, { networkingProfile: { visibleInDirectory: true } }],
+      },
+    }),
+    prisma.networkingThread.count({ where: { quizId } }),
+    prisma.networkingMessage.count({
+      where: { thread: { quizId } },
+    }),
+  ]);
+  return { messages, guests, acquaintances };
 }

@@ -1,5 +1,6 @@
 export type AdminSection =
   | "general"
+  | "projector"
   | "questions"
   | "speakers"
   | "banners"
@@ -7,11 +8,11 @@ export type AdminSection =
   | "video_wall"
   | "branding"
   | "report"
-  | "results"
-  | "danger";
+  | "more";
 
 export const ADMIN_SECTION_IDS: AdminSection[] = [
   "general",
+  "projector",
   "questions",
   "speakers",
   "banners",
@@ -19,8 +20,7 @@ export const ADMIN_SECTION_IDS: AdminSection[] = [
   "video_wall",
   "branding",
   "report",
-  "results",
-  "danger",
+  "more",
 ];
 
 export type RoomQuestionsTab = "quizzes" | "votes" | "reactions" | "feedback" | "randomizer";
@@ -71,6 +71,7 @@ function storageKey(eventName: string): string {
 }
 
 function parseSection(raw: string | undefined): AdminSection {
+  if (raw === "danger") return "more";
   if (raw && ADMIN_SECTION_ID_SET.has(raw)) return raw as AdminSection;
   return DEFAULTS.section;
 }

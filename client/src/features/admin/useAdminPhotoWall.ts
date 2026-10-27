@@ -1,6 +1,5 @@
 import {
   normalizePublicViewState,
-  sanitizePhotoWallImageExt,
   type PhotoWallImageExt,
   type PublicViewPayload,
 } from "@meyouquize/shared";
@@ -9,26 +8,11 @@ import type { PublicViewSetPatch } from "../../publicViewContract";
 
 type EmitPatch = (patch: PublicViewSetPatch) => void;
 
-type SetPublicResultsView = (
-  mode:
-    | "title"
-    | "question"
-    | "leaderboard"
-    | "speaker_questions"
-    | "reactions"
-    | "randomizer"
-    | "photo_wall"
-    | "video_wall",
-  questionId?: string,
-  patch?: PublicViewSetPatch,
-) => void;
-
 type Params = {
   emitPublicViewPatch: EmitPatch;
-  setPublicResultsView: SetPublicResultsView;
 };
 
-export function useAdminPhotoWall({ emitPublicViewPatch, setPublicResultsView }: Params) {
+export function useAdminPhotoWall({ emitPublicViewPatch }: Params) {
   const [baseUrl, setBaseUrl] = useState("");
   const [imageCount, setImageCount] = useState(0);
   const [imageExt, setImageExt] = useState<PhotoWallImageExt>("jpg");
@@ -73,21 +57,6 @@ export function useAdminPhotoWall({ emitPublicViewPatch, setPublicResultsView }:
     ],
   );
 
-  const showOnProjector = useCallback(() => {
-    setPublicResultsView("photo_wall", undefined, {
-      photoWallBaseUrl: baseUrl,
-      photoWallImageCount: imageCount,
-      photoWallImageExt: imageExt,
-      photoWallGridColumns: gridColumns,
-      photoWallAnimate: animate,
-      photoWallKenBurns: kenBurns,
-    });
-  }, [animate, baseUrl, gridColumns, imageCount, imageExt, kenBurns, setPublicResultsView]);
-
-  const hideFromProjector = useCallback(() => {
-    setPublicResultsView("title");
-  }, [setPublicResultsView]);
-
   return {
     baseUrl,
     setBaseUrl,
@@ -105,7 +74,5 @@ export function useAdminPhotoWall({ emitPublicViewPatch, setPublicResultsView }:
     setTileVisible,
     applyFromPublicView,
     emitSnapshot,
-    showOnProjector,
-    hideFromProjector,
   };
 }

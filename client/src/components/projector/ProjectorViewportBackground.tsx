@@ -1,5 +1,6 @@
 import { Box } from "@mui/material";
 import { useEffect, useMemo, useRef } from "react";
+import { createPortal } from "react-dom";
 import { buildBrandBackground } from "../../features/branding/brandVisual";
 
 type ProjectorViewportBackgroundProps = {
@@ -10,8 +11,8 @@ type ProjectorViewportBackgroundProps = {
 };
 
 /**
- * Фон проектора на весь viewport (`cover`). При зуме браузера / CSS zoom на body
- * компенсирует масштаб — картинка остаётся «прибитой» к экрану.
+ * Фон проектора на весь viewport (`cover`). Рендерится в `document.body`,
+ * чтобы картинка бренда была за прозрачным `#root` и карточками.
  */
 export function ProjectorViewportBackground({
   backgroundColor,
@@ -44,7 +45,6 @@ export function ProjectorViewportBackground({
         return;
       }
 
-      // Браузерный pinch/Ctrl-zoom: координаты visualViewport.
       if (vv && Math.abs(browserScale - 1) >= 0.001) {
         layer.style.top = `${vv.offsetTop}px`;
         layer.style.left = `${vv.offsetLeft}px`;
@@ -55,7 +55,6 @@ export function ProjectorViewportBackground({
         return;
       }
 
-      // CSS zoom на body: отменяем масштаб у fixed-фона, чтобы он закрывал экран.
       layer.style.top = "0";
       layer.style.left = "0";
       layer.style.width = "100vw";
@@ -76,7 +75,9 @@ export function ProjectorViewportBackground({
     };
   }, [contentZoom]);
 
-  return (
+  if (typeof document === "undefined") return null;
+
+  return createPortal(
     <Box
       key={normalizedImageUrl || "no-image"}
       ref={layerRef}
@@ -87,11 +88,14 @@ export function ProjectorViewportBackground({
         left: 0,
         width: "100%",
         height: "100%",
+        // Ниже #root (z-index: 1), выше body-декора.
         zIndex: 0,
         pointerEvents: "none",
         backgroundColor,
+        backgroundRepeat: "no-repeat",
         ...brandBg,
       }}
-    />
+    />,
+    document.body,
   );
 }

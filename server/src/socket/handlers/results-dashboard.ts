@@ -27,7 +27,10 @@ import {
   shouldSkipAdminViewSetDedupe,
   type AdminViewSetDedupeState,
 } from "../admin-view-set-dedupe.js";
-import { markTimelineInactive } from "../../projector-timeline-sequencer.js";
+import {
+  resumeTimelineAfterOverride,
+  suspendTimelineForOverride,
+} from "../../projector-timeline-sequencer.js";
 import { normalizeProjectorTimelineState } from "@meyouquize/shared";
 
 export function registerResultsDashboardHandlers(socket: EnrichedSocket, io: Server) {
@@ -149,24 +152,39 @@ export function registerResultsDashboardHandlers(socket: EnrichedSocket, io: Ser
           data: { isOnScreen: false },
         });
       }
-      const timelineWasPlaying = normalizeProjectorTimelineState(
-        prevView.projectorTimeline,
-      ).playing;
+      const timeline = normalizeProjectorTimelineState(prevView.projectorTimeline);
+      const stepMode = timeline.steps[timeline.cursor]?.mode;
       const manualModeChange = typeof payload.mode === "string" && payload.mode !== prevView.mode;
-      const nextViewFinal =
-        timelineWasPlaying && manualModeChange
-          ? {
-              ...nextView,
-              projectorTimeline: {
-                ...normalizeProjectorTimelineState(nextView.projectorTimeline),
-                playing: false,
-                stepStartedAt: null,
-              },
-            }
-          : nextView;
-      await saveStoredPublicView(payload.quizId, nextViewFinal);
-      if (timelineWasPlaying && manualModeChange) {
-        await markTimelineInactive(payload.quizId);
+      let nextViewFinal = nextView;
+      if (manualModeChange) {
+        const newMode = payload.mode as string;
+        // Снятие интерактива (legacy title) или возврат к режиму текущего шага → resume.
+        const shouldResume =
+          newMode === "title" || (typeof stepMode === "string" && newMode === stepMode);
+        if (shouldResume) {
+          // Сохраняем прочие поля патча, затем resume перезапишет mode шагом таймлайна.
+          await saveStoredPublicView(payload.quizId, {
+            ...nextView,
+            projectorTimeline: {
+              ...normalizeProjectorTimelineState(nextView.projectorTimeline),
+              suppressed: true,
+            },
+          });
+          nextViewFinal = await resumeTimelineAfterOverride(io, payload.quizId);
+        } else {
+          nextViewFinal = {
+            ...nextView,
+            projectorTimeline: {
+              ...normalizeProjectorTimelineState(nextView.projectorTimeline),
+              suppressed: true,
+              playing: false,
+            },
+          };
+          await saveStoredPublicView(payload.quizId, nextViewFinal);
+          await suspendTimelineForOverride(io, payload.quizId, nextViewFinal);
+        }
+      } else {
+        await saveStoredPublicView(payload.quizId, nextViewFinal);
       }
       const removedMediaUrls = findRemovedLocalMediaUrls(prevView, nextViewFinal);
       if (removedMediaUrls.length > 0) {

@@ -1,3 +1,4 @@
+import type { NetworkingJoinFormFields, NetworkingJoinFormMode } from "@meyouquize/shared";
 import type { ActiveFeedbackForm } from "../../types/feedback";
 
 export type ActiveQuestion = {
@@ -106,6 +107,9 @@ export type QuizState = {
   playerAutoJoinRandomNickname?: boolean;
   /** Опциональный модуль нетворкинга внутри квиза. */
   networkingEnabled?: boolean;
+  /** Форма входа при нетворкинге: interactive | networking | pharma. */
+  networkingJoinFormMode?: NetworkingJoinFormMode;
+  networkingJoinFormFields?: NetworkingJoinFormFields;
   playerBanners?: Array<{
     id: string;
     linkUrl: string;
@@ -163,6 +167,9 @@ export type QuizState = {
   brandPlayerBackgroundImageUrl?: string;
   brandProjectorBackgroundImageUrl?: string;
   brandBodyBackgroundColor?: string;
+  networkingProfileBackgroundColor?: string;
+  networkingProfileTextColor?: string;
+  networkingNavIconColor?: string;
   reactionSession?: ReactionSession | null;
   status: string;
   /** Сумма начисленных баллов по квизу (только в payload для игрока по сокету). */

@@ -60,6 +60,11 @@ const PLAYER_ONLY_PUBLIC_VIEW_KEYS = [
   "speakerQuestionsSpeakers",
   "speakerQuestionsReactions",
   "speakerQuestionsAllowAllSpeakersTarget",
+  /** Форма входа игрока при нетворкинге — только UI гостя/админки, не проектор. */
+  "networkingJoinFormMode",
+  "networkingJoinFormFields",
+  /** Цвет иконок нижней навигации — только игрок. */
+  "networkingNavIconColor",
 ] as const satisfies ReadonlyArray<keyof PublicViewState>;
 
 const PLAYER_ONLY_KEY_SET = new Set<string>(PLAYER_ONLY_PUBLIC_VIEW_KEYS);
@@ -85,6 +90,9 @@ const PROJECTOR_BRANDING_KEYS = [
   "projectorJoinQrOverlayInsetHorizontalPx",
   "projectorJoinQrOverlayInsetPx",
   "projectorJoinQrOverlayCorner",
+  "networkingProfileBackgroundColor",
+  "networkingProfileTextColor",
+  "networkingProjectorIconColor",
 ] as const satisfies ReadonlyArray<keyof PublicViewState>;
 
 /** Визуальный брендинг / тема — не слать при emit без явного patch (как player-only). */
@@ -116,6 +124,7 @@ const BRANDING_EMIT_GUARD_KEYS = [
   "geoPollScreenBackground",
   "projectorTimeline",
   "networkingEnabled",
+  "networkingNavIconColor",
 ] as const satisfies ReadonlyArray<keyof PublicViewState>;
 
 const BRANDING_EMIT_GUARD_KEY_SET = new Set<string>(BRANDING_EMIT_GUARD_KEYS);
@@ -234,6 +243,29 @@ const DEBATE_SERIES_MODE_KEYS = [
   "voteProgressBarColor",
 ] as const satisfies ReadonlyArray<keyof PublicViewState>;
 
+const NETWORKING_PROFILES_MODE_KEYS = [
+  "networkingSpotlightGuests",
+  "networkingEnabled",
+  "projectorTimeline",
+  "voteOptionTextColor",
+  "networkingProfileBackgroundColor",
+  "networkingProfileTextColor",
+] as const satisfies ReadonlyArray<keyof PublicViewState>;
+
+const NETWORKING_STATS_MODE_KEYS = [
+  "networkingStats",
+  "networkingEnabled",
+  "voteOptionTextColor",
+  "networkingProjectorIconColor",
+] as const satisfies ReadonlyArray<keyof PublicViewState>;
+
+const JOIN_QR_MODE_KEYS = [
+  "projectorJoinQrText",
+  "projectorJoinQrTextColor",
+  "projectorContentMaxWidthPx",
+  "voteOptionTextColor",
+] as const satisfies ReadonlyArray<keyof PublicViewState>;
+
 const DEBATE_COMPARE_MODE_KEYS = [
   "debateCompareQuestionId",
   "showVoteCount",
@@ -326,6 +358,25 @@ export function pickProjectorPublicViewState(view: PublicViewState): PublicViewS
         ...branding,
         ...pickViewKeys(resolved, DEBATE_COMPARE_MODE_KEYS),
         tagCloudManualByQuestionId: resolved.tagCloudManualByQuestionId,
+      } as PublicViewState;
+    case "networking_profiles":
+    case "networking_incomplete":
+      return {
+        mode,
+        ...branding,
+        ...pickViewKeys(resolved, NETWORKING_PROFILES_MODE_KEYS),
+      } as PublicViewState;
+    case "networking_stats":
+      return {
+        mode,
+        ...branding,
+        ...pickViewKeys(resolved, NETWORKING_STATS_MODE_KEYS),
+      } as PublicViewState;
+    case "join_qr":
+      return {
+        mode,
+        ...branding,
+        ...pickViewKeys(resolved, JOIN_QR_MODE_KEYS),
       } as PublicViewState;
     default:
       return { mode, ...branding } as unknown as PublicViewState;

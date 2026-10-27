@@ -1,5 +1,11 @@
 import { io } from "socket.io-client";
 import { SOCKET_URL } from "./config";
+import { armQuizJoinedRelay } from "./features/quizPlay/quizJoinedRelay";
+import {
+  clearEngineSessionId,
+  shouldClearEngineSessionOnDisconnect,
+  shouldPreferPollingOnly,
+} from "./socketTransportPolicy";
 
 /**
  * После `Set-Cookie` при логине браузер не обновляет заголовки уже установленного
@@ -10,14 +16,29 @@ export function disconnectSocketForCookieRefresh(): void {
   if (socket.connected) socket.disconnect();
 }
 
+const preferPollingOnly = shouldPreferPollingOnly({
+  userAgent: typeof navigator !== "undefined" ? navigator.userAgent : "",
+  pageHostname: typeof window !== "undefined" ? window.location.hostname || "" : "",
+  pagePort: typeof window !== "undefined" ? window.location.port || "" : "",
+  pageOrigin: typeof window !== "undefined" ? window.location.origin : "http://localhost",
+  socketUrl: SOCKET_URL,
+});
+
 export const socket = io(SOCKET_URL, {
   withCredentials: true,
   autoConnect: false,
   // При пике нагрузки на сервере дефолтный handshake 20s даёт connect_error "timeout" в админке.
   timeout: 45_000,
-  transports: ["websocket", "polling"],
-  upgrade: true,
-  rememberUpgrade: true,
+  ...(preferPollingOnly
+    ? {
+        transports: ["polling"] as const,
+        upgrade: false,
+      }
+    : {
+        transports: ["polling", "websocket"] as const,
+        upgrade: true,
+      }),
+  rememberUpgrade: false,
   reconnection: true,
   reconnectionAttempts: Infinity,
   reconnectionDelay: 500,
@@ -29,6 +50,9 @@ let hadSuccessfulConnect = false;
 
 socket.on("disconnect", (reason) => {
   console.info("[mq-socket] disconnected", { reason });
+  if (shouldClearEngineSessionOnDisconnect(reason)) {
+    clearEngineSessionId(socket.io?.engine);
+  }
 });
 
 socket.on("connect", () => {
@@ -55,3 +79,5 @@ socket.io.on("reconnect_failed", () => {
 socket.on("connect_error", (err) => {
   console.warn("[mq-socket] connect_error", err instanceof Error ? err.message : err);
 });
+
+armQuizJoinedRelay(socket);

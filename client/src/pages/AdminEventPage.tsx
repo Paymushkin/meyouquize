@@ -77,7 +77,6 @@ import {
   type SubQuizSheet,
 } from "../admin/adminEventForm";
 import {
-  leaderboardPlaceByScore,
   type LeaderboardItem,
   type LeaderboardSort,
   type QuestionResult,
@@ -117,7 +116,11 @@ function isSupportedPublicMode(mode: unknown): mode is PublicViewMode {
     mode === "video_wall" ||
     mode === "report" ||
     mode === "debate_compare" ||
-    mode === "debate_series"
+    mode === "debate_series" ||
+    mode === "networking_profiles" ||
+    mode === "networking_stats" ||
+    mode === "networking_incomplete" ||
+    mode === "join_qr"
   );
 }
 
@@ -203,7 +206,7 @@ export function AdminEventPage() {
   const [confirmResetDemoOpen, setConfirmResetDemoOpen] = useState(false);
   const [voteListManageMode, setVoteListManageMode] = useState(false);
   const [questionResults, setQuestionResults] = useState<QuestionResult[]>([]);
-  const [leaderboard, setLeaderboard] = useState<LeaderboardItem[]>([]);
+  const [, setLeaderboard] = useState<LeaderboardItem[]>([]);
   const [leaderboardSort, setLeaderboardSort] = useState<LeaderboardSort>(() => {
     if (typeof window === "undefined") return "place_asc";
     try {
@@ -374,8 +377,6 @@ export function AdminEventPage() {
 
   const photoWall = useAdminPhotoWall({
     emitPublicViewPatch: (patch) => emitPublicViewPatchRef.current(patch),
-    setPublicResultsView: (mode, questionId, patch) =>
-      setPublicResultsViewRef.current(mode, questionId, patch),
   });
 
   const projectorTimeline = useAdminProjectorTimeline(quizId);
@@ -688,34 +689,6 @@ export function AdminEventPage() {
     setResultsSubQuizId(leaderboardsBySubQuiz[0]?.subQuizId ?? "");
   }, [leaderboardsBySubQuiz, eventName, resultsSubQuizId]);
 
-  const leaderboardForTable = useMemo(() => {
-    const hit = leaderboardsBySubQuiz.find((x) => x.subQuizId === resultsSubQuizId);
-    return hit?.rows ?? leaderboard;
-  }, [leaderboardsBySubQuiz, resultsSubQuizId, leaderboard]);
-
-  const displayedLeaderboard = useMemo(() => {
-    const sorted = [...leaderboardForTable];
-    if (leaderboardSort === "place_asc" || leaderboardSort === "place_desc") {
-      const placeMap = leaderboardPlaceByScore(leaderboardForTable);
-      sorted.sort((a, b) => {
-        const pa = placeMap.get(a.participantId) ?? Number.MAX_SAFE_INTEGER;
-        const pb = placeMap.get(b.participantId) ?? Number.MAX_SAFE_INTEGER;
-        if (pa !== pb) {
-          return leaderboardSort === "place_asc" ? pa - pb : pb - pa;
-        }
-        return a.nickname.localeCompare(b.nickname, "ru");
-      });
-      return sorted;
-    }
-    sorted.sort((a, b) => {
-      if (leaderboardSort === "score_desc") return b.score - a.score;
-      if (leaderboardSort === "score_asc") return a.score - b.score;
-      if (leaderboardSort === "name_desc") return b.nickname.localeCompare(a.nickname, "ru");
-      return a.nickname.localeCompare(b.nickname, "ru");
-    });
-    return sorted;
-  }, [leaderboardForTable, leaderboardSort]);
-
   useEffect(() => {
     if (typeof window === "undefined") return;
     const payload = {
@@ -781,6 +754,10 @@ export function AdminEventPage() {
     setPlayerVoteOptionTextColor: branding.setPlayerVoteOptionTextColor,
     setPlayerVoteProgressTrackColor: branding.setPlayerVoteProgressTrackColor,
     setPlayerVoteProgressBarColor: branding.setPlayerVoteProgressBarColor,
+    setNetworkingProfileBackgroundColor: branding.setNetworkingProfileBackgroundColor,
+    setNetworkingProfileTextColor: branding.setNetworkingProfileTextColor,
+    setNetworkingProjectorIconColor: branding.setNetworkingProjectorIconColor,
+    setNetworkingNavIconColor: branding.setNetworkingNavIconColor,
     setProjectorJoinQrVisible: branding.setProjectorJoinQrVisible,
     setProjectorBrowserZoom: branding.setProjectorBrowserZoom,
     setProjectorContentMaxWidthPx: branding.setProjectorContentMaxWidthPx,
@@ -850,6 +827,10 @@ export function AdminEventPage() {
     playerVoteOptionTextColor: branding.playerVoteOptionTextColor,
     playerVoteProgressTrackColor: branding.playerVoteProgressTrackColor,
     playerVoteProgressBarColor: branding.playerVoteProgressBarColor,
+    networkingProfileBackgroundColor: branding.networkingProfileBackgroundColor,
+    networkingProfileTextColor: branding.networkingProfileTextColor,
+    networkingProjectorIconColor: branding.networkingProjectorIconColor,
+    networkingNavIconColor: branding.networkingNavIconColor,
     projectorJoinQrVisible: branding.projectorJoinQrVisible,
     projectorBrowserZoom: branding.projectorBrowserZoom,
     projectorContentMaxWidthPx: branding.projectorContentMaxWidthPx,
@@ -1264,6 +1245,14 @@ export function AdminEventPage() {
     setPlayerVoteOptionTextColor: branding.setPlayerVoteOptionTextColor,
     playerVoteProgressBarColor: branding.playerVoteProgressBarColor,
     setPlayerVoteProgressBarColor: branding.setPlayerVoteProgressBarColor,
+    networkingProfileBackgroundColor: branding.networkingProfileBackgroundColor,
+    setNetworkingProfileBackgroundColor: branding.setNetworkingProfileBackgroundColor,
+    networkingProfileTextColor: branding.networkingProfileTextColor,
+    setNetworkingProfileTextColor: branding.setNetworkingProfileTextColor,
+    networkingProjectorIconColor: branding.networkingProjectorIconColor,
+    setNetworkingProjectorIconColor: branding.setNetworkingProjectorIconColor,
+    networkingNavIconColor: branding.networkingNavIconColor,
+    setNetworkingNavIconColor: branding.setNetworkingNavIconColor,
     projectorJoinQrOverlayVisible: branding.projectorJoinQrOverlayVisible,
     setProjectorJoinQrOverlayVisible: branding.setProjectorJoinQrOverlayVisible,
     projectorJoinQrOverlaySizePx: branding.projectorJoinQrOverlaySizePx,
@@ -1328,30 +1317,6 @@ export function AdminEventPage() {
     if (!quizId) return;
     socket.emit("admin:answers:reset-all", { quizId });
     setMessage("Все ответы и ручные правки результатов в комнате обнулены");
-  }
-
-  function exportLeaderboardCsv() {
-    const placeMap = leaderboardPlaceByScore(displayedLeaderboard);
-    const rows = displayedLeaderboard.map((item) => ({
-      place: placeMap.get(item.participantId) ?? 0,
-      nickname: item.nickname,
-      score: item.score,
-    }));
-    const escapeCsv = (value: string | number) => `"${String(value).replaceAll('"', '""')}"`;
-    const header = ["Место", "Участник", "Баллы"];
-    const csvContent = [
-      header.map(escapeCsv).join(","),
-      ...rows.map((row) => [row.place, row.nickname, row.score].map(escapeCsv).join(",")),
-    ].join("\n");
-    const blob = new Blob(["\uFEFF" + csvContent], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = `leaderboard-${eventName || "quiz"}.csv`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
   }
 
   const resetDemoToDefault = useCallback(async () => {
@@ -1670,19 +1635,6 @@ export function AdminEventPage() {
     ],
   );
 
-  const onSelectResultsSubQuiz = useCallback(
-    (subQuizId: string) => {
-      setResultsSubQuizId(subQuizId);
-      if (publicViewMode === "leaderboard" && quizId) {
-        emitPublicViewSet({
-          mode: "leaderboard",
-          leaderboardSubQuizId: subQuizId,
-        });
-      }
-    },
-    [publicViewMode, quizId, emitPublicViewSet],
-  );
-
   return (
     <Container
       maxWidth={false}
@@ -1825,6 +1777,18 @@ export function AdminEventPage() {
                     playerAutoJoinRandomNickname: playerTiles.playerAutoJoinRandomNickname,
                     onTogglePlayerAutoJoinRandomNickname:
                       playerTiles.updatePlayerAutoJoinRandomNickname,
+                    networkingEnabled: projectorTimeline.networkingEnabled,
+                    onNetworkingEnabledChange: projectorTimeline.setNetworkingEnabledRemote,
+                    networkingJoinFormMode: projectorTimeline.networkingJoinFormMode,
+                    onNetworkingJoinFormModeChange: (mode) => {
+                      projectorTimeline.setNetworkingJoinFormMode(mode);
+                      emitPublicViewPatch({ networkingJoinFormMode: mode });
+                    },
+                    networkingJoinFormFields: projectorTimeline.networkingJoinFormFields,
+                    onNetworkingJoinFormFieldsChange: (fields) => {
+                      projectorTimeline.setNetworkingJoinFormFields(fields);
+                      emitPublicViewPatch({ networkingJoinFormFields: fields });
+                    },
                     projectorJoinQrVisible: branding.projectorJoinQrVisible,
                     setProjectorJoinQrVisible: branding.setProjectorJoinQrVisible,
                     projectorBrowserZoom: branding.projectorBrowserZoom,
@@ -1836,17 +1800,13 @@ export function AdminEventPage() {
                     projectorJoinQrTextColor: branding.projectorJoinQrTextColor,
                     setProjectorJoinQrTextColor: branding.setProjectorJoinQrTextColor,
                     emitBrandingPatch,
+                  }}
+                  projector={{
                     timeline: projectorTimeline,
-                    timelineQuestions: questionForms
-                      .map((q, i) => ({
-                        id: q.id ?? `draft-${i}`,
-                        label: `${i + 1}. ${(q.text ?? "").trim() || "Без текста"}`,
-                      }))
-                      .filter((q) => !q.id.startsWith("draft-")),
-                    timelineSubQuizzes: subQuizSheets.map((s) => ({
-                      id: s.id,
-                      label: s.title.trim() || "Без названия",
-                    })),
+                    photoWallAvailable:
+                      Boolean(photoWall.baseUrl.trim()) && photoWall.imageCount > 0,
+                    videoWallAvailable:
+                      videoWall.horizontalItems.length > 0 || videoWall.verticalItems.length > 0,
                   }}
                   questions={{
                     roomQuestionsTab,
@@ -1937,29 +1897,19 @@ export function AdminEventPage() {
                     uploadBannerMedia,
                     onUploadError: setMessage,
                   }}
-                  photoWall={{
-                    publicViewMode,
-                    ...photoWall,
-                  }}
+                  photoWall={photoWall}
                   videoWall={{
                     publicViewMode,
                     ...videoWall,
                     uploadMedia: uploadBannerMedia,
                     onUploadError: setMessage,
                   }}
-                  branding={brandingProps}
-                  results={{
-                    leaderboardSort,
-                    setLeaderboardSort,
-                    displayedLeaderboard,
-                    exportLeaderboardCsv,
-                    leaderboardsBySubQuiz: leaderboardsBySubQuiz.map((x) => ({
-                      subQuizId: x.subQuizId,
-                      title: x.title,
-                    })),
-                    resultsSubQuizId,
-                    onSelectResultsSubQuiz,
+                  more={{
+                    eventName,
+                    onResetAllAnswers: resetAllAnswers,
+                    onRequestResetDemo: () => setConfirmResetDemoOpen(true),
                   }}
+                  branding={brandingProps}
                   report={{
                     roomSlug: room.slug,
                     adminReport,
@@ -1969,11 +1919,6 @@ export function AdminEventPage() {
                     availableQuizQuestions,
                     availableVoteQuestions,
                     setMessage,
-                  }}
-                  danger={{
-                    eventName,
-                    onResetAllAnswers: resetAllAnswers,
-                    onRequestResetDemo: () => setConfirmResetDemoOpen(true),
                   }}
                 />
               </Stack>

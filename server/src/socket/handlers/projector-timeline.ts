@@ -1,4 +1,5 @@
 import {
+  isProjectorTimelineAdvancing,
   normalizeProjectorTimelineState,
   type ProjectorTimelineState,
   type ProjectorTimelineStep,
@@ -7,14 +8,12 @@ import type { Server } from "socket.io";
 import { z } from "zod";
 import {
   applyTimelineStepAndBroadcast,
+  freezeTimelineStep,
   markTimelineActive,
-  markTimelineInactive,
+  unfreezeTimeline,
 } from "../../projector-timeline-sequencer.js";
 import { assertAdmin, fail, type EnrichedSocket } from "../handler-common.js";
-import { toPublicViewPayload } from "../public-view-helpers.js";
-import { getStoredPublicView, saveStoredPublicView } from "../public-view-store.js";
-import { emitToQuizDashboard } from "../quiz-rooms.js";
-import { getQuizPublicState } from "../../quiz-service.js";
+import { getStoredPublicView } from "../public-view-store.js";
 
 const stepSchema = z.object({
   id: z.string().trim().min(1).max(80),
@@ -29,6 +28,10 @@ const stepSchema = z.object({
     "video_wall",
     "debate_compare",
     "debate_series",
+    "networking_profiles",
+    "networking_stats",
+    "networking_incomplete",
+    "join_qr",
   ]),
   questionId: z.string().trim().min(1).max(80).optional(),
   debateCompareQuestionId: z.string().trim().min(1).max(80).optional(),
@@ -47,14 +50,20 @@ const quizIdSchema = z.object({
   quizId: z.string().min(1),
 });
 
-async function broadcastView(
-  io: Server,
+const freezeSchema = z.object({
+  quizId: z.string().min(1),
+  stepIndex: z.number().int().min(0).max(99),
+});
+
+function emitTimelineUpdated(
+  socket: EnrichedSocket,
   quizId: string,
-  view: Awaited<ReturnType<typeof getStoredPublicView>>,
+  projectorTimeline: ProjectorTimelineState,
 ) {
-  const quiz = await getQuizPublicState(quizId);
-  if (!quiz) return;
-  emitToQuizDashboard(io, quizId, "results:public:view", toPublicViewPayload(view, quiz.title));
+  socket.emit("admin:projector-timeline:updated", {
+    quizId,
+    projectorTimeline,
+  });
 }
 
 export function registerProjectorTimelineHandlers(socket: EnrichedSocket, io: Server) {
@@ -64,127 +73,63 @@ export function registerProjectorTimelineHandlers(socket: EnrichedSocket, io: Se
       const payload = setStepsSchema.parse(raw);
       const view = await getStoredPublicView(payload.quizId);
       const prev = normalizeProjectorTimelineState(view.projectorTimeline);
+      const steps = payload.steps as ProjectorTimelineStep[];
       const nextTimeline: ProjectorTimelineState = normalizeProjectorTimelineState({
         ...prev,
-        steps: payload.steps as ProjectorTimelineStep[],
-        enabled: payload.enabled ?? (payload.steps.length > 0 ? true : prev.enabled),
-        cursor: Math.min(prev.cursor, Math.max(0, payload.steps.length - 1)),
-        playing: prev.playing && payload.steps.length > 0,
+        steps,
+        enabled: payload.enabled ?? true,
+        cursor: Math.min(prev.cursor, Math.max(0, Math.max(steps.length, 1) - 1)),
+        frozen: prev.frozen,
+        // Редактирование плейлиста снимает override и сразу показывает текущий шаг.
+        suppressed: false,
+        stepStartedAt: Date.now(),
       });
-      const next = { ...view, projectorTimeline: nextTimeline };
-      await saveStoredPublicView(payload.quizId, next);
-      if (!nextTimeline.playing) await markTimelineInactive(payload.quizId);
-      await broadcastView(io, payload.quizId, next);
-      socket.emit("admin:projector-timeline:updated", {
-        quizId: payload.quizId,
-        projectorTimeline: nextTimeline,
-      });
+      nextTimeline.playing = isProjectorTimelineAdvancing(nextTimeline);
+
+      // normalize всегда оставляет ≥1 шаг (дефолтный QR); таймлайн active без Play.
+      const applied = await applyTimelineStepAndBroadcast(io, payload.quizId, view, nextTimeline);
+      await markTimelineActive(payload.quizId);
+      emitTimelineUpdated(
+        socket,
+        payload.quizId,
+        normalizeProjectorTimelineState(applied.projectorTimeline),
+      );
     } catch (error) {
       fail(socket, error instanceof Error ? error.message : "Set timeline steps failed");
     }
   });
 
-  socket.on("admin:projector-timeline:play", async (raw: unknown) => {
+  socket.on("admin:projector-timeline:freeze", async (raw: unknown) => {
     try {
       await assertAdmin(socket);
-      const { quizId } = quizIdSchema.parse(raw);
+      const { quizId, stepIndex } = freezeSchema.parse(raw);
       const view = await getStoredPublicView(quizId);
       const timeline = normalizeProjectorTimelineState(view.projectorTimeline);
-      if (timeline.steps.length === 0) {
-        throw new Error("Timeline has no steps");
+      // Повторный freeze на том же шаге → unfreeze.
+      if (timeline.frozen && timeline.cursor === stepIndex) {
+        const next = await unfreezeTimeline(io, quizId);
+        emitTimelineUpdated(
+          socket,
+          quizId,
+          normalizeProjectorTimelineState(next.projectorTimeline),
+        );
+        return;
       }
-      const nextTimeline: ProjectorTimelineState = {
-        ...timeline,
-        enabled: true,
-        playing: true,
-        stepStartedAt: Date.now(),
-      };
-      await applyTimelineStepAndBroadcast(io, quizId, view, nextTimeline);
-      await markTimelineActive(quizId);
-      socket.emit("admin:projector-timeline:updated", {
-        quizId,
-        projectorTimeline: nextTimeline,
-      });
+      const next = await freezeTimelineStep(io, quizId, stepIndex);
+      emitTimelineUpdated(socket, quizId, normalizeProjectorTimelineState(next.projectorTimeline));
     } catch (error) {
-      fail(socket, error instanceof Error ? error.message : "Timeline play failed");
+      fail(socket, error instanceof Error ? error.message : "Timeline freeze failed");
     }
   });
 
-  socket.on("admin:projector-timeline:pause", async (raw: unknown) => {
+  socket.on("admin:projector-timeline:unfreeze", async (raw: unknown) => {
     try {
       await assertAdmin(socket);
       const { quizId } = quizIdSchema.parse(raw);
-      const view = await getStoredPublicView(quizId);
-      const timeline = normalizeProjectorTimelineState(view.projectorTimeline);
-      const nextTimeline: ProjectorTimelineState = {
-        ...timeline,
-        playing: false,
-        stepStartedAt: null,
-      };
-      const next = { ...view, projectorTimeline: nextTimeline };
-      await saveStoredPublicView(quizId, next);
-      await markTimelineInactive(quizId);
-      await broadcastView(io, quizId, next);
-      socket.emit("admin:projector-timeline:updated", {
-        quizId,
-        projectorTimeline: nextTimeline,
-      });
+      const next = await unfreezeTimeline(io, quizId);
+      emitTimelineUpdated(socket, quizId, normalizeProjectorTimelineState(next.projectorTimeline));
     } catch (error) {
-      fail(socket, error instanceof Error ? error.message : "Timeline pause failed");
-    }
-  });
-
-  socket.on("admin:projector-timeline:skip", async (raw: unknown) => {
-    try {
-      await assertAdmin(socket);
-      const { quizId } = quizIdSchema.parse(raw);
-      const view = await getStoredPublicView(quizId);
-      const timeline = normalizeProjectorTimelineState(view.projectorTimeline);
-      if (timeline.steps.length === 0) throw new Error("Timeline has no steps");
-      const nextCursor = (timeline.cursor + 1) % timeline.steps.length;
-      const nextTimeline: ProjectorTimelineState = {
-        ...timeline,
-        enabled: true,
-        playing: true,
-        cursor: nextCursor,
-        stepStartedAt: Date.now(),
-      };
-      await applyTimelineStepAndBroadcast(io, quizId, view, nextTimeline);
-      socket.emit("admin:projector-timeline:updated", {
-        quizId,
-        projectorTimeline: nextTimeline,
-      });
-    } catch (error) {
-      fail(socket, error instanceof Error ? error.message : "Timeline skip failed");
-    }
-  });
-
-  socket.on("admin:projector-timeline:stop", async (raw: unknown) => {
-    try {
-      await assertAdmin(socket);
-      const { quizId } = quizIdSchema.parse(raw);
-      const view = await getStoredPublicView(quizId);
-      const timeline = normalizeProjectorTimelineState(view.projectorTimeline);
-      const nextTimeline: ProjectorTimelineState = {
-        ...timeline,
-        playing: false,
-        cursor: 0,
-        stepStartedAt: null,
-      };
-      const next = {
-        ...view,
-        mode: "title" as const,
-        projectorTimeline: nextTimeline,
-      };
-      await saveStoredPublicView(quizId, next);
-      await markTimelineInactive(quizId);
-      await broadcastView(io, quizId, next);
-      socket.emit("admin:projector-timeline:updated", {
-        quizId,
-        projectorTimeline: nextTimeline,
-      });
-    } catch (error) {
-      fail(socket, error instanceof Error ? error.message : "Timeline stop failed");
+      fail(socket, error instanceof Error ? error.message : "Timeline unfreeze failed");
     }
   });
 }

@@ -11,6 +11,8 @@ import { AdminRoomsPage } from "./pages/AdminRoomsPage";
 import { AdminThemesPage } from "./pages/AdminThemesPage";
 import { AdminThemeEditorPage } from "./pages/AdminThemeEditorPage";
 import { AdminFontsPage } from "./pages/AdminFontsPage";
+import { AdminGuestsPage } from "./pages/AdminGuestsPage";
+import { AdminResultsPage } from "./pages/AdminResultsPage";
 import { AdminEventRoute } from "./pages/AdminEventRoute";
 import { AdminVoteDetailPage } from "./pages/AdminVoteDetailPage";
 import { AdminSubQuizResultsPage } from "./pages/AdminSubQuizResultsPage";
@@ -138,6 +140,8 @@ function App() {
               path=":eventName/sub-quizzes/:subQuizId/results"
               element={<AdminSubQuizResultsPage />}
             />
+            <Route path=":eventName/guests" element={<AdminGuestsPage />} />
+            <Route path=":eventName/results" element={<AdminResultsPage />} />
             <Route path=":eventName" element={<AdminEventRoute />} />
           </Route>
           <Route path="/403" element={<ForbiddenPage />} />

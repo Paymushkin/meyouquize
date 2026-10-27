@@ -1,17 +1,23 @@
 import PhotoCameraIcon from "@mui/icons-material/PhotoCamera";
 import {
   Avatar,
+  Box,
   Button,
+  CircularProgress,
   Dialog,
   DialogActions,
   DialogContent,
   DialogTitle,
-  FormControlLabel,
+  IconButton,
   Stack,
-  Switch,
   TextField,
   Typography,
 } from "@mui/material";
+import {
+  getNetworkingJoinFieldVisibility,
+  type NetworkingJoinFormFields,
+  type NetworkingJoinFormMode,
+} from "@meyouquize/shared";
 import { useEffect, useRef, useState } from "react";
 import type { NetworkingProfile } from "../../../features/quizPlay/usePlayerNetworking";
 import { API_BASE } from "../../../config";
@@ -25,12 +31,30 @@ import {
 } from "../playerDialogStyles";
 import { buildBrandPrimaryContainedButtonSx } from "../../../pages/quiz-play/QuizPlayBrandingBlocks";
 
+type ProfileDraftSource = {
+  fullName?: string;
+  jobTitle?: string;
+  company?: string;
+  avatarUrl?: string;
+  offers?: string;
+  seeking?: string;
+  visibleInDirectory?: boolean;
+};
+
 type Props = {
   open: boolean;
   onClose: () => void;
   quizId: string;
+  /** Никнейм участника — буква на аватаре, если ФИО пустое (как в списке гостей). */
+  nickname: string;
   profile: NetworkingProfile | null;
+  /** Fallback, если profile ещё null (например карточка «я» в списке гостей). */
+  fallbackProfile?: ProfileDraftSource | null;
   onSave: (patch: Partial<NetworkingProfile>) => void;
+  onOpenRefresh?: () => void;
+  /** Как форма входа: networking / pharma (interactive — только ФИО). */
+  mode?: NetworkingJoinFormMode;
+  fields?: NetworkingJoinFormFields;
   brandFontFamily: string;
   brandPrimaryColor: string;
   formBackgroundColor: string;
@@ -38,43 +62,64 @@ type Props = {
   formInputTextColor: string;
 };
 
+function buildDraft(
+  profile: NetworkingProfile | null,
+  fallback: ProfileDraftSource | null | undefined,
+  nickname: string,
+): NetworkingProfile {
+  const fullName = profile?.fullName?.trim() || fallback?.fullName?.trim() || nickname.trim() || "";
+  return {
+    fullName,
+    jobTitle: profile?.jobTitle?.trim() || fallback?.jobTitle?.trim() || "",
+    company: profile?.company?.trim() || fallback?.company?.trim() || "",
+    avatarUrl: profile?.avatarUrl?.trim() || fallback?.avatarUrl?.trim() || "",
+    offers: profile?.offers?.trim() || fallback?.offers?.trim() || "",
+    seeking: profile?.seeking?.trim() || fallback?.seeking?.trim() || "",
+    visibleInDirectory: profile?.visibleInDirectory ?? fallback?.visibleInDirectory ?? true,
+  };
+}
+
 export function PlayerNetworkingProfileDialog(props: Props) {
   const {
     open,
     onClose,
     quizId,
+    nickname,
     profile,
+    fallbackProfile,
     onSave,
+    onOpenRefresh,
+    mode = "networking",
+    fields,
     brandFontFamily,
-    brandPrimaryColor,
     formBackgroundColor,
     formTextColor,
     formInputTextColor,
   } = props;
-  const [draft, setDraft] = useState<NetworkingProfile>({
-    fullName: "",
-    company: "",
-    avatarUrl: "",
-    offers: "",
-    seeking: "",
-    visibleInDirectory: true,
-  });
+  const visibility = getNetworkingJoinFieldVisibility(mode, fields);
+  const [draft, setDraft] = useState<NetworkingProfile>(() =>
+    buildDraft(profile, fallbackProfile, nickname),
+  );
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const [avatarError, setAvatarError] = useState("");
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const draftTouchedRef = useRef(false);
 
   useEffect(() => {
-    if (!open) return;
+    if (!open) {
+      draftTouchedRef.current = false;
+      return;
+    }
     setAvatarError("");
-    setDraft({
-      fullName: profile?.fullName ?? "",
-      company: profile?.company ?? "",
-      avatarUrl: profile?.avatarUrl ?? "",
-      offers: profile?.offers ?? "",
-      seeking: profile?.seeking ?? "",
-      visibleInDirectory: profile?.visibleInDirectory ?? true,
-    });
-  }, [open, profile]);
+    draftTouchedRef.current = false;
+    setDraft(buildDraft(profile, fallbackProfile, nickname));
+    onOpenRefresh?.();
+  }, [open]); // eslint-disable-line react-hooks/exhaustive-deps -- только при открытии
+
+  useEffect(() => {
+    if (!open || draftTouchedRef.current) return;
+    setDraft(buildDraft(profile, fallbackProfile, nickname));
+  }, [open, profile, fallbackProfile, nickname]);
 
   async function uploadAvatar(file: File) {
     setAvatarError("");
@@ -94,6 +139,7 @@ export function PlayerNetworkingProfileDialog(props: Props) {
       }
       const data = (await response.json()) as { url?: string };
       if (!data.url) throw new Error("Не удалось загрузить фото");
+      draftTouchedRef.current = true;
       setDraft((prev) => ({ ...prev, avatarUrl: data.url! }));
     } catch (err) {
       setAvatarError(err instanceof Error ? err.message : "Не удалось загрузить фото");
@@ -107,6 +153,7 @@ export function PlayerNetworkingProfileDialog(props: Props) {
     formInputTextColor,
     brandFontFamily,
   );
+  const avatarLetter = (draft.fullName.trim() || nickname.trim() || "?").slice(0, 1).toUpperCase();
 
   return (
     <Dialog
@@ -119,31 +166,59 @@ export function PlayerNetworkingProfileDialog(props: Props) {
       <DialogTitle sx={PLAYER_DIALOG_TITLE_SX}>Мой профиль</DialogTitle>
       <DialogContent sx={PLAYER_DIALOG_CONTENT_SX}>
         <Stack spacing={1.5} sx={{ mt: 0.5 }} alignItems="center">
-          <Avatar
-            src={draft.avatarUrl ? resolveClientAssetUrl(draft.avatarUrl) : undefined}
-            sx={{ width: 88, height: 88, bgcolor: "grey.300", fontSize: "1.75rem" }}
-          >
-            {(draft.fullName.trim() || "?").slice(0, 1).toUpperCase()}
-          </Avatar>
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept="image/jpeg,image/png,image/webp,image/gif"
-            hidden
-            onChange={(e) => {
-              const file = e.target.files?.[0];
-              e.target.value = "";
-              if (file) void uploadAvatar(file);
-            }}
-          />
-          <Button
-            variant="outlined"
-            startIcon={<PhotoCameraIcon />}
-            disabled={uploadingAvatar}
-            onClick={() => fileInputRef.current?.click()}
-          >
-            {uploadingAvatar ? "Загрузка…" : draft.avatarUrl ? "Сменить фото" : "Загрузить фото"}
-          </Button>
+          <Box sx={{ position: "relative", width: 104, height: 104 }}>
+            <Avatar
+              src={draft.avatarUrl ? resolveClientAssetUrl(draft.avatarUrl) : undefined}
+              imgProps={{
+                onError: () => {
+                  draftTouchedRef.current = true;
+                  setDraft((prev) => (prev.avatarUrl ? { ...prev, avatarUrl: "" } : prev));
+                },
+              }}
+              sx={{ width: 104, height: 104, bgcolor: "grey.300", fontSize: "2rem" }}
+            >
+              {avatarLetter}
+            </Avatar>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/jpeg,image/png,image/webp,image/gif"
+              hidden
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                e.target.value = "";
+                if (file) void uploadAvatar(file);
+              }}
+            />
+            <IconButton
+              aria-label={draft.avatarUrl ? "Сменить фото" : "Загрузить фото"}
+              disabled={uploadingAvatar}
+              onClick={() => fileInputRef.current?.click()}
+              sx={{
+                position: "absolute",
+                right: -2,
+                bottom: -2,
+                width: 36,
+                height: 36,
+                bgcolor: formBackgroundColor,
+                color: formTextColor,
+                border: "2px solid #fff",
+                boxShadow: "0 1px 4px rgba(0,0,0,0.25)",
+                "&:hover": { bgcolor: formBackgroundColor, opacity: 0.92 },
+                "&.Mui-disabled": {
+                  bgcolor: formBackgroundColor,
+                  color: formTextColor,
+                  opacity: 0.7,
+                },
+              }}
+            >
+              {uploadingAvatar ? (
+                <CircularProgress size={18} thickness={5} sx={{ color: formTextColor }} />
+              ) : (
+                <PhotoCameraIcon sx={{ fontSize: 18 }} />
+              )}
+            </IconButton>
+          </Box>
           {avatarError ? (
             <Typography variant="caption" color="error" textAlign="center">
               {avatarError}
@@ -154,46 +229,64 @@ export function PlayerNetworkingProfileDialog(props: Props) {
             label="ФИО"
             fullWidth
             value={draft.fullName}
-            onChange={(e) => setDraft((prev) => ({ ...prev, fullName: e.target.value }))}
+            onChange={(e) => {
+              draftTouchedRef.current = true;
+              setDraft((prev) => ({ ...prev, fullName: e.target.value }));
+            }}
             sx={fieldSx}
           />
-          <TextField
-            label="Компания"
-            fullWidth
-            value={draft.company}
-            onChange={(e) => setDraft((prev) => ({ ...prev, company: e.target.value }))}
-            sx={fieldSx}
-          />
-          <TextField
-            label="Чем полезен"
-            fullWidth
-            multiline
-            minRows={2}
-            value={draft.offers}
-            onChange={(e) => setDraft((prev) => ({ ...prev, offers: e.target.value }))}
-            sx={fieldSx}
-          />
-          <TextField
-            label="Что ищу"
-            fullWidth
-            multiline
-            minRows={2}
-            value={draft.seeking}
-            onChange={(e) => setDraft((prev) => ({ ...prev, seeking: e.target.value }))}
-            sx={fieldSx}
-          />
-          <FormControlLabel
-            sx={{ alignSelf: "stretch", ml: 0 }}
-            control={
-              <Switch
-                checked={draft.visibleInDirectory}
-                onChange={(e) =>
-                  setDraft((prev) => ({ ...prev, visibleInDirectory: e.target.checked }))
-                }
-              />
-            }
-            label="Показывать в списке гостей"
-          />
+          {visibility.showJobTitle ? (
+            <TextField
+              label="Должность"
+              fullWidth
+              value={draft.jobTitle}
+              onChange={(e) => {
+                draftTouchedRef.current = true;
+                setDraft((prev) => ({ ...prev, jobTitle: e.target.value }));
+              }}
+              sx={fieldSx}
+            />
+          ) : null}
+          {visibility.showCompany ? (
+            <TextField
+              label={visibility.companyLabel}
+              fullWidth
+              value={draft.company}
+              onChange={(e) => {
+                draftTouchedRef.current = true;
+                setDraft((prev) => ({ ...prev, company: e.target.value }));
+              }}
+              sx={fieldSx}
+            />
+          ) : null}
+          {visibility.showOffers ? (
+            <TextField
+              label="Чем полезен"
+              fullWidth
+              multiline
+              minRows={2}
+              value={draft.offers}
+              onChange={(e) => {
+                draftTouchedRef.current = true;
+                setDraft((prev) => ({ ...prev, offers: e.target.value }));
+              }}
+              sx={fieldSx}
+            />
+          ) : null}
+          {visibility.showSeeking ? (
+            <TextField
+              label="Что ищу"
+              fullWidth
+              multiline
+              minRows={2}
+              value={draft.seeking}
+              onChange={(e) => {
+                draftTouchedRef.current = true;
+                setDraft((prev) => ({ ...prev, seeking: e.target.value }));
+              }}
+              sx={fieldSx}
+            />
+          ) : null}
         </Stack>
       </DialogContent>
       <DialogActions sx={{ px: 3, pb: 2 }}>
@@ -207,7 +300,7 @@ export function PlayerNetworkingProfileDialog(props: Props) {
             onSave(draft);
             onClose();
           }}
-          sx={buildBrandPrimaryContainedButtonSx(brandPrimaryColor, formTextColor)}
+          sx={buildBrandPrimaryContainedButtonSx(formBackgroundColor, formTextColor)}
         >
           Сохранить
         </Button>

@@ -6,7 +6,12 @@ import {
   Dialog,
   DialogContent,
   DialogTitle,
+  FormControl,
+  FormControlLabel,
+  FormLabel,
   IconButton,
+  Radio,
+  RadioGroup,
   Stack,
   Switch,
   TextField,
@@ -30,6 +35,11 @@ import {
   clampProjectorContentMaxWidthPx,
   type PublicViewSetPatch,
 } from "../../publicViewContract";
+import {
+  normalizeNetworkingJoinFormMode,
+  type NetworkingJoinFormFields,
+  type NetworkingJoinFormMode,
+} from "@meyouquize/shared";
 import { CompactColorField } from "./branding/CompactColorField";
 
 type Props = {
@@ -41,6 +51,12 @@ type Props = {
   onToggleShowEventTitleOnPlayer: (next: boolean) => void;
   playerAutoJoinRandomNickname: boolean;
   onTogglePlayerAutoJoinRandomNickname: (next: boolean) => void;
+  networkingEnabled: boolean;
+  onNetworkingEnabledChange: (enabled: boolean) => void;
+  networkingJoinFormMode: NetworkingJoinFormMode;
+  onNetworkingJoinFormModeChange: (mode: NetworkingJoinFormMode) => void;
+  networkingJoinFormFields: NetworkingJoinFormFields;
+  onNetworkingJoinFormFieldsChange: (fields: NetworkingJoinFormFields) => void;
   projectorJoinQrVisible: boolean;
   setProjectorJoinQrVisible: (value: boolean) => void;
   projectorBrowserZoom: number;
@@ -64,6 +80,12 @@ export function AdminGeneralSection(props: Props) {
     onToggleShowEventTitleOnPlayer,
     playerAutoJoinRandomNickname,
     onTogglePlayerAutoJoinRandomNickname,
+    networkingEnabled,
+    onNetworkingEnabledChange,
+    networkingJoinFormMode,
+    onNetworkingJoinFormModeChange,
+    networkingJoinFormFields,
+    onNetworkingJoinFormFieldsChange,
     projectorJoinQrVisible,
     setProjectorJoinQrVisible,
     projectorBrowserZoom,
@@ -328,6 +350,90 @@ export function AdminGeneralSection(props: Props) {
                   }}
                 />
               </Box>
+              <Box sx={switchRowSx}>
+                <Typography variant="body2">Нетворкинг</Typography>
+                <Switch
+                  checked={networkingEnabled}
+                  onChange={(_, next) => onNetworkingEnabledChange(next)}
+                />
+              </Box>
+              {networkingEnabled ? (
+                <FormControl component="fieldset" sx={{ display: "block", pt: 0.5 }}>
+                  <FormLabel component="legend" sx={{ mb: 0.75, typography: "body2" }}>
+                    Форма входа
+                  </FormLabel>
+                  <RadioGroup
+                    value={networkingJoinFormMode}
+                    onChange={(e) => {
+                      onNetworkingJoinFormModeChange(
+                        normalizeNetworkingJoinFormMode(e.target.value),
+                      );
+                    }}
+                  >
+                    <FormControlLabel
+                      value="interactive"
+                      control={<Radio size="small" />}
+                      label="Для интерактивов (ник + случайное)"
+                    />
+                    <FormControlLabel
+                      value="networking"
+                      control={<Radio size="small" />}
+                      label="Для нетворкинга (ФИО + поля)"
+                    />
+                    <FormControlLabel
+                      value="pharma"
+                      control={<Radio size="small" />}
+                      label="Для фармы (ФИО, должность, номер аптеки)"
+                    />
+                  </RadioGroup>
+                  {networkingJoinFormMode === "networking" ? (
+                    <Stack spacing={0.5} sx={{ mt: 1, pl: 0.5 }}>
+                      <Typography variant="body2" color="text.secondary">
+                        Поля формы (ФИО всегда)
+                      </Typography>
+                      <Box sx={switchRowSx}>
+                        <Typography variant="body2">Компания</Typography>
+                        <Switch
+                          size="small"
+                          checked={networkingJoinFormFields.company}
+                          onChange={(_, checked) =>
+                            onNetworkingJoinFormFieldsChange({
+                              ...networkingJoinFormFields,
+                              company: checked,
+                            })
+                          }
+                        />
+                      </Box>
+                      <Box sx={switchRowSx}>
+                        <Typography variant="body2">Полезен</Typography>
+                        <Switch
+                          size="small"
+                          checked={networkingJoinFormFields.offers}
+                          onChange={(_, checked) =>
+                            onNetworkingJoinFormFieldsChange({
+                              ...networkingJoinFormFields,
+                              offers: checked,
+                            })
+                          }
+                        />
+                      </Box>
+                      <Box sx={switchRowSx}>
+                        <Typography variant="body2">Ищу</Typography>
+                        <Switch
+                          size="small"
+                          checked={networkingJoinFormFields.seeking}
+                          onChange={(_, checked) =>
+                            onNetworkingJoinFormFieldsChange({
+                              ...networkingJoinFormFields,
+                              seeking: checked,
+                            })
+                          }
+                        />
+                      </Box>
+                    </Stack>
+                  ) : null}
+                </FormControl>
+              ) : null}
             </Stack>
           </Stack>
         </CardContent>

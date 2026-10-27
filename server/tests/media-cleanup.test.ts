@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import {
   extractLocalMediaFilename,
   findRemovedLocalMediaUrls,
+  localMediaUrlIfFileExists,
   resolveMediaFilePath,
 } from "../src/media-cleanup.js";
 
@@ -46,6 +47,19 @@ describe("findRemovedLocalMediaUrls", () => {
       ),
     ).toEqual([]);
   });
+
+  it("detects networking spotlight avatar dropped from public view", () => {
+    expect(
+      findRemovedLocalMediaUrls(
+        {
+          networkingSpotlightGuests: [
+            { participantId: "p1", avatarUrl: "/media/1793104780796-brbvzani.png" },
+          ],
+        },
+        { networkingSpotlightGuests: [] },
+      ),
+    ).toEqual(["/media/1793104780796-brbvzani.png"]);
+  });
 });
 
 describe("resolveMediaFilePath", () => {
@@ -67,5 +81,41 @@ describe("resolveMediaFilePath", () => {
   it("rejects path traversal", () => {
     tempDir = path.join(os.tmpdir(), "media-cleanup-safe");
     expect(resolveMediaFilePath("../secret.png", tempDir)).toBeNull();
+  });
+});
+
+describe("localMediaUrlIfFileExists", () => {
+  let tempDir = "";
+
+  afterEach(async () => {
+    if (tempDir) {
+      await fs.rm(tempDir, { recursive: true, force: true });
+      tempDir = "";
+    }
+  });
+
+  it("keeps external urls", () => {
+    expect(localMediaUrlIfFileExists("https://cdn.example/a.png")).toBe(
+      "https://cdn.example/a.png",
+    );
+  });
+
+  it("returns empty for missing local media file", () => {
+    expect(localMediaUrlIfFileExists("/media/definitely-missing-xyz.png")).toBe("");
+  });
+
+  it("keeps local url when file exists on disk", async () => {
+    tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "media-exists-"));
+    const name = "1793104780796-brbvzani.png";
+    await fs.writeFile(path.join(tempDir, name), "x");
+    expect(localMediaUrlIfFileExists(`/media/${name}`, tempDir)).toBe(`/media/${name}`);
+    expect(localMediaUrlIfFileExists(`http://192.168.1.23:5173/media/${name}`, tempDir)).toBe(
+      `http://192.168.1.23:5173/media/${name}`,
+    );
+  });
+
+  it("returns empty when local file was deleted", async () => {
+    tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "media-gone-"));
+    expect(localMediaUrlIfFileExists("/media/gone-avatar.png", tempDir)).toBe("");
   });
 });

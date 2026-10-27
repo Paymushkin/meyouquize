@@ -30,6 +30,10 @@ import { getStoredPublicView } from "../public-view-store.js";
 import { saveStoredPublicView } from "../public-view-store.js";
 import { toPublicViewPayload } from "../public-view-helpers.js";
 import {
+  resumeTimelineAfterOverride,
+  suspendTimelineForOverride,
+} from "../../projector-timeline-sequencer.js";
+import {
   broadcastQuizPublicState,
   emitToQuizDashboard,
   emitToQuizPlayers,
@@ -506,16 +510,8 @@ export function registerSpeakerQuestionsHandlers(socket: EnrichedSocket, io: Ser
             mode: "speaker_questions",
             questionId: undefined,
           });
-          await saveStoredPublicView(payload.quizId, nextView);
-          const quiz = await getQuizPublicState(payload.quizId);
-          if (quiz) {
-            emitToQuizDashboard(
-              io,
-              payload.quizId,
-              "results:public:view",
-              toPublicViewPayload(nextView, quiz.title),
-            );
-          }
+          // suspend сохраняет suppressed и рассылает public view.
+          await suspendTimelineForOverride(io, payload.quizId, nextView);
         }
       } else {
         const stillOnScreen = await prisma.speakerQuestion.count({
@@ -524,20 +520,7 @@ export function registerSpeakerQuestionsHandlers(socket: EnrichedSocket, io: Ser
         if (stillOnScreen === 0) {
           const prevView = await getStoredPublicView(payload.quizId);
           if (prevView.mode === "speaker_questions") {
-            const nextView = mergePublicViewState(prevView, {
-              mode: "title",
-              questionId: undefined,
-            });
-            await saveStoredPublicView(payload.quizId, nextView);
-            const quiz = await getQuizPublicState(payload.quizId);
-            if (quiz) {
-              emitToQuizDashboard(
-                io,
-                payload.quizId,
-                "results:public:view",
-                toPublicViewPayload(nextView, quiz.title),
-              );
-            }
+            await resumeTimelineAfterOverride(io, payload.quizId, prevView);
           }
         }
       }

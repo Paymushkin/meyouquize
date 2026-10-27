@@ -5,7 +5,11 @@ import {
   SPEAKER_TILE_ID,
   VIDEO_WALL_TILE_ID,
   contrastingTextOnColor,
+  getNetworkingJoinFieldVisibility,
   ruBallLabel,
+  type NetworkingJoinFormFields,
+  type NetworkingJoinFormMode,
+  type NetworkingProfileTextFields,
 } from "@meyouquize/shared";
 import { isQuizResultsTileId } from "../../publicViewContract";
 import { PlayerPhotoWallCollageTile } from "../../components/quiz/PlayerPhotoWallCollageTile";
@@ -997,6 +1001,111 @@ export function JoinCard(props: JoinCardProps) {
               </Typography>
             ) : null}
           </Stack>
+          <Button
+            variant="contained"
+            onClick={onJoin}
+            sx={buildBrandPrimaryContainedButtonSx(formBackgroundColor, formTextColor)}
+          >
+            Войти
+          </Button>
+        </Stack>
+      </CardContent>
+    </Card>
+  );
+}
+
+export type JoinNetworkingProfileFields = NetworkingProfileTextFields;
+
+type JoinNetworkingCardProps = {
+  formBackgroundColor: string;
+  formTextColor: string;
+  formInputTextColor: string;
+  brandFontFamily: string;
+  values: JoinNetworkingProfileFields;
+  formError?: string;
+  onChange: (patch: Partial<JoinNetworkingProfileFields>) => void;
+  onJoin: () => void;
+  mode: NetworkingJoinFormMode;
+  fields?: NetworkingJoinFormFields;
+};
+
+export function JoinNetworkingCard(props: JoinNetworkingCardProps) {
+  const {
+    formBackgroundColor,
+    formTextColor,
+    formInputTextColor,
+    brandFontFamily,
+    values,
+    formError,
+    onChange,
+    onJoin,
+    mode,
+    fields,
+  } = props;
+  const fieldSx = buildJoinNicknameInputSx(
+    formBackgroundColor,
+    formInputTextColor,
+    brandFontFamily,
+  );
+  const visibility = getNetworkingJoinFieldVisibility(mode, fields);
+  return (
+    <Card variant="outlined" sx={JOIN_CARD_ROOT_SX}>
+      <CardContent sx={JOIN_CARD_CONTENT_SX}>
+        <Stack spacing={1.5}>
+          <OutlinedInput
+            autoFocus
+            value={values.fullName}
+            onChange={(e) => onChange({ fullName: e.target.value })}
+            placeholder="ФИО"
+            fullWidth
+            error={Boolean(formError)}
+            sx={fieldSx}
+          />
+          {visibility.showJobTitle ? (
+            <OutlinedInput
+              value={values.jobTitle}
+              onChange={(e) => onChange({ jobTitle: e.target.value })}
+              placeholder="Должность"
+              fullWidth
+              sx={fieldSx}
+            />
+          ) : null}
+          {visibility.showCompany ? (
+            <OutlinedInput
+              value={values.company}
+              onChange={(e) => onChange({ company: e.target.value })}
+              placeholder={visibility.companyLabel}
+              fullWidth
+              sx={fieldSx}
+            />
+          ) : null}
+          {visibility.showOffers ? (
+            <OutlinedInput
+              value={values.offers}
+              onChange={(e) => onChange({ offers: e.target.value })}
+              placeholder="Чем полезен"
+              fullWidth
+              multiline
+              minRows={2}
+              sx={fieldSx}
+            />
+          ) : null}
+          {visibility.showSeeking ? (
+            <OutlinedInput
+              value={values.seeking}
+              onChange={(e) => onChange({ seeking: e.target.value })}
+              placeholder="Что ищу"
+              fullWidth
+              multiline
+              minRows={2}
+              sx={fieldSx}
+            />
+          ) : null}
+          {formError ? (
+            <Typography variant="body2" color="error" sx={{ px: 0.25 }}>
+              {formError}
+            </Typography>
+          ) : null}
           <Button
             variant="contained"
             onClick={onJoin}

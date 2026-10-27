@@ -1,4 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
+import {
+  DEFAULT_NETWORKING_JOIN_FORM_FIELDS,
+  normalizeNetworkingJoinFormFields,
+  normalizeNetworkingJoinFormMode,
+  type NetworkingJoinFormFields,
+  type NetworkingJoinFormMode,
+} from "@meyouquize/shared";
 import { API_BASE } from "../config";
 import type { QuizState } from "../pages/quiz-play/types";
 import { resolveClientAssetUrl } from "../utils/resolveClientAssetUrl";
@@ -30,6 +37,11 @@ export function useQuizPlayMetaBranding({ slug, quiz }: Params) {
   const [metaBrandFontUrls, setMetaBrandFontUrls] = useState<string[]>([]);
   const [joinMetaLoaded, setJoinMetaLoaded] = useState(!slug);
   const [playerAutoJoinRandomNickname, setPlayerAutoJoinRandomNickname] = useState(false);
+  const [networkingEnabled, setNetworkingEnabled] = useState(false);
+  const [networkingJoinFormMode, setNetworkingJoinFormMode] =
+    useState<NetworkingJoinFormMode>("interactive");
+  const [networkingJoinFormFields, setNetworkingJoinFormFields] =
+    useState<NetworkingJoinFormFields>({ ...DEFAULT_NETWORKING_JOIN_FORM_FIELDS });
 
   useEffect(() => {
     document.title = quiz?.title?.trim() || "Квиз";
@@ -48,6 +60,7 @@ export function useQuizPlayMetaBranding({ slug, quiz }: Params) {
     }
     setJoinMetaLoaded(false);
     const controller = new AbortController();
+    const timeoutId = window.setTimeout(() => controller.abort(), 8_000);
     void (async () => {
       try {
         const response = await fetch(`${API_BASE}/api/quiz/by-slug/${slug}/meta`, {
@@ -68,6 +81,9 @@ export function useQuizPlayMetaBranding({ slug, quiz }: Params) {
           brandFontUrl?: string;
           brandFontUrls?: string[];
           playerAutoJoinRandomNickname?: boolean;
+          networkingEnabled?: boolean;
+          networkingJoinFormMode?: NetworkingJoinFormMode | "simple" | "full";
+          networkingJoinFormFields?: Partial<NetworkingJoinFormFields>;
         };
         if (typeof payload.title === "string") {
           setQuizTitle(payload.title);
@@ -113,15 +129,30 @@ export function useQuizPlayMetaBranding({ slug, quiz }: Params) {
         if (typeof payload.playerAutoJoinRandomNickname === "boolean") {
           setPlayerAutoJoinRandomNickname(payload.playerAutoJoinRandomNickname);
         }
-      } catch {
-        // ignore network errors, socket state can still provide title later
-      } finally {
-        if (!controller.signal.aborted) {
-          setJoinMetaLoaded(true);
+        if (typeof payload.networkingEnabled === "boolean") {
+          setNetworkingEnabled(payload.networkingEnabled);
         }
+        if (payload.networkingJoinFormMode !== undefined) {
+          setNetworkingJoinFormMode(
+            normalizeNetworkingJoinFormMode(payload.networkingJoinFormMode),
+          );
+        }
+        if (payload.networkingJoinFormFields !== undefined) {
+          setNetworkingJoinFormFields(
+            normalizeNetworkingJoinFormFields(payload.networkingJoinFormFields),
+          );
+        }
+      } catch {
+        // ignore network errors / abort, socket state can still provide title later
+      } finally {
+        window.clearTimeout(timeoutId);
+        setJoinMetaLoaded(true);
       }
     })();
-    return () => controller.abort();
+    return () => {
+      window.clearTimeout(timeoutId);
+      controller.abort();
+    };
   }, [slug]);
 
   useEffect(() => {
@@ -129,6 +160,24 @@ export function useQuizPlayMetaBranding({ slug, quiz }: Params) {
       setPlayerAutoJoinRandomNickname(quiz.playerAutoJoinRandomNickname);
     }
   }, [quiz?.playerAutoJoinRandomNickname]);
+
+  useEffect(() => {
+    if (typeof quiz?.networkingEnabled === "boolean") {
+      setNetworkingEnabled(quiz.networkingEnabled);
+    }
+  }, [quiz?.networkingEnabled]);
+
+  useEffect(() => {
+    if (quiz?.networkingJoinFormMode !== undefined) {
+      setNetworkingJoinFormMode(normalizeNetworkingJoinFormMode(quiz.networkingJoinFormMode));
+    }
+  }, [quiz?.networkingJoinFormMode]);
+
+  useEffect(() => {
+    if (quiz?.networkingJoinFormFields !== undefined) {
+      setNetworkingJoinFormFields(normalizeNetworkingJoinFormFields(quiz.networkingJoinFormFields));
+    }
+  }, [quiz?.networkingJoinFormFields]);
 
   useEffect(() => {
     if (typeof quiz?.brandPlayerBackgroundImageUrl === "string") {
@@ -244,5 +293,8 @@ export function useQuizPlayMetaBranding({ slug, quiz }: Params) {
     brandFontUrls,
     joinMetaLoaded,
     playerAutoJoinRandomNickname,
+    networkingEnabled,
+    networkingJoinFormMode,
+    networkingJoinFormFields,
   };
 }

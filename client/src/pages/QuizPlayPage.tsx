@@ -23,6 +23,9 @@ import {
   ruBallLabel,
   sanitizeVideoWallItems,
   SPEAKER_TILE_ID,
+  normalizeNetworkingJoinFormFields,
+  normalizeNetworkingJoinFormMode,
+  usesExtendedNetworkingJoinForm,
 } from "@meyouquize/shared";
 import {
   buildPlayerQuizResultsTilesForPlayer,
@@ -56,6 +59,7 @@ import { useQuizPlayQuestionFlow } from "../hooks/useQuizPlayQuestionFlow";
 import { useBrandFont } from "../hooks/useBrandFont";
 import { useBodyBrandBackground } from "../hooks/useBodyBrandBackground";
 import { useEventFavicon } from "../hooks/useEventFavicon";
+import { buildBrandBackground } from "../features/branding/brandVisual";
 import { getNickname, randomNickname, setNickname } from "../storage";
 import { socket } from "../socket";
 import { useQuizPlayJoin } from "../hooks/useQuizPlayJoin";
@@ -68,6 +72,7 @@ import {
   CompletionOverlay,
   EventTitleBlock,
   JoinCard,
+  JoinNetworkingCard,
   JOIN_SCREEN_MAIN_SX,
   JOIN_SCREEN_STACK_SX,
   buildBrandPrimaryContainedButtonSx,
@@ -75,6 +80,7 @@ import {
   PlayerTilesGrid,
   ReactionsDock,
   RestoreJoinPendingBlock,
+  type JoinNetworkingProfileFields,
 } from "./quiz-play/QuizPlayBrandingBlocks";
 import type { QuizState, ReactionType } from "./quiz-play/types";
 import type { SpeakerQuestionsPayload } from "../types/speakerQuestions";
@@ -127,6 +133,11 @@ export function QuizPlayPage() {
     readStoredNetworkingTab(slug),
   );
   const [networkingProfileOpen, setNetworkingProfileOpen] = useState(false);
+  const playContainerRef = useRef<HTMLDivElement | null>(null);
+  const guestsScrollTopRef = useRef(0);
+  const chatsScrollTopRef = useRef(0);
+  const prevActivePeerIdRef = useRef<string | null>(null);
+  const activePeerIdRef = useRef<string | null>(null);
   const nicknameInputRef = useRef<HTMLInputElement | null>(null);
   const autoJoinStartedRef = useRef(false);
   const rankRowRefs = useRef<Map<string, HTMLDivElement>>(new Map());
@@ -211,7 +222,14 @@ export function QuizPlayPage() {
     joined,
   });
   const onJoinTimeout = useCallback(() => {
-    setError("Не удалось подключиться. Проверьте интернет и попробуйте снова.");
+    const host = window.location.hostname || "";
+    const lan =
+      /^10\./.test(host) || /^192\.168\./.test(host) || /^172\.(1[6-9]|2\d|3[0-1])\./.test(host);
+    setError(
+      lan
+        ? "Не удалось восстановить вход. Проверьте Wi‑Fi площадки и обновите страницу ещё раз."
+        : "Не удалось подключиться. Проверьте интернет и попробуйте снова.",
+    );
   }, []);
 
   const { joinedRef, requestJoin, requestRestoreJoin, markJoinPersisted } = useQuizPlayJoin({
@@ -265,11 +283,33 @@ export function QuizPlayPage() {
 
   useEffect(() => {
     setNetworkingTab(readStoredNetworkingTab(slug));
+    guestsScrollTopRef.current = 0;
+    chatsScrollTopRef.current = 0;
   }, [slug]);
 
   useEffect(() => {
     storeNetworkingTab(slug, networkingTab);
   }, [slug, networkingTab]);
+
+  const handleNetworkingTabChange = useCallback(
+    (next: PlayerNetworkingTab) => {
+      if (networkingTab === "guests" && next !== "guests") {
+        guestsScrollTopRef.current = playContainerRef.current?.scrollTop ?? 0;
+      }
+      if (networkingTab === "chats" && next !== "chats" && !activePeerIdRef.current) {
+        chatsScrollTopRef.current = playContainerRef.current?.scrollTop ?? 0;
+      }
+      setNetworkingTab(next);
+    },
+    [networkingTab],
+  );
+
+  useLayoutEffect(() => {
+    if (networkingTab !== "guests") return;
+    const scroller = playContainerRef.current;
+    if (!scroller) return;
+    scroller.scrollTop = guestsScrollTopRef.current;
+  }, [networkingTab]);
 
   useEffect(() => {
     if (!joined) {
@@ -355,13 +395,39 @@ export function QuizPlayPage() {
     brandFontUrls,
     joinMetaLoaded,
     playerAutoJoinRandomNickname,
+    networkingEnabled: metaNetworkingEnabled,
+    networkingJoinFormMode: metaNetworkingJoinFormMode,
+    networkingJoinFormFields: metaNetworkingJoinFormFields,
   } = useQuizPlayMetaBranding({
     slug,
     quiz,
   });
 
+  const networkingJoinFormMode = normalizeNetworkingJoinFormMode(
+    quiz?.networkingJoinFormMode ?? metaNetworkingJoinFormMode,
+  );
+  const networkingJoinFormFields = normalizeNetworkingJoinFormFields(
+    quiz?.networkingJoinFormFields ?? metaNetworkingJoinFormFields,
+  );
+  const networkingEnabledForJoin = Boolean(quiz?.networkingEnabled ?? metaNetworkingEnabled);
+  const useExtendedJoinForm = usesExtendedNetworkingJoinForm(
+    networkingEnabledForJoin,
+    networkingJoinFormMode,
+  );
   const showNicknameJoinForm =
-    joinMetaLoaded && !joined && !joinPending && !playerAutoJoinRandomNickname;
+    joinMetaLoaded &&
+    !joined &&
+    !joinPending &&
+    (useExtendedJoinForm || !playerAutoJoinRandomNickname);
+
+  const [joinNetworkingDraft, setJoinNetworkingDraft] = useState<JoinNetworkingProfileFields>({
+    fullName: "",
+    jobTitle: "",
+    company: "",
+    offers: "",
+    seeking: "",
+  });
+  const pendingNetworkingProfileRef = useRef<JoinNetworkingProfileFields | null>(null);
 
   useEffect(() => {
     if (!joinMetaLoaded) return;
@@ -373,7 +439,7 @@ export function QuizPlayPage() {
       setBootLoading(false);
       return;
     }
-    if (!playerAutoJoinRandomNickname) {
+    if (useExtendedJoinForm || !playerAutoJoinRandomNickname) {
       setBootLoading(false);
       return;
     }
@@ -384,7 +450,21 @@ export function QuizPlayPage() {
       requestJoin("manual", randomNickname());
     }
     setBootLoading(false);
-  }, [joinMetaLoaded, slug, playerAutoJoinRandomNickname, requestJoin, setJoinPending]);
+  }, [
+    joinMetaLoaded,
+    slug,
+    playerAutoJoinRandomNickname,
+    useExtendedJoinForm,
+    requestJoin,
+    setJoinPending,
+  ]);
+
+  // Страховка: не держать полноэкранный лоудер бесконечно (Safari/LAN).
+  useEffect(() => {
+    if (!bootLoading) return;
+    const timer = window.setTimeout(() => setBootLoading(false), 10_000);
+    return () => window.clearTimeout(timer);
+  }, [bootLoading]);
 
   useEffect(() => {
     if (joined) {
@@ -394,12 +474,12 @@ export function QuizPlayPage() {
   }, [joined]);
 
   useEffect(() => {
-    if (joined || joinPending || playerAutoJoinRandomNickname) return;
+    if (joined || joinPending || useExtendedJoinForm || playerAutoJoinRandomNickname) return;
     const timer = window.setTimeout(() => {
       nicknameInputRef.current?.focus();
     }, 0);
     return () => window.clearTimeout(timer);
-  }, [joined, joinPending, playerAutoJoinRandomNickname]);
+  }, [joined, joinPending, playerAutoJoinRandomNickname, useExtendedJoinForm]);
 
   useEffect(() => {
     const settings = speakerQuestions?.settings;
@@ -420,9 +500,31 @@ export function QuizPlayPage() {
       nicknameInputRef.current?.focus();
       return;
     }
+    pendingNetworkingProfileRef.current = null;
     setJoinPending(true);
     setError("");
     requestJoin("manual");
+  }
+
+  function joinWithNetworkingProfile() {
+    const fullName = joinNetworkingDraft.fullName.trim();
+    setNicknameError("");
+    if (!fullName) {
+      setNicknameError("Укажите ФИО");
+      return;
+    }
+    const nick = fullName.slice(0, 40);
+    setNick(nick);
+    pendingNetworkingProfileRef.current = {
+      fullName,
+      jobTitle: joinNetworkingDraft.jobTitle.trim(),
+      company: joinNetworkingDraft.company.trim(),
+      offers: joinNetworkingDraft.offers.trim(),
+      seeking: joinNetworkingDraft.seeking.trim(),
+    };
+    setJoinPending(true);
+    setError("");
+    requestJoin("manual", nick);
   }
 
   function editNickname() {
@@ -507,12 +609,58 @@ export function QuizPlayPage() {
   }, [persistNickname]);
 
   const shouldShowEventTitle = quiz?.showEventTitleOnPlayer ?? true;
-  const networkingEnabled = Boolean(quiz?.networkingEnabled);
+  const networkingEnabled = Boolean(quiz?.networkingEnabled ?? metaNetworkingEnabled);
   const networking = usePlayerNetworking({
     quizId: quiz?.id,
     enabled: networkingEnabled,
     joined,
   });
+  activePeerIdRef.current = networking.activePeerId;
+
+  const saveNetworkingProfile = networking.saveProfile;
+  useEffect(() => {
+    if (!joined || !networkingEnabled || !quiz?.id) return;
+    const pending = pendingNetworkingProfileRef.current;
+    if (!pending) return;
+    pendingNetworkingProfileRef.current = null;
+    saveNetworkingProfile({
+      fullName: pending.fullName,
+      jobTitle: pending.jobTitle,
+      company: pending.company,
+      offers: pending.offers,
+      seeking: pending.seeking,
+      visibleInDirectory: true,
+    });
+  }, [joined, networkingEnabled, quiz?.id, saveNetworkingProfile]);
+
+  const restoreChatsScroll = useCallback(() => {
+    const scroller = playContainerRef.current;
+    if (!scroller) return;
+    const max = Math.max(0, scroller.scrollHeight - scroller.clientHeight);
+    const next = Math.min(Math.max(0, chatsScrollTopRef.current), max);
+    scroller.scrollTop = next;
+    chatsScrollTopRef.current = next;
+  }, []);
+
+  useLayoutEffect(() => {
+    if (networkingTab !== "chats" || networking.activePeerId) return;
+    restoreChatsScroll();
+    // Safari: после display:none→block высота считается со 2-го кадра.
+    const raf = window.requestAnimationFrame(() => restoreChatsScroll());
+    return () => window.cancelAnimationFrame(raf);
+  }, [networkingTab, networking.activePeerId, restoreChatsScroll]);
+
+  useLayoutEffect(() => {
+    const prev = prevActivePeerIdRef.current;
+    prevActivePeerIdRef.current = networking.activePeerId;
+    if (prev && !networking.activePeerId && networkingTab === "chats") {
+      restoreChatsScroll();
+      const raf = window.requestAnimationFrame(() => restoreChatsScroll());
+      return () => window.cancelAnimationFrame(raf);
+    }
+    return undefined;
+  }, [networking.activePeerId, networkingTab, restoreChatsScroll]);
+
   const visiblePlayerBanners = useMemo(
     () => getVisiblePlayerBanners(quiz?.playerBanners),
     [quiz?.playerBanners],
@@ -647,8 +795,9 @@ export function QuizPlayPage() {
     () => visibleResultTiles.find((item) => item.questionId === resultsDialogQuestionId) ?? null,
     [resultsDialogQuestionId, visibleResultTiles],
   );
+  // Снаружи колонки 576px — нейтральный фон; бренд только в контейнере (fixed-слой ниже).
   useBodyBrandBackground({
-    backgroundColor: brandBodyBackgroundColor,
+    backgroundColor: "#111111",
     clearRootBackground: true,
     resetOverflowX: true,
   });
@@ -686,9 +835,34 @@ export function QuizPlayPage() {
     prevRankRowTopsRef.current = nextTops;
   }, [rankOrder, nonQuizActiveQuestion, answeredCurrentQuestion]);
 
+  // Слой уже position:fixed — без background-attachment:fixed (ломает Safari).
+  const fixedBrandBg = buildBrandBackground({
+    backgroundImageUrl: brandPlayerBackgroundImageUrl?.trim() || undefined,
+    backgroundAnchor: "bottom",
+  });
   return (
     <>
+      {/* Фон по ширине контейнера (576), не на весь экран */}
+      <Box
+        aria-hidden
+        sx={{
+          position: "fixed",
+          top: 0,
+          bottom: 0,
+          left: "50%",
+          transform: "translateX(-50%)",
+          width: "100%",
+          maxWidth: 576,
+          zIndex: 0,
+          pointerEvents: "none",
+          backgroundColor: brandBodyBackgroundColor,
+          ...fixedBrandBg,
+          backgroundRepeat: "no-repeat",
+          backgroundSize: fixedBrandBg.backgroundSize ?? "cover",
+        }}
+      />
       <Container
+        ref={playContainerRef}
         maxWidth={false}
         disableGutters
         sx={{
@@ -696,13 +870,24 @@ export function QuizPlayPage() {
             brandFontFamily,
             isJoinScreen,
             joined,
-            backgroundColor: brandBodyBackgroundColor,
-            backgroundImageUrl: brandPlayerBackgroundImageUrl,
+            // Цвет/картинка — на fixed-слое выше; контейнер прозрачный.
+            backgroundColor: "transparent",
+            backgroundImageUrl: undefined,
           }),
-          ...(joined && networkingEnabled && networkingTab === "guests"
+          backgroundImage: "none",
+          ...(joined
             ? {
-                overflowY: "hidden",
-                pb: "env(safe-area-inset-bottom, 0px)",
+                // Скролл на контейнере (не на body) — иначе sticky у фильтров гостей не работает.
+                minHeight: "100dvh",
+                height: "100dvh",
+                overflowY: "auto",
+                // overflow-x: hidden ломает position:sticky у фильтров гостей
+                WebkitOverflowScrolling: "touch",
+                scrollbarWidth: "none",
+                msOverflowStyle: "none",
+                "&::-webkit-scrollbar": { display: "none" },
+                // Иначе 96px container + shell nav = огромная пустота под гостями/чатами.
+                ...(networkingEnabled ? { pb: "env(safe-area-inset-bottom, 0px)" } : null),
               }
             : null),
         }}
@@ -722,7 +907,7 @@ export function QuizPlayPage() {
         ) : null}
         {!bootLoading ? (
           <>
-            {joined ? (
+            {joined && !(networkingEnabled && networkingTab !== "feed") ? (
               <PlayerIdentityBar
                 nickname={nickname}
                 connectionChip={connectionChip}
@@ -754,10 +939,13 @@ export function QuizPlayPage() {
               networkingEnabled ? (
                 <PlayerNetworkingShell
                   tab={networkingTab}
-                  onTabChange={setNetworkingTab}
+                  onTabChange={handleNetworkingTabChange}
                   unreadTotal={networking.unreadTotal}
-                  buttonBackgroundColor={formBackgroundColor}
+                  buttonBackgroundColor={
+                    quiz?.networkingNavIconColor?.trim() || formBackgroundColor
+                  }
                   buttonTextColor={formTextColor}
+                  hideNav={Boolean(networking.activePeerId)}
                 >
                   {networkingTab === "feed" ? (
                     <PlayerTilesGrid
@@ -800,7 +988,10 @@ export function QuizPlayPage() {
                       }}
                     />
                   ) : null}
-                  {networkingTab === "guests" ? (
+                  <Box
+                    sx={{ display: networkingTab === "guests" ? "block" : "none" }}
+                    aria-hidden={networkingTab !== "guests"}
+                  >
                     <PlayerNetworkingGuestsPanel
                       quizId={quiz?.id ?? ""}
                       guests={networking.guests}
@@ -819,7 +1010,7 @@ export function QuizPlayPage() {
                       selfParticipantId={networking.selfParticipantId}
                       onOpenProfile={() => setNetworkingProfileOpen(true)}
                       onOpenChat={(peerId, peerMeta) => {
-                        setNetworkingTab("chats");
+                        handleNetworkingTabChange("chats");
                         networking.openChatWithPeer(peerId, undefined, {
                           ...peerMeta,
                           returnTab: "guests",
@@ -829,34 +1020,54 @@ export function QuizPlayPage() {
                       brandPrimaryColor={brandPrimaryColor}
                       brandAccentColor={formBackgroundColor}
                       formBackgroundColor={formBackgroundColor}
+                      pageBackgroundColor={brandBodyBackgroundColor}
                       formTextColor={formTextColor}
                       formInputTextColor={formInputTextColor}
+                      profileBackgroundColor={
+                        quiz?.networkingProfileBackgroundColor?.trim() ||
+                        brandPrimaryColor ||
+                        "#7c5acb"
+                      }
+                      profileTextColor={
+                        quiz?.networkingProfileTextColor?.trim() || formTextColor || "#ffffff"
+                      }
                     />
-                  ) : null}
-                  {networkingTab === "chats" ? (
+                  </Box>
+                  <Box
+                    sx={{ display: networkingTab === "chats" ? "block" : "none" }}
+                    aria-hidden={networkingTab !== "chats"}
+                  >
                     <PlayerNetworkingChatsPanel
+                      quizId={quiz?.id ?? ""}
                       threads={networking.threads}
+                      threadsHasMore={networking.threadsHasMore}
+                      threadsLoadingMore={networking.threadsLoadingMore}
+                      onLoadMoreThreads={networking.loadMoreThreads}
                       activePeerId={networking.activePeerId}
                       activeThreadId={networking.activeThreadId}
                       activePeerLabel={networking.activePeerLabel}
                       activePeerAvatarUrl={networking.activePeerAvatarUrl}
                       messages={networking.messages}
                       selfParticipantId={networking.selfParticipantId}
-                      onOpenThread={(peerId, threadId) =>
-                        networking.openChatWithPeer(peerId, threadId, { returnTab: "chats" })
-                      }
+                      onOpenThread={(peerId, threadId) => {
+                        chatsScrollTopRef.current = playContainerRef.current?.scrollTop ?? 0;
+                        networking.openChatWithPeer(peerId, threadId, { returnTab: "chats" });
+                      }}
                       onSend={networking.sendDm}
                       onCloseChat={() => {
                         const returnTab = networking.chatReturnTab;
                         networking.closeChat();
-                        if (returnTab) setNetworkingTab(returnTab);
+                        if (returnTab && returnTab !== "chats") {
+                          handleNetworkingTabChange(returnTab);
+                        }
                       }}
                       brandFontFamily={brandFontFamily}
                       brandPrimaryColor={brandPrimaryColor}
                       buttonBackgroundColor={formBackgroundColor}
                       buttonTextColor={formTextColor}
+                      pageBackgroundColor={brandBodyBackgroundColor}
                     />
-                  ) : null}
+                  </Box>
                 </PlayerNetworkingShell>
               ) : (
                 <PlayerTilesGrid
@@ -908,24 +1119,42 @@ export function QuizPlayPage() {
                       {error}
                     </Alert>
                   ) : null}
-                  <JoinCard
-                    formBackgroundColor={formBackgroundColor}
-                    formTextColor={formTextColor}
-                    formInputTextColor={formInputTextColor}
-                    brandFontFamily={brandFontFamily}
-                    nickname={nickname}
-                    nicknameError={nicknameError}
-                    nicknameInputRef={nicknameInputRef}
-                    onNicknameChange={(value) => {
-                      setNicknameError("");
-                      setNick(value);
-                    }}
-                    onRandomNickname={() => {
-                      setNicknameError("");
-                      setNick(randomNickname());
-                    }}
-                    onJoin={join}
-                  />
+                  {useExtendedJoinForm ? (
+                    <JoinNetworkingCard
+                      formBackgroundColor={formBackgroundColor}
+                      formTextColor={formTextColor}
+                      formInputTextColor={formInputTextColor}
+                      brandFontFamily={brandFontFamily}
+                      values={joinNetworkingDraft}
+                      formError={nicknameError}
+                      mode={networkingJoinFormMode}
+                      fields={networkingJoinFormFields}
+                      onChange={(patch) => {
+                        setNicknameError("");
+                        setJoinNetworkingDraft((prev) => ({ ...prev, ...patch }));
+                      }}
+                      onJoin={joinWithNetworkingProfile}
+                    />
+                  ) : (
+                    <JoinCard
+                      formBackgroundColor={formBackgroundColor}
+                      formTextColor={formTextColor}
+                      formInputTextColor={formInputTextColor}
+                      brandFontFamily={brandFontFamily}
+                      nickname={nickname}
+                      nicknameError={nicknameError}
+                      nicknameInputRef={nicknameInputRef}
+                      onNicknameChange={(value) => {
+                        setNicknameError("");
+                        setNick(value);
+                      }}
+                      onRandomNickname={() => {
+                        setNicknameError("");
+                        setNick(randomNickname());
+                      }}
+                      onJoin={join}
+                    />
+                  )}
                 </Stack>
               </Box>
             )}
@@ -1087,8 +1316,16 @@ export function QuizPlayPage() {
                 open={networkingProfileOpen}
                 onClose={() => setNetworkingProfileOpen(false)}
                 quizId={quiz?.id ?? ""}
+                nickname={nickname}
                 profile={networking.profile}
+                fallbackProfile={
+                  networking.guests.find((g) => g.participantId === networking.selfParticipantId) ??
+                  null
+                }
                 onSave={networking.saveProfile}
+                onOpenRefresh={networking.refreshProfile}
+                mode={networkingJoinFormMode}
+                fields={networkingJoinFormFields}
                 brandFontFamily={brandFontFamily}
                 brandPrimaryColor={brandPrimaryColor}
                 formBackgroundColor={formBackgroundColor}

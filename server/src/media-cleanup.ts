@@ -1,3 +1,4 @@
+import fsSync from "node:fs";
 import fs from "node:fs/promises";
 import path from "node:path";
 import type { Prisma } from "@prisma/client";
@@ -52,13 +53,40 @@ export function resolveMediaFilePath(filename: string, mediaDir = env.mediaDir):
   return resolved;
 }
 
+/**
+ * Локальный `/media/...`: URL как есть, если файл на диске есть; иначе "".
+ * Внешние URL (не /media/) не трогаем.
+ */
+export function localMediaUrlIfFileExists(
+  url: string | null | undefined,
+  mediaDir = env.mediaDir,
+): string {
+  const trimmed = typeof url === "string" ? url.trim() : "";
+  if (!trimmed) return "";
+  const filename = extractLocalMediaFilename(trimmed);
+  if (!filename) return trimmed;
+  const filePath = resolveMediaFilePath(filename, mediaDir);
+  if (!filePath) return "";
+  try {
+    return fsSync.existsSync(filePath) ? trimmed : "";
+  } catch {
+    return "";
+  }
+}
+
 async function collectReferencedMediaFilenames(): Promise<Set<string>> {
   const referenced = new Set<string>();
 
-  const [questions, options, quizzes] = await Promise.all([
+  const [questions, options, quizzes, profiles] = await Promise.all([
     prisma.question.findMany({ select: { imageUrl: true } }),
     prisma.option.findMany({ select: { imageUrl: true } }),
     prisma.quiz.findMany({ select: { publicView: true } }),
+    // Аватары нетворкинга живут в профиле; в publicView (spotlight) они появляются
+    // временно — без этой выборки cleanup удаляет файл при смене кадра таймлайна.
+    prisma.participantProfile.findMany({
+      where: { avatarUrl: { contains: "/media/" } },
+      select: { avatarUrl: true },
+    }),
   ]);
 
   for (const row of questions) addFilenameFromUrl(row.imageUrl ?? "", referenced);
@@ -68,6 +96,7 @@ async function collectReferencedMediaFilenames(): Promise<Set<string>> {
       if (value.includes("/media/")) addFilenameFromUrl(value, referenced);
     });
   }
+  for (const row of profiles) addFilenameFromUrl(row.avatarUrl, referenced);
 
   for (const font of readFontLibrary(env.mediaDir)) {
     addFilenameFromUrl(font.url, referenced);

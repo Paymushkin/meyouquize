@@ -1,7 +1,12 @@
 import { useCallback, useEffect, useState } from "react";
 import {
+  DEFAULT_NETWORKING_JOIN_FORM_FIELDS,
   DEFAULT_PROJECTOR_TIMELINE_STATE,
+  normalizeNetworkingJoinFormFields,
+  normalizeNetworkingJoinFormMode,
   normalizeProjectorTimelineState,
+  type NetworkingJoinFormFields,
+  type NetworkingJoinFormMode,
   type ProjectorTimelineState,
   type ProjectorTimelineStep,
 } from "@meyouquize/shared";
@@ -15,9 +20,13 @@ function newStepId(): string {
 export function useAdminProjectorTimeline(quizId: string | undefined) {
   const [timeline, setTimeline] = useState<ProjectorTimelineState>({
     ...DEFAULT_PROJECTOR_TIMELINE_STATE,
-    steps: [],
+    steps: DEFAULT_PROJECTOR_TIMELINE_STATE.steps.map((s) => ({ ...s })),
   });
   const [networkingEnabled, setNetworkingEnabled] = useState(false);
+  const [networkingJoinFormMode, setNetworkingJoinFormMode] =
+    useState<NetworkingJoinFormMode>("interactive");
+  const [networkingJoinFormFields, setNetworkingJoinFormFields] =
+    useState<NetworkingJoinFormFields>({ ...DEFAULT_NETWORKING_JOIN_FORM_FIELDS });
 
   const applyFromPublicView = useCallback(
     (payload: PublicViewPayload | Record<string, unknown>) => {
@@ -27,6 +36,21 @@ export function useAdminProjectorTimeline(quizId: string | undefined) {
       setTimeline(next);
       const enabled = (payload as { networkingEnabled?: unknown }).networkingEnabled;
       if (typeof enabled === "boolean") setNetworkingEnabled(enabled);
+      // Не сбрасывать в interactive, если в echo нет поля (частичный/старый payload).
+      if ("networkingJoinFormMode" in payload) {
+        setNetworkingJoinFormMode(
+          normalizeNetworkingJoinFormMode(
+            (payload as { networkingJoinFormMode?: unknown }).networkingJoinFormMode,
+          ),
+        );
+      }
+      if ("networkingJoinFormFields" in payload) {
+        setNetworkingJoinFormFields(
+          normalizeNetworkingJoinFormFields(
+            (payload as { networkingJoinFormFields?: unknown }).networkingJoinFormFields,
+          ),
+        );
+      }
     },
     [],
   );
@@ -36,10 +60,23 @@ export function useAdminProjectorTimeline(quizId: string | undefined) {
       if (!quizId || payload.quizId !== quizId) return;
       setTimeline(normalizeProjectorTimelineState(payload.projectorTimeline));
     };
-    const onNetworkingUpdated = (payload: { quizId?: string; networkingEnabled?: boolean }) => {
+    const onNetworkingUpdated = (payload: {
+      quizId?: string;
+      networkingEnabled?: boolean;
+      networkingJoinFormMode?: NetworkingJoinFormMode;
+      networkingJoinFormFields?: NetworkingJoinFormFields;
+    }) => {
       if (!quizId || payload.quizId !== quizId) return;
       if (typeof payload.networkingEnabled === "boolean") {
         setNetworkingEnabled(payload.networkingEnabled);
+      }
+      if (payload.networkingJoinFormMode !== undefined) {
+        setNetworkingJoinFormMode(normalizeNetworkingJoinFormMode(payload.networkingJoinFormMode));
+      }
+      if (payload.networkingJoinFormFields !== undefined) {
+        setNetworkingJoinFormFields(
+          normalizeNetworkingJoinFormFields(payload.networkingJoinFormFields),
+        );
       }
     };
     socket.on("admin:projector-timeline:updated", onTimelineUpdated);
@@ -62,40 +99,25 @@ export function useAdminProjectorTimeline(quizId: string | undefined) {
     [quizId],
   );
 
-  const play = useCallback(() => {
-    if (!quizId) return;
-    socket.emit("admin:projector-timeline:play", { quizId });
-  }, [quizId]);
+  const freezeStep = useCallback(
+    (stepIndex: number) => {
+      if (!quizId) return;
+      socket.emit("admin:projector-timeline:freeze", { quizId, stepIndex });
+    },
+    [quizId],
+  );
 
-  const pause = useCallback(() => {
+  const unfreeze = useCallback(() => {
     if (!quizId) return;
-    socket.emit("admin:projector-timeline:pause", { quizId });
-  }, [quizId]);
-
-  const skip = useCallback(() => {
-    if (!quizId) return;
-    socket.emit("admin:projector-timeline:skip", { quizId });
-  }, [quizId]);
-
-  const stop = useCallback(() => {
-    if (!quizId) return;
-    socket.emit("admin:projector-timeline:stop", { quizId });
+    socket.emit("admin:projector-timeline:unfreeze", { quizId });
   }, [quizId]);
 
   const addStep = useCallback(
     (partial?: Partial<ProjectorTimelineStep>) => {
       const step: ProjectorTimelineStep = {
         id: newStepId(),
-        mode: partial?.mode ?? "title",
-        durationSec: partial?.durationSec ?? 15,
-        ...(partial?.questionId ? { questionId: partial.questionId } : {}),
-        ...(partial?.debateCompareQuestionId
-          ? { debateCompareQuestionId: partial.debateCompareQuestionId }
-          : {}),
-        ...(partial?.debateSeriesId ? { debateSeriesId: partial.debateSeriesId } : {}),
-        ...(partial?.leaderboardSubQuizId
-          ? { leaderboardSubQuizId: partial.leaderboardSubQuizId }
-          : {}),
+        mode: partial?.mode ?? "networking_profiles",
+        durationSec: partial?.durationSec ?? 16,
       };
       const steps = [...timeline.steps, step];
       setTimeline((prev) => ({ ...prev, steps, enabled: true }));
@@ -149,11 +171,13 @@ export function useAdminProjectorTimeline(quizId: string | undefined) {
   return {
     timeline,
     networkingEnabled,
+    networkingJoinFormMode,
+    setNetworkingJoinFormMode,
+    networkingJoinFormFields,
+    setNetworkingJoinFormFields,
     applyFromPublicView,
-    play,
-    pause,
-    skip,
-    stop,
+    freezeStep,
+    unfreeze,
     addStep,
     updateStep,
     removeStep,

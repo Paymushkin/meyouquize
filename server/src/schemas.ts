@@ -407,6 +407,10 @@ export const setPublicViewSchema = z.object({
       "report",
       "debate_compare",
       "debate_series",
+      "networking_profiles",
+      "networking_stats",
+      "networking_incomplete",
+      "join_qr",
     ])
     .optional(),
   questionId: z.string().min(1).optional(),
@@ -552,10 +556,38 @@ export const setPublicViewSchema = z.object({
     })
     .optional(),
   networkingEnabled: z.boolean().optional(),
+  networkingJoinFormMode: z
+    .enum(["interactive", "networking", "pharma", "simple", "full"])
+    .optional(),
+  networkingJoinFormFields: z
+    .object({
+      company: z.boolean().optional(),
+      offers: z.boolean().optional(),
+      seeking: z.boolean().optional(),
+    })
+    .optional(),
+  networkingProfileBackgroundColor: z
+    .string()
+    .regex(/^#([0-9a-fA-F]{6})$/)
+    .optional(),
+  networkingProfileTextColor: z
+    .string()
+    .regex(/^#([0-9a-fA-F]{6})$/)
+    .optional(),
+  networkingProjectorIconColor: z
+    .string()
+    .regex(/^#([0-9a-fA-F]{6})$/)
+    .optional(),
+  networkingNavIconColor: z
+    .string()
+    .regex(/^#([0-9a-fA-F]{6})$/)
+    .optional(),
   projectorTimeline: z
     .object({
       enabled: z.boolean(),
       playing: z.boolean(),
+      frozen: z.boolean().optional(),
+      suppressed: z.boolean().optional(),
       cursor: z.number().int().min(0),
       stepStartedAt: z.number().nullable(),
       steps: z
@@ -573,6 +605,10 @@ export const setPublicViewSchema = z.object({
               "video_wall",
               "debate_compare",
               "debate_series",
+              "networking_profiles",
+              "networking_stats",
+              "networking_incomplete",
+              "join_qr",
             ]),
             questionId: z.string().trim().min(1).max(80).optional(),
             debateCompareQuestionId: z.string().trim().min(1).max(80).optional(),

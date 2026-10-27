@@ -1,7 +1,10 @@
+import ChatBubbleIcon from "@mui/icons-material/ChatBubble";
 import ChatBubbleOutlineIcon from "@mui/icons-material/ChatBubbleOutline";
+import HomeIcon from "@mui/icons-material/Home";
 import HomeOutlinedIcon from "@mui/icons-material/HomeOutlined";
+import PeopleIcon from "@mui/icons-material/People";
 import PeopleOutlineIcon from "@mui/icons-material/PeopleOutline";
-import { Badge, BottomNavigation, BottomNavigationAction, Box, Paper } from "@mui/material";
+import { Badge, Box, ButtonBase, Typography } from "@mui/material";
 import type { ReactNode } from "react";
 
 export type PlayerNetworkingTab = "feed" | "guests" | "chats";
@@ -30,14 +33,46 @@ export function storeNetworkingTab(slug: string, tab: PlayerNetworkingTab): void
   }
 }
 
+const BAR_HEIGHT = 56;
+const NAV_BG = "#111111";
+export const NETWORKING_NAV_TOTAL_HEIGHT = BAR_HEIGHT;
+
+const TABS: {
+  value: PlayerNetworkingTab;
+  label: string;
+  icon: ReactNode;
+  iconActive: ReactNode;
+}[] = [
+  {
+    value: "feed",
+    label: "Лента",
+    icon: <HomeOutlinedIcon />,
+    iconActive: <HomeIcon />,
+  },
+  {
+    value: "guests",
+    label: "Гости",
+    icon: <PeopleOutlineIcon />,
+    iconActive: <PeopleIcon />,
+  },
+  {
+    value: "chats",
+    label: "Чаты",
+    icon: <ChatBubbleOutlineIcon />,
+    iconActive: <ChatBubbleIcon />,
+  },
+];
+
 type Props = {
   tab: PlayerNetworkingTab;
   onTabChange: (tab: PlayerNetworkingTab) => void;
   unreadTotal: number;
-  /** Фон как у кнопки. */
+  /** Яркий цвет иконок (акцент бренда). */
   buttonBackgroundColor: string;
-  /** Иконки и подписи как текст кнопки. */
+  /** @deprecated подписи берутся от акцента; оставлен для совместимости. */
   buttonTextColor: string;
+  /** Скрыть нижнее меню (например, в открытом диалоге). */
+  hideNav?: boolean;
   children: ReactNode;
 };
 
@@ -46,93 +81,129 @@ export function PlayerNetworkingShell({
   onTabChange,
   unreadTotal,
   buttonBackgroundColor,
-  buttonTextColor,
+  hideNav = false,
   children,
 }: Props) {
+  const accent = buttonBackgroundColor;
+
   return (
     <Box
       sx={{
-        pb: tab === "guests" ? 0 : 5,
-        bgcolor: "transparent",
-        ...(tab === "guests"
-          ? { flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }
-          : { minHeight: "100%" }),
+        // Единственный запас под fixed-меню (container pb при networking обнуляем).
+        pb: hideNav
+          ? 0
+          : `calc(${NETWORKING_NAV_TOTAL_HEIGHT + 8}px + env(safe-area-inset-bottom, 0px))`,
+        position: "relative",
       }}
     >
-      <Box
-        sx={
-          tab === "guests"
-            ? { flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }
-            : undefined
-        }
-      >
-        {children}
-      </Box>
-      <Paper
-        elevation={8}
-        sx={{
-          position: "fixed",
-          left: "50%",
-          transform: "translateX(-50%)",
-          bottom: 0,
-          width: "100%",
-          maxWidth: 576,
-          zIndex: 20,
-          borderRadius: 0,
-          bgcolor: buttonBackgroundColor,
-        }}
-      >
-        <BottomNavigation
-          showLabels
-          value={tab}
-          onChange={(_, value: PlayerNetworkingTab) => onTabChange(value)}
+      {/*
+        Белый фон списка чатов — fixed full-bleed (как меню), не minHeight внутри
+        Container с px: иначе Safari рисует «карточку» с щелями бренда по бокам.
+      */}
+      {tab === "chats" && !hideNav ? (
+        <Box
+          aria-hidden
           sx={{
-            bgcolor: buttonBackgroundColor,
-            color: buttonTextColor,
-            "& .MuiBottomNavigationAction-root": {
-              color: buttonTextColor,
-              opacity: 0.72,
-              minWidth: 0,
-            },
-            "& .MuiBottomNavigationAction-root.Mui-selected": {
-              color: buttonTextColor,
-              opacity: 1,
-            },
-            "& .MuiBottomNavigationAction-label": {
-              color: "inherit",
-              fontSize: "0.7rem",
-            },
-            "& .MuiBottomNavigationAction-label.Mui-selected": {
-              fontSize: "0.7rem",
-            },
-            "& .MuiSvgIcon-root": {
-              color: "inherit",
-            },
+            position: "fixed",
+            top: 0,
+            bottom: 0,
+            left: "50%",
+            transform: "translateX(-50%)",
+            width: "100%",
+            maxWidth: 576,
+            bgcolor: "#ffffff",
+            zIndex: 0,
+            pointerEvents: "none",
+          }}
+        />
+      ) : null}
+
+      <Box sx={{ position: "relative", zIndex: 1 }}>{children}</Box>
+
+      {hideNav ? null : (
+        <Box
+          sx={{
+            position: "fixed",
+            left: "50%",
+            transform: "translateX(-50%)",
+            bottom: 0,
+            width: "100%",
+            maxWidth: 576,
+            zIndex: 20,
+            height: BAR_HEIGHT,
+            bgcolor: NAV_BG,
+            display: "flex",
           }}
         >
-          <BottomNavigationAction label="Лента" value="feed" icon={<HomeOutlinedIcon />} />
-          <BottomNavigationAction label="Гости" value="guests" icon={<PeopleOutlineIcon />} />
-          <BottomNavigationAction
-            label="Чаты"
-            value="chats"
-            icon={
-              <Badge
-                color="error"
-                badgeContent={unreadTotal}
-                max={99}
+          {TABS.map((item) => {
+            const selected = tab === item.value;
+            const rawIcon = selected ? item.iconActive : item.icon;
+            const iconNode =
+              item.value === "chats" ? (
+                <Badge
+                  color="error"
+                  badgeContent={unreadTotal}
+                  max={99}
+                  invisible={unreadTotal <= 0}
+                  overlap="circular"
+                  sx={{
+                    "& .MuiBadge-badge": {
+                      bgcolor: "#ff3b30",
+                      color: "#fff",
+                      fontWeight: 700,
+                      minWidth: 18,
+                      height: 18,
+                      fontSize: "0.65rem",
+                    },
+                  }}
+                >
+                  {rawIcon}
+                </Badge>
+              ) : (
+                rawIcon
+              );
+
+            return (
+              <ButtonBase
+                key={item.value}
+                onClick={() => onTabChange(item.value)}
+                aria-label={item.label}
+                aria-current={selected ? "page" : undefined}
                 sx={{
-                  "& .MuiBadge-badge": {
-                    bgcolor: "#d32f2f",
-                    color: "#fff",
+                  flex: 1,
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: 0.25,
+                  color: accent,
+                  opacity: selected ? 1 : 0.5,
+                  minWidth: 0,
+                  "&:hover": { opacity: 1 },
+                  "& .MuiSvgIcon-root": {
+                    fontSize: selected ? 26 : 22,
+                    color: accent,
                   },
                 }}
               >
-                <ChatBubbleOutlineIcon />
-              </Badge>
-            }
-          />
-        </BottomNavigation>
-      </Paper>
+                {iconNode}
+                <Typography
+                  component="span"
+                  sx={{
+                    fontSize: "0.7rem",
+                    lineHeight: 1.1,
+                    fontWeight: selected ? 700 : 500,
+                    color: accent,
+                    textTransform: "none",
+                  }}
+                >
+                  {item.label}
+                </Typography>
+              </ButtonBase>
+            );
+          })}
+        </Box>
+      )}
     </Box>
   );
 }

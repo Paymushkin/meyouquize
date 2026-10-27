@@ -20,10 +20,16 @@ import {
   DEFAULT_GEO_POLL_REGION_HEAT_SCALE,
   normalizeGeoPollRegionHeatScale,
 } from "./geoPollRegionHeatScale.js";
-import type { ProjectorTimelineState } from "./projectorTimeline.js";
+import type {
+  ProjectorNetworkingSpotlightGuest,
+  ProjectorNetworkingStats,
+  ProjectorTimelineState,
+} from "./projectorTimeline.js";
 import {
   DEFAULT_PROJECTOR_TIMELINE_STATE,
   normalizeProjectorTimelineState,
+  sanitizeProjectorNetworkingSpotlightGuests,
+  sanitizeProjectorNetworkingStats,
 } from "./projectorTimeline.js";
 import {
   eventThemeBrandingToPublicViewPatch,
@@ -38,6 +44,12 @@ import {
   type TagCloudQuestionManualState,
   type OptionVoteCountOverride,
 } from "./tagCloudManual.js";
+import type { NetworkingJoinFormFields, NetworkingJoinFormMode } from "./networkingJoinForm.js";
+import {
+  DEFAULT_NETWORKING_JOIN_FORM_FIELDS,
+  normalizeNetworkingJoinFormFields,
+  normalizeNetworkingJoinFormMode,
+} from "./networkingJoinForm.js";
 import {
   filterMediaBrandFontUrls,
   isBuiltinBrandFontFamily,
@@ -158,7 +170,11 @@ export type PublicViewMode =
   | "video_wall"
   | "report"
   | "debate_compare"
-  | "debate_series";
+  | "debate_series"
+  | "networking_profiles"
+  | "networking_stats"
+  | "networking_incomplete"
+  | "join_qr";
 export type QuestionRevealStage = "options" | "results";
 export type RandomizerMode = "names" | "numbers";
 export type RandomizerListMode = "participants_only" | "free_list";
@@ -239,14 +255,23 @@ export {
   resolveGeoPollRegionHeatFillOpacity,
 } from "./geoPollRegionHeatScale.js";
 export type {
+  ProjectorNetworkingSpotlightGuest,
+  ProjectorNetworkingStats,
   ProjectorTimelineMode,
   ProjectorTimelineState,
   ProjectorTimelineStep,
 } from "./projectorTimeline.js";
 export {
+  DEFAULT_JOIN_QR_TIMELINE_STEP,
   DEFAULT_PROJECTOR_TIMELINE_STATE,
+  PROJECTOR_NETWORKING_PROFILE_SLOT_SEC,
+  PROJECTOR_PLAYLIST_MODES,
+  isProjectorTimelineAdvancing,
+  networkingProfileSlotsForDuration,
   normalizeProjectorTimelineState,
   projectorTimelineStepToPublicViewPatch,
+  sanitizeProjectorNetworkingSpotlightGuests,
+  sanitizeProjectorNetworkingStats,
 } from "./projectorTimeline.js";
 export {
   DEBATE_POLL_DEFAULT_QUESTION_TEXT,
@@ -368,6 +393,21 @@ export type RandomizerHistoryEntry = {
   mode: RandomizerMode;
 };
 
+export type {
+  NetworkingJoinFormFields,
+  NetworkingJoinFormMode,
+  NetworkingJoinFieldVisibility,
+  NetworkingProfileTextFields,
+} from "./networkingJoinForm.js";
+export {
+  DEFAULT_NETWORKING_JOIN_FORM_FIELDS,
+  formatNetworkingGuestIdentity,
+  getNetworkingJoinFieldVisibility,
+  normalizeNetworkingJoinFormFields,
+  normalizeNetworkingJoinFormMode,
+  usesExtendedNetworkingJoinForm,
+} from "./networkingJoinForm.js";
+
 export interface PublicViewState {
   mode: PublicViewMode;
   questionId?: string;
@@ -402,6 +442,28 @@ export interface PublicViewState {
   projectorTimeline: ProjectorTimelineState;
   /** Опциональный модуль нетворкинга гостей внутри квиза (эксперимент). */
   networkingEnabled: boolean;
+  /**
+   * Форма входа при включённом нетворкинге:
+   * - interactive — ник + случайное (по умолчанию);
+   * - networking — ФИО + опционально компания / полезен / ищу;
+   * - pharma — ФИО + должность + номер аптеки (необяз.).
+   * Legacy: simple→interactive, full→networking.
+   */
+  networkingJoinFormMode: NetworkingJoinFormMode;
+  /** Какие поля показывать в режиме networking (ФИО всегда). */
+  networkingJoinFormFields: NetworkingJoinFormFields;
+  /** Фон карточки профиля (список гостей + проектор). */
+  networkingProfileBackgroundColor: string;
+  /** Текст на карточке профиля (список гостей + проектор). */
+  networkingProfileTextColor: string;
+  /** Цвет иконок статистики нетворкинга на проекторе. */
+  networkingProjectorIconColor: string;
+  /** Цвет иконок нижней навигации нетворкинга у игрока. */
+  networkingNavIconColor: string;
+  /** Гости для ротации на шагах networking_profiles / networking_incomplete. */
+  networkingSpotlightGuests: ProjectorNetworkingSpotlightGuest[];
+  /** Счётчики для режима networking_stats. */
+  networkingStats: ProjectorNetworkingStats;
   /** Показывать подсветку правильного ответа в вариантах на проекторе */
   showCorrectOption: boolean;
   showQuestionTitle: boolean;
@@ -777,7 +839,7 @@ function sanitizeProjectorJoinQrOverlayCorner(
 }
 
 export const DEFAULT_PUBLIC_VIEW_STATE: PublicViewState = {
-  mode: "title",
+  mode: "join_qr",
   debateSeriesShowRounds: false,
   questionRevealStage: "options",
   highlightedLeadersCount: 3,
@@ -786,8 +848,21 @@ export const DEFAULT_PUBLIC_VIEW_STATE: PublicViewState = {
   geoPollShowAnswerList: true,
   geoPollRegionHeatEnabled: false,
   geoPollRegionHeatScale: DEFAULT_GEO_POLL_REGION_HEAT_SCALE,
-  projectorTimeline: { ...DEFAULT_PROJECTOR_TIMELINE_STATE, steps: [] },
+  projectorTimeline: {
+    ...DEFAULT_PROJECTOR_TIMELINE_STATE,
+    steps: DEFAULT_PROJECTOR_TIMELINE_STATE.steps.map((s) => ({ ...s })),
+  },
   networkingEnabled: false,
+  networkingJoinFormMode: "interactive",
+  networkingJoinFormFields: { ...DEFAULT_NETWORKING_JOIN_FORM_FIELDS },
+  networkingProfileBackgroundColor: "#ffffff",
+  networkingProfileTextColor: "#111111",
+  /** Пусто = наследовать brandPrimaryColor при normalize. */
+  networkingProjectorIconColor: "",
+  /** Пусто = наследовать brandAccentColor при normalize. */
+  networkingNavIconColor: "",
+  networkingSpotlightGuests: [],
+  networkingStats: { messages: 0, guests: 0, acquaintances: 0 },
   showCorrectOption: false,
   showQuestionTitle: true,
   hiddenTagTexts: [],
@@ -1152,6 +1227,24 @@ function sanitizeHex6(value: string | undefined, fallback: string): string {
   return fallback;
 }
 
+/** Старый дефолт иконок нетворкинга до наследования от brand. */
+const LEGACY_NETWORKING_ICON_COLOR = "#1976d2";
+
+/** Пусто / legacy-дефолт → brand; иначе явный #RRGGBB. */
+function sanitizeNetworkingIconColor(value: string | undefined, brandFallback: string): string {
+  if (typeof value === "string" && /^#[0-9a-fA-F]{6}$/.test(value.trim())) {
+    const hex = value.trim();
+    if (
+      hex.toLowerCase() === LEGACY_NETWORKING_ICON_COLOR &&
+      brandFallback.toLowerCase() !== LEGACY_NETWORKING_ICON_COLOR
+    ) {
+      return brandFallback;
+    }
+    return hex;
+  }
+  return brandFallback;
+}
+
 /** Фон экрана геоопроса: `transparent` или #RRGGBB. */
 function sanitizeGeoPollScreenBackground(value: string | undefined, fallback: string): string {
   if (typeof value !== "string") return fallback;
@@ -1491,7 +1584,11 @@ export function normalizePublicViewState(
     value?.mode === "video_wall" ||
     value?.mode === "report" ||
     value?.mode === "debate_compare" ||
-    value?.mode === "debate_series"
+    value?.mode === "debate_series" ||
+    value?.mode === "networking_profiles" ||
+    value?.mode === "networking_stats" ||
+    value?.mode === "networking_incomplete" ||
+    value?.mode === "join_qr"
       ? value.mode
       : base.mode;
   const rawQuestionId =
@@ -1638,6 +1735,33 @@ export function normalizePublicViewState(
       typeof value?.networkingEnabled === "boolean"
         ? value.networkingEnabled
         : base.networkingEnabled,
+    networkingJoinFormMode: normalizeNetworkingJoinFormMode(value?.networkingJoinFormMode),
+    networkingJoinFormFields: normalizeNetworkingJoinFormFields(value?.networkingJoinFormFields),
+    networkingProfileBackgroundColor: sanitizeHex6(
+      value?.networkingProfileBackgroundColor,
+      base.networkingProfileBackgroundColor,
+    ),
+    networkingProfileTextColor: sanitizeHex6(
+      value?.networkingProfileTextColor,
+      base.networkingProfileTextColor,
+    ),
+    // Пусто / legacy #1976d2 → актуальный brand primary / accent.
+    networkingProjectorIconColor: sanitizeNetworkingIconColor(
+      value?.networkingProjectorIconColor,
+      sanitizeHex6(value?.brandPrimaryColor, base.brandPrimaryColor),
+    ),
+    networkingNavIconColor: sanitizeNetworkingIconColor(
+      value?.networkingNavIconColor,
+      sanitizeHex6(value?.brandAccentColor, base.brandAccentColor),
+    ),
+    networkingSpotlightGuests:
+      mode === "networking_profiles" || mode === "networking_incomplete"
+        ? sanitizeProjectorNetworkingSpotlightGuests(value?.networkingSpotlightGuests)
+        : [],
+    networkingStats:
+      mode === "networking_stats"
+        ? sanitizeProjectorNetworkingStats(value?.networkingStats)
+        : base.networkingStats,
     showCorrectOption:
       typeof value?.showCorrectOption === "boolean"
         ? value.showCorrectOption

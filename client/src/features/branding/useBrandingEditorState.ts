@@ -69,6 +69,11 @@ export function useBrandingEditorState() {
   const [playerVoteOptionTextColor, setPlayerVoteOptionTextColor] = useState("#ffffff");
   const [playerVoteProgressTrackColor, setPlayerVoteProgressTrackColor] = useState("#6a5600");
   const [playerVoteProgressBarColor, setPlayerVoteProgressBarColor] = useState("#F3F722");
+  const [networkingProfileBackgroundColor, setNetworkingProfileBackgroundColor] =
+    useState("#ffffff");
+  const [networkingProfileTextColor, setNetworkingProfileTextColor] = useState("#111111");
+  const [networkingProjectorIconColor, setNetworkingProjectorIconColor] = useState("#7c5acb");
+  const [networkingNavIconColor, setNetworkingNavIconColor] = useState("#1976d2");
   const [brandPrimaryColor, setBrandPrimaryColor] = useState("#7c5acb");
   const [brandAccentColor, setBrandAccentColor] = useState("#1976d2");
   const [brandSurfaceColor, setBrandSurfaceColor] = useState("#ffffff");
@@ -135,6 +140,10 @@ export function useBrandingEditorState() {
     setPlayerVoteOptionTextColor,
     setPlayerVoteProgressTrackColor,
     setPlayerVoteProgressBarColor,
+    setNetworkingProfileBackgroundColor,
+    setNetworkingProfileTextColor,
+    setNetworkingProjectorIconColor,
+    setNetworkingNavIconColor,
     setBrandPrimaryColor,
     setBrandAccentColor,
     setBrandSurfaceColor,
@@ -174,6 +183,10 @@ export function useBrandingEditorState() {
     setPlayerVoteOptionTextColor,
     setPlayerVoteProgressTrackColor,
     setPlayerVoteProgressBarColor,
+    setNetworkingProfileBackgroundColor,
+    setNetworkingProfileTextColor,
+    setNetworkingProjectorIconColor,
+    setNetworkingNavIconColor,
     setBrandPrimaryColor,
     setBrandAccentColor,
     setBrandSurfaceColor,
@@ -233,6 +246,8 @@ export function useBrandingEditorState() {
       setPlayerVoteOptionTextColor,
       setPlayerVoteProgressTrackColor,
       setPlayerVoteProgressBarColor,
+      setNetworkingProjectorIconColor,
+      setNetworkingNavIconColor,
       setBrandPrimaryColor,
       setBrandAccentColor,
       setBrandSurfaceColor,
@@ -258,6 +273,8 @@ export function useBrandingEditorState() {
     setPlayerVoteOptionTextColor,
     setPlayerVoteProgressTrackColor,
     setPlayerVoteProgressBarColor,
+    setNetworkingProjectorIconColor,
+    setNetworkingNavIconColor,
     setBrandPrimaryColor,
     setBrandAccentColor,
     setBrandSurfaceColor,
@@ -336,6 +353,10 @@ export function useBrandingEditorState() {
       playerVoteOptionTextColor,
       playerVoteProgressTrackColor,
       playerVoteProgressBarColor,
+      networkingProfileBackgroundColor,
+      networkingProfileTextColor,
+      networkingProjectorIconColor,
+      networkingNavIconColor,
       brandPrimaryColor,
       brandAccentColor,
       brandSurfaceColor,
@@ -387,6 +408,10 @@ export function useBrandingEditorState() {
     playerVoteOptionTextColor,
     playerVoteProgressTrackColor,
     playerVoteProgressBarColor,
+    networkingProfileBackgroundColor,
+    networkingProfileTextColor,
+    networkingProjectorIconColor,
+    networkingNavIconColor,
     brandPrimaryColor,
     brandAccentColor,
     brandSurfaceColor,
@@ -463,6 +488,14 @@ export function useBrandingEditorState() {
     setPlayerVoteProgressTrackColor,
     playerVoteProgressBarColor,
     setPlayerVoteProgressBarColor,
+    networkingProfileBackgroundColor,
+    setNetworkingProfileBackgroundColor,
+    networkingProfileTextColor,
+    setNetworkingProfileTextColor,
+    networkingProjectorIconColor,
+    setNetworkingProjectorIconColor,
+    networkingNavIconColor,
+    setNetworkingNavIconColor,
     brandPrimaryColor,
     setBrandPrimaryColor,
     brandAccentColor,

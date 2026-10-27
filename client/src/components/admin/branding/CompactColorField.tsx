@@ -7,8 +7,17 @@ type Props = {
   onBlur: () => void;
 };
 
+const HEX6_RE = /^#([0-9a-fA-F]{6})$/;
+
+/** `<input type="color">` принимает только #RRGGBB. */
+function toColorInputValue(value: string, fallback = "#000000"): string {
+  const trimmed = value.trim();
+  return HEX6_RE.test(trimmed) ? trimmed : fallback;
+}
+
 export function CompactColorField(props: Props) {
   const { label, value, onChange, onBlur } = props;
+  const colorValue = toColorInputValue(value);
   return (
     <Box
       sx={{
@@ -29,7 +38,7 @@ export function CompactColorField(props: Props) {
       </Typography>
       <input
         type="color"
-        value={value}
+        value={colorValue}
         onChange={(e) => onChange(e.target.value)}
         onBlur={onBlur}
         aria-label={label}
@@ -44,6 +53,19 @@ export function CompactColorField(props: Props) {
           background: "transparent",
         }}
       />
+      <Typography
+        variant="caption"
+        component="span"
+        title={colorValue}
+        sx={{
+          fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
+          color: "text.secondary",
+          flexShrink: 0,
+          letterSpacing: 0.2,
+        }}
+      >
+        {colorValue.toUpperCase()}
+      </Typography>
     </Box>
   );
 }
