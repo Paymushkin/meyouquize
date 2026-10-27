@@ -29,14 +29,17 @@ export const socket = io(SOCKET_URL, {
   autoConnect: false,
   // При пике нагрузки на сервере дефолтный handshake 20s даёт connect_error "timeout" в админке.
   timeout: 45_000,
+  // websocket первым: без polling→ws upgrade (на рефреше probe часто рвётся →
+  // «WS closed before established» + POST …&sid=… 400 Session ID unknown).
+  // Safari/LAN Vite — только polling (см. socketTransportPolicy).
   ...(preferPollingOnly
     ? {
         transports: ["polling"] as const,
         upgrade: false,
       }
     : {
-        transports: ["polling", "websocket"] as const,
-        upgrade: true,
+        transports: ["websocket", "polling"] as const,
+        upgrade: false,
       }),
   rememberUpgrade: false,
   reconnection: true,
@@ -65,6 +68,8 @@ socket.on("connect", () => {
 });
 
 socket.io.on("reconnect_attempt", (attempt) => {
+  // Не тащить мёртвый Engine.IO sid в новый open после 400 / transport error.
+  clearEngineSessionId(socket.io?.engine);
   console.info("[mq-socket] reconnect_attempt", { attempt });
 });
 
@@ -77,6 +82,7 @@ socket.io.on("reconnect_failed", () => {
 });
 
 socket.on("connect_error", (err) => {
+  clearEngineSessionId(socket.io?.engine);
   console.warn("[mq-socket] connect_error", err instanceof Error ? err.message : err);
 });
 
