@@ -1273,6 +1273,8 @@ export function buildApp() {
       networkingEnabled: Boolean(view.networkingEnabled),
       networkingJoinFormMode: view.networkingJoinFormMode,
       networkingJoinFormFields: view.networkingJoinFormFields,
+      networkingJoinFormCopy: view.networkingJoinFormCopy,
+      networkingDefaultTab: view.networkingDefaultTab,
       networkingProfileBackgroundColor: view.networkingProfileBackgroundColor,
       networkingProfileTextColor: view.networkingProfileTextColor,
       networkingNavIconColor: view.networkingNavIconColor,

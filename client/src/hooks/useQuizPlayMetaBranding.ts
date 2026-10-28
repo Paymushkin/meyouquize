@@ -1,10 +1,16 @@
 import { useEffect, useMemo, useState } from "react";
 import {
+  DEFAULT_NETWORKING_JOIN_FORM_COPY,
   DEFAULT_NETWORKING_JOIN_FORM_FIELDS,
+  DEFAULT_NETWORKING_PLAYER_TAB,
+  normalizeNetworkingJoinFormCopy,
   normalizeNetworkingJoinFormFields,
   normalizeNetworkingJoinFormMode,
+  normalizeNetworkingPlayerTab,
+  type NetworkingJoinFormCopy,
   type NetworkingJoinFormFields,
   type NetworkingJoinFormMode,
+  type NetworkingPlayerTab,
 } from "@meyouquize/shared";
 import { API_BASE } from "../config";
 import type { QuizState } from "../pages/quiz-play/types";
@@ -42,6 +48,12 @@ export function useQuizPlayMetaBranding({ slug, quiz }: Params) {
     useState<NetworkingJoinFormMode>("interactive");
   const [networkingJoinFormFields, setNetworkingJoinFormFields] =
     useState<NetworkingJoinFormFields>({ ...DEFAULT_NETWORKING_JOIN_FORM_FIELDS });
+  const [networkingJoinFormCopy, setNetworkingJoinFormCopy] = useState<NetworkingJoinFormCopy>({
+    ...DEFAULT_NETWORKING_JOIN_FORM_COPY,
+  });
+  const [networkingDefaultTab, setNetworkingDefaultTab] = useState<NetworkingPlayerTab>(
+    DEFAULT_NETWORKING_PLAYER_TAB,
+  );
 
   useEffect(() => {
     document.title = quiz?.title?.trim() || "Квиз";
@@ -84,6 +96,8 @@ export function useQuizPlayMetaBranding({ slug, quiz }: Params) {
           networkingEnabled?: boolean;
           networkingJoinFormMode?: NetworkingJoinFormMode | "simple" | "full";
           networkingJoinFormFields?: Partial<NetworkingJoinFormFields>;
+          networkingJoinFormCopy?: Partial<NetworkingJoinFormCopy>;
+          networkingDefaultTab?: NetworkingPlayerTab;
         };
         if (typeof payload.title === "string") {
           setQuizTitle(payload.title);
@@ -142,6 +156,14 @@ export function useQuizPlayMetaBranding({ slug, quiz }: Params) {
             normalizeNetworkingJoinFormFields(payload.networkingJoinFormFields),
           );
         }
+        if (payload.networkingJoinFormCopy !== undefined) {
+          setNetworkingJoinFormCopy(
+            normalizeNetworkingJoinFormCopy(payload.networkingJoinFormCopy),
+          );
+        }
+        if (payload.networkingDefaultTab !== undefined) {
+          setNetworkingDefaultTab(normalizeNetworkingPlayerTab(payload.networkingDefaultTab));
+        }
       } catch {
         // ignore network errors / abort, socket state can still provide title later
       } finally {
@@ -178,6 +200,18 @@ export function useQuizPlayMetaBranding({ slug, quiz }: Params) {
       setNetworkingJoinFormFields(normalizeNetworkingJoinFormFields(quiz.networkingJoinFormFields));
     }
   }, [quiz?.networkingJoinFormFields]);
+
+  useEffect(() => {
+    if (quiz?.networkingJoinFormCopy !== undefined) {
+      setNetworkingJoinFormCopy(normalizeNetworkingJoinFormCopy(quiz.networkingJoinFormCopy));
+    }
+  }, [quiz?.networkingJoinFormCopy]);
+
+  useEffect(() => {
+    if (quiz?.networkingDefaultTab !== undefined) {
+      setNetworkingDefaultTab(normalizeNetworkingPlayerTab(quiz.networkingDefaultTab));
+    }
+  }, [quiz?.networkingDefaultTab]);
 
   useEffect(() => {
     if (typeof quiz?.brandPlayerBackgroundImageUrl === "string") {
@@ -296,5 +330,7 @@ export function useQuizPlayMetaBranding({ slug, quiz }: Params) {
     networkingEnabled,
     networkingJoinFormMode,
     networkingJoinFormFields,
+    networkingJoinFormCopy,
+    networkingDefaultTab,
   };
 }

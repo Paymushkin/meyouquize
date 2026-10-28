@@ -15,6 +15,8 @@ import {
 } from "@mui/material";
 import {
   getNetworkingJoinFieldVisibility,
+  networkingJoinFieldPlaceholder,
+  type NetworkingJoinFormCopy,
   type NetworkingJoinFormFields,
   type NetworkingJoinFormMode,
 } from "@meyouquize/shared";
@@ -30,6 +32,8 @@ import {
   buildPlayerDialogTextFieldSx,
 } from "../playerDialogStyles";
 import { buildBrandPrimaryContainedButtonSx } from "../../../pages/quiz-play/QuizPlayBrandingBlocks";
+import { ensureClientCompressedAvatarFile } from "../../../features/quizPlay/avatarCrop";
+import { NetworkingAvatarCropDialog } from "./NetworkingAvatarCropDialog";
 
 type ProfileDraftSource = {
   fullName?: string;
@@ -55,6 +59,7 @@ type Props = {
   /** Как форма входа: networking / pharma (interactive — только ФИО). */
   mode?: NetworkingJoinFormMode;
   fields?: NetworkingJoinFormFields;
+  copy?: NetworkingJoinFormCopy;
   brandFontFamily: string;
   brandPrimaryColor: string;
   formBackgroundColor: string;
@@ -91,17 +96,19 @@ export function PlayerNetworkingProfileDialog(props: Props) {
     onOpenRefresh,
     mode = "networking",
     fields,
+    copy,
     brandFontFamily,
     formBackgroundColor,
     formTextColor,
     formInputTextColor,
   } = props;
-  const visibility = getNetworkingJoinFieldVisibility(mode, fields);
+  const visibility = getNetworkingJoinFieldVisibility(mode, fields, copy);
   const [draft, setDraft] = useState<NetworkingProfile>(() =>
     buildDraft(profile, fallbackProfile, nickname),
   );
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const [avatarError, setAvatarError] = useState("");
+  const [cropFile, setCropFile] = useState<File | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const draftTouchedRef = useRef(false);
 
@@ -125,8 +132,10 @@ export function PlayerNetworkingProfileDialog(props: Props) {
     setAvatarError("");
     setUploadingAvatar(true);
     try {
+      // Сжатие только на клиенте (JPEG ≤ ~180KB) — сервер файл не перекодирует.
+      const compressed = await ensureClientCompressedAvatarFile(file);
       const form = new FormData();
-      form.append("file", file);
+      form.append("file", compressed);
       form.append("quizId", quizId);
       form.append("deviceId", getOrCreateDeviceId());
       const response = await fetch(`${API_BASE}/api/networking/avatar`, {
@@ -187,7 +196,10 @@ export function PlayerNetworkingProfileDialog(props: Props) {
               onChange={(e) => {
                 const file = e.target.files?.[0];
                 e.target.value = "";
-                if (file) void uploadAvatar(file);
+                if (file) {
+                  setAvatarError("");
+                  setCropFile(file);
+                }
               }}
             />
             <IconButton
@@ -261,7 +273,11 @@ export function PlayerNetworkingProfileDialog(props: Props) {
           ) : null}
           {visibility.showOffers ? (
             <TextField
-              label="Чем полезен"
+              label={visibility.offersLabel}
+              placeholder={networkingJoinFieldPlaceholder(
+                visibility.offersLabel,
+                visibility.offersPlaceholder,
+              )}
               fullWidth
               multiline
               minRows={2}
@@ -275,7 +291,11 @@ export function PlayerNetworkingProfileDialog(props: Props) {
           ) : null}
           {visibility.showSeeking ? (
             <TextField
-              label="Что ищу"
+              label={visibility.seekingLabel}
+              placeholder={networkingJoinFieldPlaceholder(
+                visibility.seekingLabel,
+                visibility.seekingPlaceholder,
+              )}
               fullWidth
               multiline
               minRows={2}
@@ -305,6 +325,20 @@ export function PlayerNetworkingProfileDialog(props: Props) {
           Сохранить
         </Button>
       </DialogActions>
+
+      <NetworkingAvatarCropDialog
+        open={Boolean(cropFile)}
+        file={cropFile}
+        onClose={() => setCropFile(null)}
+        onConfirm={(cropped) => {
+          setCropFile(null);
+          void uploadAvatar(cropped);
+        }}
+        brandFontFamily={brandFontFamily}
+        formBackgroundColor={formBackgroundColor}
+        formTextColor={formTextColor}
+        formInputTextColor={formInputTextColor}
+      />
     </Dialog>
   );
 }

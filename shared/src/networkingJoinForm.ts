@@ -14,6 +14,54 @@ export const DEFAULT_NETWORKING_JOIN_FORM_FIELDS: NetworkingJoinFormFields = {
   seeking: true,
 };
 
+/** Подписи и плейсхолдеры полей «полезен» / «ищу» (режим networking). */
+export type NetworkingJoinFormCopy = {
+  offersLabel: string;
+  seekingLabel: string;
+  offersPlaceholder: string;
+  seekingPlaceholder: string;
+};
+
+export const DEFAULT_NETWORKING_JOIN_FORM_COPY: NetworkingJoinFormCopy = {
+  offersLabel: "Чем полезен",
+  seekingLabel: "Что ищу",
+  offersPlaceholder: "",
+  seekingPlaceholder: "",
+};
+
+const LABEL_MAX = 60;
+const PLACEHOLDER_MAX = 160;
+
+function sanitizeJoinFormLabel(raw: unknown, fallback: string): string {
+  if (typeof raw !== "string") return fallback;
+  const next = raw.trim().slice(0, LABEL_MAX);
+  return next || fallback;
+}
+
+function sanitizeJoinFormPlaceholder(raw: unknown): string {
+  if (typeof raw !== "string") return "";
+  return raw.trim().slice(0, PLACEHOLDER_MAX);
+}
+
+export function normalizeNetworkingJoinFormCopy(raw: unknown): NetworkingJoinFormCopy {
+  const src =
+    raw && typeof raw === "object"
+      ? (raw as Record<string, unknown>)
+      : ({} as Record<string, unknown>);
+  return {
+    offersLabel: sanitizeJoinFormLabel(
+      src.offersLabel,
+      DEFAULT_NETWORKING_JOIN_FORM_COPY.offersLabel,
+    ),
+    seekingLabel: sanitizeJoinFormLabel(
+      src.seekingLabel,
+      DEFAULT_NETWORKING_JOIN_FORM_COPY.seekingLabel,
+    ),
+    offersPlaceholder: sanitizeJoinFormPlaceholder(src.offersPlaceholder),
+    seekingPlaceholder: sanitizeJoinFormPlaceholder(src.seekingPlaceholder),
+  };
+}
+
 export function normalizeNetworkingJoinFormMode(raw: unknown): NetworkingJoinFormMode {
   if (raw === "interactive" || raw === "networking" || raw === "pharma") return raw;
   if (raw === "simple") return "interactive";
@@ -52,13 +100,20 @@ export type NetworkingJoinFieldVisibility = {
   companyLabel: string;
   showOffers: boolean;
   showSeeking: boolean;
+  offersLabel: string;
+  seekingLabel: string;
+  /** Плейсхолдер; если пуст — на клиенте можно взять label. */
+  offersPlaceholder: string;
+  seekingPlaceholder: string;
 };
 
 /** Единые правила видимости полей join/profile по режиму формы. */
 export function getNetworkingJoinFieldVisibility(
   mode: NetworkingJoinFormMode,
   fields: NetworkingJoinFormFields = DEFAULT_NETWORKING_JOIN_FORM_FIELDS,
+  copy: NetworkingJoinFormCopy = DEFAULT_NETWORKING_JOIN_FORM_COPY,
 ): NetworkingJoinFieldVisibility {
+  const normalizedCopy = normalizeNetworkingJoinFormCopy(copy);
   if (mode === "pharma") {
     return {
       showJobTitle: true,
@@ -66,6 +121,10 @@ export function getNetworkingJoinFieldVisibility(
       companyLabel: "Номер аптеки",
       showOffers: false,
       showSeeking: false,
+      offersLabel: normalizedCopy.offersLabel,
+      seekingLabel: normalizedCopy.seekingLabel,
+      offersPlaceholder: normalizedCopy.offersPlaceholder,
+      seekingPlaceholder: normalizedCopy.seekingPlaceholder,
     };
   }
   if (mode === "networking") {
@@ -75,6 +134,10 @@ export function getNetworkingJoinFieldVisibility(
       companyLabel: "Компания",
       showOffers: fields.offers,
       showSeeking: fields.seeking,
+      offersLabel: normalizedCopy.offersLabel,
+      seekingLabel: normalizedCopy.seekingLabel,
+      offersPlaceholder: normalizedCopy.offersPlaceholder,
+      seekingPlaceholder: normalizedCopy.seekingPlaceholder,
     };
   }
   return {
@@ -83,7 +146,20 @@ export function getNetworkingJoinFieldVisibility(
     companyLabel: "Компания",
     showOffers: false,
     showSeeking: false,
+    offersLabel: normalizedCopy.offersLabel,
+    seekingLabel: normalizedCopy.seekingLabel,
+    offersPlaceholder: normalizedCopy.offersPlaceholder,
+    seekingPlaceholder: normalizedCopy.seekingPlaceholder,
   };
+}
+
+/** Placeholder для input: своя фраза или название поля. */
+export function networkingJoinFieldPlaceholder(
+  label: string,
+  placeholder: string | undefined,
+): string {
+  const custom = typeof placeholder === "string" ? placeholder.trim() : "";
+  return custom || label;
 }
 
 /** Нужна ли расширенная форма входа (не ник + random). */
@@ -92,6 +168,16 @@ export function usesExtendedNetworkingJoinForm(
   mode: NetworkingJoinFormMode,
 ): boolean {
   return networkingEnabled && (mode === "networking" || mode === "pharma");
+}
+
+/** Нижние вкладки плеера нетворкинга. */
+export type NetworkingPlayerTab = "feed" | "guests" | "chats";
+
+export const DEFAULT_NETWORKING_PLAYER_TAB: NetworkingPlayerTab = "feed";
+
+export function normalizeNetworkingPlayerTab(raw: unknown): NetworkingPlayerTab {
+  if (raw === "feed" || raw === "guests" || raw === "chats") return raw;
+  return DEFAULT_NETWORKING_PLAYER_TAB;
 }
 
 /** Строка идентичности гостя: имя · должность · компания. */

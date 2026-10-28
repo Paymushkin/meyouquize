@@ -26,11 +26,44 @@ describe("networkingEnabled in publicView", () => {
       offers: true,
       seeking: true,
     });
+    expect(normalizePublicViewState(null).networkingJoinFormCopy).toEqual({
+      offersLabel: "Чем полезен",
+      seekingLabel: "Что ищу",
+      offersPlaceholder: "",
+      seekingPlaceholder: "",
+    });
+    expect(
+      normalizePublicViewState({
+        networkingJoinFormCopy: {
+          offersLabel: " Даю ",
+          seekingLabel: "",
+          offersPlaceholder: "x".repeat(200),
+        },
+      }).networkingJoinFormCopy,
+    ).toEqual({
+      offersLabel: "Даю",
+      seekingLabel: "Что ищу",
+      offersPlaceholder: "x".repeat(160),
+      seekingPlaceholder: "",
+    });
     expect(
       normalizePublicViewState({
         networkingJoinFormFields: { company: false, offers: true, seeking: false },
       }).networkingJoinFormFields,
     ).toEqual({ company: false, offers: true, seeking: false });
+  });
+
+  it("defaults networkingDefaultTab to feed and accepts guests/chats", () => {
+    expect(normalizePublicViewState(null).networkingDefaultTab).toBe("feed");
+    expect(normalizePublicViewState({ networkingDefaultTab: "guests" }).networkingDefaultTab).toBe(
+      "guests",
+    );
+    expect(normalizePublicViewState({ networkingDefaultTab: "chats" }).networkingDefaultTab).toBe(
+      "chats",
+    );
+    expect(
+      normalizePublicViewState({ networkingDefaultTab: "nope" as "feed" }).networkingDefaultTab,
+    ).toBe("feed");
   });
 
   it("inherits networking icon colors from brand; remaps legacy #1976d2", () => {

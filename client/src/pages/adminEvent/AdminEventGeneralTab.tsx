@@ -1,5 +1,10 @@
 import { Stack } from "@mui/material";
-import type { NetworkingJoinFormFields, NetworkingJoinFormMode } from "@meyouquize/shared";
+import type {
+  NetworkingJoinFormCopy,
+  NetworkingJoinFormFields,
+  NetworkingJoinFormMode,
+  NetworkingPlayerTab,
+} from "@meyouquize/shared";
 import { AdminGeneralSection } from "../../components/admin/AdminGeneralSection";
 
 import type { PublicViewSetPatch } from "../../publicViewContract";
@@ -19,6 +24,10 @@ export type AdminEventGeneralTabProps = {
   onNetworkingJoinFormModeChange: (mode: NetworkingJoinFormMode) => void;
   networkingJoinFormFields: NetworkingJoinFormFields;
   onNetworkingJoinFormFieldsChange: (fields: NetworkingJoinFormFields) => void;
+  networkingJoinFormCopy: NetworkingJoinFormCopy;
+  onNetworkingJoinFormCopyChange: (copy: NetworkingJoinFormCopy) => void;
+  networkingDefaultTab: NetworkingPlayerTab;
+  onNetworkingDefaultTabChange: (tab: NetworkingPlayerTab) => void;
   projectorJoinQrVisible: boolean;
   setProjectorJoinQrVisible: (value: boolean) => void;
   projectorBrowserZoom: number;

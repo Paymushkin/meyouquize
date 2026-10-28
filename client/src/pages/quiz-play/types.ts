@@ -1,4 +1,9 @@
-import type { NetworkingJoinFormFields, NetworkingJoinFormMode } from "@meyouquize/shared";
+import type {
+  NetworkingJoinFormCopy,
+  NetworkingJoinFormFields,
+  NetworkingJoinFormMode,
+  NetworkingPlayerTab,
+} from "@meyouquize/shared";
 import type { ActiveFeedbackForm } from "../../types/feedback";
 
 export type ActiveQuestion = {
@@ -110,6 +115,8 @@ export type QuizState = {
   /** Форма входа при нетворкинге: interactive | networking | pharma. */
   networkingJoinFormMode?: NetworkingJoinFormMode;
   networkingJoinFormFields?: NetworkingJoinFormFields;
+  networkingJoinFormCopy?: NetworkingJoinFormCopy;
+  networkingDefaultTab?: NetworkingPlayerTab;
   playerBanners?: Array<{
     id: string;
     linkUrl: string;

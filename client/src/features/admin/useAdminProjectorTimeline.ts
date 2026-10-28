@@ -1,12 +1,18 @@
 import { useCallback, useEffect, useState } from "react";
 import {
+  DEFAULT_NETWORKING_JOIN_FORM_COPY,
   DEFAULT_NETWORKING_JOIN_FORM_FIELDS,
+  DEFAULT_NETWORKING_PLAYER_TAB,
   DEFAULT_PROJECTOR_TIMELINE_STATE,
+  normalizeNetworkingJoinFormCopy,
   normalizeNetworkingJoinFormFields,
   normalizeNetworkingJoinFormMode,
+  normalizeNetworkingPlayerTab,
   normalizeProjectorTimelineState,
+  type NetworkingJoinFormCopy,
   type NetworkingJoinFormFields,
   type NetworkingJoinFormMode,
+  type NetworkingPlayerTab,
   type ProjectorTimelineState,
   type ProjectorTimelineStep,
 } from "@meyouquize/shared";
@@ -27,6 +33,12 @@ export function useAdminProjectorTimeline(quizId: string | undefined) {
     useState<NetworkingJoinFormMode>("interactive");
   const [networkingJoinFormFields, setNetworkingJoinFormFields] =
     useState<NetworkingJoinFormFields>({ ...DEFAULT_NETWORKING_JOIN_FORM_FIELDS });
+  const [networkingJoinFormCopy, setNetworkingJoinFormCopy] = useState<NetworkingJoinFormCopy>({
+    ...DEFAULT_NETWORKING_JOIN_FORM_COPY,
+  });
+  const [networkingDefaultTab, setNetworkingDefaultTab] = useState<NetworkingPlayerTab>(
+    DEFAULT_NETWORKING_PLAYER_TAB,
+  );
 
   const applyFromPublicView = useCallback(
     (payload: PublicViewPayload | Record<string, unknown>) => {
@@ -51,6 +63,20 @@ export function useAdminProjectorTimeline(quizId: string | undefined) {
           ),
         );
       }
+      if ("networkingJoinFormCopy" in payload) {
+        setNetworkingJoinFormCopy(
+          normalizeNetworkingJoinFormCopy(
+            (payload as { networkingJoinFormCopy?: unknown }).networkingJoinFormCopy,
+          ),
+        );
+      }
+      if ("networkingDefaultTab" in payload) {
+        setNetworkingDefaultTab(
+          normalizeNetworkingPlayerTab(
+            (payload as { networkingDefaultTab?: unknown }).networkingDefaultTab,
+          ),
+        );
+      }
     },
     [],
   );
@@ -65,6 +91,8 @@ export function useAdminProjectorTimeline(quizId: string | undefined) {
       networkingEnabled?: boolean;
       networkingJoinFormMode?: NetworkingJoinFormMode;
       networkingJoinFormFields?: NetworkingJoinFormFields;
+      networkingJoinFormCopy?: NetworkingJoinFormCopy;
+      networkingDefaultTab?: NetworkingPlayerTab;
     }) => {
       if (!quizId || payload.quizId !== quizId) return;
       if (typeof payload.networkingEnabled === "boolean") {
@@ -77,6 +105,12 @@ export function useAdminProjectorTimeline(quizId: string | undefined) {
         setNetworkingJoinFormFields(
           normalizeNetworkingJoinFormFields(payload.networkingJoinFormFields),
         );
+      }
+      if (payload.networkingJoinFormCopy !== undefined) {
+        setNetworkingJoinFormCopy(normalizeNetworkingJoinFormCopy(payload.networkingJoinFormCopy));
+      }
+      if (payload.networkingDefaultTab !== undefined) {
+        setNetworkingDefaultTab(normalizeNetworkingPlayerTab(payload.networkingDefaultTab));
       }
     };
     socket.on("admin:projector-timeline:updated", onTimelineUpdated);
@@ -175,6 +209,10 @@ export function useAdminProjectorTimeline(quizId: string | undefined) {
     setNetworkingJoinFormMode,
     networkingJoinFormFields,
     setNetworkingJoinFormFields,
+    networkingJoinFormCopy,
+    setNetworkingJoinFormCopy,
+    networkingDefaultTab,
+    setNetworkingDefaultTab,
     applyFromPublicView,
     freezeStep,
     unfreeze,

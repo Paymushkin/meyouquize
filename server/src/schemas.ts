@@ -566,6 +566,15 @@ export const setPublicViewSchema = z.object({
       seeking: z.boolean().optional(),
     })
     .optional(),
+  networkingJoinFormCopy: z
+    .object({
+      offersLabel: z.string().trim().max(60).optional(),
+      seekingLabel: z.string().trim().max(60).optional(),
+      offersPlaceholder: z.string().trim().max(160).optional(),
+      seekingPlaceholder: z.string().trim().max(160).optional(),
+    })
+    .optional(),
+  networkingDefaultTab: z.enum(["feed", "guests", "chats"]).optional(),
   networkingProfileBackgroundColor: z
     .string()
     .regex(/^#([0-9a-fA-F]{6})$/)

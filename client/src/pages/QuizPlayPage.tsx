@@ -23,8 +23,10 @@ import {
   ruBallLabel,
   sanitizeVideoWallItems,
   SPEAKER_TILE_ID,
+  normalizeNetworkingJoinFormCopy,
   normalizeNetworkingJoinFormFields,
   normalizeNetworkingJoinFormMode,
+  normalizeNetworkingPlayerTab,
   usesExtendedNetworkingJoinForm,
 } from "@meyouquize/shared";
 import {
@@ -282,12 +284,6 @@ export function QuizPlayPage() {
   }, [slug]);
 
   useEffect(() => {
-    setNetworkingTab(readStoredNetworkingTab(slug));
-    guestsScrollTopRef.current = 0;
-    chatsScrollTopRef.current = 0;
-  }, [slug]);
-
-  useEffect(() => {
     storeNetworkingTab(slug, networkingTab);
   }, [slug, networkingTab]);
 
@@ -398,6 +394,8 @@ export function QuizPlayPage() {
     networkingEnabled: metaNetworkingEnabled,
     networkingJoinFormMode: metaNetworkingJoinFormMode,
     networkingJoinFormFields: metaNetworkingJoinFormFields,
+    networkingJoinFormCopy: metaNetworkingJoinFormCopy,
+    networkingDefaultTab: metaNetworkingDefaultTab,
   } = useQuizPlayMetaBranding({
     slug,
     quiz,
@@ -409,6 +407,19 @@ export function QuizPlayPage() {
   const networkingJoinFormFields = normalizeNetworkingJoinFormFields(
     quiz?.networkingJoinFormFields ?? metaNetworkingJoinFormFields,
   );
+  const networkingJoinFormCopy = normalizeNetworkingJoinFormCopy(
+    quiz?.networkingJoinFormCopy ?? metaNetworkingJoinFormCopy,
+  );
+  const networkingDefaultTab = normalizeNetworkingPlayerTab(
+    quiz?.networkingDefaultTab ?? metaNetworkingDefaultTab,
+  );
+
+  useEffect(() => {
+    setNetworkingTab(readStoredNetworkingTab(slug, networkingDefaultTab));
+    guestsScrollTopRef.current = 0;
+    chatsScrollTopRef.current = 0;
+  }, [slug, networkingDefaultTab]);
+
   const networkingEnabledForJoin = Boolean(quiz?.networkingEnabled ?? metaNetworkingEnabled);
   const useExtendedJoinForm = usesExtendedNetworkingJoinForm(
     networkingEnabledForJoin,
@@ -1129,6 +1140,7 @@ export function QuizPlayPage() {
                       formError={nicknameError}
                       mode={networkingJoinFormMode}
                       fields={networkingJoinFormFields}
+                      copy={networkingJoinFormCopy}
                       onChange={(patch) => {
                         setNicknameError("");
                         setJoinNetworkingDraft((prev) => ({ ...prev, ...patch }));
@@ -1326,6 +1338,7 @@ export function QuizPlayPage() {
                 onOpenRefresh={networking.refreshProfile}
                 mode={networkingJoinFormMode}
                 fields={networkingJoinFormFields}
+                copy={networkingJoinFormCopy}
                 brandFontFamily={brandFontFamily}
                 brandPrimaryColor={brandPrimaryColor}
                 formBackgroundColor={formBackgroundColor}

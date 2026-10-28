@@ -6,7 +6,9 @@ import {
   VIDEO_WALL_TILE_ID,
   contrastingTextOnColor,
   getNetworkingJoinFieldVisibility,
+  networkingJoinFieldPlaceholder,
   ruBallLabel,
+  type NetworkingJoinFormCopy,
   type NetworkingJoinFormFields,
   type NetworkingJoinFormMode,
   type NetworkingProfileTextFields,
@@ -1027,6 +1029,7 @@ type JoinNetworkingCardProps = {
   onJoin: () => void;
   mode: NetworkingJoinFormMode;
   fields?: NetworkingJoinFormFields;
+  copy?: NetworkingJoinFormCopy;
 };
 
 export function JoinNetworkingCard(props: JoinNetworkingCardProps) {
@@ -1041,13 +1044,14 @@ export function JoinNetworkingCard(props: JoinNetworkingCardProps) {
     onJoin,
     mode,
     fields,
+    copy,
   } = props;
   const fieldSx = buildJoinNicknameInputSx(
     formBackgroundColor,
     formInputTextColor,
     brandFontFamily,
   );
-  const visibility = getNetworkingJoinFieldVisibility(mode, fields);
+  const visibility = getNetworkingJoinFieldVisibility(mode, fields, copy);
   return (
     <Card variant="outlined" sx={JOIN_CARD_ROOT_SX}>
       <CardContent sx={JOIN_CARD_CONTENT_SX}>
@@ -1083,7 +1087,10 @@ export function JoinNetworkingCard(props: JoinNetworkingCardProps) {
             <OutlinedInput
               value={values.offers}
               onChange={(e) => onChange({ offers: e.target.value })}
-              placeholder="Чем полезен"
+              placeholder={networkingJoinFieldPlaceholder(
+                visibility.offersLabel,
+                visibility.offersPlaceholder,
+              )}
               fullWidth
               multiline
               minRows={2}
@@ -1094,7 +1101,10 @@ export function JoinNetworkingCard(props: JoinNetworkingCardProps) {
             <OutlinedInput
               value={values.seeking}
               onChange={(e) => onChange({ seeking: e.target.value })}
-              placeholder="Что ищу"
+              placeholder={networkingJoinFieldPlaceholder(
+                visibility.seekingLabel,
+                visibility.seekingPlaceholder,
+              )}
               fullWidth
               multiline
               minRows={2}

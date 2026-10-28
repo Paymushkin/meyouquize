@@ -63,6 +63,8 @@ const PLAYER_ONLY_PUBLIC_VIEW_KEYS = [
   /** Форма входа игрока при нетворкинге — только UI гостя/админки, не проектор. */
   "networkingJoinFormMode",
   "networkingJoinFormFields",
+  "networkingJoinFormCopy",
+  "networkingDefaultTab",
   /** Цвет иконок нижней навигации — только игрок. */
   "networkingNavIconColor",
 ] as const satisfies ReadonlyArray<keyof PublicViewState>;

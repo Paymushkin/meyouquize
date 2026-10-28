@@ -2,8 +2,11 @@ import { describe, expect, it } from "vitest";
 import {
   formatNetworkingGuestIdentity,
   getNetworkingJoinFieldVisibility,
+  networkingJoinFieldPlaceholder,
+  normalizeNetworkingJoinFormCopy,
   normalizeNetworkingJoinFormFields,
   normalizeNetworkingJoinFormMode,
+  normalizeNetworkingPlayerTab,
   usesExtendedNetworkingJoinForm,
 } from "./networkingJoinForm.js";
 
@@ -12,6 +15,12 @@ describe("networkingJoinForm", () => {
     expect(normalizeNetworkingJoinFormMode("simple")).toBe("interactive");
     expect(normalizeNetworkingJoinFormMode("full")).toBe("networking");
     expect(normalizeNetworkingJoinFormMode("pharma")).toBe("pharma");
+  });
+
+  it("normalizes default player tab", () => {
+    expect(normalizeNetworkingPlayerTab("guests")).toBe("guests");
+    expect(normalizeNetworkingPlayerTab("chats")).toBe("chats");
+    expect(normalizeNetworkingPlayerTab("nope")).toBe("feed");
   });
 
   it("defaults join fields on", () => {
@@ -23,7 +32,7 @@ describe("networkingJoinForm", () => {
   });
 
   it("resolves pharma visibility", () => {
-    expect(getNetworkingJoinFieldVisibility("pharma")).toEqual({
+    expect(getNetworkingJoinFieldVisibility("pharma")).toMatchObject({
       showJobTitle: true,
       showCompany: true,
       companyLabel: "Номер аптеки",
@@ -34,18 +43,38 @@ describe("networkingJoinForm", () => {
 
   it("resolves networking visibility from toggles", () => {
     expect(
-      getNetworkingJoinFieldVisibility("networking", {
-        company: false,
-        offers: true,
-        seeking: false,
-      }),
+      getNetworkingJoinFieldVisibility(
+        "networking",
+        { company: false, offers: true, seeking: false },
+        {
+          offersLabel: "Даю",
+          seekingLabel: "Беру",
+          offersPlaceholder: "Навыки",
+          seekingPlaceholder: "",
+        },
+      ),
     ).toEqual({
       showJobTitle: false,
       showCompany: false,
       companyLabel: "Компания",
       showOffers: true,
       showSeeking: false,
+      offersLabel: "Даю",
+      seekingLabel: "Беру",
+      offersPlaceholder: "Навыки",
+      seekingPlaceholder: "",
     });
+  });
+
+  it("normalizes join form copy with defaults", () => {
+    expect(normalizeNetworkingJoinFormCopy(undefined)).toEqual({
+      offersLabel: "Чем полезен",
+      seekingLabel: "Что ищу",
+      offersPlaceholder: "",
+      seekingPlaceholder: "",
+    });
+    expect(networkingJoinFieldPlaceholder("Чем полезен", "")).toBe("Чем полезен");
+    expect(networkingJoinFieldPlaceholder("Чем полезен", "  Могу X  ")).toBe("Могу X");
   });
 
   it("hides extended fields for interactive", () => {

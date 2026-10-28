@@ -1102,6 +1102,8 @@ export async function getQuizPublicState(quizId: string) {
     networkingEnabled: Boolean(view.networkingEnabled),
     networkingJoinFormMode: view.networkingJoinFormMode,
     networkingJoinFormFields: view.networkingJoinFormFields,
+    networkingJoinFormCopy: view.networkingJoinFormCopy,
+    networkingDefaultTab: view.networkingDefaultTab,
     playerBanners: view.playerBanners,
     activePlayerBannerId: view.activePlayerBannerId,
     speakerTileText: view.speakerTileText,

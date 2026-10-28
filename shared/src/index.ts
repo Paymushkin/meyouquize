@@ -44,11 +44,20 @@ import {
   type TagCloudQuestionManualState,
   type OptionVoteCountOverride,
 } from "./tagCloudManual.js";
-import type { NetworkingJoinFormFields, NetworkingJoinFormMode } from "./networkingJoinForm.js";
+import type {
+  NetworkingJoinFormCopy,
+  NetworkingJoinFormFields,
+  NetworkingJoinFormMode,
+  NetworkingPlayerTab,
+} from "./networkingJoinForm.js";
 import {
+  DEFAULT_NETWORKING_JOIN_FORM_COPY,
   DEFAULT_NETWORKING_JOIN_FORM_FIELDS,
+  DEFAULT_NETWORKING_PLAYER_TAB,
+  normalizeNetworkingJoinFormCopy,
   normalizeNetworkingJoinFormFields,
   normalizeNetworkingJoinFormMode,
+  normalizeNetworkingPlayerTab,
 } from "./networkingJoinForm.js";
 import {
   filterMediaBrandFontUrls,
@@ -394,17 +403,24 @@ export type RandomizerHistoryEntry = {
 };
 
 export type {
+  NetworkingJoinFormCopy,
   NetworkingJoinFormFields,
   NetworkingJoinFormMode,
   NetworkingJoinFieldVisibility,
+  NetworkingPlayerTab,
   NetworkingProfileTextFields,
 } from "./networkingJoinForm.js";
 export {
+  DEFAULT_NETWORKING_JOIN_FORM_COPY,
   DEFAULT_NETWORKING_JOIN_FORM_FIELDS,
+  DEFAULT_NETWORKING_PLAYER_TAB,
   formatNetworkingGuestIdentity,
   getNetworkingJoinFieldVisibility,
+  networkingJoinFieldPlaceholder,
+  normalizeNetworkingJoinFormCopy,
   normalizeNetworkingJoinFormFields,
   normalizeNetworkingJoinFormMode,
+  normalizeNetworkingPlayerTab,
   usesExtendedNetworkingJoinForm,
 } from "./networkingJoinForm.js";
 
@@ -452,6 +468,10 @@ export interface PublicViewState {
   networkingJoinFormMode: NetworkingJoinFormMode;
   /** Какие поля показывать в режиме networking (ФИО всегда). */
   networkingJoinFormFields: NetworkingJoinFormFields;
+  /** Названия и плейсхолдеры «полезен» / «ищу». */
+  networkingJoinFormCopy: NetworkingJoinFormCopy;
+  /** Стартовая вкладка нетворкинга у игрока (если нет сохранённого выбора). */
+  networkingDefaultTab: NetworkingPlayerTab;
   /** Фон карточки профиля (список гостей + проектор). */
   networkingProfileBackgroundColor: string;
   /** Текст на карточке профиля (список гостей + проектор). */
@@ -855,6 +875,8 @@ export const DEFAULT_PUBLIC_VIEW_STATE: PublicViewState = {
   networkingEnabled: false,
   networkingJoinFormMode: "interactive",
   networkingJoinFormFields: { ...DEFAULT_NETWORKING_JOIN_FORM_FIELDS },
+  networkingJoinFormCopy: { ...DEFAULT_NETWORKING_JOIN_FORM_COPY },
+  networkingDefaultTab: DEFAULT_NETWORKING_PLAYER_TAB,
   networkingProfileBackgroundColor: "#ffffff",
   networkingProfileTextColor: "#111111",
   /** Пусто = наследовать brandPrimaryColor при normalize. */
@@ -1737,6 +1759,8 @@ export function normalizePublicViewState(
         : base.networkingEnabled,
     networkingJoinFormMode: normalizeNetworkingJoinFormMode(value?.networkingJoinFormMode),
     networkingJoinFormFields: normalizeNetworkingJoinFormFields(value?.networkingJoinFormFields),
+    networkingJoinFormCopy: normalizeNetworkingJoinFormCopy(value?.networkingJoinFormCopy),
+    networkingDefaultTab: normalizeNetworkingPlayerTab(value?.networkingDefaultTab),
     networkingProfileBackgroundColor: sanitizeHex6(
       value?.networkingProfileBackgroundColor,
       base.networkingProfileBackgroundColor,

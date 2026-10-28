@@ -36,9 +36,13 @@ import {
   type PublicViewSetPatch,
 } from "../../publicViewContract";
 import {
+  DEFAULT_NETWORKING_JOIN_FORM_COPY,
   normalizeNetworkingJoinFormMode,
+  normalizeNetworkingPlayerTab,
+  type NetworkingJoinFormCopy,
   type NetworkingJoinFormFields,
   type NetworkingJoinFormMode,
+  type NetworkingPlayerTab,
 } from "@meyouquize/shared";
 import { CompactColorField } from "./branding/CompactColorField";
 
@@ -57,6 +61,10 @@ type Props = {
   onNetworkingJoinFormModeChange: (mode: NetworkingJoinFormMode) => void;
   networkingJoinFormFields: NetworkingJoinFormFields;
   onNetworkingJoinFormFieldsChange: (fields: NetworkingJoinFormFields) => void;
+  networkingJoinFormCopy: NetworkingJoinFormCopy;
+  onNetworkingJoinFormCopyChange: (copy: NetworkingJoinFormCopy) => void;
+  networkingDefaultTab: NetworkingPlayerTab;
+  onNetworkingDefaultTabChange: (tab: NetworkingPlayerTab) => void;
   projectorJoinQrVisible: boolean;
   setProjectorJoinQrVisible: (value: boolean) => void;
   projectorBrowserZoom: number;
@@ -86,6 +94,10 @@ export function AdminGeneralSection(props: Props) {
     onNetworkingJoinFormModeChange,
     networkingJoinFormFields,
     onNetworkingJoinFormFieldsChange,
+    networkingJoinFormCopy,
+    onNetworkingJoinFormCopyChange,
+    networkingDefaultTab,
+    onNetworkingDefaultTabChange,
     projectorJoinQrVisible,
     setProjectorJoinQrVisible,
     projectorBrowserZoom,
@@ -387,7 +399,7 @@ export function AdminGeneralSection(props: Props) {
                     />
                   </RadioGroup>
                   {networkingJoinFormMode === "networking" ? (
-                    <Stack spacing={0.5} sx={{ mt: 1, pl: 0.5 }}>
+                    <Stack spacing={1} sx={{ mt: 1, pl: 0.5 }}>
                       <Typography variant="body2" color="text.secondary">
                         Поля формы (ФИО всегда)
                       </Typography>
@@ -417,6 +429,42 @@ export function AdminGeneralSection(props: Props) {
                           }
                         />
                       </Box>
+                      {networkingJoinFormFields.offers ? (
+                        <Stack spacing={1} sx={{ pl: 0.5 }}>
+                          <TextField
+                            size="small"
+                            label="Название поля"
+                            value={networkingJoinFormCopy.offersLabel}
+                            placeholder={DEFAULT_NETWORKING_JOIN_FORM_COPY.offersLabel}
+                            onChange={(e) =>
+                              onNetworkingJoinFormCopyChange({
+                                ...networkingJoinFormCopy,
+                                offersLabel: e.target.value,
+                              })
+                            }
+                            onBlur={() =>
+                              onNetworkingJoinFormCopyChange({
+                                ...networkingJoinFormCopy,
+                                offersLabel:
+                                  networkingJoinFormCopy.offersLabel.trim() ||
+                                  DEFAULT_NETWORKING_JOIN_FORM_COPY.offersLabel,
+                              })
+                            }
+                          />
+                          <TextField
+                            size="small"
+                            label="Подсказка в поле"
+                            value={networkingJoinFormCopy.offersPlaceholder}
+                            placeholder="Например: могу помочь с …"
+                            onChange={(e) =>
+                              onNetworkingJoinFormCopyChange({
+                                ...networkingJoinFormCopy,
+                                offersPlaceholder: e.target.value,
+                              })
+                            }
+                          />
+                        </Stack>
+                      ) : null}
                       <Box sx={switchRowSx}>
                         <Typography variant="body2">Ищу</Typography>
                         <Switch
@@ -430,8 +478,66 @@ export function AdminGeneralSection(props: Props) {
                           }
                         />
                       </Box>
+                      {networkingJoinFormFields.seeking ? (
+                        <Stack spacing={1} sx={{ pl: 0.5 }}>
+                          <TextField
+                            size="small"
+                            label="Название поля"
+                            value={networkingJoinFormCopy.seekingLabel}
+                            placeholder={DEFAULT_NETWORKING_JOIN_FORM_COPY.seekingLabel}
+                            onChange={(e) =>
+                              onNetworkingJoinFormCopyChange({
+                                ...networkingJoinFormCopy,
+                                seekingLabel: e.target.value,
+                              })
+                            }
+                            onBlur={() =>
+                              onNetworkingJoinFormCopyChange({
+                                ...networkingJoinFormCopy,
+                                seekingLabel:
+                                  networkingJoinFormCopy.seekingLabel.trim() ||
+                                  DEFAULT_NETWORKING_JOIN_FORM_COPY.seekingLabel,
+                              })
+                            }
+                          />
+                          <TextField
+                            size="small"
+                            label="Подсказка в поле"
+                            value={networkingJoinFormCopy.seekingPlaceholder}
+                            placeholder="Например: ищу партнёра по …"
+                            onChange={(e) =>
+                              onNetworkingJoinFormCopyChange({
+                                ...networkingJoinFormCopy,
+                                seekingPlaceholder: e.target.value,
+                              })
+                            }
+                          />
+                        </Stack>
+                      ) : null}
                     </Stack>
                   ) : null}
+                </FormControl>
+              ) : null}
+              {networkingEnabled ? (
+                <FormControl component="fieldset" sx={{ display: "block", pt: 0.5 }}>
+                  <FormLabel component="legend" sx={{ mb: 0.75, typography: "body2" }}>
+                    Вкладка по умолчанию
+                  </FormLabel>
+                  <RadioGroup
+                    row
+                    value={networkingDefaultTab}
+                    onChange={(e) => {
+                      onNetworkingDefaultTabChange(normalizeNetworkingPlayerTab(e.target.value));
+                    }}
+                  >
+                    <FormControlLabel value="feed" control={<Radio size="small" />} label="Лента" />
+                    <FormControlLabel
+                      value="guests"
+                      control={<Radio size="small" />}
+                      label="Гости"
+                    />
+                    <FormControlLabel value="chats" control={<Radio size="small" />} label="Чаты" />
+                  </RadioGroup>
                 </FormControl>
               ) : null}
             </Stack>

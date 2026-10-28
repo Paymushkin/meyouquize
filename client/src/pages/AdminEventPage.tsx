@@ -1789,6 +1789,16 @@ export function AdminEventPage() {
                       projectorTimeline.setNetworkingJoinFormFields(fields);
                       emitPublicViewPatch({ networkingJoinFormFields: fields });
                     },
+                    networkingJoinFormCopy: projectorTimeline.networkingJoinFormCopy,
+                    onNetworkingJoinFormCopyChange: (copy) => {
+                      projectorTimeline.setNetworkingJoinFormCopy(copy);
+                      emitPublicViewPatch({ networkingJoinFormCopy: copy });
+                    },
+                    networkingDefaultTab: projectorTimeline.networkingDefaultTab,
+                    onNetworkingDefaultTabChange: (tab) => {
+                      projectorTimeline.setNetworkingDefaultTab(tab);
+                      emitPublicViewPatch({ networkingDefaultTab: tab });
+                    },
                     projectorJoinQrVisible: branding.projectorJoinQrVisible,
                     setProjectorJoinQrVisible: branding.setProjectorJoinQrVisible,
                     projectorBrowserZoom: branding.projectorBrowserZoom,

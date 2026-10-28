@@ -5,23 +5,28 @@ import HomeOutlinedIcon from "@mui/icons-material/HomeOutlined";
 import PeopleIcon from "@mui/icons-material/People";
 import PeopleOutlineIcon from "@mui/icons-material/PeopleOutline";
 import { Badge, Box, ButtonBase, Typography } from "@mui/material";
+import type { NetworkingPlayerTab } from "@meyouquize/shared";
+import { DEFAULT_NETWORKING_PLAYER_TAB } from "@meyouquize/shared";
 import type { ReactNode } from "react";
 
-export type PlayerNetworkingTab = "feed" | "guests" | "chats";
+export type PlayerNetworkingTab = NetworkingPlayerTab;
 
 function networkingTabStorageKey(slug: string): string {
   return `mq:networking:tab:${slug}`;
 }
 
-export function readStoredNetworkingTab(slug: string): PlayerNetworkingTab {
-  if (!slug) return "feed";
+export function readStoredNetworkingTab(
+  slug: string,
+  fallback: PlayerNetworkingTab = DEFAULT_NETWORKING_PLAYER_TAB,
+): PlayerNetworkingTab {
+  if (!slug) return fallback;
   try {
     const value = localStorage.getItem(networkingTabStorageKey(slug));
     if (value === "feed" || value === "guests" || value === "chats") return value;
   } catch {
     /* ignore */
   }
-  return "feed";
+  return fallback;
 }
 
 export function storeNetworkingTab(slug: string, tab: PlayerNetworkingTab): void {
