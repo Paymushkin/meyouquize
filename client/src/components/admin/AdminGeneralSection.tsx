@@ -412,10 +412,30 @@ export function AdminGeneralSection(props: Props) {
                             onNetworkingJoinFormFieldsChange({
                               ...networkingJoinFormFields,
                               company: checked,
+                              companyRequired: checked
+                                ? networkingJoinFormFields.companyRequired
+                                : false,
                             })
                           }
                         />
                       </Box>
+                      {networkingJoinFormFields.company ? (
+                        <Box sx={{ ...switchRowSx, pl: 0.5 }}>
+                          <Typography variant="body2" color="text.secondary">
+                            Обязательное
+                          </Typography>
+                          <Switch
+                            size="small"
+                            checked={networkingJoinFormFields.companyRequired}
+                            onChange={(_, checked) =>
+                              onNetworkingJoinFormFieldsChange({
+                                ...networkingJoinFormFields,
+                                companyRequired: checked,
+                              })
+                            }
+                          />
+                        </Box>
+                      ) : null}
                       <Box sx={switchRowSx}>
                         <Typography variant="body2">Полезен</Typography>
                         <Switch
@@ -425,12 +445,30 @@ export function AdminGeneralSection(props: Props) {
                             onNetworkingJoinFormFieldsChange({
                               ...networkingJoinFormFields,
                               offers: checked,
+                              offersRequired: checked
+                                ? networkingJoinFormFields.offersRequired
+                                : false,
                             })
                           }
                         />
                       </Box>
                       {networkingJoinFormFields.offers ? (
                         <Stack spacing={1} sx={{ pl: 0.5 }}>
+                          <Box sx={switchRowSx}>
+                            <Typography variant="body2" color="text.secondary">
+                              Обязательное
+                            </Typography>
+                            <Switch
+                              size="small"
+                              checked={networkingJoinFormFields.offersRequired}
+                              onChange={(_, checked) =>
+                                onNetworkingJoinFormFieldsChange({
+                                  ...networkingJoinFormFields,
+                                  offersRequired: checked,
+                                })
+                              }
+                            />
+                          </Box>
                           <TextField
                             size="small"
                             label="Название поля"
@@ -474,12 +512,30 @@ export function AdminGeneralSection(props: Props) {
                             onNetworkingJoinFormFieldsChange({
                               ...networkingJoinFormFields,
                               seeking: checked,
+                              seekingRequired: checked
+                                ? networkingJoinFormFields.seekingRequired
+                                : false,
                             })
                           }
                         />
                       </Box>
                       {networkingJoinFormFields.seeking ? (
                         <Stack spacing={1} sx={{ pl: 0.5 }}>
+                          <Box sx={switchRowSx}>
+                            <Typography variant="body2" color="text.secondary">
+                              Обязательное
+                            </Typography>
+                            <Switch
+                              size="small"
+                              checked={networkingJoinFormFields.seekingRequired}
+                              onChange={(_, checked) =>
+                                onNetworkingJoinFormFieldsChange({
+                                  ...networkingJoinFormFields,
+                                  seekingRequired: checked,
+                                })
+                              }
+                            />
+                          </Box>
                           <TextField
                             size="small"
                             label="Название поля"
@@ -514,6 +570,95 @@ export function AdminGeneralSection(props: Props) {
                           />
                         </Stack>
                       ) : null}
+                      <Box sx={switchRowSx}>
+                        <Typography variant="body2">Телефон</Typography>
+                        <Switch
+                          size="small"
+                          checked={networkingJoinFormFields.phone}
+                          onChange={(_, checked) =>
+                            onNetworkingJoinFormFieldsChange({
+                              ...networkingJoinFormFields,
+                              phone: checked,
+                              phoneRequired: checked
+                                ? networkingJoinFormFields.phoneRequired
+                                : false,
+                            })
+                          }
+                        />
+                      </Box>
+                      {networkingJoinFormFields.phone ? (
+                        <Box sx={{ ...switchRowSx, pl: 0.5 }}>
+                          <Typography variant="body2" color="text.secondary">
+                            Обязательное
+                          </Typography>
+                          <Switch
+                            size="small"
+                            checked={networkingJoinFormFields.phoneRequired}
+                            onChange={(_, checked) =>
+                              onNetworkingJoinFormFieldsChange({
+                                ...networkingJoinFormFields,
+                                phoneRequired: checked,
+                              })
+                            }
+                          />
+                        </Box>
+                      ) : null}
+                      <Box sx={switchRowSx}>
+                        <Typography variant="body2">Почта</Typography>
+                        <Switch
+                          size="small"
+                          checked={networkingJoinFormFields.email}
+                          onChange={(_, checked) =>
+                            onNetworkingJoinFormFieldsChange({
+                              ...networkingJoinFormFields,
+                              email: checked,
+                              emailRequired: checked
+                                ? networkingJoinFormFields.emailRequired
+                                : false,
+                            })
+                          }
+                        />
+                      </Box>
+                      {networkingJoinFormFields.email ? (
+                        <Box sx={{ ...switchRowSx, pl: 0.5 }}>
+                          <Typography variant="body2" color="text.secondary">
+                            Обязательное
+                          </Typography>
+                          <Switch
+                            size="small"
+                            checked={networkingJoinFormFields.emailRequired}
+                            onChange={(_, checked) =>
+                              onNetworkingJoinFormFieldsChange({
+                                ...networkingJoinFormFields,
+                                emailRequired: checked,
+                              })
+                            }
+                          />
+                        </Box>
+                      ) : null}
+                      <TextField
+                        size="small"
+                        label="Ссылка на документ обработки ПД"
+                        value={networkingJoinFormCopy.privacyPolicyUrl}
+                        placeholder="https://…"
+                        helperText={
+                          networkingJoinFormCopy.privacyPolicyUrl.trim()
+                            ? "На форме входа: «Нажимая кнопку „Войти“ вы соглашаетесь на обработку персональных данных»"
+                            : "Пусто — согласие на форме не показывается"
+                        }
+                        onChange={(e) =>
+                          onNetworkingJoinFormCopyChange({
+                            ...networkingJoinFormCopy,
+                            privacyPolicyUrl: e.target.value,
+                          })
+                        }
+                        onBlur={() =>
+                          onNetworkingJoinFormCopyChange({
+                            ...networkingJoinFormCopy,
+                            privacyPolicyUrl: networkingJoinFormCopy.privacyPolicyUrl.trim(),
+                          })
+                        }
+                      />
                     </Stack>
                   ) : null}
                 </FormControl>

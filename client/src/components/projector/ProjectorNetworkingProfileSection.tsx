@@ -114,38 +114,42 @@ function ProfileMolecule(props: {
             bgcolor: "#ffffff",
           }}
         >
-          <Typography
-            sx={{
-              display: "-webkit-box",
-              WebkitLineClamp: 3,
-              WebkitBoxOrient: "vertical",
-              overflow: "hidden",
-              wordBreak: "break-word",
-              whiteSpace: "pre-line",
-              fontSize: { xs: "1.6rem", md: "2.1rem" },
-              lineHeight: 1.3,
-              fontWeight: 500,
-              textAlign: "left",
-            }}
-          >
-            {guest.offers.trim() || "ничем не полезен"}
-          </Typography>
-          <Typography
-            sx={{
-              display: "-webkit-box",
-              WebkitLineClamp: 3,
-              WebkitBoxOrient: "vertical",
-              overflow: "hidden",
-              wordBreak: "break-word",
-              whiteSpace: "pre-line",
-              fontSize: { xs: "1.6rem", md: "2.1rem" },
-              lineHeight: 1.3,
-              fontWeight: 500,
-              textAlign: "right",
-            }}
-          >
-            {guest.seeking.trim() || "ничего не ищу"}
-          </Typography>
+          <Box sx={{ minWidth: 0, pr: `${avatarSize / 2 + 8}px` }}>
+            <Typography
+              sx={{
+                display: "-webkit-box",
+                WebkitLineClamp: 3,
+                WebkitBoxOrient: "vertical",
+                overflow: "hidden",
+                wordBreak: "break-word",
+                whiteSpace: "pre-line",
+                fontSize: { xs: "1.6rem", md: "2.1rem" },
+                lineHeight: 1.3,
+                fontWeight: 500,
+                textAlign: "left",
+              }}
+            >
+              {guest.offers.trim() || "ничем не полезен"}
+            </Typography>
+          </Box>
+          <Box sx={{ minWidth: 0, pl: `${avatarSize / 2 + 8}px` }}>
+            <Typography
+              sx={{
+                display: "-webkit-box",
+                WebkitLineClamp: 3,
+                WebkitBoxOrient: "vertical",
+                overflow: "hidden",
+                wordBreak: "break-word",
+                whiteSpace: "pre-line",
+                fontSize: { xs: "1.6rem", md: "2.1rem" },
+                lineHeight: 1.3,
+                fontWeight: 500,
+                textAlign: "right",
+              }}
+            >
+              {guest.seeking.trim() || "ничего не ищу"}
+            </Typography>
+          </Box>
         </Box>
 
         <Box

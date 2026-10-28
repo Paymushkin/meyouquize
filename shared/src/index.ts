@@ -414,14 +414,19 @@ export {
   DEFAULT_NETWORKING_JOIN_FORM_COPY,
   DEFAULT_NETWORKING_JOIN_FORM_FIELDS,
   DEFAULT_NETWORKING_PLAYER_TAB,
+  NETWORKING_JOIN_PRIVACY_CONSENT_LINK_LABEL,
+  NETWORKING_JOIN_PRIVACY_CONSENT_PREFIX,
   formatNetworkingGuestIdentity,
   getNetworkingJoinFieldVisibility,
+  isValidNetworkingEmail,
+  isValidNetworkingPhone,
   networkingJoinFieldPlaceholder,
   normalizeNetworkingJoinFormCopy,
   normalizeNetworkingJoinFormFields,
   normalizeNetworkingJoinFormMode,
   normalizeNetworkingPlayerTab,
   usesExtendedNetworkingJoinForm,
+  validateNetworkingJoinDraft,
 } from "./networkingJoinForm.js";
 
 export interface PublicViewState {

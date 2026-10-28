@@ -53,6 +53,13 @@ type Props = {
   profileBackgroundColor: string;
   /** Текст на теле карточки профиля. */
   profileTextColor: string;
+  /** Подписи колонок из админки (offers/seeking labels). */
+  offersLabel?: string;
+  seekingLabel?: string;
+  showOffers?: boolean;
+  showSeeking?: boolean;
+  showPhone?: boolean;
+  showEmail?: boolean;
 };
 
 function GuestCard(props: {
@@ -61,6 +68,12 @@ function GuestCard(props: {
   isFavorite: boolean;
   profileBackgroundColor: string;
   profileTextColor: string;
+  offersLabel: string;
+  seekingLabel: string;
+  showOffers: boolean;
+  showSeeking: boolean;
+  showPhone: boolean;
+  showEmail: boolean;
   onOpenChat: (peerId: string, peerMeta?: { label?: string; avatarUrl?: string }) => void;
   onToggleFavorite: (guest: NetworkingGuest) => void;
   onEditProfile?: () => void;
@@ -71,10 +84,20 @@ function GuestCard(props: {
     isFavorite,
     profileBackgroundColor,
     profileTextColor,
+    offersLabel,
+    seekingLabel,
+    showOffers,
+    showSeeking,
+    showPhone,
+    showEmail,
     onOpenChat,
     onToggleFavorite,
     onEditProfile,
   } = props;
+  const phone = showPhone ? (g.phone ?? "").trim() : "";
+  const email = showEmail ? (g.email ?? "").trim() : "";
+  const showRightColumn = showSeeking || Boolean(phone) || Boolean(email);
+  const showBodyGrid = showOffers || showRightColumn;
   const title = g.fullName.trim() || g.nickname;
   const [avatarBroken, setAvatarBroken] = useState(false);
   const avatarSrc = !avatarBroken && g.avatarUrl ? resolveClientAssetUrl(g.avatarUrl) : undefined;
@@ -120,42 +143,46 @@ function GuestCard(props: {
       }}
     >
       <Box sx={{ position: "relative" }}>
-        <Typography
-          variant="caption"
-          sx={{
-            position: "absolute",
-            left: 14,
-            top: 0,
-            transform: "translateY(calc(-100% - 4px))",
-            zIndex: 2,
-            fontWeight: 700,
-            fontSize: "0.7rem",
-            color: "#fff",
-            opacity: 0.92,
-            pointerEvents: "none",
-            lineHeight: 1.2,
-          }}
-        >
-          Полезен
-        </Typography>
-        <Typography
-          variant="caption"
-          sx={{
-            position: "absolute",
-            right: 14,
-            top: 0,
-            transform: "translateY(calc(-100% - 4px))",
-            zIndex: 2,
-            fontWeight: 700,
-            fontSize: "0.7rem",
-            color: "#fff",
-            opacity: 0.92,
-            pointerEvents: "none",
-            lineHeight: 1.2,
-          }}
-        >
-          Ищу
-        </Typography>
+        {showOffers ? (
+          <Typography
+            variant="caption"
+            sx={{
+              position: "absolute",
+              left: 14,
+              top: 0,
+              transform: "translateY(calc(-100% - 4px))",
+              zIndex: 2,
+              fontWeight: 700,
+              fontSize: "0.7rem",
+              color: "#fff",
+              opacity: 0.92,
+              pointerEvents: "none",
+              lineHeight: 1.2,
+            }}
+          >
+            {offersLabel}
+          </Typography>
+        ) : null}
+        {showSeeking || showPhone || showEmail ? (
+          <Typography
+            variant="caption"
+            sx={{
+              position: "absolute",
+              right: 14,
+              top: 0,
+              transform: "translateY(calc(-100% - 4px))",
+              zIndex: 2,
+              fontWeight: 700,
+              fontSize: "0.7rem",
+              color: "#fff",
+              opacity: 0.92,
+              pointerEvents: "none",
+              lineHeight: 1.2,
+            }}
+          >
+            {seekingLabel}
+          </Typography>
+        ) : null}
 
         <Box
           sx={{
@@ -206,52 +233,111 @@ function GuestCard(props: {
             boxShadow: "0 2px 12px rgba(0,0,0,0.14)",
           }}
         >
-          <Box
-            sx={{
-              display: "grid",
-              gridTemplateColumns: "1fr 1fr",
-              alignItems: "start",
-              alignContent: "start",
-              gap: 2,
-              px: 1.75,
-              py: 1.25,
-              height: "fit-content",
-              color: "#111111",
-            }}
-          >
-            <Typography
-              variant="body2"
+          {showBodyGrid ? (
+            <Box
               sx={{
-                display: "-webkit-box",
-                WebkitLineClamp: 4,
-                WebkitBoxOrient: "vertical",
-                overflow: "hidden",
-                wordBreak: "break-word",
-                whiteSpace: "pre-line",
-                fontSize: "0.875rem",
-                lineHeight: 1.3,
-                textAlign: "left",
+                display: "grid",
+                gridTemplateColumns: showOffers && showRightColumn ? "1fr 1fr" : "1fr",
+                alignItems: "start",
+                alignContent: "start",
+                gap: 2,
+                px: 1.75,
+                py: 1.25,
+                height: "fit-content",
+                color: "#111111",
               }}
             >
-              {g.offers.trim() || "ничем не полезен"}
-            </Typography>
-            <Typography
-              variant="body2"
-              sx={{
-                display: "-webkit-box",
-                WebkitLineClamp: 4,
-                WebkitBoxOrient: "vertical",
-                overflow: "hidden",
-                wordBreak: "break-word",
-                whiteSpace: "pre-line",
-                fontSize: "0.875rem",
-                lineHeight: 1.3,
-                textAlign: "right",
-              }}
-            >
-              {g.seeking.trim() || "ничего не ищу"}
-            </Typography>
-          </Box>
+              {showOffers ? (
+                <Box sx={{ minWidth: 0, pr: `${avatarSize / 2 + 8}px` }}>
+                  <Typography
+                    variant="body2"
+                    sx={{
+                      display: "-webkit-box",
+                      WebkitLineClamp: 4,
+                      WebkitBoxOrient: "vertical",
+                      overflow: "hidden",
+                      wordBreak: "break-word",
+                      whiteSpace: "pre-line",
+                      fontSize: "0.875rem",
+                      lineHeight: 1.3,
+                      textAlign: "left",
+                    }}
+                  >
+                    {g.offers.trim() || "ничем не полезен"}
+                  </Typography>
+                </Box>
+              ) : null}
+              {showRightColumn ? (
+                <Box
+                  sx={{
+                    display: "flex",
+                    flexDirection: "column",
+                    alignItems: showOffers ? "flex-end" : "flex-start",
+                    gap: 0.5,
+                    minWidth: 0,
+                    pl: `${avatarSize / 2 + 8}px`,
+                  }}
+                  onClick={(e) => {
+                    if (phone || email) e.stopPropagation();
+                  }}
+                >
+                  {showSeeking ? (
+                    <Typography
+                      variant="body2"
+                      sx={{
+                        display: "-webkit-box",
+                        WebkitLineClamp: 4,
+                        WebkitBoxOrient: "vertical",
+                        overflow: "hidden",
+                        wordBreak: "break-word",
+                        whiteSpace: "pre-line",
+                        fontSize: "0.875rem",
+                        lineHeight: 1.3,
+                        textAlign: showOffers ? "right" : "left",
+                        width: "100%",
+                      }}
+                    >
+                      {g.seeking.trim() || "ничего не ищу"}
+                    </Typography>
+                  ) : null}
+                  {phone ? (
+                    <Typography
+                      variant="body2"
+                      component="a"
+                      href={`tel:${phone}`}
+                      sx={{
+                        fontSize: "0.8rem",
+                        lineHeight: 1.3,
+                        textAlign: showOffers ? "right" : "left",
+                        color: "inherit",
+                        textDecoration: "none",
+                        wordBreak: "break-word",
+                      }}
+                    >
+                      {phone}
+                    </Typography>
+                  ) : null}
+                  {email ? (
+                    <Typography
+                      variant="body2"
+                      component="a"
+                      href={`mailto:${email}`}
+                      sx={{
+                        fontSize: "0.8rem",
+                        lineHeight: 1.3,
+                        textAlign: showOffers ? "right" : "left",
+                        color: "inherit",
+                        textDecoration: "none",
+                        wordBreak: "break-word",
+                      }}
+                    >
+                      {email}
+                    </Typography>
+                  ) : null}
+                </Box>
+              ) : null}
+            </Box>
+          ) : null}
 
           <Box
             sx={{
@@ -391,6 +477,12 @@ export function PlayerNetworkingGuestsPanel(props: Props) {
     formInputTextColor,
     profileBackgroundColor,
     profileTextColor,
+    offersLabel = "Полезен",
+    seekingLabel = "Ищу",
+    showOffers = true,
+    showSeeking = true,
+    showPhone = false,
+    showEmail = false,
   } = props;
   const [searchOpen, setSearchOpen] = useState(false);
   const [guestsFilter, setGuestsFilter] = useState<GuestsFilter>("all");
@@ -550,11 +642,11 @@ export function PlayerNetworkingGuestsPanel(props: Props) {
                 "& .MuiToggleButton-root": {
                   color: formTextColor,
                   borderColor: brandAccentColor,
-                  bgcolor: `${brandAccentColor}59`,
+                  bgcolor: `${brandAccentColor}B8`,
                   px: 1.5,
                   gap: 0.5,
                   textTransform: "none",
-                  "&:hover": { bgcolor: `${brandAccentColor}80` },
+                  "&:hover": { bgcolor: `${brandAccentColor}D0` },
                   "&.Mui-selected": {
                     color: formTextColor,
                     bgcolor: brandAccentColor,
@@ -603,6 +695,12 @@ export function PlayerNetworkingGuestsPanel(props: Props) {
               isFavorite={Boolean(favoriteGuests[g.participantId])}
               profileBackgroundColor={profileBackgroundColor}
               profileTextColor={profileTextColor}
+              offersLabel={offersLabel}
+              seekingLabel={seekingLabel}
+              showOffers={showOffers}
+              showSeeking={showSeeking}
+              showPhone={showPhone}
+              showEmail={showEmail}
               onOpenChat={onOpenChat}
               onToggleFavorite={toggleFavorite}
               onEditProfile={onOpenProfile}

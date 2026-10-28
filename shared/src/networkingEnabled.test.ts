@@ -25,12 +25,20 @@ describe("networkingEnabled in publicView", () => {
       company: true,
       offers: true,
       seeking: true,
+      phone: false,
+      email: false,
+      companyRequired: false,
+      offersRequired: false,
+      seekingRequired: false,
+      phoneRequired: false,
+      emailRequired: false,
     });
     expect(normalizePublicViewState(null).networkingJoinFormCopy).toEqual({
       offersLabel: "Чем полезен",
       seekingLabel: "Что ищу",
       offersPlaceholder: "",
       seekingPlaceholder: "",
+      privacyPolicyUrl: "",
     });
     expect(
       normalizePublicViewState({
@@ -45,12 +53,24 @@ describe("networkingEnabled in publicView", () => {
       seekingLabel: "Что ищу",
       offersPlaceholder: "x".repeat(160),
       seekingPlaceholder: "",
+      privacyPolicyUrl: "",
     });
     expect(
       normalizePublicViewState({
         networkingJoinFormFields: { company: false, offers: true, seeking: false },
       }).networkingJoinFormFields,
-    ).toEqual({ company: false, offers: true, seeking: false });
+    ).toEqual({
+      company: false,
+      offers: true,
+      seeking: false,
+      phone: false,
+      email: false,
+      companyRequired: false,
+      offersRequired: false,
+      seekingRequired: false,
+      phoneRequired: false,
+      emailRequired: false,
+    });
   });
 
   it("defaults networkingDefaultTab to feed and accepts guests/chats", () => {

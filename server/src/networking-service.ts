@@ -37,6 +37,8 @@ export function toPublicNetworkingProfile(
     avatarUrl: string;
     offers: string;
     seeking: string;
+    phone: string;
+    email: string;
     visibleInDirectory: boolean;
   },
   participantId: string,
@@ -48,6 +50,8 @@ export function toPublicNetworkingProfile(
     avatarUrl: publicNetworkingAvatarUrl(profile.avatarUrl, participantId),
     offers: profile.offers,
     seeking: profile.seeking,
+    phone: profile.phone,
+    email: profile.email,
     visibleInDirectory: profile.visibleInDirectory,
   };
 }
@@ -150,6 +154,8 @@ export async function upsertParticipantProfile(
     avatarUrl?: string;
     offers?: string;
     seeking?: string;
+    phone?: string;
+    email?: string;
     visibleInDirectory?: boolean;
   },
 ) {
@@ -179,6 +185,10 @@ export async function upsertParticipantProfile(
       typeof patch.seeking === "string"
         ? patch.seeking.trim().slice(0, 500)
         : (existing?.seeking ?? ""),
+    phone:
+      typeof patch.phone === "string" ? patch.phone.trim().slice(0, 40) : (existing?.phone ?? ""),
+    email:
+      typeof patch.email === "string" ? patch.email.trim().slice(0, 120) : (existing?.email ?? ""),
     visibleInDirectory:
       typeof patch.visibleInDirectory === "boolean"
         ? patch.visibleInDirectory
@@ -212,7 +222,7 @@ export async function listNetworkingGuests(input: {
   const participants = await prisma.participant.findMany({
     where: { quizId: input.quizId },
     include: { networkingProfile: true },
-    // Новые гости сверху; свой профиль потом поднимаем первым.
+    // Базовый порядок БД; финальный — filled → newer → pin self (в памяти).
     orderBy: { createdAt: "desc" },
   });
 
@@ -222,37 +232,103 @@ export async function listNetworkingGuests(input: {
       if (viewerId && p.id === viewerId) return true;
       return p.networkingProfile?.visibleInDirectory !== false;
     })
-    .map((p) => ({
-      participantId: p.id,
-      nickname: p.nickname,
-      fullName: p.networkingProfile?.fullName ?? "",
-      jobTitle: p.networkingProfile?.jobTitle ?? "",
-      company: p.networkingProfile?.company ?? "",
-      avatarUrl: publicNetworkingAvatarUrl(p.networkingProfile?.avatarUrl, p.id),
-      offers: p.networkingProfile?.offers ?? "",
-      seeking: p.networkingProfile?.seeking ?? "",
-      online: online.has(p.id),
-      hasProfile: Boolean(p.networkingProfile),
-    }));
+    .map((p) => {
+      const fullName = p.networkingProfile?.fullName ?? "";
+      const jobTitle = p.networkingProfile?.jobTitle ?? "";
+      const company = p.networkingProfile?.company ?? "";
+      const offers = p.networkingProfile?.offers ?? "";
+      const seeking = p.networkingProfile?.seeking ?? "";
+      const phone = p.networkingProfile?.phone ?? "";
+      const email = p.networkingProfile?.email ?? "";
+      return {
+        participantId: p.id,
+        nickname: p.nickname,
+        fullName,
+        jobTitle,
+        company,
+        avatarUrl: publicNetworkingAvatarUrl(p.networkingProfile?.avatarUrl, p.id),
+        offers,
+        seeking,
+        phone,
+        email,
+        online: online.has(p.id),
+        hasProfile: networkingGuestHasFilledFields({
+          fullName,
+          jobTitle,
+          company,
+          offers,
+          seeking,
+          phone,
+          email,
+        }),
+        createdAtMs: p.createdAt.getTime(),
+      };
+    });
 
   if (q) {
     rows = rows.filter((r) => {
       if (viewerId && r.participantId === viewerId) return true;
       const hay =
-        `${r.nickname} ${r.fullName} ${r.jobTitle} ${r.company} ${r.offers} ${r.seeking}`.toLocaleLowerCase(
+        `${r.nickname} ${r.fullName} ${r.jobTitle} ${r.company} ${r.offers} ${r.seeking} ${r.phone} ${r.email}`.toLocaleLowerCase(
           "ru",
         );
       return hay.includes(q);
     });
   }
 
+  rows = sortNetworkingGuestsFilledThenNewest(rows);
   rows = pinNetworkingViewerFirst(rows, viewerId);
 
   const total = rows.length;
-  return { total, guests: rows.slice(offset, offset + limit) };
+  const guests = rows
+    .slice(offset, offset + limit)
+    .map(({ createdAtMs: _createdAtMs, ...guest }) => guest);
+  return { total, guests };
 }
 
-/** Зритель всегда первый; остальные уже отсортированы (новые сверху). */
+/** Есть ли хоть одно заполненное поле networking-профиля. */
+export function networkingGuestHasFilledFields(row: {
+  fullName: string;
+  jobTitle: string;
+  company: string;
+  offers: string;
+  seeking: string;
+  phone: string;
+  email: string;
+}): boolean {
+  return Boolean(
+    row.fullName.trim() ||
+    row.jobTitle.trim() ||
+    row.company.trim() ||
+    row.offers.trim() ||
+    row.seeking.trim() ||
+    row.phone.trim() ||
+    row.email.trim(),
+  );
+}
+
+/** Сначала с заполненными полями, внутри группы — более новые. */
+export function sortNetworkingGuestsFilledThenNewest<
+  T extends {
+    fullName: string;
+    jobTitle: string;
+    company: string;
+    offers: string;
+    seeking: string;
+    phone: string;
+    email: string;
+    createdAtMs: number;
+  },
+>(rows: T[]): T[] {
+  return [...rows].sort((a, b) => {
+    const aFilled = networkingGuestHasFilledFields(a) ? 1 : 0;
+    const bFilled = networkingGuestHasFilledFields(b) ? 1 : 0;
+    if (aFilled !== bFilled) return bFilled - aFilled;
+    return b.createdAtMs - a.createdAtMs;
+  });
+}
+
+/** Зритель всегда первый; остальные уже отсортированы (filled → newer). */
 export function pinNetworkingViewerFirst<T extends { participantId: string }>(
   rows: T[],
   viewerId: string,
@@ -554,6 +630,8 @@ export type AdminNetworkingGuestRow = {
   avatarUrl: string;
   offers: string;
   seeking: string;
+  phone: string;
+  email: string;
   visibleInDirectory: boolean;
   chatsCount: number;
   messagesCount: number;
@@ -587,6 +665,8 @@ export async function listAdminNetworkingGuests(
     avatarUrl: publicNetworkingAvatarUrl(p.networkingProfile?.avatarUrl, p.id),
     offers: p.networkingProfile?.offers ?? "",
     seeking: p.networkingProfile?.seeking ?? "",
+    phone: p.networkingProfile?.phone ?? "",
+    email: p.networkingProfile?.email ?? "",
     visibleInDirectory: p.networkingProfile?.visibleInDirectory ?? true,
     chatsCount: p._count.networkingThreadsAsA + p._count.networkingThreadsAsB,
     messagesCount: p._count.networkingMessagesSent,
@@ -604,6 +684,8 @@ export async function adminUpdateNetworkingGuest(
     company?: string;
     offers?: string;
     seeking?: string;
+    phone?: string;
+    email?: string;
     visibleInDirectory?: boolean;
   },
 ): Promise<AdminNetworkingGuestRow> {
@@ -641,6 +723,10 @@ export async function adminUpdateNetworkingGuest(
     typeof patch.seeking === "string"
       ? patch.seeking.trim().slice(0, 500)
       : (existing?.seeking ?? "");
+  const phone =
+    typeof patch.phone === "string" ? patch.phone.trim().slice(0, 40) : (existing?.phone ?? "");
+  const email =
+    typeof patch.email === "string" ? patch.email.trim().slice(0, 120) : (existing?.email ?? "");
   const visibleInDirectory =
     typeof patch.visibleInDirectory === "boolean"
       ? patch.visibleInDirectory
@@ -655,6 +741,8 @@ export async function adminUpdateNetworkingGuest(
       company,
       offers,
       seeking,
+      phone,
+      email,
       visibleInDirectory,
       avatarUrl: existing?.avatarUrl ?? "",
     },
@@ -664,6 +752,8 @@ export async function adminUpdateNetworkingGuest(
       company,
       offers,
       seeking,
+      phone,
+      email,
       visibleInDirectory,
     },
   });

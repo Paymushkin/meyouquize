@@ -880,8 +880,7 @@ export function buildApp() {
       const body =
         req.body && typeof req.body === "object" ? (req.body as Record<string, unknown>) : {};
       try {
-        const { adminUpdateNetworkingGuest, isNetworkingEnabledForQuiz } =
-          await import("./networking-service.js");
+        const { adminUpdateNetworkingGuest } = await import("./networking-service.js");
         const guest = await adminUpdateNetworkingGuest(room.id, participantId, {
           ...(typeof body.nickname === "string" ? { nickname: body.nickname } : {}),
           ...(typeof body.fullName === "string" ? { fullName: body.fullName } : {}),
@@ -889,17 +888,12 @@ export function buildApp() {
           ...(typeof body.company === "string" ? { company: body.company } : {}),
           ...(typeof body.offers === "string" ? { offers: body.offers } : {}),
           ...(typeof body.seeking === "string" ? { seeking: body.seeking } : {}),
+          ...(typeof body.phone === "string" ? { phone: body.phone } : {}),
+          ...(typeof body.email === "string" ? { email: body.email } : {}),
           ...(typeof body.visibleInDirectory === "boolean"
             ? { visibleInDirectory: body.visibleInDirectory }
             : {}),
         });
-        if (await isNetworkingEnabledForQuiz(room.id)) {
-          const io = getSocketIo();
-          if (io) {
-            const { emitToQuizPlayers } = await import("./socket/quiz-rooms.js");
-            emitToQuizPlayers(io, room.id, "networking:guests:changed", { quizId: room.id });
-          }
-        }
         return res.json({ guest });
       } catch (error) {
         const message = error instanceof Error ? error.message : "Update failed";

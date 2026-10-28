@@ -6,6 +6,8 @@ import {
   VIDEO_WALL_TILE_ID,
   contrastingTextOnColor,
   getNetworkingJoinFieldVisibility,
+  NETWORKING_JOIN_PRIVACY_CONSENT_LINK_LABEL,
+  NETWORKING_JOIN_PRIVACY_CONSENT_PREFIX,
   networkingJoinFieldPlaceholder,
   ruBallLabel,
   type NetworkingJoinFormCopy,
@@ -37,6 +39,7 @@ import {
   Chip,
   CircularProgress,
   IconButton,
+  Link,
   OutlinedInput,
   Stack,
   TextField,
@@ -1052,6 +1055,8 @@ export function JoinNetworkingCard(props: JoinNetworkingCardProps) {
     brandFontFamily,
   );
   const visibility = getNetworkingJoinFieldVisibility(mode, fields, copy);
+  const privacyPolicyUrl =
+    mode === "networking" ? sanitizeExternalHttpUrl(copy?.privacyPolicyUrl) : "";
   return (
     <Card variant="outlined" sx={JOIN_CARD_ROOT_SX}>
       <CardContent sx={JOIN_CARD_CONTENT_SX}>
@@ -1060,7 +1065,7 @@ export function JoinNetworkingCard(props: JoinNetworkingCardProps) {
             autoFocus
             value={values.fullName}
             onChange={(e) => onChange({ fullName: e.target.value })}
-            placeholder="ФИО"
+            placeholder="ФИО *"
             fullWidth
             error={Boolean(formError)}
             sx={fieldSx}
@@ -1078,7 +1083,11 @@ export function JoinNetworkingCard(props: JoinNetworkingCardProps) {
             <OutlinedInput
               value={values.company}
               onChange={(e) => onChange({ company: e.target.value })}
-              placeholder={visibility.companyLabel}
+              placeholder={networkingJoinFieldPlaceholder(
+                visibility.companyLabel,
+                undefined,
+                visibility.companyRequired,
+              )}
               fullWidth
               sx={fieldSx}
             />
@@ -1090,6 +1099,7 @@ export function JoinNetworkingCard(props: JoinNetworkingCardProps) {
               placeholder={networkingJoinFieldPlaceholder(
                 visibility.offersLabel,
                 visibility.offersPlaceholder,
+                visibility.offersRequired,
               )}
               fullWidth
               multiline
@@ -1104,6 +1114,7 @@ export function JoinNetworkingCard(props: JoinNetworkingCardProps) {
               placeholder={networkingJoinFieldPlaceholder(
                 visibility.seekingLabel,
                 visibility.seekingPlaceholder,
+                visibility.seekingRequired,
               )}
               fullWidth
               multiline
@@ -1111,9 +1122,66 @@ export function JoinNetworkingCard(props: JoinNetworkingCardProps) {
               sx={fieldSx}
             />
           ) : null}
+          {visibility.showPhone ? (
+            <OutlinedInput
+              value={values.phone}
+              onChange={(e) => onChange({ phone: e.target.value })}
+              placeholder={networkingJoinFieldPlaceholder(
+                "Телефон",
+                undefined,
+                visibility.phoneRequired,
+              )}
+              fullWidth
+              type="tel"
+              inputMode="tel"
+              sx={fieldSx}
+            />
+          ) : null}
+          {visibility.showEmail ? (
+            <OutlinedInput
+              value={values.email}
+              onChange={(e) => onChange({ email: e.target.value })}
+              placeholder={networkingJoinFieldPlaceholder(
+                "Почта",
+                undefined,
+                visibility.emailRequired,
+              )}
+              fullWidth
+              type="email"
+              inputMode="email"
+              sx={fieldSx}
+            />
+          ) : null}
           {formError ? (
             <Typography variant="body2" color="error" sx={{ px: 0.25 }}>
               {formError}
+            </Typography>
+          ) : null}
+          {privacyPolicyUrl ? (
+            <Typography
+              variant="caption"
+              sx={{
+                px: 0.25,
+                color: formInputTextColor,
+                opacity: 0.85,
+                lineHeight: 1.35,
+              }}
+            >
+              {NETWORKING_JOIN_PRIVACY_CONSENT_PREFIX}{" "}
+              <Link
+                href={privacyPolicyUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                underline="none"
+                sx={{
+                  color: formBackgroundColor,
+                  opacity: 1,
+                  fontWeight: 600,
+                  "&:hover": { color: formBackgroundColor, opacity: 0.85 },
+                }}
+              >
+                {NETWORKING_JOIN_PRIVACY_CONSENT_LINK_LABEL}
+              </Link>
             </Typography>
           ) : null}
           <Button

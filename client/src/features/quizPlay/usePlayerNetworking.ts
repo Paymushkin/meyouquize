@@ -17,6 +17,8 @@ export type NetworkingGuest = {
   avatarUrl: string;
   offers: string;
   seeking: string;
+  phone: string;
+  email: string;
   online: boolean;
   hasProfile: boolean;
 };
@@ -59,7 +61,9 @@ function profileHasContent(profile: NetworkingProfile | null | undefined): boole
     profile.jobTitle.trim() ||
     profile.company.trim() ||
     profile.offers.trim() ||
-    profile.seeking.trim(),
+    profile.seeking.trim() ||
+    profile.phone.trim() ||
+    profile.email.trim(),
   );
 }
 
@@ -78,6 +82,8 @@ function applySelfProfileToGuests(
           avatarUrl: nextProfile.avatarUrl,
           offers: nextProfile.offers,
           seeking: nextProfile.seeking,
+          phone: nextProfile.phone,
+          email: nextProfile.email,
           hasProfile: true,
         }
       : g,
@@ -294,15 +300,6 @@ export function usePlayerNetworking(options: {
         setUnreadTotal(Math.max(0, payload.unreadTotal));
       }
     };
-    const onGuestsChanged = (payload: { quizId?: string }) => {
-      if (payload.quizId !== quizId) return;
-      socket.emit("networking:guests:list", {
-        quizId,
-        query: guestsQueryRef.current,
-        limit: NETWORKING_GUESTS_PAGE_SIZE,
-        offset: guestsPageRef.current * NETWORKING_GUESTS_PAGE_SIZE,
-      });
-    };
     const rejoinNetworking = () => {
       socket.emit("networking:join", { quizId });
       socket.emit("networking:threads:list", {
@@ -315,7 +312,6 @@ export function usePlayerNetworking(options: {
     socket.on("networking:joined", onJoined);
     socket.on("networking:profile", onProfile);
     socket.on("networking:guests", onGuests);
-    socket.on("networking:guests:changed", onGuestsChanged);
     socket.on("networking:threads", onThreads);
     socket.on("networking:dm:history", onHistory);
     socket.on("networking:dm:message", onMessage);
@@ -331,7 +327,6 @@ export function usePlayerNetworking(options: {
       socket.off("networking:joined", onJoined);
       socket.off("networking:profile", onProfile);
       socket.off("networking:guests", onGuests);
-      socket.off("networking:guests:changed", onGuestsChanged);
       socket.off("networking:threads", onThreads);
       socket.off("networking:dm:history", onHistory);
       socket.off("networking:dm:message", onMessage);
@@ -381,6 +376,8 @@ export function usePlayerNetworking(options: {
         avatarUrl: patch.avatarUrl ?? profileRef.current?.avatarUrl ?? "",
         offers: patch.offers ?? profileRef.current?.offers ?? "",
         seeking: patch.seeking ?? profileRef.current?.seeking ?? "",
+        phone: patch.phone ?? profileRef.current?.phone ?? "",
+        email: patch.email ?? profileRef.current?.email ?? "",
         visibleInDirectory:
           patch.visibleInDirectory ?? profileRef.current?.visibleInDirectory ?? true,
       };
@@ -402,6 +399,8 @@ export function usePlayerNetworking(options: {
               avatarUrl: nextProfile.avatarUrl,
               offers: nextProfile.offers,
               seeking: nextProfile.seeking,
+              phone: nextProfile.phone,
+              email: nextProfile.email,
               online: true,
               hasProfile: true,
             },

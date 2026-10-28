@@ -155,6 +155,10 @@ model ParticipantProfile {
   offers        String      @default("")
   /** Что ищет */
   seeking       String      @default("")
+  /** Телефон (форма нетворкинга). */
+  phone         String      @default("")
+  /** Почта (форма нетворкинга). */
+  email         String      @default("")
   visibleInDirectory Boolean @default(true)
   updatedAt     DateTime    @updatedAt
 }

@@ -14,8 +14,10 @@ import {
   Typography,
 } from "@mui/material";
 import {
+  DEFAULT_NETWORKING_JOIN_FORM_FIELDS,
   getNetworkingJoinFieldVisibility,
   networkingJoinFieldPlaceholder,
+  validateNetworkingJoinDraft,
   type NetworkingJoinFormCopy,
   type NetworkingJoinFormFields,
   type NetworkingJoinFormMode,
@@ -42,6 +44,8 @@ type ProfileDraftSource = {
   avatarUrl?: string;
   offers?: string;
   seeking?: string;
+  phone?: string;
+  email?: string;
   visibleInDirectory?: boolean;
 };
 
@@ -80,6 +84,8 @@ function buildDraft(
     avatarUrl: profile?.avatarUrl?.trim() || fallback?.avatarUrl?.trim() || "",
     offers: profile?.offers?.trim() || fallback?.offers?.trim() || "",
     seeking: profile?.seeking?.trim() || fallback?.seeking?.trim() || "",
+    phone: profile?.phone?.trim() || fallback?.phone?.trim() || "",
+    email: profile?.email?.trim() || fallback?.email?.trim() || "",
     visibleInDirectory: profile?.visibleInDirectory ?? fallback?.visibleInDirectory ?? true,
   };
 }
@@ -108,6 +114,7 @@ export function PlayerNetworkingProfileDialog(props: Props) {
   );
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const [avatarError, setAvatarError] = useState("");
+  const [formError, setFormError] = useState("");
   const [cropFile, setCropFile] = useState<File | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const draftTouchedRef = useRef(false);
@@ -118,6 +125,7 @@ export function PlayerNetworkingProfileDialog(props: Props) {
       return;
     }
     setAvatarError("");
+    setFormError("");
     draftTouchedRef.current = false;
     setDraft(buildDraft(profile, fallbackProfile, nickname));
     onOpenRefresh?.();
@@ -261,7 +269,11 @@ export function PlayerNetworkingProfileDialog(props: Props) {
           ) : null}
           {visibility.showCompany ? (
             <TextField
-              label={visibility.companyLabel}
+              label={
+                visibility.companyRequired
+                  ? `${visibility.companyLabel} *`
+                  : visibility.companyLabel
+              }
               fullWidth
               value={draft.company}
               onChange={(e) => {
@@ -273,10 +285,13 @@ export function PlayerNetworkingProfileDialog(props: Props) {
           ) : null}
           {visibility.showOffers ? (
             <TextField
-              label={visibility.offersLabel}
+              label={
+                visibility.offersRequired ? `${visibility.offersLabel} *` : visibility.offersLabel
+              }
               placeholder={networkingJoinFieldPlaceholder(
                 visibility.offersLabel,
                 visibility.offersPlaceholder,
+                visibility.offersRequired,
               )}
               fullWidth
               multiline
@@ -291,10 +306,15 @@ export function PlayerNetworkingProfileDialog(props: Props) {
           ) : null}
           {visibility.showSeeking ? (
             <TextField
-              label={visibility.seekingLabel}
+              label={
+                visibility.seekingRequired
+                  ? `${visibility.seekingLabel} *`
+                  : visibility.seekingLabel
+              }
               placeholder={networkingJoinFieldPlaceholder(
                 visibility.seekingLabel,
                 visibility.seekingPlaceholder,
+                visibility.seekingRequired,
               )}
               fullWidth
               multiline
@@ -307,6 +327,37 @@ export function PlayerNetworkingProfileDialog(props: Props) {
               sx={fieldSx}
             />
           ) : null}
+          {visibility.showPhone ? (
+            <TextField
+              label={visibility.phoneRequired ? "Телефон *" : "Телефон"}
+              fullWidth
+              type="tel"
+              value={draft.phone}
+              onChange={(e) => {
+                draftTouchedRef.current = true;
+                setDraft((prev) => ({ ...prev, phone: e.target.value }));
+              }}
+              sx={fieldSx}
+            />
+          ) : null}
+          {visibility.showEmail ? (
+            <TextField
+              label={visibility.emailRequired ? "Почта *" : "Почта"}
+              fullWidth
+              type="email"
+              value={draft.email}
+              onChange={(e) => {
+                draftTouchedRef.current = true;
+                setDraft((prev) => ({ ...prev, email: e.target.value }));
+              }}
+              sx={fieldSx}
+            />
+          ) : null}
+          {formError ? (
+            <Typography variant="body2" color="error">
+              {formError}
+            </Typography>
+          ) : null}
         </Stack>
       </DialogContent>
       <DialogActions sx={{ px: 3, pb: 2 }}>
@@ -317,6 +368,16 @@ export function PlayerNetworkingProfileDialog(props: Props) {
           variant="contained"
           disabled={uploadingAvatar}
           onClick={() => {
+            const error = validateNetworkingJoinDraft(
+              mode,
+              fields ?? DEFAULT_NETWORKING_JOIN_FORM_FIELDS,
+              draft,
+            );
+            if (error) {
+              setFormError(error);
+              return;
+            }
+            setFormError("");
             onSave(draft);
             onClose();
           }}

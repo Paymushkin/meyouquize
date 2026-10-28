@@ -564,6 +564,13 @@ export const setPublicViewSchema = z.object({
       company: z.boolean().optional(),
       offers: z.boolean().optional(),
       seeking: z.boolean().optional(),
+      phone: z.boolean().optional(),
+      email: z.boolean().optional(),
+      companyRequired: z.boolean().optional(),
+      offersRequired: z.boolean().optional(),
+      seekingRequired: z.boolean().optional(),
+      phoneRequired: z.boolean().optional(),
+      emailRequired: z.boolean().optional(),
     })
     .optional(),
   networkingJoinFormCopy: z
@@ -572,6 +579,7 @@ export const setPublicViewSchema = z.object({
       seekingLabel: z.string().trim().max(60).optional(),
       offersPlaceholder: z.string().trim().max(160).optional(),
       seekingPlaceholder: z.string().trim().max(160).optional(),
+      privacyPolicyUrl: z.string().trim().max(500).optional(),
     })
     .optional(),
   networkingDefaultTab: z.enum(["feed", "guests", "chats"]).optional(),

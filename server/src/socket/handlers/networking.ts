@@ -19,20 +19,10 @@ import {
   upsertParticipantProfile,
 } from "../../networking-service.js";
 import { getStoredPublicView, saveStoredPublicView } from "../public-view-store.js";
-import {
-  broadcastQuizPublicState,
-  emitToQuizDashboard,
-  emitToQuizPlayers,
-  quizPlayerRoom,
-} from "../quiz-rooms.js";
+import { broadcastQuizPublicState, emitToQuizDashboard, quizPlayerRoom } from "../quiz-rooms.js";
 import { getQuizPublicState } from "../../quiz-service.js";
 import { toPublicViewPayload } from "../public-view-helpers.js";
 import { normalizePublicViewState } from "@meyouquize/shared";
-
-/** Клиенты перезапрашивают свой текущий список гостей. */
-function broadcastNetworkingGuestsChanged(io: Server, quizId: string) {
-  emitToQuizPlayers(io, quizId, "networking:guests:changed", { quizId });
-}
 
 /** DM/unread: сокеты игрока в комнате квиза (+ networking-комната на случай гонки join). */
 async function emitToNetworkingParticipant(
@@ -197,6 +187,8 @@ export function registerNetworkingHandlers(socket: EnrichedSocket, io: Server) {
           avatarUrl: z.string().max(500).optional(),
           offers: z.string().max(500).optional(),
           seeking: z.string().max(500).optional(),
+          phone: z.string().max(40).optional(),
+          email: z.string().max(120).optional(),
           visibleInDirectory: z.boolean().optional(),
         })
         .parse(raw);
@@ -207,7 +199,6 @@ export function registerNetworkingHandlers(socket: EnrichedSocket, io: Server) {
         participantId,
         profile: toPublicNetworkingProfile(profile, participantId),
       });
-      broadcastNetworkingGuestsChanged(io, payload.quizId);
     } catch (error) {
       fail(socket, error instanceof Error ? error.message : "Set profile failed");
     }

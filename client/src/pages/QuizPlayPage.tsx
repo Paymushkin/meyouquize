@@ -28,6 +28,7 @@ import {
   normalizeNetworkingJoinFormMode,
   normalizeNetworkingPlayerTab,
   usesExtendedNetworkingJoinForm,
+  validateNetworkingJoinDraft,
 } from "@meyouquize/shared";
 import {
   buildPlayerQuizResultsTilesForPlayer,
@@ -437,6 +438,8 @@ export function QuizPlayPage() {
     company: "",
     offers: "",
     seeking: "",
+    phone: "",
+    email: "",
   });
   const pendingNetworkingProfileRef = useRef<JoinNetworkingProfileFields | null>(null);
 
@@ -518,12 +521,17 @@ export function QuizPlayPage() {
   }
 
   function joinWithNetworkingProfile() {
-    const fullName = joinNetworkingDraft.fullName.trim();
     setNicknameError("");
-    if (!fullName) {
-      setNicknameError("Укажите ФИО");
+    const validationError = validateNetworkingJoinDraft(
+      networkingJoinFormMode,
+      networkingJoinFormFields,
+      joinNetworkingDraft,
+    );
+    if (validationError) {
+      setNicknameError(validationError);
       return;
     }
+    const fullName = joinNetworkingDraft.fullName.trim();
     const nick = fullName.slice(0, 40);
     setNick(nick);
     pendingNetworkingProfileRef.current = {
@@ -532,6 +540,8 @@ export function QuizPlayPage() {
       company: joinNetworkingDraft.company.trim(),
       offers: joinNetworkingDraft.offers.trim(),
       seeking: joinNetworkingDraft.seeking.trim(),
+      phone: joinNetworkingDraft.phone.trim(),
+      email: joinNetworkingDraft.email.trim(),
     };
     setJoinPending(true);
     setError("");
@@ -628,6 +638,18 @@ export function QuizPlayPage() {
   });
   activePeerIdRef.current = networking.activePeerId;
 
+  const refreshNetworkingGuests = networking.refreshGuests;
+  const prevNetworkingTabRef = useRef(networkingTab);
+  useEffect(() => {
+    const prev = prevNetworkingTabRef.current;
+    prevNetworkingTabRef.current = networkingTab;
+    // Дешёво: один list у клиента при входе в «Гости», без broadcast всем.
+    if (!networkingEnabled || !joined) return;
+    if (networkingTab === "guests" && prev !== "guests") {
+      refreshNetworkingGuests();
+    }
+  }, [networkingTab, networkingEnabled, joined, refreshNetworkingGuests]);
+
   const saveNetworkingProfile = networking.saveProfile;
   useEffect(() => {
     if (!joined || !networkingEnabled || !quiz?.id) return;
@@ -640,6 +662,8 @@ export function QuizPlayPage() {
       company: pending.company,
       offers: pending.offers,
       seeking: pending.seeking,
+      phone: pending.phone,
+      email: pending.email,
       visibleInDirectory: true,
     });
   }, [joined, networkingEnabled, quiz?.id, saveNetworkingProfile]);
@@ -1042,6 +1066,12 @@ export function QuizPlayPage() {
                       profileTextColor={
                         quiz?.networkingProfileTextColor?.trim() || formTextColor || "#ffffff"
                       }
+                      offersLabel={networkingJoinFormCopy.offersLabel}
+                      seekingLabel={networkingJoinFormCopy.seekingLabel}
+                      showOffers={networkingJoinFormFields.offers}
+                      showSeeking={networkingJoinFormFields.seeking}
+                      showPhone={networkingJoinFormFields.phone}
+                      showEmail={networkingJoinFormFields.email}
                     />
                   </Box>
                   <Box

@@ -64,6 +64,8 @@ describe("publicNetworkingAvatarUrl", () => {
         avatarUrl: "/media/gone.png",
         offers: "",
         seeking: "",
+        phone: "",
+        email: "",
         visibleInDirectory: true,
       },
       "p9",
