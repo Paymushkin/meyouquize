@@ -185,7 +185,7 @@ export function EventTitleBlock(props: EventTitleBlockProps) {
           ? {
               px: pcq(2, 0),
               mt: pcq(1, 1.5),
-              mb: 1,
+              mb: 4,
               alignSelf: "stretch",
             }
           : {}),
@@ -221,9 +221,9 @@ export function EventTitleBlock(props: EventTitleBlockProps) {
               isJoinScreen
                 ? {
                     ...playerEventTitleSx(brandFontFamily),
-                    fontSize: "clamp(1.75rem, 6cqw, 3rem)",
-                    lineHeight: 1.08,
-                    letterSpacing: 0.4,
+                    fontSize: "clamp(1.35rem, 4.5cqw, 2.1rem)",
+                    lineHeight: 1.12,
+                    letterSpacing: 0.2,
                     mb: 0,
                   }
                 : playerEventTitleSx(brandFontFamily)
@@ -606,7 +606,6 @@ const JOIN_CARD_ROOT_SX: SxProps<Theme> = {
 export const JOIN_SCREEN_STACK_SX: SxProps<Theme> = {
   width: "100%",
   maxWidth: 520,
-  px: pcq(2, 0),
   display: "flex",
   flexDirection: "column",
   alignItems: "stretch",
