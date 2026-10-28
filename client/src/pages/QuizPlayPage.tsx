@@ -910,9 +910,9 @@ export function QuizPlayPage() {
             backgroundImageUrl: undefined,
           }),
           backgroundImage: "none",
-          ...(joined
+          ...(joined || isJoinScreen
             ? {
-                // Скролл на контейнере (не на body) — иначе sticky у фильтров гостей не работает.
+                // Скролл на контейнере (не на body); фон — fixed-слой выше.
                 minHeight: "100dvh",
                 height: "100dvh",
                 overflowY: "auto",
@@ -922,7 +922,9 @@ export function QuizPlayPage() {
                 msOverflowStyle: "none",
                 "&::-webkit-scrollbar": { display: "none" },
                 // Иначе 96px container + shell nav = огромная пустота под гостями/чатами.
-                ...(networkingEnabled ? { pb: "env(safe-area-inset-bottom, 0px)" } : null),
+                ...(joined && networkingEnabled
+                  ? { pb: "env(safe-area-inset-bottom, 0px)" }
+                  : null),
               }
             : null),
         }}

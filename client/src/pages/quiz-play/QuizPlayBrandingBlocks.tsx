@@ -91,13 +91,13 @@ export function buildQuizPlayContainerSx(params: QuizPlayContainerSxParams): SxP
     backgroundColor,
     backgroundImageUrl,
   } = params;
-  const allowMainScroll = joined && !isJoinScreen;
+  // Join и post-join: скролл страницы в контейнере; фон — отдельный fixed-слой.
+  const allowPageScroll = joined || isJoinScreen;
   const normalizedImageUrl = backgroundImageUrl?.trim() ?? "";
   const brandBg = buildBrandBackground({
     backgroundImageUrl: normalizedImageUrl || undefined,
     backgroundAnchor: "bottom",
-    // После join длинный скролл (гости/чаты) не должен «уезжать» от брендового фона.
-    backgroundAttachment: joined ? "fixed" : "scroll",
+    backgroundAttachment: allowPageScroll ? "fixed" : "scroll",
   });
   return {
     position: "relative",
@@ -124,11 +124,12 @@ export function buildQuizPlayContainerSx(params: QuizPlayContainerSxParams): SxP
       },
     pt: isJoinScreen ? 5 : 2,
     pb: isJoinScreen
-      ? "env(safe-area-inset-bottom, 0px)"
+      ? "calc(env(safe-area-inset-bottom, 0px) + 48px)"
       : "calc(env(safe-area-inset-bottom, 0px) + 96px)",
     minHeight: "100dvh",
-    height: allowMainScroll ? "auto" : "100dvh",
-    overflowY: allowMainScroll ? "auto" : "hidden",
+    height: "100dvh",
+    overflowY: allowPageScroll ? "auto" : "hidden",
+    WebkitOverflowScrolling: allowPageScroll ? "touch" : undefined,
     display: "flex",
     flexDirection: "column",
     justifyContent: "flex-start",
@@ -184,6 +185,7 @@ export function EventTitleBlock(props: EventTitleBlockProps) {
           ? {
               px: pcq(2, 0),
               mt: pcq(1, 1.5),
+              mb: 1,
               alignSelf: "stretch",
             }
           : {}),
@@ -609,16 +611,19 @@ export const JOIN_SCREEN_STACK_SX: SxProps<Theme> = {
   flexDirection: "column",
   alignItems: "stretch",
   gap: 1.5,
+  // Короткая форма — по центру оставшейся высоты; длинная задаёт высоту страницы.
+  my: "auto",
+  flexShrink: 0,
 };
 
 export const JOIN_SCREEN_MAIN_SX: SxProps<Theme> = {
-  flex: 1,
+  // Растём, если места много; не сжимаемся ниже контента — скролл у контейнера страницы.
+  flex: "1 0 auto",
   width: "100%",
   display: "flex",
   flexDirection: "column",
   alignItems: "center",
-  justifyContent: "center",
-  minHeight: 0,
+  pb: 5,
 };
 
 const JOIN_CARD_CONTENT_SX: SxProps<Theme> = {
