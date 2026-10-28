@@ -5,6 +5,7 @@ import { assertAdmin, fail, type EnrichedSocket } from "../handler-common.js";
 import {
   assertNetworkingEnabled,
   assertParticipantsInQuiz,
+  countNetworkingUnreadTotal,
   getParticipantProfile,
   isNetworkingEnabledForQuiz,
   listNetworkingGuests,
@@ -18,10 +19,43 @@ import {
   upsertParticipantProfile,
 } from "../../networking-service.js";
 import { getStoredPublicView, saveStoredPublicView } from "../public-view-store.js";
-import { broadcastQuizPublicState, emitToQuizDashboard } from "../quiz-rooms.js";
+import {
+  broadcastQuizPublicState,
+  emitToQuizDashboard,
+  emitToQuizPlayers,
+  quizPlayerRoom,
+} from "../quiz-rooms.js";
 import { getQuizPublicState } from "../../quiz-service.js";
 import { toPublicViewPayload } from "../public-view-helpers.js";
 import { normalizePublicViewState } from "@meyouquize/shared";
+
+/** Клиенты перезапрашивают свой текущий список гостей. */
+function broadcastNetworkingGuestsChanged(io: Server, quizId: string) {
+  emitToQuizPlayers(io, quizId, "networking:guests:changed", { quizId });
+}
+
+/** DM/unread: сокеты игрока в комнате квиза (+ networking-комната на случай гонки join). */
+async function emitToNetworkingParticipant(
+  io: Server,
+  quizId: string,
+  participantId: string,
+  event: string,
+  payload: unknown,
+) {
+  const seen = new Set<string>();
+  const sockets = await io.in(quizPlayerRoom(quizId)).fetchSockets();
+  for (const sk of sockets) {
+    if (sk.data?.participantId !== participantId) continue;
+    seen.add(sk.id);
+    sk.emit(event, payload);
+  }
+  // Fallback, если сокет ещё не в quiz-room, но уже в networking:participant.
+  const roomSockets = await io.in(participantRoom(participantId)).fetchSockets();
+  for (const sk of roomSockets) {
+    if (seen.has(sk.id)) continue;
+    sk.emit(event, payload);
+  }
+}
 
 function requireJoined(socket: EnrichedSocket, quizId: string): string {
   if (!socket.data.participantId) throw new Error("Not joined");
@@ -173,6 +207,7 @@ export function registerNetworkingHandlers(socket: EnrichedSocket, io: Server) {
         participantId,
         profile: toPublicNetworkingProfile(profile, participantId),
       });
+      broadcastNetworkingGuestsChanged(io, payload.quizId);
     } catch (error) {
       fail(socket, error instanceof Error ? error.message : "Set profile failed");
     }
@@ -295,8 +330,22 @@ export function registerNetworkingHandlers(socket: EnrichedSocket, io: Server) {
         createdAt: message.createdAt.toISOString(),
         readAt: null as string | null,
       };
-      io.to(participantRoom(senderId)).emit("networking:dm:message", dto);
-      io.to(participantRoom(payload.peerId)).emit("networking:dm:message", dto);
+      const peerUnreadTotal = await countNetworkingUnreadTotal(payload.quizId, payload.peerId);
+      await emitToNetworkingParticipant(io, payload.quizId, senderId, "networking:dm:message", dto);
+      await emitToNetworkingParticipant(
+        io,
+        payload.quizId,
+        payload.peerId,
+        "networking:dm:message",
+        {
+          ...dto,
+          unreadTotal: peerUnreadTotal,
+        },
+      );
+      await emitToNetworkingParticipant(io, payload.quizId, payload.peerId, "networking:unread", {
+        quizId: payload.quizId,
+        unreadTotal: peerUnreadTotal,
+      });
     } catch (error) {
       fail(socket, error instanceof Error ? error.message : "Send DM failed");
     }
@@ -310,7 +359,9 @@ export function registerNetworkingHandlers(socket: EnrichedSocket, io: Server) {
       const participantId = await requireLiveParticipant(socket, payload.quizId);
       await assertNetworkingEnabled(payload.quizId);
       await markThreadRead(payload.threadId, participantId);
+      const unreadTotal = await countNetworkingUnreadTotal(payload.quizId, participantId);
       socket.emit("networking:dm:read-ok", { threadId: payload.threadId });
+      socket.emit("networking:unread", { quizId: payload.quizId, unreadTotal });
     } catch (error) {
       fail(socket, error instanceof Error ? error.message : "Mark read failed");
     }

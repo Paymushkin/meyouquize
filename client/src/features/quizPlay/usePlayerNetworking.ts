@@ -121,9 +121,13 @@ export function usePlayerNetworking(options: {
   const threadsLenRef = useRef(0);
   const threadsHasMoreRef = useRef(false);
   const threadsLoadingMoreRef = useRef(false);
+  const guestsQueryRef = useRef("");
+  const guestsPageRef = useRef(0);
   activeThreadIdRef.current = activeThreadId;
   activePeerIdRef.current = activePeerId;
   selfIdRef.current = selfParticipantId;
+  guestsQueryRef.current = guestsQuery;
+  guestsPageRef.current = guestsPage;
   // Не затирать profileRef «старым» null между saveProfile и следующим commit state.
   if (profile) profileRef.current = profile;
   threadsLenRef.current = threads.length;
@@ -208,30 +212,99 @@ export function usePlayerNetworking(options: {
       }
       if (typeof payload.total === "number") setThreadsTotal(payload.total);
       setThreadsHasMore(Boolean(payload.hasMore));
-      if (typeof payload.unreadTotal === "number") setUnreadTotal(payload.unreadTotal);
+      if (typeof payload.unreadTotal === "number") {
+        let total = payload.unreadTotal;
+        // Открытый тред уже «прочитан» локально — не держим его в бейдже.
+        if (activeId) {
+          const rawUnread = (Array.isArray(payload.threads) ? payload.threads : []).find(
+            (t) => t.threadId === activeId,
+          )?.unread;
+          if (typeof rawUnread === "number" && rawUnread > 0) {
+            total = Math.max(0, total - rawUnread);
+          }
+        }
+        setUnreadTotal(total);
+      }
       setThreadsLoadingMore(false);
     };
     const onHistory = (payload: { threadId?: string; messages?: NetworkingMessage[] }) => {
       if (!payload.threadId || payload.threadId !== activeThreadIdRef.current) return;
       setMessages(Array.isArray(payload.messages) ? payload.messages : []);
     };
-    const onMessage = (dto: NetworkingMessage) => {
+    const onMessage = (dto: NetworkingMessage & { unreadTotal?: number }) => {
       const activeId = activeThreadIdRef.current;
       const peerId = activePeerIdRef.current;
       const selfId = selfIdRef.current;
+      const fromOther = Boolean(selfId && dto.senderId !== selfId);
+      const viewingThisThread =
+        (activeId && dto.threadId === activeId) ||
+        (!activeId && Boolean(peerId) && (dto.senderId === peerId || dto.senderId === selfId));
+
       if (activeId && dto.threadId === activeId) {
         setMessages((prev) => (prev.some((m) => m.id === dto.id) ? prev : [...prev, dto]));
         // Чат открыт — сразу помечаем прочитанным, чтобы бейдж не вспыхивал.
-        if (dto.senderId !== selfId) {
+        if (fromOther) {
           socket.emit("networking:dm:read", { quizId, threadId: activeId });
         }
       } else if (!activeId && peerId && (dto.senderId === peerId || dto.senderId === selfId)) {
         setActiveThreadId(dto.threadId);
         setMessages((prev) => (prev.some((m) => m.id === dto.id) ? prev : [...prev, dto]));
-        if (dto.senderId !== selfId) {
+        if (fromOther) {
           socket.emit("networking:dm:read", { quizId, threadId: dto.threadId });
         }
       }
+
+      // Индикатор «Чаты»: сразу по сокету, не ждём threads:list.
+      if (fromOther && !viewingThisThread) {
+        if (typeof dto.unreadTotal === "number") {
+          setUnreadTotal(Math.max(0, dto.unreadTotal));
+        } else {
+          setUnreadTotal((n) => n + 1);
+        }
+        setThreads((prev) => {
+          const idx = prev.findIndex((t) => t.threadId === dto.threadId);
+          if (idx < 0) return prev;
+          const next = [...prev];
+          const row = next[idx]!;
+          next[idx] = {
+            ...row,
+            unread: (row.unread || 0) + 1,
+            lastMessage: {
+              id: dto.id,
+              text: dto.text,
+              createdAt: dto.createdAt,
+              senderId: dto.senderId,
+            },
+            updatedAt: dto.createdAt,
+          };
+          next.sort((a, b) => (a.updatedAt < b.updatedAt ? 1 : -1));
+          return next;
+        });
+      }
+
+      socket.emit("networking:threads:list", {
+        quizId,
+        limit: Math.max(NETWORKING_THREADS_PAGE_SIZE, threadsLenRef.current),
+        offset: 0,
+      });
+    };
+    const onUnread = (payload: { quizId?: string; unreadTotal?: number }) => {
+      if (payload.quizId !== quizId) return;
+      if (typeof payload.unreadTotal === "number") {
+        setUnreadTotal(Math.max(0, payload.unreadTotal));
+      }
+    };
+    const onGuestsChanged = (payload: { quizId?: string }) => {
+      if (payload.quizId !== quizId) return;
+      socket.emit("networking:guests:list", {
+        quizId,
+        query: guestsQueryRef.current,
+        limit: NETWORKING_GUESTS_PAGE_SIZE,
+        offset: guestsPageRef.current * NETWORKING_GUESTS_PAGE_SIZE,
+      });
+    };
+    const rejoinNetworking = () => {
+      socket.emit("networking:join", { quizId });
       socket.emit("networking:threads:list", {
         quizId,
         limit: Math.max(NETWORKING_THREADS_PAGE_SIZE, threadsLenRef.current),
@@ -242,9 +315,12 @@ export function usePlayerNetworking(options: {
     socket.on("networking:joined", onJoined);
     socket.on("networking:profile", onProfile);
     socket.on("networking:guests", onGuests);
+    socket.on("networking:guests:changed", onGuestsChanged);
     socket.on("networking:threads", onThreads);
     socket.on("networking:dm:history", onHistory);
     socket.on("networking:dm:message", onMessage);
+    socket.on("networking:unread", onUnread);
+    socket.on("connect", rejoinNetworking);
 
     const presenceTimer = window.setInterval(() => {
       socket.emit("networking:presence:touch", { quizId });
@@ -255,9 +331,12 @@ export function usePlayerNetworking(options: {
       socket.off("networking:joined", onJoined);
       socket.off("networking:profile", onProfile);
       socket.off("networking:guests", onGuests);
+      socket.off("networking:guests:changed", onGuestsChanged);
       socket.off("networking:threads", onThreads);
       socket.off("networking:dm:history", onHistory);
       socket.off("networking:dm:message", onMessage);
+      socket.off("networking:unread", onUnread);
+      socket.off("connect", rejoinNetworking);
     };
   }, [enabled, joined, quizId]);
 

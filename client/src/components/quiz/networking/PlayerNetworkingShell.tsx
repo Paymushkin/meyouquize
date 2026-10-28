@@ -143,36 +143,44 @@ export function PlayerNetworkingShell({
           {TABS.map((item) => {
             const selected = tab === item.value;
             const rawIcon = selected ? item.iconActive : item.icon;
-            const iconNode =
-              item.value === "chats" ? (
-                <Badge
-                  color="error"
-                  badgeContent={unreadTotal}
-                  max={99}
-                  invisible={unreadTotal <= 0}
-                  overlap="circular"
-                  sx={{
-                    "& .MuiBadge-badge": {
-                      bgcolor: "#ff3b30",
-                      color: "#fff",
-                      fontWeight: 700,
-                      minWidth: 18,
-                      height: 18,
-                      fontSize: "0.65rem",
-                    },
-                  }}
-                >
-                  {rawIcon}
-                </Badge>
-              ) : (
-                rawIcon
-              );
+            const chatsUnread = item.value === "chats" && unreadTotal > 0;
+            const iconNode = chatsUnread ? (
+              <Badge
+                color="error"
+                badgeContent={unreadTotal}
+                max={99}
+                overlap="circular"
+                anchorOrigin={{ vertical: "top", horizontal: "right" }}
+                sx={{
+                  overflow: "visible",
+                  "& .MuiBadge-badge": {
+                    bgcolor: "#ff3b30",
+                    color: "#fff",
+                    fontWeight: 700,
+                    minWidth: 18,
+                    height: 18,
+                    fontSize: "0.65rem",
+                    top: 2,
+                    right: 2,
+                    border: "2px solid #111111",
+                  },
+                }}
+              >
+                {rawIcon}
+              </Badge>
+            ) : (
+              rawIcon
+            );
 
             return (
               <ButtonBase
                 key={item.value}
                 onClick={() => onTabChange(item.value)}
-                aria-label={item.label}
+                aria-label={
+                  chatsUnread
+                    ? `${item.label}, ${unreadTotal > 99 ? "99+" : unreadTotal} новых`
+                    : item.label
+                }
                 aria-current={selected ? "page" : undefined}
                 sx={{
                   flex: 1,
@@ -184,6 +192,7 @@ export function PlayerNetworkingShell({
                   color: accent,
                   opacity: selected ? 1 : 0.5,
                   minWidth: 0,
+                  overflow: "visible",
                   "&:hover": { opacity: 1 },
                   "& .MuiSvgIcon-root": {
                     fontSize: selected ? 26 : 22,

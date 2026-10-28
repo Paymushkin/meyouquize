@@ -25,7 +25,13 @@ import {
   broadcastDashboardResultsNow,
   scheduleDashboardResultsBroadcast,
 } from "../dashboard-results.js";
-import { broadcastQuizPublicState, emitQuizOnlineCount, quizPlayerRoom } from "../quiz-rooms.js";
+import {
+  broadcastQuizPublicState,
+  emitQuizOnlineCount,
+  emitToQuizPlayers,
+  quizPlayerRoom,
+} from "../quiz-rooms.js";
+import { isNetworkingEnabledForQuiz } from "../../networking-service.js";
 import { allowAnswerSubmit } from "../submit-rate-limit.js";
 import { allowSocketAction } from "../action-rate-limit.js";
 import type { EnrichedSocket } from "../handler-common.js";
@@ -147,6 +153,11 @@ export function registerQuizPlayHandlers(socket: EnrichedSocket, io: Server) {
         ...trialQuizStatePayload(state),
       });
       emitQuizOnlineCount(io, joined.quizId);
+      if (await isNetworkingEnabledForQuiz(joined.quizId)) {
+        emitToQuizPlayers(io, joined.quizId, "networking:guests:changed", {
+          quizId: joined.quizId,
+        });
+      }
     } catch (error) {
       trialLog("quiz_join_error", {
         ...trialSocketPayload(socket.id),
@@ -246,6 +257,11 @@ export function registerQuizPlayHandlers(socket: EnrichedSocket, io: Server) {
       const state = await getQuizPublicState(payload.quizId);
       if (!state) throw new Error("Quiz not found");
       await broadcastQuizPublicState(io, payload.quizId, state);
+      if (await isNetworkingEnabledForQuiz(payload.quizId)) {
+        emitToQuizPlayers(io, payload.quizId, "networking:guests:changed", {
+          quizId: payload.quizId,
+        });
+      }
     } catch (error) {
       const message = error instanceof Error ? error.message : "Update nickname failed";
       fail(socket, message);

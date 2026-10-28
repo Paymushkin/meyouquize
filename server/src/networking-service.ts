@@ -212,7 +212,8 @@ export async function listNetworkingGuests(input: {
   const participants = await prisma.participant.findMany({
     where: { quizId: input.quizId },
     include: { networkingProfile: true },
-    orderBy: { createdAt: "asc" },
+    // Новые гости сверху; свой профиль потом поднимаем первым.
+    orderBy: { createdAt: "desc" },
   });
 
   const online = new Set(input.onlineIds ?? []);
@@ -245,16 +246,24 @@ export async function listNetworkingGuests(input: {
     });
   }
 
-  if (viewerId) {
-    const selfIdx = rows.findIndex((r) => r.participantId === viewerId);
-    if (selfIdx > 0) {
-      const [self] = rows.splice(selfIdx, 1);
-      rows.unshift(self!);
-    }
-  }
+  rows = pinNetworkingViewerFirst(rows, viewerId);
 
   const total = rows.length;
   return { total, guests: rows.slice(offset, offset + limit) };
+}
+
+/** Зритель всегда первый; остальные уже отсортированы (новые сверху). */
+export function pinNetworkingViewerFirst<T extends { participantId: string }>(
+  rows: T[],
+  viewerId: string,
+): T[] {
+  if (!viewerId) return rows;
+  const selfIdx = rows.findIndex((r) => r.participantId === viewerId);
+  if (selfIdx <= 0) return rows;
+  const next = [...rows];
+  const [self] = next.splice(selfIdx, 1);
+  next.unshift(self!);
+  return next;
 }
 
 export async function assertParticipantsInQuiz(
@@ -310,13 +319,7 @@ export async function listThreadsForParticipant(
 
   const [total, unreadTotal, threads] = await Promise.all([
     prisma.networkingThread.count({ where }),
-    prisma.networkingMessage.count({
-      where: {
-        senderId: { not: participantId },
-        readAt: null,
-        thread: { quizId, OR: where.OR },
-      },
-    }),
+    countNetworkingUnreadTotal(quizId, participantId),
     prisma.networkingThread.findMany({
       where,
       include: {
@@ -429,6 +432,23 @@ export async function markThreadRead(threadId: string, readerId: string) {
   await prisma.networkingMessage.updateMany({
     where: { threadId, senderId: { not: readerId }, readAt: null },
     data: { readAt: new Date() },
+  });
+}
+
+/** Суммарный unread по всем тредам участника в квизе. */
+export async function countNetworkingUnreadTotal(
+  quizId: string,
+  participantId: string,
+): Promise<number> {
+  return prisma.networkingMessage.count({
+    where: {
+      senderId: { not: participantId },
+      readAt: null,
+      thread: {
+        quizId,
+        OR: [{ participantAId: participantId }, { participantBId: participantId }],
+      },
+    },
   });
 }
 
