@@ -491,9 +491,10 @@ export function AdminGeneralSection(props: Props) {
                           />
                           <TextField
                             size="small"
-                            label="Подсказка в поле"
+                            label="Подсказка и текст по умолчанию"
                             value={networkingJoinFormCopy.offersPlaceholder}
                             placeholder="Например: могу помочь с …"
+                            helperText="В форме входа и на карточке, если гость ничего не указал"
                             onChange={(e) =>
                               onNetworkingJoinFormCopyChange({
                                 ...networkingJoinFormCopy,
@@ -558,9 +559,10 @@ export function AdminGeneralSection(props: Props) {
                           />
                           <TextField
                             size="small"
-                            label="Подсказка в поле"
+                            label="Подсказка и текст по умолчанию"
                             value={networkingJoinFormCopy.seekingPlaceholder}
                             placeholder="Например: ищу партнёра по …"
+                            helperText="В форме входа и на карточке, если гость ничего не указал"
                             onChange={(e) =>
                               onNetworkingJoinFormCopyChange({
                                 ...networkingJoinFormCopy,

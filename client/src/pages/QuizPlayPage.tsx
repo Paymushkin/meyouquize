@@ -1068,6 +1068,8 @@ export function QuizPlayPage() {
                       }
                       offersLabel={networkingJoinFormCopy.offersLabel}
                       seekingLabel={networkingJoinFormCopy.seekingLabel}
+                      offersPlaceholder={networkingJoinFormCopy.offersPlaceholder}
+                      seekingPlaceholder={networkingJoinFormCopy.seekingPlaceholder}
                       showOffers={networkingJoinFormFields.offers}
                       showSeeking={networkingJoinFormFields.seeking}
                       showPhone={networkingJoinFormFields.phone}

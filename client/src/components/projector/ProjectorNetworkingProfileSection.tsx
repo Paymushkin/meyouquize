@@ -23,9 +23,19 @@ function ProfileMolecule(props: {
   profileTextColor: string;
   avatarSize: number;
   cardRadius: number;
+  offersEmptyText: string;
+  seekingEmptyText: string;
 }) {
-  const { guest, labelColor, profileBackgroundColor, profileTextColor, avatarSize, cardRadius } =
-    props;
+  const {
+    guest,
+    labelColor,
+    profileBackgroundColor,
+    profileTextColor,
+    avatarSize,
+    cardRadius,
+    offersEmptyText,
+    seekingEmptyText,
+  } = props;
   const title = guest.fullName.trim() || guest.nickname;
   const [avatarBroken, setAvatarBroken] = useState(false);
   const avatarSrc =
@@ -129,7 +139,7 @@ function ProfileMolecule(props: {
                 textAlign: "left",
               }}
             >
-              {guest.offers.trim() || "ничем не полезен"}
+              {guest.offers.trim() || offersEmptyText}
             </Typography>
           </Box>
           <Box sx={{ minWidth: 0, pl: `${avatarSize / 2 + 8}px` }}>
@@ -147,7 +157,7 @@ function ProfileMolecule(props: {
                 textAlign: "right",
               }}
             >
-              {guest.seeking.trim() || "ничего не ищу"}
+              {guest.seeking.trim() || seekingEmptyText}
             </Typography>
           </Box>
         </Box>
@@ -291,6 +301,8 @@ export function ProjectorNetworkingProfileSection({ view }: Props) {
     profileTextColor,
     avatarSize,
     cardRadius,
+    offersEmptyText: view.networkingJoinFormCopy?.offersPlaceholder?.trim() || "ничем не полезен",
+    seekingEmptyText: view.networkingJoinFormCopy?.seekingPlaceholder?.trim() || "ничего не ищу",
   };
 
   return (

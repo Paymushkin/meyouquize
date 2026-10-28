@@ -56,6 +56,9 @@ type Props = {
   /** Подписи колонок из админки (offers/seeking labels). */
   offersLabel?: string;
   seekingLabel?: string;
+  /** Подсказка в форме и текст на карточке, если поле пустое. */
+  offersPlaceholder?: string;
+  seekingPlaceholder?: string;
   showOffers?: boolean;
   showSeeking?: boolean;
   showPhone?: boolean;
@@ -70,6 +73,8 @@ function GuestCard(props: {
   profileTextColor: string;
   offersLabel: string;
   seekingLabel: string;
+  offersPlaceholder: string;
+  seekingPlaceholder: string;
   showOffers: boolean;
   showSeeking: boolean;
   showPhone: boolean;
@@ -86,6 +91,8 @@ function GuestCard(props: {
     profileTextColor,
     offersLabel,
     seekingLabel,
+    offersPlaceholder,
+    seekingPlaceholder,
     showOffers,
     showSeeking,
     showPhone,
@@ -94,6 +101,8 @@ function GuestCard(props: {
     onToggleFavorite,
     onEditProfile,
   } = props;
+  const offersEmptyText = offersPlaceholder.trim() || "ничем не полезен";
+  const seekingEmptyText = seekingPlaceholder.trim() || "ничего не ищу";
   const phone = showPhone ? (g.phone ?? "").trim() : "";
   const email = showEmail ? (g.email ?? "").trim() : "";
   const showRightColumn = showSeeking || Boolean(phone) || Boolean(email);
@@ -263,7 +272,7 @@ function GuestCard(props: {
                       textAlign: "left",
                     }}
                   >
-                    {g.offers.trim() || "ничем не полезен"}
+                    {g.offers.trim() || offersEmptyText}
                   </Typography>
                 </Box>
               ) : null}
@@ -297,7 +306,7 @@ function GuestCard(props: {
                         width: "100%",
                       }}
                     >
-                      {g.seeking.trim() || "ничего не ищу"}
+                      {g.seeking.trim() || seekingEmptyText}
                     </Typography>
                   ) : null}
                   {phone ? (
@@ -479,6 +488,8 @@ export function PlayerNetworkingGuestsPanel(props: Props) {
     profileTextColor,
     offersLabel = "Полезен",
     seekingLabel = "Ищу",
+    offersPlaceholder = "",
+    seekingPlaceholder = "",
     showOffers = true,
     showSeeking = true,
     showPhone = false,
@@ -697,6 +708,8 @@ export function PlayerNetworkingGuestsPanel(props: Props) {
               profileTextColor={profileTextColor}
               offersLabel={offersLabel}
               seekingLabel={seekingLabel}
+              offersPlaceholder={offersPlaceholder}
+              seekingPlaceholder={seekingPlaceholder}
               showOffers={showOffers}
               showSeeking={showSeeking}
               showPhone={showPhone}
