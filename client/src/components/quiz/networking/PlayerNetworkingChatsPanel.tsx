@@ -14,10 +14,12 @@ import {
   Typography,
 } from "@mui/material";
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import type {
   NetworkingMessage,
   NetworkingThread,
 } from "../../../features/quizPlay/usePlayerNetworking";
+import { useIosKeyboardFixedLayer } from "../../../hooks/useIosKeyboardFixedLayer";
 import { resolveClientAssetUrl } from "../../../utils/resolveClientAssetUrl";
 import { loadFavoriteParticipantIds } from "./networkingFavorites";
 
@@ -160,6 +162,7 @@ export function PlayerNetworkingChatsPanel(props: Props) {
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
   const loadMoreSentinelRef = useRef<HTMLDivElement | null>(null);
+  const conversationShellRef = useRef<HTMLDivElement | null>(null);
   const outgoingBg = buttonBackgroundColor;
   const outgoingFg = buttonTextColor;
   const metaOut = buttonTextColor;
@@ -175,6 +178,8 @@ export function PlayerNetworkingChatsPanel(props: Props) {
     (props.activePeerAvatarUrl ? resolveClientAssetUrl(props.activePeerAvatarUrl) : undefined) ||
     (activeThread?.peer.avatarUrl ? resolveClientAssetUrl(activeThread.peer.avatarUrl) : undefined);
   const canSend = Boolean(draft.trim());
+
+  useIosKeyboardFixedLayer(Boolean(activePeerId), conversationShellRef);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -208,323 +213,348 @@ export function PlayerNetworkingChatsPanel(props: Props) {
     setDraft("");
   }
 
-  const conversation = activePeerId ? (
-    <Box
-      sx={{
-        position: "fixed",
-        top: 0,
-        bottom: 0,
-        left: 0,
-        right: 0,
-        mx: "auto",
-        width: "100%",
-        maxWidth: 576,
-        zIndex: 19,
-        display: "flex",
-        flexDirection: "column",
-        minHeight: 0,
-        // Safari: transform на fixed-слое даёт ложный zoom; без translate.
-        WebkitTextSizeAdjust: "100%",
-        textSizeAdjust: "100%",
-        bgcolor: pageBackgroundColor,
-        backgroundImage: `
+  const conversation =
+    activePeerId && typeof document !== "undefined"
+      ? createPortal(
+          <Box
+            ref={conversationShellRef}
+            sx={{
+              position: "fixed",
+              top: 0,
+              left: 0,
+              right: 0,
+              mx: "auto",
+              width: "100%",
+              maxWidth: 576,
+              // До гидрации хука — высота экрана; дальше top/height пишет useIosKeyboardFixedLayer.
+              height: "100dvh",
+              minHeight: "100dvh",
+              maxHeight: "100dvh",
+              zIndex: 1400,
+              display: "flex",
+              flexDirection: "column",
+              overflow: "hidden",
+              overscrollBehavior: "none",
+              touchAction: "manipulation",
+              WebkitTextSizeAdjust: "100%",
+              textSizeAdjust: "100%",
+              bgcolor: pageBackgroundColor,
+              backgroundImage: `
             radial-gradient(circle at 12% 18%, rgba(255,255,255,0.2) 0 1.5px, transparent 2px),
             radial-gradient(circle at 72% 32%, rgba(255,255,255,0.14) 0 1.5px, transparent 2px),
             radial-gradient(circle at 38% 64%, rgba(0,0,0,0.08) 0 1.2px, transparent 2px),
             radial-gradient(circle at 88% 78%, rgba(255,255,255,0.12) 0 1.5px, transparent 2px)
           `,
-        backgroundSize: "48px 48px, 64px 64px, 40px 40px, 56px 56px",
-      }}
-    >
-      <Stack
-        direction="row"
-        alignItems="center"
-        spacing={0.5}
-        sx={{
-          px: 0.75,
-          py: 0.75,
-          flexShrink: 0,
-          minHeight: 56,
-          bgcolor: "rgba(246,246,246,0.92)",
-          backdropFilter: "blur(12px)",
-          borderBottom: "1px solid rgba(0,0,0,0.06)",
-        }}
-      >
-        <IconButton
-          onClick={onCloseChat}
-          aria-label="Назад"
-          sx={{ color: "#111", flexShrink: 0, width: 40, height: 40 }}
-        >
-          <ArrowBackIosNewIcon sx={{ fontSize: 18 }} />
-        </IconButton>
-        <Box sx={{ flex: 1, minWidth: 0, textAlign: "center", px: 0.5 }}>
-          <Typography
-            noWrap
-            sx={{
-              fontWeight: 600,
-              fontSize: "1rem",
-              lineHeight: 1.2,
-              color: "#111",
-              fontFamily: brandFontFamily || undefined,
+              backgroundSize: "48px 48px, 64px 64px, 40px 40px, 56px 56px",
             }}
           >
-            {peerTitle}
-          </Typography>
-        </Box>
-        <Avatar
-          src={peerAvatarSrc}
-          sx={{
-            width: 40,
-            height: 40,
-            flexShrink: 0,
-            mr: 0.5,
-            bgcolor: "grey.200",
-            color: "#111",
-            fontWeight: 700,
-            fontSize: "1rem",
-          }}
-        >
-          {peerTitle.slice(0, 1).toUpperCase()}
-        </Avatar>
-      </Stack>
-
-      <Box
-        sx={{
-          flex: 1,
-          minHeight: 0,
-          overflowY: "auto",
-          display: "flex",
-          flexDirection: "column",
-          gap: 1.75,
-          px: 1,
-          py: 1.25,
-          scrollbarWidth: "none",
-          msOverflowStyle: "none",
-          "&::-webkit-scrollbar": { display: "none" },
-        }}
-      >
-        {messages.length === 0 ? (
-          <Typography
-            variant="body2"
-            sx={{
-              m: "auto",
-              textAlign: "center",
-              px: 2,
-              py: 0.75,
-              borderRadius: 999,
-              bgcolor: "rgba(0,0,0,0.22)",
-              color: "#fff",
-              fontSize: "0.8rem",
-            }}
-          >
-            Напишите первое сообщение
-          </Typography>
-        ) : null}
-        {messages.map((m, index) => {
-          const mine = m.senderId === selfParticipantId;
-          const prev = index > 0 ? messages[index - 1] : null;
-          const next = index < messages.length - 1 ? messages[index + 1] : null;
-          const showDay = !prev || !sameCalendarDay(prev.createdAt, m.createdAt);
-          const sameAsPrev =
-            Boolean(prev) &&
-            prev!.senderId === m.senderId &&
-            sameCalendarDay(prev!.createdAt, m.createdAt);
-          const sameAsNext =
-            Boolean(next) &&
-            next!.senderId === m.senderId &&
-            sameCalendarDay(next!.createdAt, m.createdAt);
-          const showTail = !sameAsNext;
-          const timeLabel = formatMessageTime(m.createdAt);
-          const read = Boolean(m.readAt);
-          const bubbleBg = mine ? outgoingBg : INCOMING_BG;
-          const bubbleFg = mine ? outgoingFg : "#111";
-
-          const radius = mine
-            ? `${sameAsPrev ? 6 : 16}px ${showTail ? 4 : sameAsPrev ? 6 : 16}px ${showTail ? 4 : 6}px ${sameAsPrev ? 6 : 16}px`
-            : `${showTail ? 4 : sameAsPrev ? 6 : 16}px ${sameAsPrev ? 6 : 16}px ${sameAsPrev ? 6 : 16}px ${showTail ? 4 : 6}px`;
-
-          return (
-            <Fragment key={m.id}>
-              {showDay ? (
-                <Typography
-                  variant="caption"
-                  sx={{
-                    alignSelf: "center",
-                    my: 0.5,
-                    px: 1.35,
-                    py: 0.4,
-                    borderRadius: 999,
-                    bgcolor: "rgba(0,0,0,0.22)",
-                    color: "#fff",
-                    fontWeight: 600,
-                    fontSize: "0.72rem",
-                    letterSpacing: "0.01em",
-                  }}
-                >
-                  {formatDayLabel(m.createdAt)}
-                </Typography>
-              ) : null}
-              <Box
-                sx={{
-                  position: "relative",
-                  alignSelf: mine ? "flex-end" : "flex-start",
-                  maxWidth: "82%",
-                  mt: sameAsPrev ? -0.5 : 0,
-                  px: 1.15,
-                  pt: 0.75,
-                  pb: 0.55,
-                  borderRadius: radius,
-                  bgcolor: bubbleBg,
-                  color: bubbleFg,
-                  boxShadow: "0 1px 1px rgba(0,0,0,0.08)",
-                  "&::after": showTail
-                    ? {
-                        content: '""',
-                        position: "absolute",
-                        bottom: 0,
-                        [mine ? "right" : "left"]: -6,
-                        width: 10,
-                        height: 14,
-                        bgcolor: bubbleBg,
-                        clipPath: mine
-                          ? "polygon(0 0, 0 100%, 100% 100%)"
-                          : "polygon(100% 0, 0 100%, 100% 100%)",
-                        filter: "drop-shadow(0 1px 0 rgba(0,0,0,0.04))",
-                      }
-                    : undefined,
-                }}
+            <Stack
+              direction="row"
+              alignItems="center"
+              spacing={0.5}
+              sx={{
+                px: 0.75,
+                py: 0.75,
+                flex: "0 0 auto",
+                minHeight: 56,
+                bgcolor: "rgba(246,246,246,0.92)",
+                backdropFilter: "blur(12px)",
+                borderBottom: "1px solid rgba(0,0,0,0.06)",
+              }}
+            >
+              <IconButton
+                onClick={onCloseChat}
+                aria-label="Назад"
+                sx={{ color: "#111", flexShrink: 0, width: 40, height: 40 }}
               >
+                <ArrowBackIosNewIcon sx={{ fontSize: 18 }} />
+              </IconButton>
+              <Box sx={{ flex: 1, minWidth: 0, textAlign: "center", px: 0.5 }}>
                 <Typography
-                  variant="body2"
+                  noWrap
                   sx={{
-                    whiteSpace: "pre-wrap",
-                    wordBreak: "break-word",
-                    fontSize: "0.95rem",
-                    lineHeight: 1.35,
+                    fontWeight: 600,
+                    fontSize: "1rem",
+                    lineHeight: 1.2,
+                    color: "#111",
                     fontFamily: brandFontFamily || undefined,
                   }}
                 >
-                  {m.text}
+                  {peerTitle}
                 </Typography>
-                {timeLabel ? (
-                  <Box
-                    sx={{
-                      display: "flex",
-                      justifyContent: "flex-end",
-                      alignItems: "center",
-                      gap: 0.25,
-                      mt: 0.4,
-                      userSelect: "none",
-                      color: mine ? metaOut : META_IN,
-                      opacity: mine ? 0.7 : 1,
-                      fontSize: "0.68rem",
-                      lineHeight: 1,
-                    }}
-                  >
-                    {timeLabel}
-                    {mine ? (
-                      read ? (
-                        <DoneAllIcon sx={{ fontSize: 14, color: "inherit" }} />
-                      ) : (
-                        <DoneIcon sx={{ fontSize: 14, color: "inherit" }} />
-                      )
-                    ) : null}
-                  </Box>
-                ) : null}
               </Box>
-            </Fragment>
-          );
-        })}
-        <div ref={messagesEndRef} />
-      </Box>
+              <Avatar
+                src={peerAvatarSrc}
+                sx={{
+                  width: 40,
+                  height: 40,
+                  flexShrink: 0,
+                  mr: 0.5,
+                  bgcolor: "grey.200",
+                  color: "#111",
+                  fontWeight: 700,
+                  fontSize: "1rem",
+                }}
+              >
+                {peerTitle.slice(0, 1).toUpperCase()}
+              </Avatar>
+            </Stack>
 
-      <Box
-        sx={{
-          px: 1,
-          py: 0.75,
-          flexShrink: 0,
-          bgcolor: "transparent",
-        }}
-      >
-        <Box sx={{ position: "relative", width: "100%" }}>
-          <TextField
-            size="small"
-            fullWidth
-            multiline
-            maxRows={4}
-            placeholder="Сообщение"
-            value={draft}
-            inputRef={inputRef}
-            onChange={(e) => setDraft(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && !e.shiftKey) {
-                e.preventDefault();
-                submitDraft();
-              }
-            }}
-            sx={{
-              fontFamily: brandFontFamily || undefined,
-              "& .MuiOutlinedInput-root": {
-                minHeight: 48,
-                bgcolor: "#fff",
-                color: "#111",
-                borderRadius: 4,
-                alignItems: "center",
-                pr: "48px",
-                py: 0,
-                boxShadow: "0 1px 2px rgba(0,0,0,0.08)",
-                "& fieldset": { borderColor: "transparent" },
-                "&:hover fieldset": { borderColor: "transparent" },
-                "&.Mui-focused fieldset": { borderColor: "transparent" },
-              },
-              "& .MuiInputBase-input": {
-                color: "#111",
-                WebkitTextFillColor: "#111",
-                whiteSpace: "pre-wrap",
-                wordBreak: "break-word",
-                lineHeight: 1.35,
-                // ≥16px — иначе iOS Safari зумит страницу при фокусе.
-                fontSize: "16px",
-                py: "12px",
+            <Box
+              sx={{
+                // Единственная скроллящаяся зона: шапка и инпут снаружи.
+                flex: "1 1 0",
+                minHeight: 0,
+                overflowX: "hidden",
+                overflowY: "auto",
+                overscrollBehavior: "contain",
+                WebkitOverflowScrolling: "touch",
+                touchAction: "pan-y",
+                display: "flex",
+                flexDirection: "column",
+                gap: 1.75,
                 px: 1,
-                "&::placeholder": {
-                  color: "rgba(0,0,0,0.35)",
-                  opacity: 0.55,
-                  whiteSpace: "nowrap",
-                  fontSize: "16px",
-                },
-              },
-            }}
-          />
-          <IconButton
-            onClick={submitDraft}
-            disabled={!canSend}
-            aria-label="Отправить"
-            sx={{
-              position: "absolute",
-              right: 4,
-              top: "50%",
-              transform: "translateY(-50%)",
-              width: 36,
-              height: 36,
-              bgcolor: canSend ? buttonBackgroundColor : "transparent",
-              color: canSend ? buttonTextColor : "rgba(0,0,0,0.28)",
-              "&:hover": {
-                bgcolor: canSend ? buttonBackgroundColor : "rgba(0,0,0,0.04)",
-                filter: canSend ? "brightness(0.96)" : undefined,
-              },
-              "&.Mui-disabled": {
+                py: 1.25,
+                scrollbarWidth: "none",
+                msOverflowStyle: "none",
+                "&::-webkit-scrollbar": { display: "none" },
+              }}
+            >
+              {messages.length === 0 ? (
+                <Typography
+                  variant="body2"
+                  sx={{
+                    m: "auto",
+                    textAlign: "center",
+                    px: 2,
+                    py: 0.75,
+                    borderRadius: 999,
+                    bgcolor: "rgba(0,0,0,0.22)",
+                    color: "#fff",
+                    fontSize: "0.8rem",
+                  }}
+                >
+                  Напишите первое сообщение
+                </Typography>
+              ) : null}
+              {messages.map((m, index) => {
+                const mine = m.senderId === selfParticipantId;
+                const prev = index > 0 ? messages[index - 1] : null;
+                const next = index < messages.length - 1 ? messages[index + 1] : null;
+                const showDay = !prev || !sameCalendarDay(prev.createdAt, m.createdAt);
+                const sameAsPrev =
+                  Boolean(prev) &&
+                  prev!.senderId === m.senderId &&
+                  sameCalendarDay(prev!.createdAt, m.createdAt);
+                const sameAsNext =
+                  Boolean(next) &&
+                  next!.senderId === m.senderId &&
+                  sameCalendarDay(next!.createdAt, m.createdAt);
+                const showTail = !sameAsNext;
+                const timeLabel = formatMessageTime(m.createdAt);
+                const read = Boolean(m.readAt);
+                const bubbleBg = mine ? outgoingBg : INCOMING_BG;
+                const bubbleFg = mine ? outgoingFg : "#111";
+
+                const radius = mine
+                  ? `${sameAsPrev ? 6 : 16}px ${showTail ? 4 : sameAsPrev ? 6 : 16}px ${showTail ? 4 : 6}px ${sameAsPrev ? 6 : 16}px`
+                  : `${showTail ? 4 : sameAsPrev ? 6 : 16}px ${sameAsPrev ? 6 : 16}px ${sameAsPrev ? 6 : 16}px ${showTail ? 4 : 6}px`;
+
+                return (
+                  <Fragment key={m.id}>
+                    {showDay ? (
+                      <Typography
+                        variant="caption"
+                        sx={{
+                          alignSelf: "center",
+                          my: 0.5,
+                          px: 1.35,
+                          py: 0.4,
+                          borderRadius: 999,
+                          bgcolor: "rgba(0,0,0,0.22)",
+                          color: "#fff",
+                          fontWeight: 600,
+                          fontSize: "0.72rem",
+                          letterSpacing: "0.01em",
+                        }}
+                      >
+                        {formatDayLabel(m.createdAt)}
+                      </Typography>
+                    ) : null}
+                    <Box
+                      sx={{
+                        position: "relative",
+                        alignSelf: mine ? "flex-end" : "flex-start",
+                        maxWidth: "82%",
+                        mt: sameAsPrev ? -0.5 : 0,
+                        px: 1.15,
+                        pt: 0.75,
+                        pb: 0.55,
+                        borderRadius: radius,
+                        bgcolor: bubbleBg,
+                        color: bubbleFg,
+                        boxShadow: "0 1px 1px rgba(0,0,0,0.08)",
+                        "&::after": showTail
+                          ? {
+                              content: '""',
+                              position: "absolute",
+                              bottom: 0,
+                              [mine ? "right" : "left"]: -6,
+                              width: 10,
+                              height: 14,
+                              bgcolor: bubbleBg,
+                              clipPath: mine
+                                ? "polygon(0 0, 0 100%, 100% 100%)"
+                                : "polygon(100% 0, 0 100%, 100% 100%)",
+                              filter: "drop-shadow(0 1px 0 rgba(0,0,0,0.04))",
+                            }
+                          : undefined,
+                      }}
+                    >
+                      <Typography
+                        variant="body2"
+                        sx={{
+                          whiteSpace: "pre-wrap",
+                          wordBreak: "break-word",
+                          fontSize: "0.95rem",
+                          lineHeight: 1.35,
+                          fontFamily: brandFontFamily || undefined,
+                        }}
+                      >
+                        {m.text}
+                      </Typography>
+                      {timeLabel ? (
+                        <Box
+                          sx={{
+                            display: "flex",
+                            justifyContent: "flex-end",
+                            alignItems: "center",
+                            gap: 0.25,
+                            mt: 0.4,
+                            userSelect: "none",
+                            color: mine ? metaOut : META_IN,
+                            opacity: mine ? 0.7 : 1,
+                            fontSize: "0.68rem",
+                            lineHeight: 1,
+                          }}
+                        >
+                          {timeLabel}
+                          {mine ? (
+                            read ? (
+                              <DoneAllIcon sx={{ fontSize: 14, color: "inherit" }} />
+                            ) : (
+                              <DoneIcon sx={{ fontSize: 14, color: "inherit" }} />
+                            )
+                          ) : null}
+                        </Box>
+                      ) : null}
+                    </Box>
+                  </Fragment>
+                );
+              })}
+              <div ref={messagesEndRef} />
+            </Box>
+
+            <Box
+              sx={{
+                px: 1,
+                pt: 0.75,
+                pb: "max(0.75rem, env(safe-area-inset-bottom, 0px))",
+                flex: "0 0 auto",
                 bgcolor: "transparent",
-                color: "rgba(0,0,0,0.28)",
-              },
-            }}
-          >
-            <SendRoundedIcon sx={{ fontSize: 20, transform: "translateX(1px)" }} />
-          </IconButton>
-        </Box>
-      </Box>
-    </Box>
-  ) : null;
+              }}
+            >
+              <Box sx={{ position: "relative", width: "100%" }}>
+                <TextField
+                  size="small"
+                  fullWidth
+                  multiline
+                  maxRows={4}
+                  placeholder="Сообщение"
+                  value={draft}
+                  inputRef={inputRef}
+                  onChange={(e) => setDraft(e.target.value)}
+                  onFocus={() => {
+                    // iOS иначе скроллит документ к полю и ломает fixed-слой.
+                    window.scrollTo(0, 0);
+                    document.documentElement.scrollTop = 0;
+                    document.body.scrollTop = 0;
+                    window.setTimeout(() => {
+                      window.scrollTo(0, 0);
+                      messagesEndRef.current?.scrollIntoView({ block: "end" });
+                    }, 50);
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && !e.shiftKey) {
+                      e.preventDefault();
+                      submitDraft();
+                    }
+                  }}
+                  sx={{
+                    fontFamily: brandFontFamily || undefined,
+                    "& .MuiOutlinedInput-root": {
+                      minHeight: 48,
+                      bgcolor: "#fff",
+                      color: "#111",
+                      borderRadius: 4,
+                      alignItems: "center",
+                      pr: "48px",
+                      py: 0,
+                      boxShadow: "0 1px 2px rgba(0,0,0,0.08)",
+                      "& fieldset": { borderColor: "transparent" },
+                      "&:hover fieldset": { borderColor: "transparent" },
+                      "&.Mui-focused fieldset": { borderColor: "transparent" },
+                    },
+                    "& .MuiInputBase-input": {
+                      color: "#111",
+                      WebkitTextFillColor: "#111",
+                      whiteSpace: "pre-wrap",
+                      wordBreak: "break-word",
+                      lineHeight: 1.35,
+                      // ≥16px — иначе iOS Safari зумит страницу при фокусе.
+                      fontSize: "16px",
+                      py: "12px",
+                      px: 1,
+                      "&::placeholder": {
+                        color: "rgba(0,0,0,0.35)",
+                        opacity: 0.55,
+                        whiteSpace: "nowrap",
+                        fontSize: "16px",
+                      },
+                    },
+                  }}
+                />
+                <IconButton
+                  onClick={submitDraft}
+                  disabled={!canSend}
+                  aria-label="Отправить"
+                  sx={{
+                    position: "absolute",
+                    right: 4,
+                    top: "50%",
+                    transform: "translateY(-50%)",
+                    width: 36,
+                    height: 36,
+                    bgcolor: canSend ? buttonBackgroundColor : "transparent",
+                    color: canSend ? buttonTextColor : "rgba(0,0,0,0.28)",
+                    "&:hover": {
+                      bgcolor: canSend ? buttonBackgroundColor : "rgba(0,0,0,0.04)",
+                      filter: canSend ? "brightness(0.96)" : undefined,
+                    },
+                    "&.Mui-disabled": {
+                      bgcolor: "transparent",
+                      color: "rgba(0,0,0,0.28)",
+                    },
+                  }}
+                >
+                  <SendRoundedIcon sx={{ fontSize: 20, transform: "translateX(1px)" }} />
+                </IconButton>
+              </Box>
+            </Box>
+          </Box>,
+          document.body,
+        )
+      : null;
 
   return (
     <>
