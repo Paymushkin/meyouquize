@@ -5,6 +5,9 @@ import { withProjectorTagCloudFields } from "./tagCloudManual.js";
 const PLAYER_ONLY_PUBLIC_VIEW_KEYS = [
   "showEventTitleOnPlayer",
   "playerAutoJoinRandomNickname",
+  "networkingJoinFormMode",
+  "networkingJoinFormFields",
+  "networkingJoinFormCopy",
   "playerBanners",
   "playerBannerClickStats",
   "playerBannerClickParticipantIds",

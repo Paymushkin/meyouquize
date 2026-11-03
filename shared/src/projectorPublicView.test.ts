@@ -268,6 +268,9 @@ describe("isPlayerOnlyPublicViewStateKey", () => {
   it("recognizes player-only keys", () => {
     expect(isPlayerOnlyPublicViewStateKey("speakerTileVisible")).toBe(true);
     expect(isPlayerOnlyPublicViewStateKey("playerTilesGridColumns")).toBe(true);
+    expect(isPlayerOnlyPublicViewStateKey("networkingJoinFormMode")).toBe(true);
+    expect(isPlayerOnlyPublicViewStateKey("networkingJoinFormFields")).toBe(true);
+    expect(isPlayerOnlyPublicViewStateKey("networkingJoinFormCopy")).toBe(true);
     expect(isPlayerOnlyPublicViewStateKey("videoWallHorizontalPosterUrl")).toBe(true);
     expect(isPlayerOnlyPublicViewStateKey("videoWallVerticalPosterUrl")).toBe(true);
     expect(isPlayerOnlyPublicViewStateKey("projectorBackground")).toBe(false);

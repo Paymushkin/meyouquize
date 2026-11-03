@@ -438,3 +438,40 @@ describe("setPublicViewSchema playerTilesGridColumns", () => {
     );
   });
 });
+
+describe("setPublicViewSchema networkingJoinForm", () => {
+  it("keeps join form mode/fields/copy in parsed payload", () => {
+    const parsed = setPublicViewSchema.parse({
+      quizId: "q1",
+      networkingJoinFormMode: "pharma",
+      networkingJoinFormFields: {
+        company: true,
+        offers: false,
+        seeking: false,
+        phone: false,
+        email: false,
+        companyRequired: false,
+        offersRequired: false,
+        seekingRequired: false,
+        phoneRequired: false,
+        emailRequired: false,
+      },
+      networkingJoinFormCopy: {
+        offersLabel: "Чем полезен",
+        seekingLabel: "Что ищу",
+        offersPlaceholder: "",
+        seekingPlaceholder: "",
+        privacyPolicyUrl: "https://example.com/privacy",
+      },
+    });
+    expect(parsed.networkingJoinFormMode).toBe("pharma");
+    expect(parsed.networkingJoinFormFields?.company).toBe(true);
+    expect(parsed.networkingJoinFormCopy?.privacyPolicyUrl).toBe("https://example.com/privacy");
+  });
+
+  it("rejects unknown join form mode", () => {
+    expect(
+      setPublicViewSchema.safeParse({ quizId: "q1", networkingJoinFormMode: "simple" }).success,
+    ).toBe(false);
+  });
+});

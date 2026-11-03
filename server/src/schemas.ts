@@ -581,6 +581,30 @@ export const setPublicViewSchema = z.object({
   speakerQuestionsModeratorShowAll: z.boolean().optional(),
   showEventTitleOnPlayer: z.boolean().optional(),
   playerAutoJoinRandomNickname: z.boolean().optional(),
+  networkingJoinFormMode: z.enum(["interactive", "networking", "pharma"]).optional(),
+  networkingJoinFormFields: z
+    .object({
+      company: z.boolean(),
+      offers: z.boolean(),
+      seeking: z.boolean(),
+      phone: z.boolean(),
+      email: z.boolean(),
+      companyRequired: z.boolean(),
+      offersRequired: z.boolean(),
+      seekingRequired: z.boolean(),
+      phoneRequired: z.boolean(),
+      emailRequired: z.boolean(),
+    })
+    .optional(),
+  networkingJoinFormCopy: z
+    .object({
+      offersLabel: z.string().trim().max(60),
+      seekingLabel: z.string().trim().max(60),
+      offersPlaceholder: z.string().trim().max(160),
+      seekingPlaceholder: z.string().trim().max(160),
+      privacyPolicyUrl: z.string().trim().max(500),
+    })
+    .optional(),
   playerBanners: z
     .array(
       z.object({
