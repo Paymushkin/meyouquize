@@ -1,4 +1,14 @@
 import { useEffect, useMemo, useState } from "react";
+import {
+  DEFAULT_NETWORKING_JOIN_FORM_COPY,
+  DEFAULT_NETWORKING_JOIN_FORM_FIELDS,
+  normalizeNetworkingJoinFormCopy,
+  normalizeNetworkingJoinFormFields,
+  normalizeNetworkingJoinFormMode,
+  type NetworkingJoinFormCopy,
+  type NetworkingJoinFormFields,
+  type NetworkingJoinFormMode,
+} from "@meyouquize/shared";
 import { API_BASE } from "../config";
 import type { QuizState } from "../pages/quiz-play/types";
 import { resolveClientAssetUrl } from "../utils/resolveClientAssetUrl";
@@ -30,6 +40,13 @@ export function useQuizPlayMetaBranding({ slug, quiz }: Params) {
   const [metaBrandFontUrls, setMetaBrandFontUrls] = useState<string[]>([]);
   const [joinMetaLoaded, setJoinMetaLoaded] = useState(!slug);
   const [playerAutoJoinRandomNickname, setPlayerAutoJoinRandomNickname] = useState(false);
+  const [networkingJoinFormMode, setNetworkingJoinFormMode] =
+    useState<NetworkingJoinFormMode>("interactive");
+  const [networkingJoinFormFields, setNetworkingJoinFormFields] =
+    useState<NetworkingJoinFormFields>({ ...DEFAULT_NETWORKING_JOIN_FORM_FIELDS });
+  const [networkingJoinFormCopy, setNetworkingJoinFormCopy] = useState<NetworkingJoinFormCopy>({
+    ...DEFAULT_NETWORKING_JOIN_FORM_COPY,
+  });
 
   useEffect(() => {
     document.title = quiz?.title?.trim() || "Квиз";
@@ -68,6 +85,9 @@ export function useQuizPlayMetaBranding({ slug, quiz }: Params) {
           brandFontUrl?: string;
           brandFontUrls?: string[];
           playerAutoJoinRandomNickname?: boolean;
+          networkingJoinFormMode?: NetworkingJoinFormMode;
+          networkingJoinFormFields?: NetworkingJoinFormFields;
+          networkingJoinFormCopy?: NetworkingJoinFormCopy;
         };
         if (typeof payload.title === "string") {
           setQuizTitle(payload.title);
@@ -113,6 +133,21 @@ export function useQuizPlayMetaBranding({ slug, quiz }: Params) {
         if (typeof payload.playerAutoJoinRandomNickname === "boolean") {
           setPlayerAutoJoinRandomNickname(payload.playerAutoJoinRandomNickname);
         }
+        if (payload.networkingJoinFormMode !== undefined) {
+          setNetworkingJoinFormMode(
+            normalizeNetworkingJoinFormMode(payload.networkingJoinFormMode),
+          );
+        }
+        if (payload.networkingJoinFormFields !== undefined) {
+          setNetworkingJoinFormFields(
+            normalizeNetworkingJoinFormFields(payload.networkingJoinFormFields),
+          );
+        }
+        if (payload.networkingJoinFormCopy !== undefined) {
+          setNetworkingJoinFormCopy(
+            normalizeNetworkingJoinFormCopy(payload.networkingJoinFormCopy),
+          );
+        }
       } catch {
         // ignore network errors, socket state can still provide title later
       } finally {
@@ -129,6 +164,18 @@ export function useQuizPlayMetaBranding({ slug, quiz }: Params) {
       setPlayerAutoJoinRandomNickname(quiz.playerAutoJoinRandomNickname);
     }
   }, [quiz?.playerAutoJoinRandomNickname]);
+
+  useEffect(() => {
+    if (quiz?.networkingJoinFormMode !== undefined) {
+      setNetworkingJoinFormMode(normalizeNetworkingJoinFormMode(quiz.networkingJoinFormMode));
+    }
+    if (quiz?.networkingJoinFormFields !== undefined) {
+      setNetworkingJoinFormFields(normalizeNetworkingJoinFormFields(quiz.networkingJoinFormFields));
+    }
+    if (quiz?.networkingJoinFormCopy !== undefined) {
+      setNetworkingJoinFormCopy(normalizeNetworkingJoinFormCopy(quiz.networkingJoinFormCopy));
+    }
+  }, [quiz?.networkingJoinFormCopy, quiz?.networkingJoinFormFields, quiz?.networkingJoinFormMode]);
 
   useEffect(() => {
     if (typeof quiz?.brandPlayerBackgroundImageUrl === "string") {
@@ -244,5 +291,8 @@ export function useQuizPlayMetaBranding({ slug, quiz }: Params) {
     brandFontUrls,
     joinMetaLoaded,
     playerAutoJoinRandomNickname,
+    networkingJoinFormMode,
+    networkingJoinFormFields,
+    networkingJoinFormCopy,
   };
 }

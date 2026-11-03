@@ -104,6 +104,9 @@ export type QuizState = {
   title: string;
   showEventTitleOnPlayer?: boolean;
   playerAutoJoinRandomNickname?: boolean;
+  networkingJoinFormMode?: import("@meyouquize/shared").NetworkingJoinFormMode;
+  networkingJoinFormFields?: import("@meyouquize/shared").NetworkingJoinFormFields;
+  networkingJoinFormCopy?: import("@meyouquize/shared").NetworkingJoinFormCopy;
   playerBanners?: Array<{
     id: string;
     linkUrl: string;

@@ -39,6 +39,42 @@ import {
   isMediaBrandFontUrl,
   sanitizeBrandFontUrls,
 } from "./brandFontFaces.js";
+import {
+  DEFAULT_NETWORKING_JOIN_FORM_COPY,
+  DEFAULT_NETWORKING_JOIN_FORM_FIELDS,
+  normalizeNetworkingJoinFormCopy,
+  normalizeNetworkingJoinFormFields,
+  normalizeNetworkingJoinFormMode,
+  type NetworkingJoinFormCopy,
+  type NetworkingJoinFormFields,
+  type NetworkingJoinFormMode,
+} from "./networkingJoinForm.js";
+export type {
+  NetworkingJoinFormCopy,
+  NetworkingJoinFormFields,
+  NetworkingJoinFormMode,
+  NetworkingJoinFieldVisibility,
+  NetworkingPlayerTab,
+  NetworkingProfileTextFields,
+} from "./networkingJoinForm.js";
+export {
+  DEFAULT_NETWORKING_JOIN_FORM_COPY,
+  DEFAULT_NETWORKING_JOIN_FORM_FIELDS,
+  DEFAULT_NETWORKING_PLAYER_TAB,
+  NETWORKING_JOIN_PRIVACY_CONSENT_LINK_LABEL,
+  NETWORKING_JOIN_PRIVACY_CONSENT_PREFIX,
+  formatNetworkingGuestIdentity,
+  getNetworkingJoinFieldVisibility,
+  isValidNetworkingEmail,
+  isValidNetworkingPhone,
+  networkingJoinFieldPlaceholder,
+  normalizeNetworkingJoinFormCopy,
+  normalizeNetworkingJoinFormFields,
+  normalizeNetworkingJoinFormMode,
+  normalizeNetworkingPlayerTab,
+  usesExtendedNetworkingJoinForm,
+  validateNetworkingJoinDraft,
+} from "./networkingJoinForm.js";
 import { sanitizeVoteOptionBorderColor } from "./voteOptionBorderColor.js";
 import { sanitizeVoteFillColor, sanitizeVoteQuestionTextColor } from "./voteQuestionTextStyle.js";
 import type { SpeakerQuestionSession } from "./speakerQuestionSessions.js";
@@ -451,6 +487,12 @@ export interface PublicViewState {
   showEventTitleOnPlayer: boolean;
   /** Вход в ивент без формы: сразу случайный ник (пользователь может сменить позже). */
   playerAutoJoinRandomNickname: boolean;
+  /** Тип формы входа: interactive | networking | pharma (независимо от модуля нетворкинга). */
+  networkingJoinFormMode: NetworkingJoinFormMode;
+  /** Настройки полей для режима networking. */
+  networkingJoinFormFields: NetworkingJoinFormFields;
+  /** Подписи/плейсхолдеры и URL ПД. */
+  networkingJoinFormCopy: NetworkingJoinFormCopy;
   /** Баннеры для пользовательского интерфейса */
   playerBanners: PublicBanner[];
   /** Уникальные клики по баннерам (для админки). */
@@ -804,6 +846,9 @@ export const DEFAULT_PUBLIC_VIEW_STATE: PublicViewState = {
   speakerQuestionsModeratorShowAll: false,
   showEventTitleOnPlayer: true,
   playerAutoJoinRandomNickname: false,
+  networkingJoinFormMode: "interactive",
+  networkingJoinFormFields: { ...DEFAULT_NETWORKING_JOIN_FORM_FIELDS },
+  networkingJoinFormCopy: { ...DEFAULT_NETWORKING_JOIN_FORM_COPY },
   playerBanners: [],
   playerBannerClickStats: [],
   playerBannerClickParticipantIds: {},
@@ -1753,6 +1798,9 @@ export function normalizePublicViewState(
       typeof value?.playerAutoJoinRandomNickname === "boolean"
         ? value.playerAutoJoinRandomNickname
         : base.playerAutoJoinRandomNickname,
+    networkingJoinFormMode: normalizeNetworkingJoinFormMode(value?.networkingJoinFormMode),
+    networkingJoinFormFields: normalizeNetworkingJoinFormFields(value?.networkingJoinFormFields),
+    networkingJoinFormCopy: normalizeNetworkingJoinFormCopy(value?.networkingJoinFormCopy),
     playerBanners,
     playerBannerClickStats: bannerClickData.playerBannerClickStats,
     playerBannerClickParticipantIds: bannerClickData.playerBannerClickParticipantIds,

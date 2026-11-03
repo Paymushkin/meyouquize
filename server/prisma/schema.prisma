@@ -127,6 +127,14 @@ model Participant {
   quiz      Quiz     @relation(fields: [quizId], references: [id], onDelete: Cascade)
   deviceId  String
   nickname  String
+  /** Данные расширенной формы входа (фарма / нетворкинг). */
+  fullName  String   @default("")
+  jobTitle  String   @default("")
+  company   String   @default("")
+  offers    String   @default("")
+  seeking   String   @default("")
+  phone     String   @default("")
+  email     String   @default("")
   createdAt DateTime @default(now())
   answers   Answer[]
   speakerQuestions SpeakerQuestion[]

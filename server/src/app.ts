@@ -1156,6 +1156,9 @@ export function buildApp() {
       brandFontUrl: view.brandFontUrl,
       brandFontUrls: view.brandFontUrls,
       playerAutoJoinRandomNickname: view.playerAutoJoinRandomNickname,
+      networkingJoinFormMode: view.networkingJoinFormMode,
+      networkingJoinFormFields: view.networkingJoinFormFields,
+      networkingJoinFormCopy: view.networkingJoinFormCopy,
     });
   });
 

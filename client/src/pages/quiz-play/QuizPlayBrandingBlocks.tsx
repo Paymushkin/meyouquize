@@ -4,8 +4,16 @@ import {
   PROGRAM_TILE_ID,
   SPEAKER_TILE_ID,
   VIDEO_WALL_TILE_ID,
+  NETWORKING_JOIN_PRIVACY_CONSENT_LINK_LABEL,
+  NETWORKING_JOIN_PRIVACY_CONSENT_PREFIX,
   contrastingTextOnColor,
+  getNetworkingJoinFieldVisibility,
+  networkingJoinFieldPlaceholder,
   ruBallLabel,
+  type NetworkingJoinFormCopy,
+  type NetworkingJoinFormFields,
+  type NetworkingJoinFormMode,
+  type NetworkingProfileTextFields,
 } from "@meyouquize/shared";
 import { isQuizResultsTileId } from "../../publicViewContract";
 import { PlayerPhotoWallCollageTile } from "../../components/quiz/PlayerPhotoWallCollageTile";
@@ -31,6 +39,7 @@ import {
   Chip,
   CircularProgress,
   IconButton,
+  Link,
   OutlinedInput,
   Stack,
   TextField,
@@ -995,6 +1004,186 @@ export function JoinCard(props: JoinCardProps) {
               </Typography>
             ) : null}
           </Stack>
+          <Button
+            variant="contained"
+            onClick={onJoin}
+            sx={buildBrandPrimaryContainedButtonSx(formBackgroundColor, formTextColor)}
+          >
+            Войти
+          </Button>
+        </Stack>
+      </CardContent>
+    </Card>
+  );
+}
+
+export type JoinNetworkingProfileFields = NetworkingProfileTextFields;
+
+type JoinNetworkingCardProps = {
+  formBackgroundColor: string;
+  formTextColor: string;
+  formInputTextColor: string;
+  brandFontFamily: string;
+  values: JoinNetworkingProfileFields;
+  formError?: string;
+  onChange: (patch: Partial<JoinNetworkingProfileFields>) => void;
+  onJoin: () => void;
+  mode: NetworkingJoinFormMode;
+  fields?: NetworkingJoinFormFields;
+  copy?: NetworkingJoinFormCopy;
+};
+
+export function JoinNetworkingCard(props: JoinNetworkingCardProps) {
+  const {
+    formBackgroundColor,
+    formTextColor,
+    formInputTextColor,
+    brandFontFamily,
+    values,
+    formError,
+    onChange,
+    onJoin,
+    mode,
+    fields,
+    copy,
+  } = props;
+  const fieldSx = buildJoinNicknameInputSx(
+    formBackgroundColor,
+    formInputTextColor,
+    brandFontFamily,
+  );
+  const visibility = getNetworkingJoinFieldVisibility(mode, fields, copy);
+  const privacyPolicyUrl =
+    mode === "networking" || mode === "pharma"
+      ? sanitizeExternalHttpUrl(copy?.privacyPolicyUrl)
+      : "";
+  return (
+    <Card variant="outlined" sx={JOIN_CARD_ROOT_SX}>
+      <CardContent sx={JOIN_CARD_CONTENT_SX}>
+        <Stack spacing={1.5}>
+          <OutlinedInput
+            autoFocus
+            value={values.fullName}
+            onChange={(e) => onChange({ fullName: e.target.value })}
+            placeholder="ФИО *"
+            fullWidth
+            error={Boolean(formError)}
+            sx={fieldSx}
+          />
+          {visibility.showJobTitle ? (
+            <OutlinedInput
+              value={values.jobTitle}
+              onChange={(e) => onChange({ jobTitle: e.target.value })}
+              placeholder="Должность"
+              fullWidth
+              sx={fieldSx}
+            />
+          ) : null}
+          {visibility.showCompany ? (
+            <OutlinedInput
+              value={values.company}
+              onChange={(e) => onChange({ company: e.target.value })}
+              placeholder={networkingJoinFieldPlaceholder(
+                visibility.companyLabel,
+                undefined,
+                visibility.companyRequired,
+              )}
+              fullWidth
+              sx={fieldSx}
+            />
+          ) : null}
+          {visibility.showOffers ? (
+            <OutlinedInput
+              value={values.offers}
+              onChange={(e) => onChange({ offers: e.target.value })}
+              placeholder={networkingJoinFieldPlaceholder(
+                visibility.offersLabel,
+                visibility.offersPlaceholder,
+                visibility.offersRequired,
+              )}
+              fullWidth
+              multiline
+              minRows={2}
+              sx={fieldSx}
+            />
+          ) : null}
+          {visibility.showSeeking ? (
+            <OutlinedInput
+              value={values.seeking}
+              onChange={(e) => onChange({ seeking: e.target.value })}
+              placeholder={networkingJoinFieldPlaceholder(
+                visibility.seekingLabel,
+                visibility.seekingPlaceholder,
+                visibility.seekingRequired,
+              )}
+              fullWidth
+              multiline
+              minRows={2}
+              sx={fieldSx}
+            />
+          ) : null}
+          {visibility.showPhone ? (
+            <OutlinedInput
+              value={values.phone}
+              onChange={(e) => onChange({ phone: e.target.value })}
+              placeholder={networkingJoinFieldPlaceholder(
+                "Телефон",
+                undefined,
+                visibility.phoneRequired,
+              )}
+              fullWidth
+              type="tel"
+              inputMode="tel"
+              sx={fieldSx}
+            />
+          ) : null}
+          {visibility.showEmail ? (
+            <OutlinedInput
+              value={values.email}
+              onChange={(e) => onChange({ email: e.target.value })}
+              placeholder={networkingJoinFieldPlaceholder(
+                "Почта",
+                undefined,
+                visibility.emailRequired,
+              )}
+              fullWidth
+              type="email"
+              inputMode="email"
+              sx={fieldSx}
+            />
+          ) : null}
+          {formError ? (
+            <Typography variant="body2" color="error" sx={{ px: 0.25 }}>
+              {formError}
+            </Typography>
+          ) : null}
+          {privacyPolicyUrl ? (
+            <Typography
+              variant="caption"
+              sx={{
+                px: 0.25,
+                color: formInputTextColor,
+                opacity: 0.85,
+                lineHeight: 1.35,
+              }}
+            >
+              {NETWORKING_JOIN_PRIVACY_CONSENT_PREFIX}{" "}
+              <Link
+                href={privacyPolicyUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                underline="none"
+                sx={{
+                  color: formBackgroundColor,
+                  opacity: 1,
+                  fontWeight: 600,
+                  "&:hover": { color: formBackgroundColor, opacity: 0.85 },
+                }}
+              >
+                {NETWORKING_JOIN_PRIVACY_CONSENT_LINK_LABEL}
+              </Link>
+            </Typography>
+          ) : null}
           <Button
             variant="contained"
             onClick={onJoin}

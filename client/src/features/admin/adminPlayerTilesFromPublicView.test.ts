@@ -6,6 +6,9 @@ function makeSetters() {
   return {
     setShowEventTitleOnPlayer: vi.fn(),
     setPlayerAutoJoinRandomNickname: vi.fn(),
+    setNetworkingJoinFormMode: vi.fn(),
+    setNetworkingJoinFormFields: vi.fn(),
+    setNetworkingJoinFormCopy: vi.fn(),
     setSpeakerTileText: vi.fn(),
     setSpeakerTileBackgroundColor: vi.fn(),
     setSpeakerTileTextColor: vi.fn(),

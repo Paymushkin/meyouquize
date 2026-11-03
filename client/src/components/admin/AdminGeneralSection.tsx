@@ -31,6 +31,12 @@ import {
   type PublicViewSetPatch,
 } from "../../publicViewContract";
 import { CompactColorField } from "./branding/CompactColorField";
+import { AdminJoinAuthSection } from "./AdminJoinAuthSection";
+import type {
+  NetworkingJoinFormCopy,
+  NetworkingJoinFormFields,
+  NetworkingJoinFormMode,
+} from "@meyouquize/shared";
 
 type Props = {
   editableTitle: string;
@@ -41,6 +47,12 @@ type Props = {
   onToggleShowEventTitleOnPlayer: (next: boolean) => void;
   playerAutoJoinRandomNickname: boolean;
   onTogglePlayerAutoJoinRandomNickname: (next: boolean) => void;
+  networkingJoinFormMode: NetworkingJoinFormMode;
+  onNetworkingJoinFormModeChange: (mode: NetworkingJoinFormMode) => void;
+  networkingJoinFormFields: NetworkingJoinFormFields;
+  onNetworkingJoinFormFieldsChange: (fields: NetworkingJoinFormFields) => void;
+  networkingJoinFormCopy: NetworkingJoinFormCopy;
+  onNetworkingJoinFormCopyChange: (copy: NetworkingJoinFormCopy) => void;
   projectorJoinQrVisible: boolean;
   setProjectorJoinQrVisible: (value: boolean) => void;
   projectorBrowserZoom: number;
@@ -64,6 +76,12 @@ export function AdminGeneralSection(props: Props) {
     onToggleShowEventTitleOnPlayer,
     playerAutoJoinRandomNickname,
     onTogglePlayerAutoJoinRandomNickname,
+    networkingJoinFormMode,
+    onNetworkingJoinFormModeChange,
+    networkingJoinFormFields,
+    onNetworkingJoinFormFieldsChange,
+    networkingJoinFormCopy,
+    onNetworkingJoinFormCopyChange,
     projectorJoinQrVisible,
     setProjectorJoinQrVisible,
     projectorBrowserZoom,
@@ -136,202 +154,214 @@ export function AdminGeneralSection(props: Props) {
 
   return (
     <>
-      <Card variant="outlined">
-        <CardContent>
-          <Stack spacing={2}>
-            <TextField
-              label="Название квиза"
-              value={editableTitle}
-              onChange={(e) => setEditableTitle(e.target.value)}
-              onBlur={saveQuizTitle}
-              fullWidth
-              size="small"
-              multiline
-              minRows={2}
-              maxRows={4}
-            />
-            <TextField
-              label="Текст рядом с QR"
-              placeholder={DEFAULT_PROJECTOR_JOIN_QR_TEXT}
-              value={projectorJoinQrText}
-              onChange={(e) => setProjectorJoinQrText(e.target.value)}
-              onBlur={() => emitBrandingPatch({ projectorJoinQrText })}
-              fullWidth
-              size="small"
-              multiline
-              minRows={2}
-              maxRows={5}
-              inputProps={{ maxLength: PROJECTOR_JOIN_QR_TEXT_MAX_LENGTH }}
-            />
-            <CompactColorField
-              label="Цвет текста"
-              value={projectorJoinQrTextColor}
-              onChange={setProjectorJoinQrTextColor}
-              onBlur={() => emitBrandingPatch({ projectorJoinQrTextColor })}
-            />
-            <Stack spacing={0.5}>
-              <Stack direction="row" alignItems="center" spacing={0.5}>
-                <Typography variant="body2" sx={rowLabelSx}>
-                  Ивент
-                </Typography>
-                <Tooltip title="Скопировать ссылку">
-                  <span>
-                    <IconButton
-                      size="small"
-                      onClick={() => void copyToClipboard(joinUrl)}
-                      disabled={!joinUrl}
-                    >
-                      <ContentCopyIcon fontSize="small" />
-                    </IconButton>
-                  </span>
-                </Tooltip>
-                <Tooltip title="Показать QR">
-                  <span>
-                    <IconButton
-                      size="small"
-                      onClick={() => void openQr("Ссылка на ивент", buildPlayerJoinUrl(eventSlug))}
-                      disabled={!eventSlug}
-                    >
-                      <QrCode2Icon fontSize="small" />
-                    </IconButton>
-                  </span>
-                </Tooltip>
-                <Tooltip title="Открыть в новой вкладке">
-                  <span>
-                    <IconButton
-                      size="small"
-                      onClick={() => {
-                        if (joinUrl) window.open(joinUrl, "_blank", "noopener,noreferrer");
-                      }}
-                      disabled={!joinUrl}
-                    >
-                      <OpenInNewIcon fontSize="small" />
-                    </IconButton>
-                  </span>
-                </Tooltip>
+      <Stack spacing={2}>
+        <Card variant="outlined">
+          <CardContent>
+            <Stack spacing={2}>
+              <TextField
+                label="Название квиза"
+                value={editableTitle}
+                onChange={(e) => setEditableTitle(e.target.value)}
+                onBlur={saveQuizTitle}
+                fullWidth
+                size="small"
+                multiline
+                minRows={2}
+                maxRows={4}
+              />
+              <TextField
+                label="Текст рядом с QR"
+                placeholder={DEFAULT_PROJECTOR_JOIN_QR_TEXT}
+                value={projectorJoinQrText}
+                onChange={(e) => setProjectorJoinQrText(e.target.value)}
+                onBlur={() => emitBrandingPatch({ projectorJoinQrText })}
+                fullWidth
+                size="small"
+                multiline
+                minRows={2}
+                maxRows={5}
+                inputProps={{ maxLength: PROJECTOR_JOIN_QR_TEXT_MAX_LENGTH }}
+              />
+              <CompactColorField
+                label="Цвет текста"
+                value={projectorJoinQrTextColor}
+                onChange={setProjectorJoinQrTextColor}
+                onBlur={() => emitBrandingPatch({ projectorJoinQrTextColor })}
+              />
+              <Stack spacing={0.5}>
+                <Stack direction="row" alignItems="center" spacing={0.5}>
+                  <Typography variant="body2" sx={rowLabelSx}>
+                    Ивент
+                  </Typography>
+                  <Tooltip title="Скопировать ссылку">
+                    <span>
+                      <IconButton
+                        size="small"
+                        onClick={() => void copyToClipboard(joinUrl)}
+                        disabled={!joinUrl}
+                      >
+                        <ContentCopyIcon fontSize="small" />
+                      </IconButton>
+                    </span>
+                  </Tooltip>
+                  <Tooltip title="Показать QR">
+                    <span>
+                      <IconButton
+                        size="small"
+                        onClick={() =>
+                          void openQr("Ссылка на ивент", buildPlayerJoinUrl(eventSlug))
+                        }
+                        disabled={!eventSlug}
+                      >
+                        <QrCode2Icon fontSize="small" />
+                      </IconButton>
+                    </span>
+                  </Tooltip>
+                  <Tooltip title="Открыть в новой вкладке">
+                    <span>
+                      <IconButton
+                        size="small"
+                        onClick={() => {
+                          if (joinUrl) window.open(joinUrl, "_blank", "noopener,noreferrer");
+                        }}
+                        disabled={!joinUrl}
+                      >
+                        <OpenInNewIcon fontSize="small" />
+                      </IconButton>
+                    </span>
+                  </Tooltip>
+                </Stack>
+                <Stack direction="row" alignItems="center" spacing={0.5}>
+                  <Typography variant="body2" sx={rowLabelSx}>
+                    Проектор
+                  </Typography>
+                  <Tooltip title="Скопировать ссылку">
+                    <span>
+                      <IconButton
+                        size="small"
+                        onClick={() => void copyToClipboard(screenUrl)}
+                        disabled={!screenUrl}
+                      >
+                        <ContentCopyIcon fontSize="small" />
+                      </IconButton>
+                    </span>
+                  </Tooltip>
+                  <Tooltip title="Показать QR">
+                    <span>
+                      <IconButton
+                        size="small"
+                        onClick={() =>
+                          void openQr("Ссылка на проектор", buildProjectorScreenUrl(eventSlug))
+                        }
+                        disabled={!eventSlug}
+                      >
+                        <QrCode2Icon fontSize="small" />
+                      </IconButton>
+                    </span>
+                  </Tooltip>
+                  <Tooltip title="Открыть в новой вкладке">
+                    <span>
+                      <IconButton
+                        size="small"
+                        onClick={() => {
+                          if (screenUrl) window.open(screenUrl, "_blank", "noopener,noreferrer");
+                        }}
+                        disabled={!screenUrl}
+                      >
+                        <OpenInNewIcon fontSize="small" />
+                      </IconButton>
+                    </span>
+                  </Tooltip>
+                </Stack>
               </Stack>
-              <Stack direction="row" alignItems="center" spacing={0.5}>
-                <Typography variant="body2" sx={rowLabelSx}>
-                  Проектор
-                </Typography>
-                <Tooltip title="Скопировать ссылку">
-                  <span>
-                    <IconButton
-                      size="small"
-                      onClick={() => void copyToClipboard(screenUrl)}
-                      disabled={!screenUrl}
-                    >
-                      <ContentCopyIcon fontSize="small" />
-                    </IconButton>
-                  </span>
-                </Tooltip>
-                <Tooltip title="Показать QR">
-                  <span>
-                    <IconButton
-                      size="small"
-                      onClick={() =>
-                        void openQr("Ссылка на проектор", buildProjectorScreenUrl(eventSlug))
+              <Stack spacing={1}>
+                <Box sx={switchRowSx}>
+                  <Typography variant="body2" sx={rowLabelSx}>
+                    Масштаб проектора
+                  </Typography>
+                  <TextField
+                    id="projector-browser-zoom"
+                    type="number"
+                    size="small"
+                    value={zoomDraft}
+                    onChange={(e) => setZoomDraft(e.target.value)}
+                    onBlur={() => commitZoom(zoomDraft)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.currentTarget.blur();
                       }
-                      disabled={!eventSlug}
-                    >
-                      <QrCode2Icon fontSize="small" />
-                    </IconButton>
-                  </span>
-                </Tooltip>
-                <Tooltip title="Открыть в новой вкладке">
-                  <span>
-                    <IconButton
-                      size="small"
-                      onClick={() => {
-                        if (screenUrl) window.open(screenUrl, "_blank", "noopener,noreferrer");
-                      }}
-                      disabled={!screenUrl}
-                    >
-                      <OpenInNewIcon fontSize="small" />
-                    </IconButton>
-                  </span>
-                </Tooltip>
+                    }}
+                    inputProps={{
+                      min: PROJECTOR_BROWSER_ZOOM_MIN,
+                      max: PROJECTOR_BROWSER_ZOOM_MAX,
+                      step: PROJECTOR_BROWSER_ZOOM_STEP,
+                      "aria-label": "Масштаб проектора",
+                    }}
+                    sx={{ width: 96 }}
+                  />
+                </Box>
+                <Box sx={switchRowSx}>
+                  <Typography variant="body2" sx={rowLabelSx}>
+                    Макс. ширина контейнера, px
+                  </Typography>
+                  <TextField
+                    id="projector-content-max-width"
+                    type="number"
+                    size="small"
+                    value={maxWidthDraft}
+                    onChange={(e) => setMaxWidthDraft(e.target.value)}
+                    onBlur={() => commitContentMaxWidth(maxWidthDraft)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.currentTarget.blur();
+                      }
+                    }}
+                    inputProps={{
+                      min: PROJECTOR_CONTENT_MAX_WIDTH_PX_MIN,
+                      max: PROJECTOR_CONTENT_MAX_WIDTH_PX_MAX,
+                      step: 10,
+                      "aria-label": "Макс. ширина контейнера проектора",
+                    }}
+                    sx={{ width: 96 }}
+                  />
+                </Box>
+                <Box sx={switchRowSx}>
+                  <Typography variant="body2">Показывать название ивента у пользователя</Typography>
+                  <Switch
+                    checked={showEventTitleOnPlayer}
+                    onChange={(_, next) => onToggleShowEventTitleOnPlayer(next)}
+                  />
+                </Box>
+                <Box sx={switchRowSx}>
+                  <Typography variant="body2">Вход без формы: сразу случайное имя</Typography>
+                  <Switch
+                    checked={playerAutoJoinRandomNickname}
+                    onChange={(_, next) => onTogglePlayerAutoJoinRandomNickname(next)}
+                  />
+                </Box>
+                <Box sx={switchRowSx}>
+                  <Typography variant="body2">Показывать QR-код на экране ивента</Typography>
+                  <Switch
+                    checked={projectorJoinQrVisible}
+                    onChange={(_, next) => {
+                      setProjectorJoinQrVisible(next);
+                      emitBrandingPatch({ projectorJoinQrVisible: next });
+                    }}
+                  />
+                </Box>
               </Stack>
             </Stack>
-            <Stack spacing={1}>
-              <Box sx={switchRowSx}>
-                <Typography variant="body2" sx={rowLabelSx}>
-                  Масштаб проектора
-                </Typography>
-                <TextField
-                  id="projector-browser-zoom"
-                  type="number"
-                  size="small"
-                  value={zoomDraft}
-                  onChange={(e) => setZoomDraft(e.target.value)}
-                  onBlur={() => commitZoom(zoomDraft)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") {
-                      e.currentTarget.blur();
-                    }
-                  }}
-                  inputProps={{
-                    min: PROJECTOR_BROWSER_ZOOM_MIN,
-                    max: PROJECTOR_BROWSER_ZOOM_MAX,
-                    step: PROJECTOR_BROWSER_ZOOM_STEP,
-                    "aria-label": "Масштаб проектора",
-                  }}
-                  sx={{ width: 96 }}
-                />
-              </Box>
-              <Box sx={switchRowSx}>
-                <Typography variant="body2" sx={rowLabelSx}>
-                  Макс. ширина контейнера, px
-                </Typography>
-                <TextField
-                  id="projector-content-max-width"
-                  type="number"
-                  size="small"
-                  value={maxWidthDraft}
-                  onChange={(e) => setMaxWidthDraft(e.target.value)}
-                  onBlur={() => commitContentMaxWidth(maxWidthDraft)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") {
-                      e.currentTarget.blur();
-                    }
-                  }}
-                  inputProps={{
-                    min: PROJECTOR_CONTENT_MAX_WIDTH_PX_MIN,
-                    max: PROJECTOR_CONTENT_MAX_WIDTH_PX_MAX,
-                    step: 10,
-                    "aria-label": "Макс. ширина контейнера проектора",
-                  }}
-                  sx={{ width: 96 }}
-                />
-              </Box>
-              <Box sx={switchRowSx}>
-                <Typography variant="body2">Показывать название ивента у пользователя</Typography>
-                <Switch
-                  checked={showEventTitleOnPlayer}
-                  onChange={(_, next) => onToggleShowEventTitleOnPlayer(next)}
-                />
-              </Box>
-              <Box sx={switchRowSx}>
-                <Typography variant="body2">Вход без формы: сразу случайное имя</Typography>
-                <Switch
-                  checked={playerAutoJoinRandomNickname}
-                  onChange={(_, next) => onTogglePlayerAutoJoinRandomNickname(next)}
-                />
-              </Box>
-              <Box sx={switchRowSx}>
-                <Typography variant="body2">Показывать QR-код на экране ивента</Typography>
-                <Switch
-                  checked={projectorJoinQrVisible}
-                  onChange={(_, next) => {
-                    setProjectorJoinQrVisible(next);
-                    emitBrandingPatch({ projectorJoinQrVisible: next });
-                  }}
-                />
-              </Box>
-            </Stack>
-          </Stack>
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+        <AdminJoinAuthSection
+          networkingJoinFormMode={networkingJoinFormMode}
+          onNetworkingJoinFormModeChange={onNetworkingJoinFormModeChange}
+          networkingJoinFormFields={networkingJoinFormFields}
+          onNetworkingJoinFormFieldsChange={onNetworkingJoinFormFieldsChange}
+          networkingJoinFormCopy={networkingJoinFormCopy}
+          onNetworkingJoinFormCopyChange={onNetworkingJoinFormCopyChange}
+        />
+      </Stack>
       <Dialog open={qrOpen} onClose={() => setQrOpen(false)}>
         <DialogTitle>{qrLabel}</DialogTitle>
         <DialogContent

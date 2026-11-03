@@ -1,7 +1,7 @@
 import { useEffect, useRef } from "react";
 import { socket } from "../socket";
 import { getNickname } from "../storage";
-import { emitQuizJoin } from "../features/quizPlay/emitQuizJoin";
+import { emitQuizJoin, type QuizJoinProfileFields } from "../features/quizPlay/emitQuizJoin";
 import {
   clearRoomJoined,
   getRoomNickKey,
@@ -37,10 +37,14 @@ export function useQuizPlayJoin({
 
   const safeNick = () => (nickname || "").trim() || "Игрок";
 
-  const requestJoin = (reason: "manual" | "restore", nicknameOverride?: string) => {
+  const requestJoin = (
+    reason: "manual" | "restore",
+    nicknameOverride?: string,
+    profile?: QuizJoinProfileFields,
+  ) => {
     if (!slug) return;
     const nick = (nicknameOverride ?? safeNick()).trim() || "Игрок";
-    emitQuizJoin(slug, reason, nick);
+    emitQuizJoin(slug, reason, nick, profile);
   };
 
   const requestRestoreJoin = () => {

@@ -1,5 +1,10 @@
 import { Stack } from "@mui/material";
 import { AdminGeneralSection } from "../../components/admin/AdminGeneralSection";
+import type {
+  NetworkingJoinFormCopy,
+  NetworkingJoinFormFields,
+  NetworkingJoinFormMode,
+} from "@meyouquize/shared";
 
 import type { PublicViewSetPatch } from "../../publicViewContract";
 
@@ -12,6 +17,12 @@ export type AdminEventGeneralTabProps = {
   onToggleShowEventTitleOnPlayer: (next: boolean) => void;
   playerAutoJoinRandomNickname: boolean;
   onTogglePlayerAutoJoinRandomNickname: (next: boolean) => void;
+  networkingJoinFormMode: NetworkingJoinFormMode;
+  onNetworkingJoinFormModeChange: (mode: NetworkingJoinFormMode) => void;
+  networkingJoinFormFields: NetworkingJoinFormFields;
+  onNetworkingJoinFormFieldsChange: (fields: NetworkingJoinFormFields) => void;
+  networkingJoinFormCopy: NetworkingJoinFormCopy;
+  onNetworkingJoinFormCopyChange: (copy: NetworkingJoinFormCopy) => void;
   projectorJoinQrVisible: boolean;
   setProjectorJoinQrVisible: (value: boolean) => void;
   projectorBrowserZoom: number;
@@ -25,50 +36,10 @@ export type AdminEventGeneralTabProps = {
   emitBrandingPatch: (patch: PublicViewSetPatch) => void;
 };
 
-export function AdminEventGeneralTab({
-  editableTitle,
-  setEditableTitle,
-  saveQuizTitle,
-  eventSlug,
-  showEventTitleOnPlayer,
-  onToggleShowEventTitleOnPlayer,
-  playerAutoJoinRandomNickname,
-  onTogglePlayerAutoJoinRandomNickname,
-  projectorJoinQrVisible,
-  setProjectorJoinQrVisible,
-  projectorBrowserZoom,
-  setProjectorBrowserZoom,
-  projectorContentMaxWidthPx,
-  setProjectorContentMaxWidthPx,
-  projectorJoinQrText,
-  setProjectorJoinQrText,
-  projectorJoinQrTextColor,
-  setProjectorJoinQrTextColor,
-  emitBrandingPatch,
-}: AdminEventGeneralTabProps) {
+export function AdminEventGeneralTab(props: AdminEventGeneralTabProps) {
   return (
     <Stack spacing={2}>
-      <AdminGeneralSection
-        editableTitle={editableTitle}
-        setEditableTitle={setEditableTitle}
-        saveQuizTitle={saveQuizTitle}
-        eventSlug={eventSlug}
-        showEventTitleOnPlayer={showEventTitleOnPlayer}
-        onToggleShowEventTitleOnPlayer={onToggleShowEventTitleOnPlayer}
-        playerAutoJoinRandomNickname={playerAutoJoinRandomNickname}
-        onTogglePlayerAutoJoinRandomNickname={onTogglePlayerAutoJoinRandomNickname}
-        projectorJoinQrVisible={projectorJoinQrVisible}
-        setProjectorJoinQrVisible={setProjectorJoinQrVisible}
-        projectorBrowserZoom={projectorBrowserZoom}
-        setProjectorBrowserZoom={setProjectorBrowserZoom}
-        projectorContentMaxWidthPx={projectorContentMaxWidthPx}
-        setProjectorContentMaxWidthPx={setProjectorContentMaxWidthPx}
-        projectorJoinQrText={projectorJoinQrText}
-        setProjectorJoinQrText={setProjectorJoinQrText}
-        projectorJoinQrTextColor={projectorJoinQrTextColor}
-        setProjectorJoinQrTextColor={setProjectorJoinQrTextColor}
-        emitBrandingPatch={emitBrandingPatch}
-      />
+      <AdminGeneralSection {...props} />
     </Stack>
   );
 }

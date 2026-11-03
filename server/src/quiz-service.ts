@@ -1099,6 +1099,9 @@ export async function getQuizPublicState(quizId: string) {
     status: quiz.status,
     showEventTitleOnPlayer: view.showEventTitleOnPlayer,
     playerAutoJoinRandomNickname: view.playerAutoJoinRandomNickname,
+    networkingJoinFormMode: view.networkingJoinFormMode,
+    networkingJoinFormFields: view.networkingJoinFormFields,
+    networkingJoinFormCopy: view.networkingJoinFormCopy,
     playerBanners: view.playerBanners,
     activePlayerBannerId: view.activePlayerBannerId,
     speakerTileText: view.speakerTileText,
@@ -2931,7 +2934,18 @@ async function resolveUniqueParticipantNickname(
   return buildParticipantNicknameWithSuffix(baseNickname, fallbackSuffix);
 }
 
-export async function joinQuiz(payload: { slug: string; nickname: string; deviceId: string }) {
+export async function joinQuiz(payload: {
+  slug: string;
+  nickname: string;
+  deviceId: string;
+  fullName?: string;
+  jobTitle?: string;
+  company?: string;
+  offers?: string;
+  seeking?: string;
+  phone?: string;
+  email?: string;
+}) {
   let nickname = payload.nickname.trim();
   if (containsProfanity(nickname)) {
     nickname = "Участник";
@@ -2947,6 +2961,15 @@ export async function joinQuiz(payload: { slug: string; nickname: string; device
     select: { id: true },
   });
   nickname = await resolveUniqueParticipantNickname(quiz.id, nickname, currentParticipant?.id);
+  const profileData = {
+    fullName: (payload.fullName ?? "").trim().slice(0, 120),
+    jobTitle: (payload.jobTitle ?? "").trim().slice(0, 120),
+    company: (payload.company ?? "").trim().slice(0, 120),
+    offers: (payload.offers ?? "").trim().slice(0, 500),
+    seeking: (payload.seeking ?? "").trim().slice(0, 500),
+    phone: (payload.phone ?? "").trim().slice(0, 40),
+    email: (payload.email ?? "").trim().slice(0, 120),
+  };
   const participant = await prisma.participant.upsert({
     where: {
       quizId_deviceId: { quizId: quiz.id, deviceId: payload.deviceId },
@@ -2955,9 +2978,11 @@ export async function joinQuiz(payload: { slug: string; nickname: string; device
       quizId: quiz.id,
       deviceId: payload.deviceId,
       nickname,
+      ...profileData,
     },
     update: {
       nickname,
+      ...profileData,
     },
   });
   return { quizId: quiz.id, participantId: participant.id, nickname };

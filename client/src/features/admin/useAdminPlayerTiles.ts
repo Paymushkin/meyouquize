@@ -1,10 +1,18 @@
 import {
+  DEFAULT_NETWORKING_JOIN_FORM_COPY,
+  DEFAULT_NETWORKING_JOIN_FORM_FIELDS,
   PHOTO_WALL_TILE_ID,
   PROGRAM_TILE_ID,
   SPEAKER_TILE_ID,
+  normalizeNetworkingJoinFormCopy,
+  normalizeNetworkingJoinFormFields,
+  normalizeNetworkingJoinFormMode,
   quizResultsTileIdForSubQuiz,
   QUIZ_RESULTS_TILE_ID,
   withQuizResultsTileLast,
+  type NetworkingJoinFormCopy,
+  type NetworkingJoinFormFields,
+  type NetworkingJoinFormMode,
   type PublicViewPayload,
 } from "@meyouquize/shared";
 import { useCallback, useMemo, useState } from "react";
@@ -33,6 +41,13 @@ export function useAdminPlayerTiles({
 }: Params) {
   const [showEventTitleOnPlayer, setShowEventTitleOnPlayer] = useState(true);
   const [playerAutoJoinRandomNickname, setPlayerAutoJoinRandomNickname] = useState(false);
+  const [networkingJoinFormMode, setNetworkingJoinFormMode] =
+    useState<NetworkingJoinFormMode>("interactive");
+  const [networkingJoinFormFields, setNetworkingJoinFormFields] =
+    useState<NetworkingJoinFormFields>({ ...DEFAULT_NETWORKING_JOIN_FORM_FIELDS });
+  const [networkingJoinFormCopy, setNetworkingJoinFormCopy] = useState<NetworkingJoinFormCopy>({
+    ...DEFAULT_NETWORKING_JOIN_FORM_COPY,
+  });
   const [playerBanners, setPlayerBanners] = useState<PublicBanner[]>([]);
   const [speakerTileText, setSpeakerTileText] = useState("Вопросы спикерам");
   const [speakerTileBackgroundColor, setSpeakerTileBackgroundColor] = useState("#1976d2");
@@ -80,6 +95,9 @@ export function useAdminPlayerTiles({
       applyAdminPlayerTilesFromPublicView(pv, nextBanners, {
         setShowEventTitleOnPlayer,
         setPlayerAutoJoinRandomNickname,
+        setNetworkingJoinFormMode,
+        setNetworkingJoinFormFields,
+        setNetworkingJoinFormCopy,
         setSpeakerTileText,
         setSpeakerTileBackgroundColor,
         setSpeakerTileTextColor,
@@ -452,6 +470,36 @@ export function useAdminPlayerTiles({
     [emitPublicViewPatch, refreshQuizState],
   );
 
+  const updateNetworkingJoinFormMode = useCallback(
+    (mode: NetworkingJoinFormMode) => {
+      const next = normalizeNetworkingJoinFormMode(mode);
+      setNetworkingJoinFormMode(next);
+      emitPublicViewPatch({ networkingJoinFormMode: next });
+      refreshQuizState();
+    },
+    [emitPublicViewPatch, refreshQuizState],
+  );
+
+  const updateNetworkingJoinFormFields = useCallback(
+    (fields: NetworkingJoinFormFields) => {
+      const next = normalizeNetworkingJoinFormFields(fields);
+      setNetworkingJoinFormFields(next);
+      emitPublicViewPatch({ networkingJoinFormFields: next });
+      refreshQuizState();
+    },
+    [emitPublicViewPatch, refreshQuizState],
+  );
+
+  const updateNetworkingJoinFormCopy = useCallback(
+    (copy: NetworkingJoinFormCopy) => {
+      const next = normalizeNetworkingJoinFormCopy(copy);
+      setNetworkingJoinFormCopy(next);
+      emitPublicViewPatch({ networkingJoinFormCopy: next });
+      refreshQuizState();
+    },
+    [emitPublicViewPatch, refreshQuizState],
+  );
+
   return {
     showEventTitleOnPlayer,
     setShowEventTitleOnPlayer,
@@ -459,6 +507,15 @@ export function useAdminPlayerTiles({
     playerAutoJoinRandomNickname,
     setPlayerAutoJoinRandomNickname,
     updatePlayerAutoJoinRandomNickname,
+    networkingJoinFormMode,
+    setNetworkingJoinFormMode,
+    updateNetworkingJoinFormMode,
+    networkingJoinFormFields,
+    setNetworkingJoinFormFields,
+    updateNetworkingJoinFormFields,
+    networkingJoinFormCopy,
+    setNetworkingJoinFormCopy,
+    updateNetworkingJoinFormCopy,
     playerBanners,
     setPlayerBanners,
     speakerTileText,

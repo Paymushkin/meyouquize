@@ -1,10 +1,21 @@
-import type { PublicViewPayload } from "@meyouquize/shared";
+import {
+  normalizeNetworkingJoinFormCopy,
+  normalizeNetworkingJoinFormFields,
+  normalizeNetworkingJoinFormMode,
+  type NetworkingJoinFormCopy,
+  type NetworkingJoinFormFields,
+  type NetworkingJoinFormMode,
+  type PublicViewPayload,
+} from "@meyouquize/shared";
 import { buildPlayerTilesOrder } from "../quizPlay/tiles";
 import type { PublicBanner } from "../../publicViewContract";
 
 type TileSetters = {
   setShowEventTitleOnPlayer: (value: boolean) => void;
   setPlayerAutoJoinRandomNickname: (value: boolean) => void;
+  setNetworkingJoinFormMode: (value: NetworkingJoinFormMode) => void;
+  setNetworkingJoinFormFields: (value: NetworkingJoinFormFields) => void;
+  setNetworkingJoinFormCopy: (value: NetworkingJoinFormCopy) => void;
   setSpeakerTileText: (value: string) => void;
   setSpeakerTileBackgroundColor: (value: string) => void;
   setSpeakerTileTextColor: (value: string) => void;
@@ -41,6 +52,17 @@ export function applyAdminPlayerTilesFromPublicView(
   }
   if (typeof pv.playerAutoJoinRandomNickname === "boolean") {
     setters.setPlayerAutoJoinRandomNickname(pv.playerAutoJoinRandomNickname);
+  }
+  if (pv.networkingJoinFormMode !== undefined) {
+    setters.setNetworkingJoinFormMode(normalizeNetworkingJoinFormMode(pv.networkingJoinFormMode));
+  }
+  if (pv.networkingJoinFormFields !== undefined) {
+    setters.setNetworkingJoinFormFields(
+      normalizeNetworkingJoinFormFields(pv.networkingJoinFormFields),
+    );
+  }
+  if (pv.networkingJoinFormCopy !== undefined) {
+    setters.setNetworkingJoinFormCopy(normalizeNetworkingJoinFormCopy(pv.networkingJoinFormCopy));
   }
   if (typeof pv.speakerTileText === "string") {
     setters.setSpeakerTileText(pv.speakerTileText);

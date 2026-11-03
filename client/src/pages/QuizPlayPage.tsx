@@ -23,6 +23,9 @@ import {
   ruBallLabel,
   sanitizeVideoWallItems,
   SPEAKER_TILE_ID,
+  usesExtendedNetworkingJoinForm,
+  validateNetworkingJoinDraft,
+  type NetworkingProfileTextFields,
 } from "@meyouquize/shared";
 import {
   buildPlayerQuizResultsTilesForPlayer,
@@ -68,6 +71,7 @@ import {
   CompletionOverlay,
   EventTitleBlock,
   JoinCard,
+  JoinNetworkingCard,
   JOIN_SCREEN_MAIN_SX,
   JOIN_SCREEN_STACK_SX,
   buildBrandPrimaryContainedButtonSx,
@@ -332,13 +336,30 @@ export function QuizPlayPage() {
     brandFontUrls,
     joinMetaLoaded,
     playerAutoJoinRandomNickname,
+    networkingJoinFormMode,
+    networkingJoinFormFields,
+    networkingJoinFormCopy,
   } = useQuizPlayMetaBranding({
     slug,
     quiz,
   });
 
+  const useExtendedJoinForm = usesExtendedNetworkingJoinForm(networkingJoinFormMode);
   const showNicknameJoinForm =
-    joinMetaLoaded && !joined && !joinPending && !playerAutoJoinRandomNickname;
+    joinMetaLoaded &&
+    !joined &&
+    !joinPending &&
+    (useExtendedJoinForm || !playerAutoJoinRandomNickname);
+
+  const [joinNetworkingDraft, setJoinNetworkingDraft] = useState<NetworkingProfileTextFields>({
+    fullName: "",
+    jobTitle: "",
+    company: "",
+    offers: "",
+    seeking: "",
+    phone: "",
+    email: "",
+  });
 
   useEffect(() => {
     if (!joinMetaLoaded) return;
@@ -350,7 +371,7 @@ export function QuizPlayPage() {
       setBootLoading(false);
       return;
     }
-    if (!playerAutoJoinRandomNickname) {
+    if (useExtendedJoinForm || !playerAutoJoinRandomNickname) {
       setBootLoading(false);
       return;
     }
@@ -361,7 +382,14 @@ export function QuizPlayPage() {
       requestJoin("manual", randomNickname());
     }
     setBootLoading(false);
-  }, [joinMetaLoaded, slug, playerAutoJoinRandomNickname, requestJoin, setJoinPending]);
+  }, [
+    joinMetaLoaded,
+    slug,
+    playerAutoJoinRandomNickname,
+    useExtendedJoinForm,
+    requestJoin,
+    setJoinPending,
+  ]);
 
   useEffect(() => {
     if (joined) {
@@ -371,12 +399,12 @@ export function QuizPlayPage() {
   }, [joined]);
 
   useEffect(() => {
-    if (joined || joinPending || playerAutoJoinRandomNickname) return;
+    if (joined || joinPending || useExtendedJoinForm || playerAutoJoinRandomNickname) return;
     const timer = window.setTimeout(() => {
       nicknameInputRef.current?.focus();
     }, 0);
     return () => window.clearTimeout(timer);
-  }, [joined, joinPending, playerAutoJoinRandomNickname]);
+  }, [joined, joinPending, playerAutoJoinRandomNickname, useExtendedJoinForm]);
 
   useEffect(() => {
     const settings = speakerQuestions?.settings;
@@ -400,6 +428,33 @@ export function QuizPlayPage() {
     setJoinPending(true);
     setError("");
     requestJoin("manual");
+  }
+
+  function joinWithExtendedProfile() {
+    setNicknameError("");
+    const validationError = validateNetworkingJoinDraft(
+      networkingJoinFormMode,
+      networkingJoinFormFields,
+      joinNetworkingDraft,
+    );
+    if (validationError) {
+      setNicknameError(validationError);
+      return;
+    }
+    const fullName = joinNetworkingDraft.fullName.trim();
+    const nick = fullName.slice(0, 40);
+    setNick(nick);
+    setJoinPending(true);
+    setError("");
+    requestJoin("manual", nick, {
+      fullName,
+      jobTitle: joinNetworkingDraft.jobTitle.trim(),
+      company: joinNetworkingDraft.company.trim(),
+      offers: joinNetworkingDraft.offers.trim(),
+      seeking: joinNetworkingDraft.seeking.trim(),
+      phone: joinNetworkingDraft.phone.trim(),
+      email: joinNetworkingDraft.email.trim(),
+    });
   }
 
   function editNickname() {
@@ -756,24 +811,43 @@ export function QuizPlayPage() {
                       {error}
                     </Alert>
                   ) : null}
-                  <JoinCard
-                    formBackgroundColor={formBackgroundColor}
-                    formTextColor={formTextColor}
-                    formInputTextColor={formInputTextColor}
-                    brandFontFamily={brandFontFamily}
-                    nickname={nickname}
-                    nicknameError={nicknameError}
-                    nicknameInputRef={nicknameInputRef}
-                    onNicknameChange={(value) => {
-                      setNicknameError("");
-                      setNick(value);
-                    }}
-                    onRandomNickname={() => {
-                      setNicknameError("");
-                      setNick(randomNickname());
-                    }}
-                    onJoin={join}
-                  />
+                  {useExtendedJoinForm ? (
+                    <JoinNetworkingCard
+                      formBackgroundColor={formBackgroundColor}
+                      formTextColor={formTextColor}
+                      formInputTextColor={formInputTextColor}
+                      brandFontFamily={brandFontFamily}
+                      values={joinNetworkingDraft}
+                      formError={nicknameError}
+                      onChange={(patch) => {
+                        setNicknameError("");
+                        setJoinNetworkingDraft((prev) => ({ ...prev, ...patch }));
+                      }}
+                      onJoin={joinWithExtendedProfile}
+                      mode={networkingJoinFormMode}
+                      fields={networkingJoinFormFields}
+                      copy={networkingJoinFormCopy}
+                    />
+                  ) : (
+                    <JoinCard
+                      formBackgroundColor={formBackgroundColor}
+                      formTextColor={formTextColor}
+                      formInputTextColor={formInputTextColor}
+                      brandFontFamily={brandFontFamily}
+                      nickname={nickname}
+                      nicknameError={nicknameError}
+                      nicknameInputRef={nicknameInputRef}
+                      onNicknameChange={(value) => {
+                        setNicknameError("");
+                        setNick(value);
+                      }}
+                      onRandomNickname={() => {
+                        setNicknameError("");
+                        setNick(randomNickname());
+                      }}
+                      onJoin={join}
+                    />
+                  )}
                 </Stack>
               </Box>
             )}

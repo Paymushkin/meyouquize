@@ -3,6 +3,16 @@ import { getOrCreateDeviceId } from "../../storage";
 
 export const QUIZ_JOIN_DEBOUNCE_MS = 2500;
 
+export type QuizJoinProfileFields = {
+  fullName?: string;
+  jobTitle?: string;
+  company?: string;
+  offers?: string;
+  seeking?: string;
+  phone?: string;
+  email?: string;
+};
+
 let joinDebounceTimer: ReturnType<typeof setTimeout> | null = null;
 let lastJoinEmitAt = 0;
 
@@ -14,11 +24,23 @@ export function resetQuizJoinDebounceForTests() {
   lastJoinEmitAt = 0;
 }
 
-export function emitQuizJoin(slug: string, reason: "manual" | "restore", nick: string) {
+export function emitQuizJoin(
+  slug: string,
+  reason: "manual" | "restore",
+  nick: string,
+  profile?: QuizJoinProfileFields,
+) {
   const payload = {
     slug,
     nickname: nick,
     deviceId: getOrCreateDeviceId(),
+    ...(profile?.fullName !== undefined ? { fullName: profile.fullName } : {}),
+    ...(profile?.jobTitle !== undefined ? { jobTitle: profile.jobTitle } : {}),
+    ...(profile?.company !== undefined ? { company: profile.company } : {}),
+    ...(profile?.offers !== undefined ? { offers: profile.offers } : {}),
+    ...(profile?.seeking !== undefined ? { seeking: profile.seeking } : {}),
+    ...(profile?.phone !== undefined ? { phone: profile.phone } : {}),
+    ...(profile?.email !== undefined ? { email: profile.email } : {}),
   };
   const emitNow = () => {
     lastJoinEmitAt = Date.now();

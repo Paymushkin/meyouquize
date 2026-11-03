@@ -1820,6 +1820,12 @@ export function AdminEventPage() {
                     playerAutoJoinRandomNickname: playerTiles.playerAutoJoinRandomNickname,
                     onTogglePlayerAutoJoinRandomNickname:
                       playerTiles.updatePlayerAutoJoinRandomNickname,
+                    networkingJoinFormMode: playerTiles.networkingJoinFormMode,
+                    onNetworkingJoinFormModeChange: playerTiles.updateNetworkingJoinFormMode,
+                    networkingJoinFormFields: playerTiles.networkingJoinFormFields,
+                    onNetworkingJoinFormFieldsChange: playerTiles.updateNetworkingJoinFormFields,
+                    networkingJoinFormCopy: playerTiles.networkingJoinFormCopy,
+                    onNetworkingJoinFormCopyChange: playerTiles.updateNetworkingJoinFormCopy,
                     projectorJoinQrVisible: branding.projectorJoinQrVisible,
                     setProjectorJoinQrVisible: branding.setProjectorJoinQrVisible,
                     projectorBrowserZoom: branding.projectorBrowserZoom,

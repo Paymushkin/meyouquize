@@ -1,0 +1,8 @@
+-- Extended join form fields on Participant (auth modes without networking module)
+ALTER TABLE "Participant" ADD COLUMN IF NOT EXISTS "fullName" TEXT NOT NULL DEFAULT '';
+ALTER TABLE "Participant" ADD COLUMN IF NOT EXISTS "jobTitle" TEXT NOT NULL DEFAULT '';
+ALTER TABLE "Participant" ADD COLUMN IF NOT EXISTS "company" TEXT NOT NULL DEFAULT '';
+ALTER TABLE "Participant" ADD COLUMN IF NOT EXISTS "offers" TEXT NOT NULL DEFAULT '';
+ALTER TABLE "Participant" ADD COLUMN IF NOT EXISTS "seeking" TEXT NOT NULL DEFAULT '';
+ALTER TABLE "Participant" ADD COLUMN IF NOT EXISTS "phone" TEXT NOT NULL DEFAULT '';
+ALTER TABLE "Participant" ADD COLUMN IF NOT EXISTS "email" TEXT NOT NULL DEFAULT '';
