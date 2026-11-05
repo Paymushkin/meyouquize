@@ -572,10 +572,16 @@ export function LandingProofSection() {
   }, [updateTabIndicator]);
 
   useEffect(() => {
+    const list = tabListRef.current;
     const idx = TABS.findIndex((item) => item.id === tab);
     const activeBtn = tabBtnRefs.current[idx];
-    if (!activeBtn) return;
-    activeBtn.scrollIntoView({ behavior: "smooth", inline: "nearest", block: "nearest" });
+    if (!list || !activeBtn) return;
+    // Только горизонтальный скролл tablist — без scrollIntoView (он прыгает по странице)
+    const target = activeBtn.offsetLeft - (list.clientWidth - activeBtn.offsetWidth) / 2;
+    list.scrollTo({
+      left: Math.max(0, target),
+      behavior: "smooth",
+    });
   }, [tab]);
 
   return (
