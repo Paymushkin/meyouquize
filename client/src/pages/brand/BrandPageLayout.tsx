@@ -25,6 +25,7 @@ export function BrandPageLayout({ children, documentTitle }: BrandPageLayoutProp
       <CssBaseline />
       <LandingContactProvider>
         <Box
+          component="main"
           sx={{
             minHeight: "100vh",
             width: "100%",

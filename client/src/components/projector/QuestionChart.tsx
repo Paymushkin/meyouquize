@@ -1,4 +1,13 @@
-import { Fragment, type ReactNode, useEffect, useMemo, useRef, useState } from "react";
+import {
+  Fragment,
+  lazy,
+  Suspense,
+  type ReactNode,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import { Box, Fade, LinearProgress, Paper, Stack, Typography } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
@@ -26,7 +35,6 @@ import {
 } from "../../features/quizPlay/voteOptionImages";
 import { ProjectorSideBySideContent } from "./ProjectorSideBySideContent";
 import { ProjectorOptionLabel } from "../quiz/ProjectorOptionLabel";
-import { ProjectorGeoPollMap } from "./ProjectorGeoPollMap";
 import { ProjectorTemperatureScale } from "./ProjectorTemperatureScale";
 import {
   buildDebateSideBySideRows,
@@ -34,6 +42,10 @@ import {
 } from "./ProjectorDebateSideBySideChart";
 import type { ProjectorLayoutWord, ProjectorQuestionResult } from "../../types/projectorDashboard";
 import { resolveMuiFontFamily } from "../../utils/muiFontFamily";
+
+const ProjectorGeoPollMap = lazy(() =>
+  import("./ProjectorGeoPollMap").then((m) => ({ default: m.ProjectorGeoPollMap })),
+);
 
 const CORRECT_OPTION_COLOR = "#4caf50";
 const DEFAULT_OUTLINE_COLOR = "rgba(255,255,255,0.35)";
@@ -528,21 +540,23 @@ export function QuestionChart(props: QuestionChartProps) {
 
   if (isGeoPoll && question.geoPollDictionary) {
     return (
-      <ProjectorGeoPollMap
-        dictionaryId={question.geoPollDictionary}
-        optionStats={question.optionStats}
-        brandPrimaryColor={brandPrimaryColor}
-        voteOptionTextColor={voteOptionTextColor}
-        brandFontFamily={brandFontFamily}
-        showAnswerList={geoPollShowAnswerList}
-        regionHeatEnabled={geoPollRegionHeatEnabled}
-        regionHeatScale={geoPollRegionHeatScale}
-        markerColor={geoPollMarkerColor}
-        regionFillIdle={geoPollRegionFillIdle}
-        regionFillVoted={geoPollRegionFillVoted}
-        regionStrokeIdle={geoPollRegionStrokeIdle}
-        regionStrokeVoted={geoPollRegionStrokeVoted}
-      />
+      <Suspense fallback={null}>
+        <ProjectorGeoPollMap
+          dictionaryId={question.geoPollDictionary}
+          optionStats={question.optionStats}
+          brandPrimaryColor={brandPrimaryColor}
+          voteOptionTextColor={voteOptionTextColor}
+          brandFontFamily={brandFontFamily}
+          showAnswerList={geoPollShowAnswerList}
+          regionHeatEnabled={geoPollRegionHeatEnabled}
+          regionHeatScale={geoPollRegionHeatScale}
+          markerColor={geoPollMarkerColor}
+          regionFillIdle={geoPollRegionFillIdle}
+          regionFillVoted={geoPollRegionFillVoted}
+          regionStrokeIdle={geoPollRegionStrokeIdle}
+          regionStrokeVoted={geoPollRegionStrokeVoted}
+        />
+      </Suspense>
     );
   }
 

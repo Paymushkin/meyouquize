@@ -127,7 +127,7 @@ export function BrandHeader({
                   sx={{
                     color: "rgba(255,255,255,0.82)",
                     fontSize: { lg: 13, xl: 14 },
-                    fontWeight: 500,
+                    fontWeight: 600,
                     textDecoration: "none",
                     whiteSpace: "nowrap",
                     "&:hover": { color: "text.primary" },

@@ -1,37 +1,67 @@
 /* eslint-disable react-refresh/only-export-components */
-import React from "react";
+import React, { lazy, Suspense, useEffect } from "react";
 import { createRoot } from "react-dom/client";
 import { BrowserRouter, Outlet, Route, Routes } from "react-router-dom";
 import { CssBaseline, ThemeProvider, createTheme } from "@mui/material";
-import "./styles/jost-local.css";
-import "./styles/roboto-local.css";
 import "@fontsource/manrope/400.css";
-import "@fontsource/manrope/500.css";
 import "@fontsource/manrope/600.css";
 import "@fontsource/manrope/700.css";
-import "@fontsource/manrope/800.css";
-import "@fontsource/unbounded/500.css";
-import "@fontsource/unbounded/600.css";
 import "@fontsource/unbounded/700.css";
 import "@fontsource/unbounded/800.css";
-import { QuizPlayPage } from "./pages/QuizPlayPage";
-import { ResultsPage } from "./pages/ResultsPage";
-import { AdminRoomsPage } from "./pages/AdminRoomsPage";
-import { AdminThemesPage } from "./pages/AdminThemesPage";
-import { AdminThemeEditorPage } from "./pages/AdminThemeEditorPage";
-import { AdminFontsPage } from "./pages/AdminFontsPage";
-import { AdminEventRoute } from "./pages/AdminEventRoute";
-import { AdminVoteDetailPage } from "./pages/AdminVoteDetailPage";
-import { AdminSubQuizResultsPage } from "./pages/AdminSubQuizResultsPage";
-import { AdminUsersPage } from "./pages/AdminUsersPage";
-import { PublicReportPage } from "./pages/PublicReportPage";
 import { LandingPage } from "./pages/LandingPage";
-import { LandingCookiesPage, LandingPrivacyPage } from "./pages/landing/LandingLegalPage";
-import { SpeakerModeratorPage } from "./pages/SpeakerModeratorPage";
-import { NotFoundPage } from "./pages/NotFoundPage";
-import { ForbiddenPage } from "./pages/ForbiddenPage";
-import { AdminSectionLayout } from "./components/admin/AdminSectionLayout";
 import { AppErrorBoundary } from "./components/AppErrorBoundary";
+
+const QuizPlayPage = lazy(() =>
+  import("./pages/QuizPlayPage").then((m) => ({ default: m.QuizPlayPage })),
+);
+const ResultsPage = lazy(() =>
+  import("./pages/ResultsPage").then((m) => ({ default: m.ResultsPage })),
+);
+const AdminRoomsPage = lazy(() =>
+  import("./pages/AdminRoomsPage").then((m) => ({ default: m.AdminRoomsPage })),
+);
+const AdminThemesPage = lazy(() =>
+  import("./pages/AdminThemesPage").then((m) => ({ default: m.AdminThemesPage })),
+);
+const AdminThemeEditorPage = lazy(() =>
+  import("./pages/AdminThemeEditorPage").then((m) => ({ default: m.AdminThemeEditorPage })),
+);
+const AdminFontsPage = lazy(() =>
+  import("./pages/AdminFontsPage").then((m) => ({ default: m.AdminFontsPage })),
+);
+const AdminEventRoute = lazy(() =>
+  import("./pages/AdminEventRoute").then((m) => ({ default: m.AdminEventRoute })),
+);
+const AdminVoteDetailPage = lazy(() =>
+  import("./pages/AdminVoteDetailPage").then((m) => ({ default: m.AdminVoteDetailPage })),
+);
+const AdminSubQuizResultsPage = lazy(() =>
+  import("./pages/AdminSubQuizResultsPage").then((m) => ({ default: m.AdminSubQuizResultsPage })),
+);
+const AdminUsersPage = lazy(() =>
+  import("./pages/AdminUsersPage").then((m) => ({ default: m.AdminUsersPage })),
+);
+const PublicReportPage = lazy(() =>
+  import("./pages/PublicReportPage").then((m) => ({ default: m.PublicReportPage })),
+);
+const LandingPrivacyPage = lazy(() =>
+  import("./pages/landing/LandingLegalPage").then((m) => ({ default: m.LandingPrivacyPage })),
+);
+const LandingCookiesPage = lazy(() =>
+  import("./pages/landing/LandingLegalPage").then((m) => ({ default: m.LandingCookiesPage })),
+);
+const SpeakerModeratorPage = lazy(() =>
+  import("./pages/SpeakerModeratorPage").then((m) => ({ default: m.SpeakerModeratorPage })),
+);
+const NotFoundPage = lazy(() =>
+  import("./pages/NotFoundPage").then((m) => ({ default: m.NotFoundPage })),
+);
+const ForbiddenPage = lazy(() =>
+  import("./pages/ForbiddenPage").then((m) => ({ default: m.ForbiddenPage })),
+);
+const AdminSectionLayout = lazy(() =>
+  import("./components/admin/AdminSectionLayout").then((m) => ({ default: m.AdminSectionLayout })),
+);
 
 const theme = createTheme({
   palette: {
@@ -118,10 +148,17 @@ const theme = createTheme({
 });
 
 function PurpleAppShell() {
+  useEffect(() => {
+    void import("./styles/jost-local.css");
+    void import("./styles/roboto-local.css");
+  }, []);
+
   return (
     <ThemeProvider theme={theme}>
       <CssBaseline />
-      <Outlet />
+      <Suspense fallback={null}>
+        <Outlet />
+      </Suspense>
     </ThemeProvider>
   );
 }
@@ -131,8 +168,22 @@ function App() {
     <BrowserRouter>
       <Routes>
         <Route path="/" element={<LandingPage />} />
-        <Route path="/privacy" element={<LandingPrivacyPage />} />
-        <Route path="/cookies" element={<LandingCookiesPage />} />
+        <Route
+          path="/privacy"
+          element={
+            <Suspense fallback={null}>
+              <LandingPrivacyPage />
+            </Suspense>
+          }
+        />
+        <Route
+          path="/cookies"
+          element={
+            <Suspense fallback={null}>
+              <LandingCookiesPage />
+            </Suspense>
+          }
+        />
         <Route element={<PurpleAppShell />}>
           <Route path="/q/:slug" element={<QuizPlayPage />} />
           <Route path="/q/:slug/results" element={<ResultsPage />} />

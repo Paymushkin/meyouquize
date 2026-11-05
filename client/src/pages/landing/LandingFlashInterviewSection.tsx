@@ -287,12 +287,12 @@ export function LandingFlashInterviewSection() {
                 <Box
                   component="video"
                   key={activeFormat.src}
-                  src={activeFormat.src}
-                  autoPlay
+                  {...(visible ? { src: activeFormat.src } : {})}
+                  autoPlay={visible}
                   muted
                   loop
                   playsInline
-                  preload="metadata"
+                  preload={visible ? "metadata" : "none"}
                   aria-label={activeFormat.aria}
                   sx={{
                     display: "block",

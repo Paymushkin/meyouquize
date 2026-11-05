@@ -1,19 +1,10 @@
+import { lazy, Suspense } from "react";
 import { Box } from "@mui/material";
 import { BrandPageLayout } from "./brand/BrandPageLayout";
 import { BrandHeader } from "./brand/BrandHeader";
-import { BrandFooter } from "./brand/BrandFooter";
 import { LandingHeroSection } from "./landing/LandingHeroSection";
-import { LandingPillarsSection } from "./landing/LandingPillarsSection";
-import { LandingHowItWorksSection } from "./landing/LandingHowItWorksSection";
-import { LandingOnSiteSection } from "./landing/LandingOnSiteSection";
-import { LandingProofSection } from "./landing/LandingProofSection";
-import { LandingScenariosSection } from "./landing/LandingScenariosSection";
-import { LandingFlashInterviewSection } from "./landing/LandingFlashInterviewSection";
-import { LandingSocialProofSection } from "./landing/LandingSocialProofSection";
-import { FAQ_ITEMS, LandingFaqSection } from "./landing/LandingFaqSection";
-import { LandingFinalCtaSection } from "./landing/LandingFinalCtaSection";
-import { LandingCookieBanner } from "./landing/LandingCookieBanner";
 import { DocumentSeo } from "./landing/DocumentSeo";
+import { FAQ_ITEMS } from "./landing/landingFaqData";
 import {
   buildFaqJsonLd,
   buildOrganizationJsonLd,
@@ -21,6 +12,50 @@ import {
   buildWebsiteJsonLd,
   LANDING_SEO,
 } from "./landing/landingSeo";
+
+const LandingPillarsSection = lazy(() =>
+  import("./landing/LandingPillarsSection").then((m) => ({ default: m.LandingPillarsSection })),
+);
+const LandingHowItWorksSection = lazy(() =>
+  import("./landing/LandingHowItWorksSection").then((m) => ({
+    default: m.LandingHowItWorksSection,
+  })),
+);
+const LandingOnSiteSection = lazy(() =>
+  import("./landing/LandingOnSiteSection").then((m) => ({ default: m.LandingOnSiteSection })),
+);
+const LandingProofSection = lazy(() =>
+  import("./landing/LandingProofSection").then((m) => ({ default: m.LandingProofSection })),
+);
+const LandingScenariosSection = lazy(() =>
+  import("./landing/LandingScenariosSection").then((m) => ({
+    default: m.LandingScenariosSection,
+  })),
+);
+const LandingFlashInterviewSection = lazy(() =>
+  import("./landing/LandingFlashInterviewSection").then((m) => ({
+    default: m.LandingFlashInterviewSection,
+  })),
+);
+const LandingSocialProofSection = lazy(() =>
+  import("./landing/LandingSocialProofSection").then((m) => ({
+    default: m.LandingSocialProofSection,
+  })),
+);
+const LandingFaqSection = lazy(() =>
+  import("./landing/LandingFaqSection").then((m) => ({ default: m.LandingFaqSection })),
+);
+const LandingFinalCtaSection = lazy(() =>
+  import("./landing/LandingFinalCtaSection").then((m) => ({
+    default: m.LandingFinalCtaSection,
+  })),
+);
+const BrandFooter = lazy(() =>
+  import("./brand/BrandFooter").then((m) => ({ default: m.BrandFooter })),
+);
+const LandingCookieBanner = lazy(() =>
+  import("./landing/LandingCookieBanner").then((m) => ({ default: m.LandingCookieBanner })),
+);
 
 export function LandingPage() {
   return (
@@ -40,17 +75,19 @@ export function LandingPage() {
         <BrandHeader overHero />
         <LandingHeroSection />
       </Box>
-      <LandingPillarsSection />
-      <LandingHowItWorksSection />
-      <LandingOnSiteSection />
-      <LandingProofSection />
-      <LandingScenariosSection />
-      <LandingFlashInterviewSection />
-      <LandingSocialProofSection />
-      <LandingFaqSection />
-      <LandingFinalCtaSection />
-      <BrandFooter />
-      <LandingCookieBanner />
+      <Suspense fallback={null}>
+        <LandingPillarsSection />
+        <LandingHowItWorksSection />
+        <LandingOnSiteSection />
+        <LandingProofSection />
+        <LandingScenariosSection />
+        <LandingFlashInterviewSection />
+        <LandingSocialProofSection />
+        <LandingFaqSection />
+        <LandingFinalCtaSection />
+        <BrandFooter />
+        <LandingCookieBanner />
+      </Suspense>
     </BrandPageLayout>
   );
 }

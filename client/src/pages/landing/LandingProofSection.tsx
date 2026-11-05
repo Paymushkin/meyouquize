@@ -1,4 +1,13 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
+import {
+  lazy,
+  Suspense,
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 import BrushOutlinedIcon from "@mui/icons-material/BrushOutlined";
 import CasinoOutlinedIcon from "@mui/icons-material/CasinoOutlined";
 import EmojiEventsOutlinedIcon from "@mui/icons-material/EmojiEventsOutlined";
@@ -11,7 +20,6 @@ import VideocamOutlinedIcon from "@mui/icons-material/VideocamOutlined";
 import { Box, Container, Stack, Typography } from "@mui/material";
 import { alpha } from "@mui/material/styles";
 import { ProjectorLeaderboardTable } from "../../components/projector/ProjectorLeaderboardTable";
-import { QuestionChart } from "../../components/projector/QuestionChart";
 import {
   BRAND_ACCENT,
   BRAND_BORDER,
@@ -21,6 +29,10 @@ import {
 import type { ProjectorLeader, ProjectorQuestionResult } from "../../types/projectorDashboard";
 import { LANDING_CONTAINER_SX, lt } from "./landingConstants";
 import { landingRevealSx, useLandingReveal } from "./useLandingReveal";
+
+const QuestionChart = lazy(() =>
+  import("../../components/projector/QuestionChart").then((m) => ({ default: m.QuestionChart })),
+);
 
 type ProofTabId = "poll" | "quiz" | "tags" | "speaker" | "feedback" | "all";
 
@@ -271,9 +283,11 @@ function PhoneShot({ src, alt }: { src: string; alt: string }) {
         component="img"
         src={src}
         alt={alt}
+        width={360}
+        height={780}
         loading="lazy"
         decoding="async"
-        sx={{ width: "100%", display: "block", verticalAlign: "top" }}
+        sx={{ width: "100%", height: "auto", display: "block", verticalAlign: "top" }}
       />
     </PhoneBezel>
   );
@@ -909,17 +923,19 @@ export function LandingProofSection() {
                     <Box
                       sx={{ width: "100%", height: { xs: 260, sm: 300, md: 360 }, minHeight: 0 }}
                     >
-                      <QuestionChart
-                        question={TAG_CLOUD_QUESTION}
-                        showVoteCount={false}
-                        questionRevealStage="results"
-                        fillHeight
-                        cloudTagColors={TAG_CLOUD_COLORS}
-                        cloudTopTagColor={BRAND_ACCENT}
-                        cloudTagPadding={3}
-                        cloudAnimationStrength={visible ? 36 : 0}
-                        brandFontFamily={BRAND_DISPLAY_FONT}
-                      />
+                      <Suspense fallback={null}>
+                        <QuestionChart
+                          question={TAG_CLOUD_QUESTION}
+                          showVoteCount={false}
+                          questionRevealStage="results"
+                          fillHeight
+                          cloudTagColors={TAG_CLOUD_COLORS}
+                          cloudTopTagColor={BRAND_ACCENT}
+                          cloudTagPadding={3}
+                          cloudAnimationStrength={visible ? 36 : 0}
+                          brandFontFamily={BRAND_DISPLAY_FONT}
+                        />
+                      </Suspense>
                     </Box>
                   </ProjectorShell>
                 ) : null}
