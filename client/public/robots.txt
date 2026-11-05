@@ -1,0 +1,9 @@
+User-agent: *
+Allow: /
+Disallow: /admin
+Disallow: /q/
+Disallow: /p/
+Disallow: /s/
+Disallow: /report/
+
+Sitemap: https://ameyou.ru/sitemap.xml

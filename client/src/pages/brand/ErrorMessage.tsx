@@ -101,7 +101,7 @@ export function ErrorMessage({ code, title, description, actions }: ErrorMessage
               textTransform: "uppercase",
             }}
           >
-            Meyouquize
+            МИЮ
           </Box>
         </Stack>
       </Container>

@@ -5,6 +5,15 @@ import { BrowserRouter, Outlet, Route, Routes } from "react-router-dom";
 import { CssBaseline, ThemeProvider, createTheme } from "@mui/material";
 import "./styles/jost-local.css";
 import "./styles/roboto-local.css";
+import "@fontsource/manrope/400.css";
+import "@fontsource/manrope/500.css";
+import "@fontsource/manrope/600.css";
+import "@fontsource/manrope/700.css";
+import "@fontsource/manrope/800.css";
+import "@fontsource/unbounded/500.css";
+import "@fontsource/unbounded/600.css";
+import "@fontsource/unbounded/700.css";
+import "@fontsource/unbounded/800.css";
 import { QuizPlayPage } from "./pages/QuizPlayPage";
 import { ResultsPage } from "./pages/ResultsPage";
 import { AdminRoomsPage } from "./pages/AdminRoomsPage";
@@ -17,6 +26,7 @@ import { AdminSubQuizResultsPage } from "./pages/AdminSubQuizResultsPage";
 import { AdminUsersPage } from "./pages/AdminUsersPage";
 import { PublicReportPage } from "./pages/PublicReportPage";
 import { LandingPage } from "./pages/LandingPage";
+import { LandingCookiesPage, LandingPrivacyPage } from "./pages/landing/LandingLegalPage";
 import { SpeakerModeratorPage } from "./pages/SpeakerModeratorPage";
 import { NotFoundPage } from "./pages/NotFoundPage";
 import { ForbiddenPage } from "./pages/ForbiddenPage";
@@ -121,6 +131,8 @@ function App() {
     <BrowserRouter>
       <Routes>
         <Route path="/" element={<LandingPage />} />
+        <Route path="/privacy" element={<LandingPrivacyPage />} />
+        <Route path="/cookies" element={<LandingCookiesPage />} />
         <Route element={<PurpleAppShell />}>
           <Route path="/q/:slug" element={<QuizPlayPage />} />
           <Route path="/q/:slug/results" element={<ResultsPage />} />

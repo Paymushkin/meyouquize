@@ -1,182 +1,59 @@
 import ArrowForwardIcon from "@mui/icons-material/ArrowForward";
-import { Box, Button, Container, Stack, Typography } from "@mui/material";
-import { alpha, keyframes } from "@mui/material/styles";
-import type { ReactNode } from "react";
-import { HeroSmartphoneIcon, HeroVideoCameraIcon } from "./HeroFeatureCardIcons";
+import { Box, Button, Stack, Typography } from "@mui/material";
+import { keyframes } from "@mui/material/styles";
 import {
   BRAND_ACCENT,
-  BRAND_BORDER,
   BRAND_HEADER_OVER_HERO_HEIGHT_PX,
-  BRAND_SURFACE_BORDER_RADIUS,
   BRAND_TEXT_MUTED,
+  BRAND_DISPLAY_FONT,
 } from "../../theme/brandTheme";
+import { useLandingContact } from "./LandingContactDialog";
+import { LANDING_CANVAS_MAX_WIDTH, lt } from "./landingConstants";
 
-const HERO_CANVAS_MAX_WIDTH = 1440;
-
-const HERO_REQUEST_MAILTO =
-  "mailto:hello@meyouquize.ru?subject=" + encodeURIComponent("Обсудить мероприятие");
-
-const heroCardGradientFlow = keyframes`
-  0%, 100% {
-    transform: translate(0%, 0%) scale(1);
-    opacity: 0.88;
-  }
-  50% {
-    transform: translate(-4%, 3%) scale(1.08);
-    opacity: 1;
-  }
+const heroKenBurns = keyframes`
+  0% { transform: scale(1.03) translate3d(0, 0, 0); }
+  100% { transform: scale(1.07) translate3d(0.8%, 0.4%, 0); }
 `;
 
-const heroCardGradientHover = keyframes`
-  0%, 100% {
-    transform: translate(0%, 0%) scale(1.05);
-    opacity: 0.95;
-  }
-  33% {
-    transform: translate(-6%, 4%) scale(1.12);
-    opacity: 1;
-  }
-  66% {
-    transform: translate(4%, -3%) scale(1.08);
-    opacity: 0.98;
-  }
+const heroFrameIn = keyframes`
+  from { opacity: 0; }
+  to { opacity: 1; }
 `;
 
-type HeroFeatureCardProps = {
-  number: string;
-  title: string;
-  description: string;
-  href: string;
-  icon: ReactNode;
-  highlighted?: boolean;
-};
+const heroZhivymAccent = keyframes`
+  from { color: #fff; }
+  to { color: ${BRAND_ACCENT}; }
+`;
 
-function HeroFeatureCard(props: HeroFeatureCardProps) {
-  return (
-    <Box
-      component="a"
-      href={props.href}
-      sx={{
-        position: "relative",
-        flex: 1,
-        minWidth: 0,
-        display: "flex",
-        flexDirection: "row",
-        alignItems: "center",
-        gap: { xs: 2.5, md: 3 },
-        p: { xs: 3.5, md: 4.5 },
-        borderRadius: `${BRAND_SURFACE_BORDER_RADIUS}px`,
-        border: `1px solid ${props.highlighted ? alpha(BRAND_ACCENT, 0.22) : BRAND_BORDER}`,
-        bgcolor: alpha("#0a0a0a", 0.78),
-        backdropFilter: "blur(12px)",
-        textDecoration: "none",
-        color: "inherit",
-        transition: "border-color 220ms ease, transform 220ms ease, box-shadow 220ms ease",
-        overflow: "hidden",
-        "&:hover": {
-          borderColor: alpha(BRAND_ACCENT, props.highlighted ? 0.55 : 0.45),
-          transform: "translateY(-2px)",
-          boxShadow: props.highlighted
-            ? `0 20px 56px ${alpha(BRAND_ACCENT, 0.24)}`
-            : "0 12px 32px rgba(0,0,0,0.35)",
-        },
-        ...(props.highlighted
-          ? {
-              bgcolor: alpha("#0a0a0a", 0.84),
-              "&::before": {
-                content: '""',
-                position: "absolute",
-                inset: 0,
-                borderRadius: "inherit",
-                background: `
-                  radial-gradient(ellipse 110% 130% at 92% 8%, ${alpha(BRAND_ACCENT, 0.46)} 0%, transparent 58%),
-                  radial-gradient(ellipse 80% 90% at 8% 92%, ${alpha(BRAND_ACCENT, 0.14)} 0%, transparent 52%),
-                  linear-gradient(145deg, ${alpha(BRAND_ACCENT, 0.16)} 0%, transparent 48%, ${alpha("#000", 0.35)} 100%)
-                `,
-                pointerEvents: "none",
-                animation: `${heroCardGradientFlow} 6s ease-in-out infinite`,
-                willChange: "transform, opacity",
-                transition: "opacity 220ms ease",
-              },
-              "&:hover::before": {
-                animation: `${heroCardGradientHover} 2.4s ease-in-out infinite`,
-                background: `
-                  radial-gradient(ellipse 115% 140% at 90% 4%, ${alpha(BRAND_ACCENT, 0.58)} 0%, transparent 56%),
-                  radial-gradient(ellipse 85% 95% at 6% 96%, ${alpha(BRAND_ACCENT, 0.2)} 0%, transparent 50%),
-                  linear-gradient(145deg, ${alpha(BRAND_ACCENT, 0.22)} 0%, transparent 42%, ${alpha("#000", 0.28)} 100%)
-                `,
-              },
-            }
-          : {}),
-      }}
-    >
-      <Box
-        sx={{
-          position: "relative",
-          zIndex: 1,
-          flexShrink: 0,
-          color: "text.primary",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          width: { xs: 40, md: 48 },
-        }}
-      >
-        {props.icon}
-      </Box>
+const heroStaggerIn = keyframes`
+  from { opacity: 0; transform: translateY(18px); }
+  to { opacity: 1; transform: translateY(0); }
+`;
 
-      <Box sx={{ position: "relative", zIndex: 1, flex: 1, minWidth: 0 }}>
-        <Typography
-          sx={{
-            color: BRAND_ACCENT,
-            fontWeight: 700,
-            fontSize: 13,
-            letterSpacing: "0.08em",
-            lineHeight: 1,
-            mb: 0.75,
-          }}
-        >
-          {props.number}
-        </Typography>
-        <Typography
-          sx={{
-            fontWeight: 700,
-            fontSize: { xs: "1.35rem", md: "1.65rem" },
-            lineHeight: 1.15,
-            mb: 0.75,
-          }}
-        >
-          {props.title}
-        </Typography>
-        <Typography variant="body2" sx={{ color: BRAND_TEXT_MUTED, lineHeight: 1.55 }}>
-          {props.description}
-        </Typography>
-      </Box>
+/** Пустой зал → заполнение → экран загорается (без UI сервиса) */
+const HERO_SEQ = [
+  { src: "/hero-seq-01.webp", delayMs: 0 },
+  { src: "/hero-seq-02.webp", delayMs: 450 },
+  { src: "/hero-seq-03.webp", delayMs: 1000 },
+  { src: "/hero-seq-04.webp", delayMs: 1600 },
+  { src: "/hero-seq-05.webp", delayMs: 2200 },
+] as const;
 
-      <Box
-        sx={{
-          position: "relative",
-          zIndex: 1,
-          flexShrink: 0,
-          width: 40,
-          height: 40,
-          borderRadius: "50%",
-          border: `1px solid ${BRAND_BORDER}`,
-          bgcolor: alpha("#000", 0.35),
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          color: "text.primary",
-        }}
-        aria-hidden
-      >
-        <ArrowForwardIcon sx={{ fontSize: 18 }} />
-      </Box>
-    </Box>
-  );
-}
+/** Crossfade укладывается в 3с вместе с последним кадром */
+const HERO_FRAME_FADE_MS = 800;
+const HERO_FRAME_EASE = "cubic-bezier(0.33, 0, 0.2, 1)";
+const HERO_SCREEN_ON_DELAY_MS = HERO_SEQ[HERO_SEQ.length - 1].delayMs;
+
+const heroBgLayerSx = {
+  position: "absolute",
+  inset: 0,
+  backgroundSize: "cover",
+  backgroundPosition: { xs: "55% center", md: "50% center" },
+} as const;
 
 export function LandingHeroSection() {
+  const { openContact } = useLandingContact();
+
   return (
     <Box
       component="section"
@@ -187,134 +64,238 @@ export function LandingHeroSection() {
         flexDirection: "column",
         alignItems: "center",
         bgcolor: "#000",
+        minHeight: { xs: "100svh", md: "100vh" },
+        overflow: "hidden",
       }}
     >
       <Box
+        aria-hidden
         sx={{
-          position: "relative",
+          position: "absolute",
+          inset: 0,
           overflow: "hidden",
-          width: "100%",
-          maxWidth: HERO_CANVAS_MAX_WIDTH,
-          minHeight: { xs: "auto", md: "min(920px, 92vh)" },
-          display: "flex",
-          flexDirection: "column",
+          transform: "scale(1.03)",
+          animation: `${heroKenBurns} 32s ease-in-out infinite alternate`,
+          willChange: "transform",
+          "@media (prefers-reduced-motion: reduce)": {
+            animation: "none",
+          },
         }}
       >
-        <Box
-          aria-hidden
-          sx={{
-            position: "absolute",
-            inset: 0,
-            backgroundImage: "url('/hero-bg.png')",
-            backgroundSize: "cover",
-            backgroundPosition: "center top",
-            transform: "scale(1.02)",
-          }}
-        />
-        <Box
-          aria-hidden
-          sx={{
-            position: "absolute",
-            inset: 0,
-            background: `
-              linear-gradient(90deg, rgba(0,0,0,0.88) 0%, rgba(0,0,0,0.72) 42%, rgba(0,0,0,0.28) 68%, rgba(0,0,0,0.12) 100%),
-              linear-gradient(180deg, rgba(0,0,0,0.35) 0%, rgba(0,0,0,0.08) 45%, rgba(0,0,0,0.82) 100%)
+        {HERO_SEQ.map((frame, index) => {
+          const isBase = index === 0;
+          const isLast = index === HERO_SEQ.length - 1;
+          return (
+            <Box
+              key={frame.src}
+              sx={{
+                ...heroBgLayerSx,
+                backgroundImage: `url('${frame.src}')`,
+                opacity: isBase ? 1 : 0,
+                "@media (prefers-reduced-motion: no-preference)": {
+                  ...(!isBase
+                    ? {
+                        animation: `${heroFrameIn} ${HERO_FRAME_FADE_MS}ms ${HERO_FRAME_EASE} ${frame.delayMs}ms both`,
+                      }
+                    : null),
+                },
+                "@media (prefers-reduced-motion: reduce)": {
+                  opacity: isLast ? 1 : 0,
+                  animation: "none",
+                },
+              }}
+            />
+          );
+        })}
+      </Box>
+      <Box
+        aria-hidden
+        sx={{
+          position: "absolute",
+          inset: 0,
+          pointerEvents: "none",
+          zIndex: 1,
+          background: {
+            xs: `
+              radial-gradient(ellipse 78% 72% at 55% 48%, transparent 28%, rgba(0,0,0,0.55) 68%, #000 100%),
+              linear-gradient(90deg, #000 0%, rgba(0,0,0,0.72) 28%, transparent 52%, rgba(0,0,0,0.35) 88%, #000 100%),
+              linear-gradient(180deg, #000 0%, transparent 22%, transparent 58%, #000 100%)
             `,
-          }}
-        />
+            md: `
+              radial-gradient(ellipse 70% 68% at 52% 46%, transparent 32%, rgba(0,0,0,0.45) 66%, #000 100%),
+              linear-gradient(90deg, #000 0%, rgba(0,0,0,0.78) 22%, rgba(0,0,0,0.2) 48%, transparent 62%, rgba(0,0,0,0.4) 90%, #000 100%),
+              linear-gradient(180deg, #000 0%, transparent 18%, transparent 55%, rgba(0,0,0,0.75) 88%, #000 100%)
+            `,
+          },
+        }}
+      />
 
-        <Container
-          maxWidth="lg"
+      <Box
+        sx={{
+          position: "relative",
+          zIndex: 2,
+          width: "100%",
+          maxWidth: LANDING_CANVAS_MAX_WIDTH,
+          flex: 1,
+          display: "flex",
+          flexDirection: "column",
+          justifyContent: "flex-end",
+          minHeight: { xs: "100svh", md: "min(920px, 100vh)" },
+          pt: {
+            xs: `${BRAND_HEADER_OVER_HERO_HEIGHT_PX + 28}px`,
+            md: `${BRAND_HEADER_OVER_HERO_HEIGHT_PX + 40}px`,
+          },
+          pb: { xs: 5, md: 7 },
+          px: { xs: 2, sm: 3, md: 4 },
+        }}
+      >
+        <Stack
+          spacing={0}
           sx={{
-            position: "relative",
-            zIndex: 1,
-            flex: 1,
-            display: "flex",
-            flexDirection: "column",
-            pt: {
-              xs: `${BRAND_HEADER_OVER_HERO_HEIGHT_PX + 16}px`,
-              md: `${BRAND_HEADER_OVER_HERO_HEIGHT_PX + 24}px`,
+            width: "100%",
+            "@media (prefers-reduced-motion: no-preference)": {
+              "& > *:nth-of-type(1)": {
+                animation: `${heroStaggerIn} 800ms cubic-bezier(0.22, 1, 0.36, 1) both`,
+                animationDelay: "80ms",
+              },
+              "& > *:nth-of-type(2)": {
+                animation: `${heroStaggerIn} 800ms cubic-bezier(0.22, 1, 0.36, 1) both`,
+                animationDelay: "200ms",
+              },
+              "& > *:nth-of-type(3)": {
+                animation: `${heroStaggerIn} 800ms cubic-bezier(0.22, 1, 0.36, 1) both`,
+                animationDelay: "320ms",
+              },
             },
-            pb: { xs: 4, md: 5 },
           }}
         >
-          <Box sx={{ flex: 1, display: "flex", alignItems: "center" }}>
-            <Stack
-              spacing={{ xs: 2.5, md: 3.5 }}
-              sx={{ maxWidth: 620, position: "relative", zIndex: 2 }}
-            >
-              <Typography
-                component="h1"
-                sx={{
-                  fontWeight: 800,
-                  letterSpacing: "-0.03em",
-                  lineHeight: 1.05,
-                  fontSize: { xs: "2.85rem", sm: "3.75rem", md: "5rem" },
-                }}
-              >
-                <Box component="span" sx={{ display: "block" }}>
-                  Делаем
-                </Box>
-                <Box component="span" sx={{ display: "block" }}>
-                  мероприятие
-                </Box>
-                <Box component="span" sx={{ display: "block", color: BRAND_ACCENT }}>
-                  ЖИВЫМ
-                </Box>
-              </Typography>
-              <Typography
-                sx={{
-                  color: BRAND_TEXT_MUTED,
-                  fontSize: { xs: "1rem", md: "1.125rem" },
-                  lineHeight: 1.6,
-                  maxWidth: 520,
-                }}
-              >
-                Интерактивы для всего зала и контент с участниками — под вашим брендом и с нашей
-                командой на площадке.
-              </Typography>
-              <Box>
-                <Button
-                  component="a"
-                  href={HERO_REQUEST_MAILTO}
-                  variant="contained"
-                  color="primary"
-                  size="large"
-                  endIcon={<ArrowForwardIcon />}
-                  sx={{
-                    px: 3.5,
-                    py: 1.35,
-                    fontSize: { xs: "0.95rem", md: "1rem" },
-                  }}
-                >
-                  Обсудить мероприятие
-                </Button>
-              </Box>
-            </Stack>
-          </Box>
-
-          <Stack
-            direction={{ xs: "column", md: "row" }}
-            spacing={2}
-            sx={{ mt: "auto", position: "relative", zIndex: 2 }}
+          <Typography
+            component="h1"
+            sx={{
+              fontFamily: BRAND_DISPLAY_FONT,
+              fontWeight: 800,
+              letterSpacing: { xs: "0.04em", sm: "0.08em" },
+              lineHeight: 1.05,
+              fontSize: {
+                xs: "clamp(1.35rem, 7vw, 2rem)",
+                sm: "clamp(2.2rem, 5.5vw, 3rem)",
+                md: "clamp(2.8rem, 4.6vw, 4.25rem)",
+              },
+              textTransform: "uppercase",
+              width: "100%",
+            }}
           >
-            <HeroFeatureCard
-              number="01"
-              title="Интерактивы"
-              description="Квизы, голосования, вопросы спикерам, реакции и розыгрыши."
-              href="#demo"
-              icon={<HeroSmartphoneIcon />}
-              highlighted
-            />
-            <HeroFeatureCard
-              number="02"
-              title="Флеш-интервью"
-              description="Короткие интервью с гостями. Брендированные ролики сразу после съёмки."
-              href={HERO_REQUEST_MAILTO}
-              icon={<HeroVideoCameraIcon />}
-            />
+            <Box
+              component="span"
+              sx={{ display: "block", whiteSpace: { xs: "normal", sm: "nowrap" } }}
+            >
+              Делаем мероприятие
+            </Box>
+            <Box
+              component="span"
+              sx={{
+                display: "block",
+                color: "#fff",
+                textAlign: { xs: "left", sm: "right" },
+                whiteSpace: { xs: "normal", sm: "nowrap" },
+                "@media (prefers-reduced-motion: no-preference)": {
+                  animation: `${heroZhivymAccent} ${HERO_FRAME_FADE_MS}ms ${HERO_FRAME_EASE} ${HERO_SCREEN_ON_DELAY_MS}ms both`,
+                },
+                "@media (prefers-reduced-motion: reduce)": {
+                  color: BRAND_ACCENT,
+                },
+              }}
+            >
+              живым
+            </Box>
+          </Typography>
+          {/* Обёртка принимает stagger-анимацию (она перетирает transform),
+                подъём на уровень «ЖИВЫМ» — на внутреннем Typography */}
+          <Box
+            sx={{
+              mt: { xs: 1.5, md: 1.5 },
+              mb: { xs: 2.5, md: 3 },
+            }}
+          >
+            <Typography
+              sx={{
+                color: BRAND_TEXT_MUTED,
+                fontSize: { xs: "1.02rem", md: "1.125rem" },
+                lineHeight: 1.4,
+                maxWidth: { xs: "92vw", sm: "36rem", md: "38rem" },
+                // На sm+ чуть ниже уровня «ЖИВЫМ»; на xs без подъёма
+                transform: {
+                  xs: "none",
+                  sm: "translateY(calc(-1 * (clamp(2.2rem, 5.5vw, 3rem) * 1.05 + 12px) + 18px))",
+                  md: "translateY(calc(-1 * (clamp(2.8rem, 4.6vw, 4.25rem) * 1.05 + 12px) + 22px))",
+                },
+              }}
+            >
+              {lt("Интерактивы для всего зала и контент с гостями -")}
+              <br />
+              {lt("под вашим брендом и с нашей командой на площадке.")}
+            </Typography>
+          </Box>
+          <Stack
+            direction={{ xs: "column", sm: "row" }}
+            spacing={1.5}
+            useFlexGap
+            sx={{
+              width: "100%",
+              maxWidth: "100%",
+              justifyContent: { xs: "stretch", sm: "flex-end" },
+              alignItems: { xs: "stretch", sm: "center" },
+            }}
+          >
+            <Button
+              type="button"
+              onClick={openContact}
+              variant="contained"
+              color="primary"
+              size="large"
+              endIcon={<ArrowForwardIcon />}
+              sx={{
+                width: { xs: "100%", sm: "auto" },
+                whiteSpace: "nowrap",
+                borderRadius: 0,
+                px: { xs: 2.5, md: 3.75 },
+                py: { xs: 1.35, md: 1.65 },
+                fontSize: { xs: "0.98rem", md: "1.125rem" },
+                fontWeight: 700,
+                lineHeight: 1.2,
+                transition: "transform 220ms ease, box-shadow 220ms ease",
+                "&:hover": { transform: "translateY(-1px)" },
+              }}
+            >
+              Обсудить мероприятие
+            </Button>
+            <Button
+              component="a"
+              href="#proof"
+              variant="outlined"
+              color="secondary"
+              size="large"
+              sx={{
+                width: { xs: "100%", sm: "auto" },
+                whiteSpace: "nowrap",
+                borderRadius: 0,
+                px: { xs: 2.5, md: 3.75 },
+                py: { xs: 1.35, md: 1.65 },
+                fontSize: { xs: "0.98rem", md: "1.125rem" },
+                fontWeight: 700,
+                lineHeight: 1.2,
+                borderColor: "rgba(255,255,255,0.45)",
+                color: "#fff",
+                "&:hover": {
+                  borderColor: "#fff",
+                  bgcolor: "rgba(255,255,255,0.06)",
+                },
+              }}
+            >
+              Смотреть возможности
+            </Button>
           </Stack>
-        </Container>
+        </Stack>
       </Box>
     </Box>
   );

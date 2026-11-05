@@ -278,16 +278,18 @@ export function QuestionChart(props: QuestionChartProps) {
     const max = Math.max(...sourceWords.map((item) => item.count));
     const wordCount = sourceWords.length;
     const sparseBoost = Math.max(1, Math.min(1.55, 1.55 - wordCount * 0.055));
+    // На узких контейнерах (лендинг/мобилка) уменьшаем кегль относительно эталона проектора
+    const sizeScale = Math.min(1, Math.max(0.28, cloudSize.width / 780));
     const fontSize = (count: number, text: string) => {
       const tLinear = max === min ? 1 : (count - min) / (max - min);
       const t = Math.pow(Math.max(0, Math.min(1, tLinear)), 0.72);
-      const base = max === min ? 44 : 16 + t * 30;
+      const base = (max === min ? 44 : 16 + t * 30) * sizeScale;
       const lengthPenalty = Math.max(0.68, 1 - Math.max(0, text.length - 10) * 0.018);
-      return Math.round(base * sparseBoost * lengthPenalty);
+      return Math.max(8, Math.round(base * sparseBoost * lengthPenalty));
     };
 
-    const layoutW = Math.max(320, cloudSize.width - 40);
-    const layoutH = Math.max(260, cloudSize.height - 40);
+    const layoutW = Math.max(120, cloudSize.width - 16);
+    const layoutH = Math.max(120, cloudSize.height - 16);
     const layout = cloud<ProjectorLayoutWord>()
       .size([layoutW, layoutH])
       .words(

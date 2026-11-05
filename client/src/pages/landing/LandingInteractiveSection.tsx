@@ -18,7 +18,7 @@ import {
 const INTERACTIVE_CANVAS_MAX_WIDTH = 1440;
 
 const INTERACTIVE_DETAILS_MAILTO =
-  "mailto:hello@meyouquize.ru?subject=" + encodeURIComponent("Узнать подробнее об интерактивах");
+  "mailto:a.xeva.a@yandex.ru?subject=" + encodeURIComponent("Узнать подробнее об интерактивах");
 
 const INTERACTIVE_FEATURES = [
   {

@@ -1,6 +1,12 @@
-import { Box, Button, Container, Stack, Typography } from "@mui/material";
+import { useState } from "react";
+import CloseRoundedIcon from "@mui/icons-material/CloseRounded";
+import MenuRoundedIcon from "@mui/icons-material/MenuRounded";
+import { Box, Button, Container, Drawer, IconButton, Stack, Typography } from "@mui/material";
 import { Link as RouterLink } from "react-router-dom";
+import { alpha } from "@mui/material/styles";
 import { BRAND_ACCENT, BRAND_BORDER } from "../../theme/brandTheme";
+import { useLandingContact } from "../landing/LandingContactDialog";
+import { LANDING_CONTAINER_SX, lt } from "../landing/landingConstants";
 
 interface BrandHeaderProps {
   showDemoButton?: boolean;
@@ -10,44 +16,29 @@ interface BrandHeaderProps {
 }
 
 const LANDING_NAV = [
-  { label: "Решения", href: "#demo" },
-  { label: "Кейсы", href: "#request" },
-  { label: "Как это работает", href: "#demo" },
-  { label: "FAQ", href: "#request" },
+  { label: lt("Возможности"), href: "#proof" },
+  { label: lt("Как это работает"), href: "#how" },
+  { label: lt("На площадке"), href: "#onsite" },
+  { label: lt("Интервью"), href: "#flash" },
+  { label: lt("Для кого"), href: "#scenarios" },
+  { label: lt("Отзывы"), href: "#cases" },
+  { label: "FAQ", href: "#faq" },
 ] as const;
 
-const BRAND_WORDMARK_LOGO_SIZE_PX = 36;
+const BRAND_LOGO_SIZE_PX = 52;
 
 function BrandWordmark() {
   return (
-    <Stack direction="row" alignItems="center" spacing={1.25}>
-      <Box
-        component="img"
-        src="/logo.svg"
-        alt=""
-        sx={{
-          width: BRAND_WORDMARK_LOGO_SIZE_PX,
-          height: BRAND_WORDMARK_LOGO_SIZE_PX,
-          display: "block",
-        }}
-      />
-      <Typography
-        component="span"
-        sx={{
-          fontWeight: 700,
-          fontSize: BRAND_WORDMARK_LOGO_SIZE_PX,
-          letterSpacing: "-0.02em",
-          lineHeight: 1,
-        }}
-      >
-        <Box component="span" sx={{ color: "text.primary" }}>
-          МИ
-        </Box>
-        <Box component="span" sx={{ color: BRAND_ACCENT }}>
-          Ю
-        </Box>
-      </Typography>
-    </Stack>
+    <Box
+      component="img"
+      src="/logo.svg"
+      alt="МИЮ"
+      sx={{
+        width: BRAND_LOGO_SIZE_PX,
+        height: BRAND_LOGO_SIZE_PX,
+        display: "block",
+      }}
+    />
   );
 }
 
@@ -56,6 +47,11 @@ export function BrandHeader({
   showAdminButton = true,
   overHero = false,
 }: BrandHeaderProps) {
+  const { openContact } = useLandingContact();
+  const [menuOpen, setMenuOpen] = useState(false);
+
+  const closeMenu = () => setMenuOpen(false);
+
   return (
     <Box
       component="header"
@@ -79,13 +75,18 @@ export function BrandHeader({
             }),
       }}
     >
-      <Container maxWidth="lg">
+      <Container maxWidth={false} sx={LANDING_CONTAINER_SX}>
         <Stack
           direction="row"
           alignItems="center"
           justifyContent="space-between"
-          spacing={2}
-          sx={{ py: 1.5 }}
+          spacing={1.5}
+          sx={{
+            width: "100%",
+            py: 1.5,
+            pt: { xs: "calc(12px + env(safe-area-inset-top, 0px))", sm: 1.5 },
+            minWidth: 0,
+          }}
         >
           <Stack
             component={RouterLink}
@@ -95,6 +96,7 @@ export function BrandHeader({
             sx={{
               textDecoration: "none",
               color: "text.primary",
+              flexShrink: 0,
               "&:hover": { opacity: 0.85 },
             }}
           >
@@ -103,15 +105,19 @@ export function BrandHeader({
 
           <Stack
             direction="row"
-            spacing={{ xs: 1, md: 2.5 }}
+            spacing={{ xs: 0.75, md: 1.5, xl: 2.5 }}
             alignItems="center"
-            sx={{ flexShrink: 0 }}
+            sx={{ minWidth: 0, flexShrink: 1 }}
           >
             <Stack
               direction="row"
-              spacing={{ md: 2.5 }}
+              spacing={{ lg: 1.75, xl: 2.5 }}
               alignItems="center"
-              sx={{ display: { xs: "none", lg: "flex" } }}
+              sx={{
+                display: { xs: "none", lg: "flex" },
+                minWidth: 0,
+                overflow: "hidden",
+              }}
             >
               {LANDING_NAV.map((item) => (
                 <Typography
@@ -120,7 +126,7 @@ export function BrandHeader({
                   href={item.href}
                   sx={{
                     color: "rgba(255,255,255,0.82)",
-                    fontSize: 14,
+                    fontSize: { lg: 13, xl: 14 },
                     fontWeight: 500,
                     textDecoration: "none",
                     whiteSpace: "nowrap",
@@ -134,29 +140,126 @@ export function BrandHeader({
 
             {showDemoButton ? (
               <Button
-                component="a"
-                href="#demo"
+                component={RouterLink}
+                to="/q/demo"
                 variant="text"
                 color="inherit"
-                sx={{ display: { xs: "none", sm: "inline-flex" } }}
+                sx={{ display: { xs: "none", sm: "inline-flex" }, flexShrink: 0 }}
               >
-                Демо
+                {lt("Демо")}
               </Button>
             ) : null}
             {showAdminButton ? (
               <Button
-                component="a"
-                href="#request"
+                type="button"
+                onClick={openContact}
                 variant="contained"
                 color="primary"
                 size="medium"
+                sx={{
+                  display: { xs: "none", lg: "inline-flex" },
+                  borderRadius: 0,
+                  flexShrink: 0,
+                  px: 2,
+                  minWidth: 0,
+                  fontSize: 14,
+                }}
               >
-                Оставить заявку
+                {lt("Обсудить")}
+              </Button>
+            ) : null}
+
+            <IconButton
+              aria-label={lt("Открыть меню")}
+              onClick={() => setMenuOpen(true)}
+              sx={{
+                display: { xs: "inline-flex", lg: "none" },
+                color: "#fff",
+                border: `1px solid ${BRAND_BORDER}`,
+                borderRadius: 1.5,
+              }}
+            >
+              <MenuRoundedIcon />
+            </IconButton>
+          </Stack>
+        </Stack>
+      </Container>
+
+      <Drawer
+        anchor="right"
+        open={menuOpen}
+        onClose={closeMenu}
+        PaperProps={{
+          sx: {
+            width: "min(100%, 320px)",
+            bgcolor: "#0a0a0a",
+            color: "#fff",
+            borderLeft: `1px solid ${BRAND_BORDER}`,
+            backgroundImage: "none",
+          },
+        }}
+      >
+        <Stack spacing={1} sx={{ p: 2, height: "100%" }}>
+          <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 1 }}>
+            <Typography sx={{ fontWeight: 700 }}>{lt("Меню")}</Typography>
+            <IconButton aria-label={lt("Закрыть меню")} onClick={closeMenu} sx={{ color: "#fff" }}>
+              <CloseRoundedIcon />
+            </IconButton>
+          </Stack>
+
+          {LANDING_NAV.map((item) => (
+            <Box
+              key={item.label}
+              component="a"
+              href={item.href}
+              onClick={closeMenu}
+              sx={{
+                px: 1.5,
+                py: 1.25,
+                textDecoration: "none",
+                color: alpha("#fff", 0.9),
+                fontWeight: 600,
+                borderBottom: `1px solid ${BRAND_BORDER}`,
+                "&:hover": { color: BRAND_ACCENT },
+              }}
+            >
+              {item.label}
+            </Box>
+          ))}
+
+          <Stack spacing={1.25} sx={{ mt: "auto", pt: 2 }}>
+            {showDemoButton ? (
+              <Button
+                component={RouterLink}
+                to="/q/demo"
+                variant="outlined"
+                color="secondary"
+                onClick={closeMenu}
+                sx={{
+                  borderColor: "rgba(255,255,255,0.35)",
+                  color: "#fff",
+                  "&:hover": { borderColor: "#fff", bgcolor: alpha("#fff", 0.06) },
+                }}
+              >
+                {lt("Демо")}
+              </Button>
+            ) : null}
+            {showAdminButton ? (
+              <Button
+                type="button"
+                variant="contained"
+                color="primary"
+                onClick={() => {
+                  closeMenu();
+                  openContact();
+                }}
+              >
+                {lt("Обсудить")}
               </Button>
             ) : null}
           </Stack>
         </Stack>
-      </Container>
+      </Drawer>
     </Box>
   );
 }

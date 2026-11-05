@@ -8,8 +8,10 @@ export const BRAND_SURFACE = "rgba(255,255,255,0.04)";
 export const BRAND_BORDER = "rgba(255,255,255,0.12)";
 export const BRAND_BUTTON_BORDER_RADIUS = 10;
 export const BRAND_SURFACE_BORDER_RADIUS = 12;
+/** Display / headlines — креативный гротеск с кириллицей */
+export const BRAND_DISPLAY_FONT = '"Unbounded", "Manrope", sans-serif';
 /** Высота шапки поверх hero: py 1.5 × 2 + логотип */
-export const BRAND_HEADER_OVER_HERO_HEIGHT_PX = 60;
+export const BRAND_HEADER_OVER_HERO_HEIGHT_PX = 76;
 
 export const brandTheme = createTheme({
   palette: {
@@ -34,11 +36,23 @@ export const brandTheme = createTheme({
   },
   shape: { borderRadius: 16 },
   typography: {
-    fontFamily: 'Roboto, "Helvetica Neue", Arial, sans-serif',
-    h1: { fontWeight: 800, letterSpacing: "-0.02em" },
-    h2: { fontWeight: 800, letterSpacing: "-0.02em" },
-    h3: { fontWeight: 700, letterSpacing: "-0.015em" },
-    h4: { fontWeight: 700 },
+    fontFamily: '"Manrope", "Helvetica Neue", sans-serif',
+    h1: {
+      fontFamily: BRAND_DISPLAY_FONT,
+      fontWeight: 800,
+      letterSpacing: "-0.02em",
+    },
+    h2: {
+      fontFamily: BRAND_DISPLAY_FONT,
+      fontWeight: 800,
+      letterSpacing: "-0.02em",
+    },
+    h3: {
+      fontFamily: BRAND_DISPLAY_FONT,
+      fontWeight: 700,
+      letterSpacing: "-0.015em",
+    },
+    h4: { fontFamily: BRAND_DISPLAY_FONT, fontWeight: 700 },
     button: { textTransform: "none", fontWeight: 600 },
   },
   components: {

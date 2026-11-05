@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import { Box, CssBaseline, ThemeProvider } from "@mui/material";
 import { brandTheme } from "../../theme/brandTheme";
 import { useBodyBrandBackground } from "../../hooks/useBodyBrandBackground";
+import { LandingContactProvider } from "../landing/LandingContactDialog";
 
 interface BrandPageLayoutProps {
   children: React.ReactNode;
@@ -22,18 +23,23 @@ export function BrandPageLayout({ children, documentTitle }: BrandPageLayoutProp
   return (
     <ThemeProvider theme={brandTheme}>
       <CssBaseline />
-      <Box
-        sx={{
-          minHeight: "100vh",
-          bgcolor: "background.default",
-          color: "text.primary",
-          fontFamily: "Roboto, sans-serif",
-          display: "flex",
-          flexDirection: "column",
-        }}
-      >
-        {children}
-      </Box>
+      <LandingContactProvider>
+        <Box
+          sx={{
+            minHeight: "100vh",
+            width: "100%",
+            maxWidth: "100%",
+            overflowX: "hidden",
+            bgcolor: "background.default",
+            color: "text.primary",
+            fontFamily: '"Manrope", "Helvetica Neue", sans-serif',
+            display: "flex",
+            flexDirection: "column",
+          }}
+        >
+          {children}
+        </Box>
+      </LandingContactProvider>
     </ThemeProvider>
   );
 }
