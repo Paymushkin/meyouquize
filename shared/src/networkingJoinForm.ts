@@ -8,6 +8,8 @@ export type NetworkingJoinFormFields = {
   seeking: boolean;
   phone: boolean;
   email: boolean;
+  /** Режим pharma: обязательность «Должность» (поле всегда на форме). */
+  jobTitleRequired: boolean;
   companyRequired: boolean;
   offersRequired: boolean;
   seekingRequired: boolean;
@@ -21,6 +23,7 @@ export const DEFAULT_NETWORKING_JOIN_FORM_FIELDS: NetworkingJoinFormFields = {
   seeking: true,
   phone: false,
   email: false,
+  jobTitleRequired: false,
   companyRequired: false,
   offersRequired: false,
   seekingRequired: false,
@@ -130,6 +133,7 @@ export function normalizeNetworkingJoinFormFields(raw: unknown): NetworkingJoinF
     seeking,
     phone,
     email,
+    jobTitleRequired: readFieldFlag(src, "jobTitleRequired"),
     companyRequired: company && readFieldFlag(src, "companyRequired"),
     offersRequired: offers && readFieldFlag(src, "offersRequired"),
     seekingRequired: seeking && readFieldFlag(src, "seekingRequired"),
@@ -151,6 +155,7 @@ export type NetworkingProfileTextFields = {
 
 export type NetworkingJoinFieldVisibility = {
   showJobTitle: boolean;
+  jobTitleRequired: boolean;
   showCompany: boolean;
   /** «Компания» | «Номер аптеки» */
   companyLabel: string;
@@ -191,9 +196,10 @@ export function getNetworkingJoinFieldVisibility(
   if (mode === "pharma") {
     return {
       showJobTitle: true,
+      jobTitleRequired: normalizedFields.jobTitleRequired,
       showCompany: true,
       companyLabel: "Номер аптеки",
-      companyRequired: false,
+      companyRequired: normalizedFields.companyRequired,
       showOffers: false,
       offersRequired: false,
       showSeeking: false,
@@ -208,6 +214,7 @@ export function getNetworkingJoinFieldVisibility(
   if (mode === "networking") {
     return {
       showJobTitle: false,
+      jobTitleRequired: false,
       showCompany: normalizedFields.company,
       companyLabel: "Компания",
       companyRequired: normalizedFields.companyRequired,
@@ -227,6 +234,7 @@ export function getNetworkingJoinFieldVisibility(
   }
   return {
     showJobTitle: false,
+    jobTitleRequired: false,
     showCompany: false,
     companyLabel: "Компания",
     companyRequired: false,
@@ -281,8 +289,11 @@ export function validateNetworkingJoinDraft(
   values: NetworkingProfileTextFields,
 ): string | null {
   if (!values.fullName.trim()) return "Укажите ФИО";
-  if (mode !== "networking") return null;
+  if (mode === "interactive") return null;
   const visibility = getNetworkingJoinFieldVisibility(mode, fields);
+  if (visibility.showJobTitle && visibility.jobTitleRequired && !values.jobTitle.trim()) {
+    return "Укажите должность";
+  }
   if (visibility.showCompany && visibility.companyRequired && !values.company.trim()) {
     return `Укажите ${visibility.companyLabel}`;
   }

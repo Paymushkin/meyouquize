@@ -364,6 +364,17 @@ export const joinQuizSchema = z.object({
 export const updateNicknameSchema = z.object({
   quizId: z.string().min(1),
   nickname: z.string().min(1).max(40),
+  fullName: z.string().max(120).optional(),
+  jobTitle: z.string().max(120).optional(),
+  company: z.string().max(120).optional(),
+  offers: z.string().max(500).optional(),
+  seeking: z.string().max(500).optional(),
+  phone: z.string().max(40).optional(),
+  email: z.string().max(120).optional(),
+});
+
+export const getParticipantProfileSchema = z.object({
+  quizId: z.string().min(1),
 });
 
 export const submitAnswerSchema = z.object({
@@ -589,6 +600,7 @@ export const setPublicViewSchema = z.object({
       seeking: z.boolean(),
       phone: z.boolean(),
       email: z.boolean(),
+      jobTitleRequired: z.boolean().optional(),
       companyRequired: z.boolean(),
       offersRequired: z.boolean(),
       seekingRequired: z.boolean(),

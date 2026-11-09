@@ -1074,7 +1074,11 @@ export function JoinNetworkingCard(props: JoinNetworkingCardProps) {
             <OutlinedInput
               value={values.jobTitle}
               onChange={(e) => onChange({ jobTitle: e.target.value })}
-              placeholder="Должность"
+              placeholder={networkingJoinFieldPlaceholder(
+                "Должность",
+                undefined,
+                visibility.jobTitleRequired,
+              )}
               fullWidth
               sx={fieldSx}
             />

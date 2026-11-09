@@ -225,6 +225,112 @@ export function AdminJoinAuthSection(props: Props) {
             </>
           ) : null}
 
+          {networkingJoinFormMode === "pharma" ? (
+            <>
+              <Divider />
+              <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
+                Обязательность полей
+              </Typography>
+              <Typography variant="caption" color="text.secondary">
+                ФИО всегда обязательно. Должность и номер аптеки можно сделать обязательными.
+              </Typography>
+              <Stack spacing={1.25}>
+                <Box
+                  sx={{
+                    border: "1px solid",
+                    borderColor: "divider",
+                    borderRadius: 1.5,
+                    px: 1.5,
+                    py: 1.25,
+                  }}
+                >
+                  <Stack
+                    direction={{ xs: "column", sm: "row" }}
+                    spacing={1}
+                    alignItems={{ xs: "stretch", sm: "center" }}
+                    justifyContent="space-between"
+                  >
+                    <Box sx={{ minWidth: 0, flex: 1 }}>
+                      <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                        ФИО
+                      </Typography>
+                      <Typography variant="caption" color="text.secondary">
+                        Всегда на форме и всегда обязательно
+                      </Typography>
+                    </Box>
+                    <FormControlLabel
+                      sx={{ m: 0 }}
+                      disabled
+                      control={<Switch size="small" checked />}
+                      label="Обяз."
+                    />
+                  </Stack>
+                </Box>
+                {(
+                  [
+                    {
+                      key: "jobTitleRequired" as const,
+                      title: "Должность",
+                      hint: "Поле всегда на форме",
+                    },
+                    {
+                      key: "companyRequired" as const,
+                      title: "Номер аптеки",
+                      hint: "Поле всегда на форме",
+                    },
+                  ] as const
+                ).map((row) => (
+                  <Box
+                    key={row.key}
+                    sx={{
+                      border: "1px solid",
+                      borderColor: "divider",
+                      borderRadius: 1.5,
+                      px: 1.5,
+                      py: 1.25,
+                      bgcolor: networkingJoinFormFields[row.key] ? "action.hover" : "transparent",
+                    }}
+                  >
+                    <Stack
+                      direction={{ xs: "column", sm: "row" }}
+                      spacing={1}
+                      alignItems={{ xs: "stretch", sm: "center" }}
+                      justifyContent="space-between"
+                    >
+                      <Box sx={{ minWidth: 0, flex: 1 }}>
+                        <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                          {row.title}
+                        </Typography>
+                        <Typography variant="caption" color="text.secondary">
+                          {row.hint}
+                        </Typography>
+                      </Box>
+                      <FormControlLabel
+                        sx={{ m: 0 }}
+                        control={
+                          <Switch
+                            size="small"
+                            checked={Boolean(networkingJoinFormFields[row.key])}
+                            onChange={(_, checked) =>
+                              onNetworkingJoinFormFieldsChange({
+                                ...networkingJoinFormFields,
+                                // Номер аптеки в pharma всегда виден — держим company=true,
+                                // иначе normalize сбросит companyRequired.
+                                ...(row.key === "companyRequired" ? { company: true } : null),
+                                [row.key]: checked,
+                              })
+                            }
+                          />
+                        }
+                        label="Обяз."
+                      />
+                    </Stack>
+                  </Box>
+                ))}
+              </Stack>
+            </>
+          ) : null}
+
           {networkingJoinFormMode === "pharma" || networkingJoinFormMode === "networking" ? (
             <TextField
               size="small"

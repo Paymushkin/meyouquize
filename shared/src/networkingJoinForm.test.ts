@@ -33,6 +33,7 @@ describe("networkingJoinForm", () => {
       seeking: true,
       phone: false,
       email: false,
+      jobTitleRequired: false,
       companyRequired: false,
       offersRequired: false,
       seekingRequired: false,
@@ -60,10 +61,31 @@ describe("networkingJoinForm", () => {
   it("resolves pharma visibility", () => {
     expect(getNetworkingJoinFieldVisibility("pharma")).toMatchObject({
       showJobTitle: true,
+      jobTitleRequired: false,
       showCompany: true,
       companyLabel: "Номер аптеки",
+      companyRequired: false,
       showOffers: false,
       showSeeking: false,
+    });
+    expect(
+      getNetworkingJoinFieldVisibility("pharma", {
+        company: true,
+        offers: false,
+        seeking: false,
+        phone: false,
+        email: false,
+        jobTitleRequired: true,
+        companyRequired: true,
+        offersRequired: false,
+        seekingRequired: false,
+        phoneRequired: false,
+        emailRequired: false,
+      }),
+    ).toMatchObject({
+      jobTitleRequired: true,
+      companyRequired: true,
+      companyLabel: "Номер аптеки",
     });
   });
 
@@ -77,6 +99,7 @@ describe("networkingJoinForm", () => {
           seeking: false,
           phone: true,
           email: false,
+          jobTitleRequired: true,
           companyRequired: false,
           offersRequired: true,
           seekingRequired: false,
@@ -93,6 +116,7 @@ describe("networkingJoinForm", () => {
       ),
     ).toEqual({
       showJobTitle: false,
+      jobTitleRequired: false,
       showCompany: false,
       companyLabel: "Компания",
       companyRequired: false,
@@ -118,6 +142,7 @@ describe("networkingJoinForm", () => {
       seeking: false,
       phone: false,
       email: false,
+      jobTitleRequired: false,
       companyRequired: true,
       offersRequired: false,
       seekingRequired: false,
@@ -147,6 +172,50 @@ describe("networkingJoinForm", () => {
     expect(networkingJoinFieldPlaceholder("Компания", "", true)).toBe("Компания *");
   });
 
+  it("validates required pharma fields", () => {
+    const fields = {
+      company: true,
+      offers: false,
+      seeking: false,
+      phone: false,
+      email: false,
+      jobTitleRequired: true,
+      companyRequired: true,
+      offersRequired: false,
+      seekingRequired: false,
+      phoneRequired: false,
+      emailRequired: false,
+    };
+    const empty = {
+      fullName: "",
+      jobTitle: "",
+      company: "",
+      offers: "",
+      seeking: "",
+      phone: "",
+      email: "",
+    };
+    expect(validateNetworkingJoinDraft("pharma", fields, empty)).toBe("Укажите ФИО");
+    expect(validateNetworkingJoinDraft("pharma", fields, { ...empty, fullName: "Иванов" })).toBe(
+      "Укажите должность",
+    );
+    expect(
+      validateNetworkingJoinDraft("pharma", fields, {
+        ...empty,
+        fullName: "Иванов",
+        jobTitle: "Провизор",
+      }),
+    ).toBe("Укажите Номер аптеки");
+    expect(
+      validateNetworkingJoinDraft("pharma", fields, {
+        ...empty,
+        fullName: "Иванов",
+        jobTitle: "Провизор",
+        company: "42",
+      }),
+    ).toBeNull();
+  });
+
   it("validates phone and email format when fields are shown", () => {
     expect(isValidNetworkingPhone("+7 (999) 123-45-67")).toBe(true);
     expect(isValidNetworkingPhone("89991234567")).toBe(true);
@@ -162,6 +231,7 @@ describe("networkingJoinForm", () => {
       seeking: false,
       phone: true,
       email: true,
+      jobTitleRequired: false,
       companyRequired: false,
       offersRequired: false,
       seekingRequired: false,

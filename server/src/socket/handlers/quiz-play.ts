@@ -1,5 +1,6 @@
 import type { Server } from "socket.io";
 import {
+  getParticipantProfileSchema,
   joinQuizSchema,
   playerSubQuizReportRequestSchema,
   resetAnswersSchema,
@@ -11,6 +12,7 @@ import {
 import {
   getParticipantAnswersMap,
   getParticipantPersonalSubQuizReport,
+  getParticipantProfile,
   getParticipantScoresBySubQuiz,
   getParticipantTotalScoreForQuiz,
   getQuizPublicState,
@@ -57,10 +59,35 @@ const BANNER_CLICK_RATE_MAX_PER_WINDOW = 20;
 const SUB_QUIZ_REPORT_RATE_WINDOW_MS = 60_000;
 const SUB_QUIZ_REPORT_RATE_MAX_PER_WINDOW = 5;
 const reactionRateBySocket = new Map<string, number[]>();
-const lastJoinAckBySocket = new Map<
-  string,
-  { at: number; quizId: string; participantId: string; nickname: string }
->();
+type JoinAckProfile = {
+  at: number;
+  quizId: string;
+  participantId: string;
+  nickname: string;
+  fullName: string;
+  jobTitle: string;
+  company: string;
+  offers: string;
+  seeking: string;
+  phone: string;
+  email: string;
+};
+
+const lastJoinAckBySocket = new Map<string, JoinAckProfile>();
+
+function joinAckPayload(ack: JoinAckProfile) {
+  return {
+    ok: true as const,
+    nickname: ack.nickname,
+    fullName: ack.fullName,
+    jobTitle: ack.jobTitle,
+    company: ack.company,
+    offers: ack.offers,
+    seeking: ack.seeking,
+    phone: ack.phone,
+    email: ack.email,
+  };
+}
 
 export function cleanupQuizPlaySocketState(socketId: string) {
   reactionRateBySocket.delete(socketId);
@@ -92,7 +119,7 @@ export function registerQuizPlayHandlers(socket: EnrichedSocket, io: Server) {
         socket.data.participantId === recent.participantId &&
         socket.data.quizId === recent.quizId
       ) {
-        socket.emit("quiz:joined", { ok: true, nickname: recent.nickname });
+        socket.emit("quiz:joined", joinAckPayload(recent));
         return;
       }
       const allowed = allowSocketAction({
@@ -104,7 +131,7 @@ export function registerQuizPlayHandlers(socket: EnrichedSocket, io: Server) {
       if (!allowed) {
         // Уже в комнате (типично после клика по баннеру / visibility): не пугаем игрока ошибкой.
         if (socket.data.participantId && socket.data.quizId && recent?.nickname) {
-          socket.emit("quiz:joined", { ok: true, nickname: recent.nickname });
+          socket.emit("quiz:joined", joinAckPayload(recent));
           return;
         }
         fail(socket, "Слишком много попыток подключения. Подождите немного и попробуйте снова.");
@@ -121,7 +148,20 @@ export function registerQuizPlayHandlers(socket: EnrichedSocket, io: Server) {
       socket.data.participantId = joined.participantId;
       socket.data.quizId = joined.quizId;
       await socket.join(quizPlayerRoom(joined.quizId));
-      socket.emit("quiz:joined", { ok: true, nickname: joined.nickname });
+      const joinedAck: JoinAckProfile = {
+        at: Date.now(),
+        quizId: joined.quizId,
+        participantId: joined.participantId,
+        nickname: joined.nickname,
+        fullName: joined.fullName,
+        jobTitle: joined.jobTitle,
+        company: joined.company,
+        offers: joined.offers,
+        seeking: joined.seeking,
+        phone: joined.phone,
+        email: joined.email,
+      };
+      socket.emit("quiz:joined", joinAckPayload(joinedAck));
       socket.emit("player:answers", answersMap);
       const feedbackSubmitted = await hasParticipantSubmittedFeedback(
         joined.quizId,
@@ -134,12 +174,7 @@ export function registerQuizPlayHandlers(socket: EnrichedSocket, io: Server) {
         mySubQuizScores,
         feedbackSubmitted,
       });
-      lastJoinAckBySocket.set(socket.id, {
-        at: Date.now(),
-        quizId: joined.quizId,
-        participantId: joined.participantId,
-        nickname: joined.nickname,
-      });
+      lastJoinAckBySocket.set(socket.id, joinedAck);
       trialLog("quiz_join_ok", {
         quizId: joined.quizId,
         participantId: joined.participantId,
@@ -222,6 +257,22 @@ export function registerQuizPlayHandlers(socket: EnrichedSocket, io: Server) {
     }
   });
 
+  socket.on("quiz:profile:get", async (raw: unknown) => {
+    try {
+      const payload = getParticipantProfileSchema.parse(raw);
+      if (!socket.data.participantId) throw new Error("Not joined");
+      if (socket.data.quizId !== payload.quizId) throw new Error("Not joined");
+      const profile = await getParticipantProfile({
+        quizId: payload.quizId,
+        participantId: socket.data.participantId,
+      });
+      if (!profile) throw new Error("Participant not found");
+      socket.emit("quiz:profile", profile);
+    } catch (error) {
+      fail(socket, error instanceof Error ? error.message : "Get profile failed");
+    }
+  });
+
   socket.on("quiz:nickname:update", async (raw: unknown) => {
     try {
       if (
@@ -241,8 +292,24 @@ export function registerQuizPlayHandlers(socket: EnrichedSocket, io: Server) {
         quizId: payload.quizId,
         participantId: socket.data.participantId,
         nickname: payload.nickname,
+        fullName: payload.fullName,
+        jobTitle: payload.jobTitle,
+        company: payload.company,
+        offers: payload.offers,
+        seeking: payload.seeking,
+        phone: payload.phone,
+        email: payload.email,
       });
-      socket.emit("quiz:nickname:updated", { nickname: updated.nickname });
+      socket.emit("quiz:nickname:updated", {
+        nickname: updated.nickname,
+        fullName: updated.fullName,
+        jobTitle: updated.jobTitle,
+        company: updated.company,
+        offers: updated.offers,
+        seeking: updated.seeking,
+        phone: updated.phone,
+        email: updated.email,
+      });
       const state = await getQuizPublicState(payload.quizId);
       if (!state) throw new Error("Quiz not found");
       await broadcastQuizPublicState(io, payload.quizId, state);

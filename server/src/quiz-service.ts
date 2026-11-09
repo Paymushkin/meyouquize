@@ -2961,7 +2961,7 @@ export async function joinQuiz(payload: {
     select: { id: true },
   });
   nickname = await resolveUniqueParticipantNickname(quiz.id, nickname, currentParticipant?.id);
-  const profileData = {
+  const profileCreate = {
     fullName: (payload.fullName ?? "").trim().slice(0, 120),
     jobTitle: (payload.jobTitle ?? "").trim().slice(0, 120),
     company: (payload.company ?? "").trim().slice(0, 120),
@@ -2969,6 +2969,20 @@ export async function joinQuiz(payload: {
     seeking: (payload.seeking ?? "").trim().slice(0, 500),
     phone: (payload.phone ?? "").trim().slice(0, 40),
     email: (payload.email ?? "").trim().slice(0, 120),
+  };
+  // Restore/rejoin без профиля не должен затирать уже сохранённые поля.
+  const profileUpdate = {
+    ...(payload.fullName !== undefined
+      ? { fullName: payload.fullName.trim().slice(0, 120) }
+      : null),
+    ...(payload.jobTitle !== undefined
+      ? { jobTitle: payload.jobTitle.trim().slice(0, 120) }
+      : null),
+    ...(payload.company !== undefined ? { company: payload.company.trim().slice(0, 120) } : null),
+    ...(payload.offers !== undefined ? { offers: payload.offers.trim().slice(0, 500) } : null),
+    ...(payload.seeking !== undefined ? { seeking: payload.seeking.trim().slice(0, 500) } : null),
+    ...(payload.phone !== undefined ? { phone: payload.phone.trim().slice(0, 40) } : null),
+    ...(payload.email !== undefined ? { email: payload.email.trim().slice(0, 120) } : null),
   };
   const participant = await prisma.participant.upsert({
     where: {
@@ -2978,20 +2992,68 @@ export async function joinQuiz(payload: {
       quizId: quiz.id,
       deviceId: payload.deviceId,
       nickname,
-      ...profileData,
+      ...profileCreate,
     },
     update: {
       nickname,
-      ...profileData,
+      ...profileUpdate,
     },
   });
-  return { quizId: quiz.id, participantId: participant.id, nickname };
+  return {
+    quizId: quiz.id,
+    participantId: participant.id,
+    nickname: participant.nickname,
+    fullName: participant.fullName,
+    jobTitle: participant.jobTitle,
+    company: participant.company,
+    offers: participant.offers,
+    seeking: participant.seeking,
+    phone: participant.phone,
+    email: participant.email,
+  };
+}
+
+export type ParticipantProfileFields = {
+  fullName: string;
+  jobTitle: string;
+  company: string;
+  offers: string;
+  seeking: string;
+  phone: string;
+  email: string;
+};
+
+export async function getParticipantProfile(payload: {
+  quizId: string;
+  participantId: string;
+}): Promise<(ParticipantProfileFields & { nickname: string }) | null> {
+  const participant = await prisma.participant.findFirst({
+    where: { id: payload.participantId, quizId: payload.quizId },
+    select: {
+      nickname: true,
+      fullName: true,
+      jobTitle: true,
+      company: true,
+      offers: true,
+      seeking: true,
+      phone: true,
+      email: true,
+    },
+  });
+  return participant;
 }
 
 export async function updateParticipantNickname(payload: {
   quizId: string;
   participantId: string;
   nickname: string;
+  fullName?: string;
+  jobTitle?: string;
+  company?: string;
+  offers?: string;
+  seeking?: string;
+  phone?: string;
+  email?: string;
 }) {
   let nickname = payload.nickname.trim();
   if (containsProfanity(nickname)) {
@@ -3007,11 +3069,34 @@ export async function updateParticipantNickname(payload: {
     nickname,
     payload.participantId,
   );
-  await prisma.participant.update({
+  const updated = await prisma.participant.update({
     where: { id: payload.participantId },
-    data: { nickname },
+    data: {
+      nickname,
+      ...(payload.fullName !== undefined
+        ? { fullName: payload.fullName.trim().slice(0, 120) }
+        : null),
+      ...(payload.jobTitle !== undefined
+        ? { jobTitle: payload.jobTitle.trim().slice(0, 120) }
+        : null),
+      ...(payload.company !== undefined ? { company: payload.company.trim().slice(0, 120) } : null),
+      ...(payload.offers !== undefined ? { offers: payload.offers.trim().slice(0, 500) } : null),
+      ...(payload.seeking !== undefined ? { seeking: payload.seeking.trim().slice(0, 500) } : null),
+      ...(payload.phone !== undefined ? { phone: payload.phone.trim().slice(0, 40) } : null),
+      ...(payload.email !== undefined ? { email: payload.email.trim().slice(0, 120) } : null),
+    },
+    select: {
+      nickname: true,
+      fullName: true,
+      jobTitle: true,
+      company: true,
+      offers: true,
+      seeking: true,
+      phone: true,
+      email: true,
+    },
   });
-  return { nickname };
+  return updated;
 }
 
 async function loadSubmitQuestion(

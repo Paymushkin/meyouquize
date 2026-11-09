@@ -45,6 +45,16 @@ type Params = {
   onQuizJoined?: () => void;
   /** Фактический ник после входа (может отличаться при автодобавлении суффикса). */
   onJoinedNickname?: (nickname: string) => void;
+  /** Профиль расширенной формы входа с сервера (фарма / нетворкинг). */
+  onJoinedProfile?: (profile: {
+    fullName: string;
+    jobTitle: string;
+    company: string;
+    offers: string;
+    seeking: string;
+    phone: string;
+    email: string;
+  }) => void;
   /** Вход завершён (успех или ошибка) — снять индикатор ожидания. */
   onJoinSettled?: () => void;
   /** Актуальный joined — для reconnect без показа экрана входа. */
@@ -75,6 +85,7 @@ export function useQuizPlaySocket({
   onParticipantMissing,
   onQuizJoined,
   onJoinedNickname,
+  onJoinedProfile,
   onJoinSettled,
   joinedRef,
   onQuizSessionReadyChange,
@@ -214,10 +225,39 @@ export function useQuizPlaySocket({
       }
       setConnectionStatus("offline");
     };
-    const onJoined = (payload?: { nickname?: string }) => {
+    const onJoined = (payload?: {
+      nickname?: string;
+      fullName?: string;
+      jobTitle?: string;
+      company?: string;
+      offers?: string;
+      seeking?: string;
+      phone?: string;
+      email?: string;
+    }) => {
       const resolvedNickname = payload?.nickname?.trim();
       if (resolvedNickname) {
         onJoinedNickname?.(resolvedNickname);
+      }
+      if (
+        payload &&
+        (payload.fullName !== undefined ||
+          payload.jobTitle !== undefined ||
+          payload.company !== undefined ||
+          payload.offers !== undefined ||
+          payload.seeking !== undefined ||
+          payload.phone !== undefined ||
+          payload.email !== undefined)
+      ) {
+        onJoinedProfile?.({
+          fullName: payload.fullName ?? "",
+          jobTitle: payload.jobTitle ?? "",
+          company: payload.company ?? "",
+          offers: payload.offers ?? "",
+          seeking: payload.seeking ?? "",
+          phone: payload.phone ?? "",
+          email: payload.email ?? "",
+        });
       }
       setJoined(true);
       onQuizSessionReadyChange?.(true);
@@ -329,6 +369,7 @@ export function useQuizPlaySocket({
     onParticipantMissing,
     onQuizJoined,
     onJoinedNickname,
+    onJoinedProfile,
     onJoinSettled,
     joinedRef,
     onQuizSessionReadyChange,

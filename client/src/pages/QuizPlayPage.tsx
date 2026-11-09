@@ -18,6 +18,8 @@ import {
 import {
   buildPhotoWallAlbumPhotos,
   buildVideoWallAlbumVideos,
+  getNetworkingJoinFieldVisibility,
+  networkingJoinFieldPlaceholder,
   photoWallCollagePhotoIndices,
   resolveVideoWallTileCoverUrl,
   ruBallLabel,
@@ -109,6 +111,16 @@ export function QuizPlayPage() {
   const [speakerDialogOpen, setSpeakerDialogOpen] = useState(false);
   const [nicknameDialogOpen, setNicknameDialogOpen] = useState(false);
   const [nicknameDraft, setNicknameDraft] = useState("");
+  const [nicknameDialogError, setNicknameDialogError] = useState("");
+  const [joinNetworkingDraft, setJoinNetworkingDraft] = useState<NetworkingProfileTextFields>({
+    fullName: "",
+    jobTitle: "",
+    company: "",
+    offers: "",
+    seeking: "",
+    phone: "",
+    email: "",
+  });
   const [speakerName, setSpeakerName] = useState("Все спикеры");
   const [speakerQuestionText, setSpeakerQuestionText] = useState("");
   const [resultsDialogQuestionId, setResultsDialogQuestionId] = useState<string | null>(null);
@@ -247,6 +259,10 @@ export function QuizPlayPage() {
     [persistNickname],
   );
 
+  const handleJoinedProfile = useCallback((profile: NetworkingProfileTextFields) => {
+    setJoinNetworkingDraft(profile);
+  }, []);
+
   useEffect(() => {
     if (!slug) return;
     const roomNickname = localStorage.getItem(getRoomNickKey(slug));
@@ -312,6 +328,7 @@ export function QuizPlayPage() {
     onParticipantMissing: handleParticipantMissing,
     onQuizJoined: handleJoinSuccess,
     onJoinedNickname: handleJoinedNickname,
+    onJoinedProfile: handleJoinedProfile,
     onJoinSettled: clearJoinPending,
     joinedRef,
     onQuizSessionReadyChange: setQuizSessionReady,
@@ -350,16 +367,15 @@ export function QuizPlayPage() {
     !joined &&
     !joinPending &&
     (useExtendedJoinForm || !playerAutoJoinRandomNickname);
-
-  const [joinNetworkingDraft, setJoinNetworkingDraft] = useState<NetworkingProfileTextFields>({
-    fullName: "",
-    jobTitle: "",
-    company: "",
-    offers: "",
-    seeking: "",
-    phone: "",
-    email: "",
-  });
+  const joinFieldVisibility = useMemo(
+    () =>
+      getNetworkingJoinFieldVisibility(
+        networkingJoinFormMode,
+        networkingJoinFormFields,
+        networkingJoinFormCopy,
+      ),
+    [networkingJoinFormMode, networkingJoinFormFields, networkingJoinFormCopy],
+  );
 
   useEffect(() => {
     if (!joinMetaLoaded) return;
@@ -459,15 +475,84 @@ export function QuizPlayPage() {
 
   function editNickname() {
     if (!joined || !quiz?.id) return;
+    setNicknameDialogError("");
+    if (useExtendedJoinForm) {
+      const quizId = quiz.id;
+      let settled = false;
+      const openWith = (profile: NetworkingProfileTextFields) => {
+        if (settled) return;
+        settled = true;
+        socket.off("quiz:profile", onProfile);
+        setJoinNetworkingDraft({
+          ...profile,
+          fullName: profile.fullName.trim() || nickname.trim(),
+        });
+        setNicknameDialogOpen(true);
+      };
+      const onProfile = (payload: {
+        fullName?: string;
+        jobTitle?: string;
+        company?: string;
+        offers?: string;
+        seeking?: string;
+        phone?: string;
+        email?: string;
+      }) => {
+        openWith({
+          fullName: payload.fullName ?? "",
+          jobTitle: payload.jobTitle ?? "",
+          company: payload.company ?? "",
+          offers: payload.offers ?? "",
+          seeking: payload.seeking ?? "",
+          phone: payload.phone ?? "",
+          email: payload.email ?? "",
+        });
+      };
+      socket.once("quiz:profile", onProfile);
+      socket.emit("quiz:profile:get", { quizId });
+      window.setTimeout(() => {
+        openWith({
+          ...joinNetworkingDraft,
+          fullName: joinNetworkingDraft.fullName.trim() || nickname.trim(),
+        });
+      }, 800);
+      return;
+    }
     setNicknameDraft(nickname.trim());
     setNicknameDialogOpen(true);
   }
 
   function submitNicknameUpdate() {
     if (!quiz?.id) return;
+    if (useExtendedJoinForm) {
+      const validationError = validateNetworkingJoinDraft(
+        networkingJoinFormMode,
+        networkingJoinFormFields,
+        joinNetworkingDraft,
+      );
+      if (validationError) {
+        setNicknameDialogError(validationError);
+        return;
+      }
+      const fullName = joinNetworkingDraft.fullName.trim();
+      const nextNickname = fullName.slice(0, 40);
+      socket.emit("quiz:nickname:update", {
+        quizId: quiz.id,
+        nickname: nextNickname,
+        fullName,
+        jobTitle: joinNetworkingDraft.jobTitle.trim(),
+        company: joinNetworkingDraft.company.trim(),
+        offers: joinNetworkingDraft.offers.trim(),
+        seeking: joinNetworkingDraft.seeking.trim(),
+        phone: joinNetworkingDraft.phone.trim(),
+        email: joinNetworkingDraft.email.trim(),
+      });
+      setNicknameDialogOpen(false);
+      return;
+    }
     const next = nicknameDraft.trim();
     if (!next) {
-      setError("Имя не может быть пустым");
+      setNicknameDialogError("Имя не может быть пустым");
       return;
     }
     if (next === nickname.trim()) {
@@ -523,9 +608,38 @@ export function QuizPlayPage() {
   }
 
   useEffect(() => {
-    const onNicknameUpdated = (payload: { nickname: string }) => {
+    const onNicknameUpdated = (payload: {
+      nickname: string;
+      fullName?: string;
+      jobTitle?: string;
+      company?: string;
+      offers?: string;
+      seeking?: string;
+      phone?: string;
+      email?: string;
+    }) => {
       persistNickname(payload.nickname);
+      if (
+        payload.fullName !== undefined ||
+        payload.jobTitle !== undefined ||
+        payload.company !== undefined ||
+        payload.offers !== undefined ||
+        payload.seeking !== undefined ||
+        payload.phone !== undefined ||
+        payload.email !== undefined
+      ) {
+        setJoinNetworkingDraft({
+          fullName: payload.fullName ?? "",
+          jobTitle: payload.jobTitle ?? "",
+          company: payload.company ?? "",
+          offers: payload.offers ?? "",
+          seeking: payload.seeking ?? "",
+          phone: payload.phone ?? "",
+          email: payload.email ?? "",
+        });
+      }
       setError("");
+      setNicknameDialogError("");
       setNicknameDialogOpen(false);
     };
     socket.on("quiz:nickname:updated", onNicknameUpdated);
@@ -972,21 +1086,170 @@ export function QuizPlayPage() {
                 sx: buildPlayerDialogPaperSx(brandFontFamily),
               }}
             >
-              <DialogTitle sx={PLAYER_DIALOG_TITLE_SX}>Изменить имя</DialogTitle>
+              <DialogTitle sx={PLAYER_DIALOG_TITLE_SX}>
+                {useExtendedJoinForm ? "Профиль" : "Изменить имя"}
+              </DialogTitle>
               <DialogContent sx={PLAYER_DIALOG_CONTENT_SX}>
-                <TextField
-                  autoFocus
-                  margin="dense"
-                  fullWidth
-                  value={nicknameDraft}
-                  onChange={(e) => setNicknameDraft(e.target.value)}
-                  placeholder="Введите новое имя"
-                  sx={buildPlayerDialogTextFieldSx(
-                    formBackgroundColor,
-                    formInputTextColor,
-                    brandFontFamily,
-                  )}
-                />
+                {useExtendedJoinForm ? (
+                  <Stack spacing={1.5} sx={{ pt: 0.5 }}>
+                    <TextField
+                      autoFocus
+                      fullWidth
+                      value={joinNetworkingDraft.fullName}
+                      onChange={(e) =>
+                        setJoinNetworkingDraft((prev) => ({ ...prev, fullName: e.target.value }))
+                      }
+                      placeholder="ФИО *"
+                      error={Boolean(nicknameDialogError)}
+                      sx={buildPlayerDialogTextFieldSx(
+                        formBackgroundColor,
+                        formInputTextColor,
+                        brandFontFamily,
+                      )}
+                    />
+                    {joinFieldVisibility.showJobTitle ? (
+                      <TextField
+                        fullWidth
+                        value={joinNetworkingDraft.jobTitle}
+                        onChange={(e) =>
+                          setJoinNetworkingDraft((prev) => ({ ...prev, jobTitle: e.target.value }))
+                        }
+                        placeholder={networkingJoinFieldPlaceholder(
+                          "Должность",
+                          undefined,
+                          joinFieldVisibility.jobTitleRequired,
+                        )}
+                        sx={buildPlayerDialogTextFieldSx(
+                          formBackgroundColor,
+                          formInputTextColor,
+                          brandFontFamily,
+                        )}
+                      />
+                    ) : null}
+                    {joinFieldVisibility.showCompany ? (
+                      <TextField
+                        fullWidth
+                        value={joinNetworkingDraft.company}
+                        onChange={(e) =>
+                          setJoinNetworkingDraft((prev) => ({ ...prev, company: e.target.value }))
+                        }
+                        placeholder={networkingJoinFieldPlaceholder(
+                          joinFieldVisibility.companyLabel,
+                          undefined,
+                          joinFieldVisibility.companyRequired,
+                        )}
+                        sx={buildPlayerDialogTextFieldSx(
+                          formBackgroundColor,
+                          formInputTextColor,
+                          brandFontFamily,
+                        )}
+                      />
+                    ) : null}
+                    {joinFieldVisibility.showOffers ? (
+                      <TextField
+                        fullWidth
+                        multiline
+                        minRows={2}
+                        value={joinNetworkingDraft.offers}
+                        onChange={(e) =>
+                          setJoinNetworkingDraft((prev) => ({ ...prev, offers: e.target.value }))
+                        }
+                        placeholder={networkingJoinFieldPlaceholder(
+                          joinFieldVisibility.offersLabel,
+                          joinFieldVisibility.offersPlaceholder,
+                          joinFieldVisibility.offersRequired,
+                        )}
+                        sx={buildPlayerDialogTextFieldSx(
+                          formBackgroundColor,
+                          formInputTextColor,
+                          brandFontFamily,
+                        )}
+                      />
+                    ) : null}
+                    {joinFieldVisibility.showSeeking ? (
+                      <TextField
+                        fullWidth
+                        multiline
+                        minRows={2}
+                        value={joinNetworkingDraft.seeking}
+                        onChange={(e) =>
+                          setJoinNetworkingDraft((prev) => ({ ...prev, seeking: e.target.value }))
+                        }
+                        placeholder={networkingJoinFieldPlaceholder(
+                          joinFieldVisibility.seekingLabel,
+                          joinFieldVisibility.seekingPlaceholder,
+                          joinFieldVisibility.seekingRequired,
+                        )}
+                        sx={buildPlayerDialogTextFieldSx(
+                          formBackgroundColor,
+                          formInputTextColor,
+                          brandFontFamily,
+                        )}
+                      />
+                    ) : null}
+                    {joinFieldVisibility.showPhone ? (
+                      <TextField
+                        fullWidth
+                        type="tel"
+                        value={joinNetworkingDraft.phone}
+                        onChange={(e) =>
+                          setJoinNetworkingDraft((prev) => ({ ...prev, phone: e.target.value }))
+                        }
+                        placeholder={networkingJoinFieldPlaceholder(
+                          "Телефон",
+                          undefined,
+                          joinFieldVisibility.phoneRequired,
+                        )}
+                        sx={buildPlayerDialogTextFieldSx(
+                          formBackgroundColor,
+                          formInputTextColor,
+                          brandFontFamily,
+                        )}
+                      />
+                    ) : null}
+                    {joinFieldVisibility.showEmail ? (
+                      <TextField
+                        fullWidth
+                        type="email"
+                        value={joinNetworkingDraft.email}
+                        onChange={(e) =>
+                          setJoinNetworkingDraft((prev) => ({ ...prev, email: e.target.value }))
+                        }
+                        placeholder={networkingJoinFieldPlaceholder(
+                          "Почта",
+                          undefined,
+                          joinFieldVisibility.emailRequired,
+                        )}
+                        sx={buildPlayerDialogTextFieldSx(
+                          formBackgroundColor,
+                          formInputTextColor,
+                          brandFontFamily,
+                        )}
+                      />
+                    ) : null}
+                    {nicknameDialogError ? (
+                      <Typography variant="body2" color="error">
+                        {nicknameDialogError}
+                      </Typography>
+                    ) : null}
+                  </Stack>
+                ) : (
+                  <TextField
+                    autoFocus
+                    margin="dense"
+                    fullWidth
+                    value={nicknameDraft}
+                    onChange={(e) => setNicknameDraft(e.target.value)}
+                    placeholder="Введите новое имя"
+                    error={Boolean(nicknameDialogError)}
+                    helperText={nicknameDialogError || undefined}
+                    sx={buildPlayerDialogTextFieldSx(
+                      formBackgroundColor,
+                      formInputTextColor,
+                      brandFontFamily,
+                    )}
+                  />
+                )}
               </DialogContent>
               <DialogActions sx={{ px: 3, pb: 2, pt: 0.5, justifyContent: "space-between" }}>
                 <Button
