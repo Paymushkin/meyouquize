@@ -6,6 +6,7 @@ import {
   getRoomByEventName,
   submitAnswer,
 } from "../../src/quiz-service.js";
+import { prisma } from "../../src/prisma.js";
 import {
   activateQuestion,
   joinPlayer,
@@ -41,6 +42,31 @@ describe("results", () => {
       true,
     );
     expect(dash.perQuestion.some((row) => row.questionId === question.id)).toBe(true);
+  });
+
+  it("shows pharma identity on leaderboard rows", async () => {
+    const { eventName, quizId, question } = await seedSingleChoiceQuiz(uniqueSlug("dash-pharma"));
+    const correctId = question.options.find((o) => o.isCorrect)!.id;
+    await activateQuestion(quizId, question.id);
+    const player = await joinPlayer(eventName, "NickOnly", "dev-lb-pharma");
+    await prisma.participant.update({
+      where: { id: player.participantId },
+      data: { fullName: "Иванова Анна", jobTitle: "Провизор", company: "12" },
+    });
+
+    await submitAnswer({
+      quizId,
+      questionId: question.id,
+      optionIds: [correctId],
+      participantId: player.participantId,
+    });
+
+    const dash = await getDashboardResults(quizId);
+    expect(
+      dash.leaderboard.some(
+        (row) => row.nickname === "Иванова Анна · Провизор · 12" && row.score === 10,
+      ),
+    ).toBe(true);
   });
 
   it("returns personal sub-quiz report for participant", async () => {

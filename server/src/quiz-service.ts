@@ -641,8 +641,22 @@ export async function getRoomByEventName(eventName: string) {
   });
 }
 
-/** Подпись участника для рандомайзера: в pharma/networking — ФИО · должность · компания. */
-const RANDOMIZER_PARTICIPANT_LABEL_MAX = 240;
+/** Подпись участника (рандомайзер / турнирная таблица): ФИО · должность · компания. */
+const PARTICIPANT_DISPLAY_LABEL_MAX = 240;
+
+function participantDisplayLabel(row: {
+  fullName?: string | null;
+  nickname?: string | null;
+  jobTitle?: string | null;
+  company?: string | null;
+}): string {
+  return formatNetworkingGuestIdentity({
+    fullName: row.fullName,
+    nickname: row.nickname,
+    jobTitle: row.jobTitle,
+    company: row.company,
+  }).slice(0, PARTICIPANT_DISPLAY_LABEL_MAX);
+}
 
 export async function listParticipantNicknamesByEventName(eventName: string): Promise<string[]> {
   const room = await prisma.quiz.findUnique({
@@ -657,12 +671,7 @@ export async function listParticipantNicknamesByEventName(eventName: string): Pr
   });
   const deduped: string[] = [];
   for (const row of participants) {
-    const label = formatNetworkingGuestIdentity({
-      fullName: row.fullName,
-      nickname: row.nickname,
-      jobTitle: row.jobTitle,
-      company: row.company,
-    }).slice(0, RANDOMIZER_PARTICIPANT_LABEL_MAX);
+    const label = participantDisplayLabel(row);
     if (!label) continue;
     if (!deduped.includes(label)) deduped.push(label);
   }
@@ -1719,13 +1728,19 @@ async function aggregateLeaderboardsBySubQuizForQuiz(
       subQuizId: string;
       participantId: string;
       nickname: string;
+      fullName: string | null;
+      jobTitle: string | null;
+      company: string | null;
       score: bigint;
       totalResponseMs: bigint;
     }>
   >(Prisma.sql`
     SELECT q."subQuizId" AS "subQuizId",
            a."participantId" AS "participantId",
-           p.nickname AS nickname,
+           MAX(p.nickname) AS nickname,
+           MAX(p."fullName") AS "fullName",
+           MAX(p."jobTitle") AS "jobTitle",
+           MAX(p.company) AS company,
            SUM(a."scoreAwarded")::bigint AS score,
            SUM(a."responseMs")::bigint AS "totalResponseMs"
     FROM "Answer" a
@@ -1733,7 +1748,7 @@ async function aggregateLeaderboardsBySubQuizForQuiz(
     INNER JOIN "Participant" p ON p.id = a."participantId"
     WHERE a."quizId" = ${quizId}
       AND q."subQuizId" IS NOT NULL
-    GROUP BY q."subQuizId", a."participantId", p.nickname
+    GROUP BY q."subQuizId", a."participantId"
   `);
 
   const bySub = new Map<
@@ -1744,7 +1759,7 @@ async function aggregateLeaderboardsBySubQuizForQuiz(
     const list = bySub.get(r.subQuizId);
     const row = {
       participantId: r.participantId,
-      nickname: r.nickname,
+      nickname: participantDisplayLabel(r),
       score: Number(r.score),
       totalResponseMs: Number(r.totalResponseMs),
     };
@@ -1835,7 +1850,7 @@ export async function getSubQuizDetailedResultsForQuiz(
       const totalResponseMs = p.answers.reduce((sum, a) => sum + a.responseMs, 0);
       return {
         participantId: p.id,
-        nickname: p.nickname,
+        nickname: participantDisplayLabel(p),
         scoresByQuestionId,
         totalScore,
         totalResponseMs,

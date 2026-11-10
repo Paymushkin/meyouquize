@@ -75,7 +75,7 @@ export function ProjectorLeaderboardTable(props: ProjectorLeaderboardTableProps)
         balyPx: { xs: 2, sm: 2.5 } as const,
         balyFont: { xs: "0.875rem", sm: "1rem" } as const,
         rowSpacing: 1.25,
-        rowMinH: { xs: 58, sm: 66 } as const,
+        rowMinH: { xs: 64, sm: 76 } as const,
         rowPx: { xs: 1.5, sm: 1.75 } as const,
         rowPy: { xs: 1, sm: 1.1 } as const,
         rowBorder: "2px solid",
@@ -286,11 +286,13 @@ export function ProjectorLeaderboardTable(props: ProjectorLeaderboardTableProps)
                         sx={{
                           minWidth: 0,
                           overflow: "hidden",
-                          textOverflow: "ellipsis",
-                          whiteSpace: "nowrap",
+                          display: "-webkit-box",
+                          WebkitLineClamp: 2,
+                          WebkitBoxOrient: "vertical",
+                          wordBreak: "break-word",
                           fontWeight: isWinner ? 700 : 600,
-                          fontSize: c.nickFont,
-                          lineHeight: 1.05,
+                          fontSize: embedded ? c.nickFont : { xs: "1.15rem", sm: "1.45rem" },
+                          lineHeight: 1.15,
                           color: "#fff",
                         }}
                       >
