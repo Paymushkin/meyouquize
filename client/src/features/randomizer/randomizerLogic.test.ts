@@ -2,8 +2,10 @@ import { describe, expect, it } from "vitest";
 import {
   RANDOMIZER_FREE_LIST_NAMES_TEXT_MAX_LENGTH,
   buildRandomizerAnimationPool,
+  isOutdatedParticipantIdentitySnapshot,
   isStaleParticipantSnapshot,
   randomizerNamesTextForPublicView,
+  shouldSyncParticipantNamesList,
 } from "./randomizerLogic";
 
 describe("buildRandomizerAnimationPool", () => {
@@ -43,6 +45,39 @@ describe("isStaleParticipantSnapshot", () => {
 
   it("ignores when saved list is already up to date", () => {
     expect(isStaleParticipantSnapshot(["Аня", "Боря"], ["Аня", "Боря"])).toBe(false);
+  });
+});
+
+describe("isOutdatedParticipantIdentitySnapshot", () => {
+  it("detects nickname-only list when room has full identity labels", () => {
+    expect(
+      isOutdatedParticipantIdentitySnapshot(
+        ["цыцыцы", "апапап"],
+        ["цыцыцы · уууууу · 33333", "апапап · цацу · 222"],
+      ),
+    ).toBe(true);
+  });
+
+  it("ignores when labels already match", () => {
+    expect(
+      isOutdatedParticipantIdentitySnapshot(
+        ["цыцыцы · уууууу · 33333"],
+        ["цыцыцы · уууууу · 33333"],
+      ),
+    ).toBe(false);
+  });
+
+  it("ignores custom free lists", () => {
+    expect(isOutdatedParticipantIdentitySnapshot(["Гость 1"], ["цыцыцы · уууууу · 33333"])).toBe(
+      false,
+    );
+  });
+});
+
+describe("shouldSyncParticipantNamesList", () => {
+  it("syncs on growth or identity upgrade", () => {
+    expect(shouldSyncParticipantNamesList(["Аня"], ["Аня", "Боря"])).toBe(true);
+    expect(shouldSyncParticipantNamesList(["Аня"], ["Аня · Провизор · 12"])).toBe(true);
   });
 });
 

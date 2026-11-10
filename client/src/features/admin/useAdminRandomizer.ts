@@ -5,8 +5,10 @@ import { applyRandomizerFromPublicViewPayload } from "./applyRandomizerFromPubli
 import {
   getRandomizerPool,
   makeRandomizerTimestamp,
+  parseNames,
   pickRandomWinners,
   randomizerNamesTextForPublicView,
+  shouldSyncParticipantNamesList,
   type RandomizerHistoryEntry,
   type RandomizerListMode,
   type RandomizerMode,
@@ -92,10 +94,17 @@ export function useAdminRandomizer({
     if (mode !== "names") return;
     if (listMode !== "free_list") return;
     if (namesEditedRef.current) return;
-    if (namesText.trim().length > 0) return;
     if (eventParticipantNicknames.length === 0) return;
-    setNamesText(eventParticipantNicknames.join("\n"));
-  }, [eventParticipantNicknames, listMode, mode, namesText]);
+    const nextText = eventParticipantNicknames.join("\n");
+    if (namesText.trim().length === 0) {
+      setNamesText(nextText);
+      emitPublicViewPatch({ randomizerNamesText: nextText });
+      return;
+    }
+    if (!shouldSyncParticipantNamesList(parseNames(namesText), eventParticipantNicknames)) return;
+    setNamesText(nextText);
+    emitPublicViewPatch({ randomizerNamesText: nextText });
+  }, [emitPublicViewPatch, eventParticipantNicknames, listMode, mode, namesText]);
 
   const runRandomizer = useCallback(() => {
     const effectiveNamesText =

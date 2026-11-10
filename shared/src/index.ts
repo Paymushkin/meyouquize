@@ -1439,6 +1439,9 @@ function sanitizeReactionWidgetStats(
   return result;
 }
 
+/** Макс. длина подписи участника в рандомайзере (ФИО · должность · компания). */
+const RANDOMIZER_PARTICIPANT_LABEL_MAX = 240;
+
 function sanitizeRandomizerHistory(
   items: RandomizerHistoryEntry[] | undefined,
 ): RandomizerHistoryEntry[] {
@@ -1449,7 +1452,7 @@ function sanitizeRandomizerHistory(
       timestamp: item.timestamp.trim().slice(0, 80),
       winners: item.winners
         .filter((winner): winner is string => typeof winner === "string")
-        .map((winner) => winner.trim())
+        .map((winner) => winner.trim().slice(0, RANDOMIZER_PARTICIPANT_LABEL_MAX))
         .filter((winner) => winner.length > 0)
         .slice(0, 50),
       mode: (item.mode === "numbers" ? "numbers" : "names") as RandomizerMode,
@@ -2003,21 +2006,21 @@ export function normalizePublicViewState(
     randomizerSelectedWinners: Array.isArray(value?.randomizerSelectedWinners)
       ? value.randomizerSelectedWinners
           .filter((winner): winner is string => typeof winner === "string")
-          .map((winner) => winner.trim())
+          .map((winner) => winner.trim().slice(0, RANDOMIZER_PARTICIPANT_LABEL_MAX))
           .filter((winner) => winner.length > 0)
           .slice(0, 10000)
       : [...base.randomizerSelectedWinners],
     randomizerCurrentWinners: Array.isArray(value?.randomizerCurrentWinners)
       ? value.randomizerCurrentWinners
           .filter((winner): winner is string => typeof winner === "string")
-          .map((winner) => winner.trim())
+          .map((winner) => winner.trim().slice(0, RANDOMIZER_PARTICIPANT_LABEL_MAX))
           .filter((winner) => winner.length > 0)
           .slice(0, 500)
       : [...base.randomizerCurrentWinners],
     randomizerAnimationPool: Array.isArray(value?.randomizerAnimationPool)
       ? value.randomizerAnimationPool
           .filter((item): item is string => typeof item === "string")
-          .map((item) => item.trim())
+          .map((item) => item.trim().slice(0, RANDOMIZER_PARTICIPANT_LABEL_MAX))
           .filter((item) => item.length > 0)
           .slice(0, 10000)
       : [...base.randomizerAnimationPool],

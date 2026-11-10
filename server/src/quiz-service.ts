@@ -4,6 +4,7 @@ import {
   computeTemperatureWeightedAverage,
   expandTagCloudSubmitLines,
   findSpeakerSessionName,
+  formatNetworkingGuestIdentity,
   formatTagCloudReferenceAnswer,
   groupDebateSeriesQuestionIds,
   normalizeSpeakerQuestionSessions,
@@ -640,6 +641,9 @@ export async function getRoomByEventName(eventName: string) {
   });
 }
 
+/** Подпись участника для рандомайзера: в pharma/networking — ФИО · должность · компания. */
+const RANDOMIZER_PARTICIPANT_LABEL_MAX = 240;
+
 export async function listParticipantNicknamesByEventName(eventName: string): Promise<string[]> {
   const room = await prisma.quiz.findUnique({
     where: { slug: eventName },
@@ -648,14 +652,19 @@ export async function listParticipantNicknamesByEventName(eventName: string): Pr
   if (!room) return [];
   const participants = await prisma.participant.findMany({
     where: { quizId: room.id },
-    select: { nickname: true },
+    select: { nickname: true, fullName: true, jobTitle: true, company: true },
     orderBy: { createdAt: "asc" },
   });
   const deduped: string[] = [];
   for (const row of participants) {
-    const nickname = row.nickname.trim();
-    if (!nickname) continue;
-    if (!deduped.includes(nickname)) deduped.push(nickname);
+    const label = formatNetworkingGuestIdentity({
+      fullName: row.fullName,
+      nickname: row.nickname,
+      jobTitle: row.jobTitle,
+      company: row.company,
+    }).slice(0, RANDOMIZER_PARTICIPANT_LABEL_MAX);
+    if (!label) continue;
+    if (!deduped.includes(label)) deduped.push(label);
   }
   return deduped;
 }

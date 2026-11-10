@@ -726,14 +726,15 @@ export const setPublicViewSchema = z.object({
   randomizerMaxNumber: z.number().int().min(-1000000).max(1000000).optional(),
   randomizerWinnersCount: z.number().int().min(1).max(500).optional(),
   randomizerExcludeWinners: z.boolean().optional(),
-  randomizerSelectedWinners: z.array(z.string().trim().min(1).max(120)).max(10000).optional(),
-  randomizerCurrentWinners: z.array(z.string().trim().min(1).max(120)).max(500).optional(),
-  randomizerAnimationPool: z.array(z.string().trim().min(1).max(120)).max(10000).optional(),
+  // До 240: ФИО · должность · номер аптеки (pharma / networking identity).
+  randomizerSelectedWinners: z.array(z.string().trim().min(1).max(240)).max(10000).optional(),
+  randomizerCurrentWinners: z.array(z.string().trim().min(1).max(240)).max(500).optional(),
+  randomizerAnimationPool: z.array(z.string().trim().min(1).max(240)).max(10000).optional(),
   randomizerHistory: z
     .array(
       z.object({
         timestamp: z.string().trim().min(1).max(80),
-        winners: z.array(z.string().trim().min(1).max(120)).min(1).max(50),
+        winners: z.array(z.string().trim().min(1).max(240)).min(1).max(50),
         mode: z.enum(["names", "numbers"]),
       }),
     )

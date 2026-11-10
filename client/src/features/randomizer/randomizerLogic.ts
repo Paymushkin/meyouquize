@@ -44,6 +44,43 @@ export function isStaleParticipantSnapshot(savedNames: string[], liveNicknames: 
   return savedNames.every((name) => liveLower.has(name.toLowerCase()));
 }
 
+/**
+ * Свободный список — старые nickname без ФИО/должности/аптеки,
+ * а в комнате уже полные подписи «Имя · должность · компания».
+ */
+export function isOutdatedParticipantIdentitySnapshot(
+  savedNames: string[],
+  liveLabels: string[],
+): boolean {
+  if (savedNames.length === 0 || liveLabels.length === 0) return false;
+  if (savedNames.length !== liveLabels.length) return false;
+  const liveByPrimary = new Map<string, string>();
+  for (const label of liveLabels) {
+    const primary = label.split(" · ")[0]?.trim().toLowerCase() ?? "";
+    if (!primary) continue;
+    liveByPrimary.set(primary, label);
+  }
+  let upgraded = 0;
+  for (const saved of savedNames) {
+    const key = saved.trim().toLowerCase();
+    const live = liveByPrimary.get(key);
+    if (!live) return false;
+    if (live.trim().toLowerCase() !== key) upgraded += 1;
+  }
+  return upgraded > 0;
+}
+
+/** Нужно ли подтянуть свободный список из актуальных подписей комнаты. */
+export function shouldSyncParticipantNamesList(
+  savedNames: string[],
+  liveLabels: string[],
+): boolean {
+  return (
+    isStaleParticipantSnapshot(savedNames, liveLabels) ||
+    isOutdatedParticipantIdentitySnapshot(savedNames, liveLabels)
+  );
+}
+
 export function buildNumberRange(minNumber: number, maxNumber: number): string[] {
   if (!Number.isFinite(minNumber) || !Number.isFinite(maxNumber)) return [];
   const min = Math.trunc(minNumber);

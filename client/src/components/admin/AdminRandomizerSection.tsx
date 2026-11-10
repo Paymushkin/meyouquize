@@ -142,7 +142,7 @@ export function AdminRandomizerSection(props: Props) {
                   disabled={listMode === "participants_only"}
                   helperText={
                     listMode === "participants_only"
-                      ? `Актуальный список из комнаты: ${liveParticipantCount} участников`
+                      ? `Актуальный список из комнаты: ${liveParticipantCount} участников (ФИО · должность · аптека/компания)`
                       : `Сохранённый список: ${parseNames(namesText).length} имён. В комнате сейчас: ${liveParticipantCount}.`
                   }
                   sx={{

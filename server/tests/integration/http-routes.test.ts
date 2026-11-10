@@ -7,6 +7,7 @@ import {
   seedSingleChoiceQuiz,
   uniqueSlug,
 } from "../helpers/integrationFixtures.js";
+import { prisma } from "../../src/prisma.js";
 import { setQuestionEnabled } from "../../src/quiz-service.js";
 import { saveStoredPublicView } from "../../src/socket/public-view-store.js";
 import { DEFAULT_PUBLIC_VIEW_STATE } from "@meyouquize/shared";
@@ -35,7 +36,7 @@ describe("HTTP routes integration", () => {
   });
 
   it("GET /api/admin/rooms/:eventName/participants lists joined players", async () => {
-    const { eventName } = await seedSingleChoiceQuiz(uniqueSlug("participants"));
+    const { eventName, quizId } = await seedSingleChoiceQuiz(uniqueSlug("participants"));
     await joinPlayer(eventName, "Listed Player", "dev-list");
     const app = buildApp();
     const agent = await createAdminAgent(app);
@@ -44,6 +45,15 @@ describe("HTTP routes integration", () => {
     expect(response.body.nicknames.some((nickname: string) => nickname === "Listed Player")).toBe(
       true,
     );
+
+    await prisma.participant.updateMany({
+      where: { quizId, nickname: "Listed Player" },
+      data: { fullName: "Иванова Анна", jobTitle: "Провизор", company: "12" },
+    });
+    const withProfile = await agent.get(`/api/admin/rooms/${eventName}/participants`);
+    expect(withProfile.status).toBe(200);
+    expect(withProfile.body.nicknames).toContain("Иванова Анна · Провизор · 12");
+    expect(withProfile.body.nicknames).not.toContain("Listed Player");
   });
 
   it("GET /api/quiz/by-slug/:slug/meta returns branding fields", async () => {

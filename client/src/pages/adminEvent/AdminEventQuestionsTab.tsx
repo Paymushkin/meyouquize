@@ -41,7 +41,7 @@ import type { useAdminReactions } from "../../features/admin/useAdminReactions";
 import type { useAdminPlayerTiles } from "../../features/admin/useAdminPlayerTiles";
 import type { AdminSetPublicResultsView } from "../../features/admin/useAdminRandomizer";
 import {
-  isStaleParticipantSnapshot,
+  shouldSyncParticipantNamesList,
   parseNames,
   randomizerNamesTextForPublicView,
 } from "../../features/randomizer/randomizerLogic";
@@ -249,7 +249,7 @@ export function AdminEventQuestionsTab({
       if (randomizer.listMode !== "free_list") return;
       if (randomizer.namesEditedRef.current) return;
       const saved = parseNames(randomizer.namesText);
-      if (!isStaleParticipantSnapshot(saved, nicknames)) return;
+      if (!shouldSyncParticipantNamesList(saved, nicknames)) return;
       importParticipantsToFreeList(nicknames);
     })();
   }, [

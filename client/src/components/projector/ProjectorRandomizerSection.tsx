@@ -103,12 +103,15 @@ export function ProjectorRandomizerSection({ view }: Props) {
                   sx={{
                     display: "inline-block",
                     position: "relative",
+                    maxWidth: "100%",
                     fontWeight: 800,
-                    fontSize: { xs: "2.2rem", md: "4rem" },
+                    fontSize: { xs: "1.55rem", md: "3rem" },
+                    lineHeight: 1.2,
                     letterSpacing: 0.3,
                     color: view.voteOptionTextColor,
                     fontFamily: view.brandFontFamily,
                     textAlign: "center",
+                    wordBreak: "break-word",
                     pb: { xs: 0.45, md: 0.6 },
                     "&::after": {
                       content: '""',
@@ -188,12 +191,12 @@ export function ProjectorRandomizerSection({ view }: Props) {
                     <Box
                       key={`${row.idx}:${row.winner}`}
                       sx={{
-                        borderRadius: 999,
+                        borderRadius: 2,
                         px: 2,
                         py: 1.5,
                         bgcolor: "rgba(255,255,255,0.08)",
                         border: "1px solid rgba(255,255,255,0.18)",
-                        maxWidth: { xs: "100%", md: 360 },
+                        maxWidth: { xs: "100%", md: 520 },
                         display: "flex",
                         alignItems: "center",
                         justifyContent: "center",
@@ -224,7 +227,7 @@ export function ProjectorRandomizerSection({ view }: Props) {
                           color: view.voteOptionTextColor,
                           fontWeight: 700,
                           fontFamily: view.brandFontFamily,
-                          lineHeight: 1,
+                          lineHeight: 1.25,
                           wordBreak: "break-word",
                           textAlign: "center",
                         }}
