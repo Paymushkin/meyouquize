@@ -3,11 +3,12 @@ import {
   buildPhotoWallWaterfallColumnPhotos,
   photoWallKenBurnsVariant,
   photoWallPickInsertPhotoIndex,
-  photoWallSlotPhotoIndex,
-  photoWallWaterfallScrollDurationSec,
+  photoWallPickRemovalTileIndex,
+  photoWallWaterfallScrollSpeedPxPerSec,
   PHOTO_WALL_INSERT_DURATION_MS,
   PHOTO_WALL_INSERT_INTERVAL_MS,
   PHOTO_WALL_INSERT_RETRY_MS,
+  PHOTO_WALL_WATERFALL_MIN_TILES_PER_COLUMN,
   resolvePhotoWallColumnCount,
   type PhotoWallAlbumPhoto,
   type PublicViewState,
@@ -22,6 +23,7 @@ import {
   useState,
   type CSSProperties,
   type ReactNode,
+  type RefObject,
   type TransitionEvent,
 } from "react";
 import { Box, Stack, Typography } from "@mui/material";
@@ -80,8 +82,57 @@ function useViewportWidth(): number {
   return width;
 }
 
-function kenBurnsLayerClass(kenBurnsMotion: boolean, photoIndex: number): string {
-  if (!kenBurnsMotion) return "photo-wall-waterfall-tile__layer";
+/** Постоянная скорость ленты в px/s (не % от растущей высоты). */
+function useWaterfallConstantScroll(params: {
+  enabled: boolean;
+  trackRef: RefObject<HTMLElement | null>;
+  speedPxPerSec: number;
+}) {
+  const { enabled, trackRef, speedPxPerSec } = params;
+  const offsetRef = useRef(0);
+  const lastTsRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    const track = trackRef.current;
+    if (!enabled) {
+      offsetRef.current = 0;
+      lastTsRef.current = null;
+      if (track) track.style.transform = "";
+      return;
+    }
+
+    let raf = 0;
+    const tick = (ts: number) => {
+      const el = trackRef.current;
+      if (!el) {
+        raf = requestAnimationFrame(tick);
+        return;
+      }
+      if (lastTsRef.current == null) lastTsRef.current = ts;
+      const dt = Math.min(0.064, (ts - lastTsRef.current) / 1000);
+      lastTsRef.current = ts;
+
+      offsetRef.current += speedPxPerSec * dt;
+      const half = el.scrollHeight / 2;
+      if (half > 1) {
+        while (offsetRef.current >= half) offsetRef.current -= half;
+        if (offsetRef.current < 0) offsetRef.current = 0;
+      }
+
+      el.style.transform = `translate3d(0, ${-offsetRef.current}px, 0)`;
+      raf = requestAnimationFrame(tick);
+    };
+
+    raf = requestAnimationFrame(tick);
+    return () => {
+      cancelAnimationFrame(raf);
+      lastTsRef.current = null;
+    };
+  }, [enabled, speedPxPerSec, trackRef]);
+}
+
+function kenBurnsLayerClass(kenBurnsMotion: boolean, inView: boolean, photoIndex: number): string {
+  if (!kenBurnsMotion || !inView) return "photo-wall-waterfall-tile__layer";
   const variant = photoWallKenBurnsVariant(photoIndex);
   return `photo-wall-waterfall-tile__layer photo-wall-waterfall-tile__layer--ken-burns-${variant}`;
 }
@@ -129,6 +180,7 @@ function WaterfallTile({
   const imgRef = useRef<HTMLImageElement | null>(null);
   const [broken, setBroken] = useState(false);
   const [loaded, setLoaded] = useState(false);
+  const [inView, setInView] = useState(false);
   const [clipAnimating, setClipAnimating] = useState(false);
   const expandCompleteRef = useRef(false);
   const usesClip = expandClipHeightPx !== null;
@@ -181,7 +233,19 @@ function WaterfallTile({
 
   useEffect(() => {
     const node = tileRef.current;
-    if (!node || !insertPhotos) return;
+    if (!node) return;
+
+    const visibilityObserver = new IntersectionObserver(
+      ([entry]) => {
+        setInView(Boolean(entry?.isIntersecting && (entry.intersectionRatio ?? 0) > 0));
+      },
+      { root: null, threshold: [0, 0.05, 0.15] },
+    );
+    visibilityObserver.observe(node);
+
+    if (!insertPhotos) {
+      return () => visibilityObserver.disconnect();
+    }
 
     const edgePercent = INSERT_VIEWPORT_EDGE_RATIO * 100;
     const rootMargin = `-${edgePercent}% 0px -${edgePercent}% 0px`;
@@ -200,16 +264,17 @@ function WaterfallTile({
       });
     };
 
-    const observer = new IntersectionObserver(
+    const centerObserver = new IntersectionObserver(
       ([entry]) => {
         if (!entry) return;
         reportCenterZone(entry);
       },
       { rootMargin, threshold: [0, 0.1, 0.25, 0.5, 0.75, 1] },
     );
-    observer.observe(node);
+    centerObserver.observe(node);
     return () => {
-      observer.disconnect();
+      visibilityObserver.disconnect();
+      centerObserver.disconnect();
       onCenterZoneChange(tileKey, null);
     };
   }, [insertPhotos, logicalIndex, onCenterZoneChange, tileKey]);
@@ -276,7 +341,7 @@ function WaterfallTile({
         <img
           ref={imgRef}
           className={[
-            kenBurnsLayerClass(kenBurnsMotion, photo.index),
+            kenBurnsLayerClass(kenBurnsMotion, inView, photo.index),
             loaded || usesClip ? "photo-wall-waterfall-tile__layer--loaded" : "",
           ]
             .filter(Boolean)
@@ -315,14 +380,30 @@ function WaterfallColumn({
   const centerZoneTilesRef = useRef<Map<string, CenterZoneTile>>(new Map());
   const insertingRef = useRef(false);
   const pickSlotRef = useRef(columnIndex);
+  const trackRef = useRef<HTMLDivElement | null>(null);
 
+  const albumKey = `${photos.length}:${photos[0]?.src ?? ""}:${photos[photos.length - 1]?.src ?? ""}`;
   const [tiles, setTiles] = useState<ColumnTile[]>(() =>
     buildInitialColumnTiles(photos, columnIndex, columnCount),
   );
   const [expandingTileId, setExpandingTileId] = useState<string | null>(null);
   const [expandClipHeightPx, setExpandClipHeightPx] = useState<number | null>(null);
 
-  const scrollDurationSec = photoWallWaterfallScrollDurationSec(columnIndex, columnCount);
+  useEffect(() => {
+    // Новое включение / смена альбома — снова начинаем с самых новых фото.
+    setTiles(buildInitialColumnTiles(photos, columnIndex, columnCount));
+    setExpandingTileId(null);
+    setExpandClipHeightPx(null);
+    insertCountRef.current = 0;
+  }, [albumKey, columnCount, columnIndex, photos]);
+
+  const speedPxPerSec = photoWallWaterfallScrollSpeedPxPerSec(columnIndex, columnCount);
+  useWaterfallConstantScroll({
+    enabled: scroll,
+    trackRef,
+    speedPxPerSec,
+  });
+
   const strip = useMemo(() => [...tiles, ...tiles], [tiles]);
   const expandingSlotIndex = useMemo(() => {
     if (!expandingTileId) return -1;
@@ -418,9 +499,24 @@ function WaterfallColumn({
         if (committed) return;
         committed = true;
         insertCountRef.current += 1;
+        const centerLogicalIndices = Array.from(
+          new Set(Array.from(centerZoneTilesRef.current.values()).map((tile) => tile.logicalIndex)),
+        );
         setTiles((prev) => {
           const next = [...prev];
-          next.splice(insertAt, 0, { id: newTileId, photoIndex: nextPhotoIndex });
+          let at = insertAt;
+          if (next.length >= PHOTO_WALL_WATERFALL_MIN_TILES_PER_COLUMN) {
+            const removeIndex = photoWallPickRemovalTileIndex({
+              tilesLength: next.length,
+              insertAt: at,
+              centerLogicalIndices,
+            });
+            if (removeIndex != null) {
+              if (removeIndex < at) at -= 1;
+              next.splice(removeIndex, 1);
+            }
+          }
+          next.splice(at, 0, { id: newTileId, photoIndex: nextPhotoIndex });
           return next;
         });
         setExpandingTileId(newTileId);
@@ -456,20 +552,16 @@ function WaterfallColumn({
     return () => registerColumn(columnIndex, null);
   }, [columnIndex, registerColumn, tryInsertVisible]);
 
-  const trackStyle = {
-    "--photo-wall-scroll-duration": `${scrollDurationSec}s`,
-  } as CSSProperties;
-
   return (
     <Box className="photo-wall-waterfall-column">
       <Box
+        ref={trackRef}
         className={[
           "photo-wall-waterfall-column__track",
-          scroll ? "photo-wall-waterfall-column__track--scroll" : "",
+          scroll ? "photo-wall-waterfall-column__track--js-scroll" : "",
         ]
           .filter(Boolean)
           .join(" ")}
-        style={trackStyle}
       >
         {strip.map((tile, slotIndex) => {
           const photo = photos[tile.photoIndex];

@@ -18,20 +18,11 @@
   display: flex;
   flex-direction: column;
   gap: 0;
+}
+
+.photo-wall-waterfall-column__track--js-scroll {
   will-change: transform;
-}
-
-.photo-wall-waterfall-column__track--scroll {
-  animation: photo-wall-waterfall-scroll-up var(--photo-wall-scroll-duration, 240s) linear infinite;
-}
-
-@keyframes photo-wall-waterfall-scroll-up {
-  from {
-    transform: translateY(0);
-  }
-  to {
-    transform: translateY(-50%);
-  }
+  backface-visibility: hidden;
 }
 
 .photo-wall-waterfall-tile {
@@ -59,7 +50,6 @@
   height: auto;
   max-width: 100%;
   transform-origin: center center;
-  will-change: transform;
   opacity: 0;
   transition: opacity 0.35s ease;
 }
@@ -72,6 +62,13 @@
 .photo-wall-waterfall-tile__frame--clip .photo-wall-waterfall-tile__layer--loaded {
   opacity: 1;
   transition: none;
+}
+
+.photo-wall-waterfall-tile__layer--ken-burns-1,
+.photo-wall-waterfall-tile__layer--ken-burns-2,
+.photo-wall-waterfall-tile__layer--ken-burns-3,
+.photo-wall-waterfall-tile__layer--ken-burns-4 {
+  will-change: transform;
 }
 
 .photo-wall-waterfall-tile__layer--ken-burns-1 {
@@ -126,6 +123,6 @@
   }
 }
 
-/* Проектор — экран показа: не глушим scroll/Ken Burns при
+/* Проектор — экран показа: не глушим Ken Burns при
    prefers-reduced-motion (Windows «Эффекты анимации» / RDP).
    Этот CSS подключается только в ProjectorPhotoWallSection. */

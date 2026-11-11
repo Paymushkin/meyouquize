@@ -57,7 +57,8 @@ type SpeakerQuestionWire = {
 type ViewerMode = "player" | "projector" | "admin" | "moderator";
 
 const SPEAKER_QUESTIONS_SUBSCRIBE_RATE_WINDOW_MS = 60_000;
-const SPEAKER_QUESTIONS_SUBSCRIBE_RATE_MAX_PER_WINDOW = 5;
+/** Игрок переподписывается при reconnect и при каждом открытии диалога. */
+const SPEAKER_QUESTIONS_SUBSCRIBE_RATE_MAX_PER_WINDOW = 40;
 
 const SPEAKER_QUESTION_CREATE_RATE_WINDOW_MS = 60_000;
 const SPEAKER_QUESTION_CREATE_RATE_MAX_PER_WINDOW = 5;

@@ -51,6 +51,7 @@
   </head>
   <body>
     <div id="root"></div>
-    <script type="module" src="/src/main.tsx"></script>
+    <!-- entry сначала проверяет Safari/iOS &lt; 17 и не грузит React/MUI на старых устройствах -->
+    <script type="module" src="/src/entry.ts"></script>
   </body>
 </html>

@@ -64,6 +64,7 @@ import { useEventFavicon } from "../hooks/useEventFavicon";
 import { getNickname, randomNickname, setNickname } from "../storage";
 import { socket } from "../socket";
 import { useQuizPlayJoin } from "../hooks/useQuizPlayJoin";
+import { usePlayerSpeakerQuestionsSubscribe } from "../hooks/usePlayerSpeakerQuestionsSubscribe";
 import { buildQuizPlayConnectionChip } from "../features/quizPlay/connectionChip";
 import { getRoomNickKey, shouldRestoreJoin } from "../features/quizPlay/joinStorage";
 import { buildPlayerTilesOrder, getVisiblePlayerBanners } from "../features/quizPlay/tiles";
@@ -334,10 +335,11 @@ export function QuizPlayPage() {
     onQuizSessionReadyChange: setQuizSessionReady,
   });
 
-  useEffect(() => {
-    if (!slug || !joined) return;
-    socket.emit("speaker:questions:subscribe", { slug, viewer: "player" });
-  }, [slug, joined]);
+  usePlayerSpeakerQuestionsSubscribe({
+    slug,
+    joined,
+    dialogOpen: speakerDialogOpen,
+  });
 
   const {
     titleText,

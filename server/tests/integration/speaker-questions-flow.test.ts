@@ -243,4 +243,46 @@ describe("speaker questions integration", () => {
     expect(stored?.isVisibleToModerator).toBe(true);
     expect(stored?.isVisibleToUsers).toBe(true);
   });
+
+  it("player re-subscribe returns newly published questions", async () => {
+    const { eventName, quizId } = await seedSingleChoiceQuiz(uniqueSlug("speaker-resub"));
+    await enableSpeakerQuestions(quizId);
+    server = await createTestServer();
+
+    const author = await joinPlayerSocket(server.baseUrl, eventName, "Author", "dev-resub-1");
+    sockets.push(author);
+
+    const createdWait = waitForEvent<SpeakerQuestionsUpdate>(author, "speaker:questions:update");
+    author.emit("speaker:question:create", {
+      quizId,
+      speakerName: "Иванов",
+      text: "Опубликуйте меня для зала?",
+    });
+    await createdWait;
+
+    const row = await prisma.speakerQuestion.findFirst({
+      where: { quizId },
+      orderBy: { createdAt: "desc" },
+    });
+    expect(row).toBeTruthy();
+
+    const viewer = await joinPlayerSocket(server.baseUrl, eventName, "Viewer", "dev-resub-2");
+    sockets.push(viewer);
+
+    const initialWait = waitForEvent<SpeakerQuestionsUpdate>(viewer, "speaker:questions:update");
+    viewer.emit("speaker:questions:subscribe", { slug: eventName, viewer: "player" });
+    const initial = await initialWait;
+    expect(initial.items.some((i) => i.id === row!.id && i.userVisible)).toBe(false);
+
+    // Публикация без broadcast: имитируем «открыл диалог → subscribe» после изменения в БД.
+    await prisma.speakerQuestion.update({
+      where: { id: row!.id },
+      data: { status: "APPROVED", isVisibleToUsers: true },
+    });
+
+    const refreshWait = waitForEvent<SpeakerQuestionsUpdate>(viewer, "speaker:questions:update");
+    viewer.emit("speaker:questions:subscribe", { slug: eventName, viewer: "player" });
+    const refreshed = await refreshWait;
+    expect(refreshed.items.some((i) => i.id === row!.id && i.userVisible)).toBe(true);
+  });
 });

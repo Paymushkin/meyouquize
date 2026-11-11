@@ -6,11 +6,14 @@ import {
   clampPhotoWallImageCount,
   photoWallColumnPhotoIndices,
   photoWallPickInsertPhotoIndex,
+  photoWallPickRemovalTileIndex,
   photoWallSlotPhotoIndex,
   photoWallCollagePhotoIndices,
+  photoWallWaterfallScrollSpeedPxPerSec,
   resolvePhotoWallCollageLayout,
   photoWallTileAspectRatio,
   PHOTO_WALL_COLLAGE_PHOTO_COUNT,
+  PHOTO_WALL_SCROLL_SPEED_PX_PER_SEC,
   resolvePhotoWallColumnCount,
   sanitizePhotoWallBaseUrl,
 } from "./photoWall.js";
@@ -64,30 +67,59 @@ describe("photoWall", () => {
     const col0 = buildPhotoWallWaterfallColumnPhotos(photos, 0, 3, 3);
     const col1 = buildPhotoWallWaterfallColumnPhotos(photos, 1, 3, 3);
     const col2 = buildPhotoWallWaterfallColumnPhotos(photos, 2, 3, 3);
-    expect(col0.map((p) => p.index)).toEqual([1, 4, 1]);
-    expect(col1.map((p) => p.index)).toEqual([2, 5, 2]);
-    expect(col2.map((p) => p.index)).toEqual([3, 6, 3]);
+    // Новые файлы (больший index) идут первыми в колонке.
+    expect(col0.map((p) => p.index)).toEqual([4, 1, 4]);
+    expect(col1.map((p) => p.index)).toEqual([5, 2, 5]);
+    expect(col2.map((p) => p.index)).toEqual([6, 3, 6]);
     const visibleAtSlot0 = [
       photoWallSlotPhotoIndex(6, 0, 3, 0, 0),
       photoWallSlotPhotoIndex(6, 1, 3, 0, 0),
       photoWallSlotPhotoIndex(6, 2, 3, 0, 0),
     ];
     expect(new Set(visibleAtSlot0).size).toBe(3);
+    expect(visibleAtSlot0).toEqual([3, 4, 5]);
     expect(photoWallTileAspectRatio({ width: 1600, height: 1200 })).toBe("1600 / 1200");
   });
 
   it("picks insert photo avoiding neighbors in column pool", () => {
-    expect(photoWallColumnPhotoIndices(6, 0, 3)).toEqual([0, 3]);
+    expect(photoWallColumnPhotoIndices(6, 0, 3)).toEqual([3, 0]);
     expect(photoWallPickInsertPhotoIndex(6, 0, 3, [0], 0)).toBe(3);
     expect(photoWallPickInsertPhotoIndex(6, 0, 3, [0, 3], 0)).toBeNull();
     expect(photoWallPickInsertPhotoIndex(6, 1, 3, [1], 0)).toBe(4);
   });
 
-  it("picks evenly spaced photos for player collage", () => {
+  it("picks the last photos for player collage", () => {
     expect(photoWallCollagePhotoIndices(0)).toEqual([]);
     expect(photoWallCollagePhotoIndices(1)).toEqual([0]);
-    expect(photoWallCollagePhotoIndices(8)).toEqual([0, 4, 7]);
+    expect(photoWallCollagePhotoIndices(2)).toEqual([0, 1]);
+    expect(photoWallCollagePhotoIndices(8)).toEqual([5, 6, 7]);
     expect(photoWallCollagePhotoIndices(8, PHOTO_WALL_COLLAGE_PHOTO_COUNT)).toHaveLength(3);
+  });
+
+  it("keeps waterfall scroll speed stable across columns", () => {
+    expect(photoWallWaterfallScrollSpeedPxPerSec(0, 4)).toBe(PHOTO_WALL_SCROLL_SPEED_PX_PER_SEC);
+    expect(photoWallWaterfallScrollSpeedPxPerSec(2, 4)).toBe(
+      PHOTO_WALL_SCROLL_SPEED_PX_PER_SEC + 10,
+    );
+  });
+
+  it("picks a removal tile away from insert and center zone", () => {
+    expect(
+      photoWallPickRemovalTileIndex({
+        tilesLength: 1,
+        insertAt: 1,
+        centerLogicalIndices: [0],
+      }),
+    ).toBeNull();
+
+    const removed = photoWallPickRemovalTileIndex({
+      tilesLength: 8,
+      insertAt: 3,
+      centerLogicalIndices: [2, 3, 4],
+    });
+    expect(removed).not.toBeNull();
+    expect([2, 3]).not.toContain(removed);
+    expect([2, 3, 4]).not.toContain(removed);
   });
 
   it("resolves collage grid layout for tile preview", () => {

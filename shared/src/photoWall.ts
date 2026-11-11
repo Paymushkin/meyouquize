@@ -99,6 +99,8 @@ export function photoWallKenBurnsVariant(index: number): number {
 }
 
 export const PHOTO_WALL_WATERFALL_MIN_TILES_PER_COLUMN = 12;
+/** Постоянная скорость ленты (px/s); раньше % от растущей высоты разгонял анимацию. */
+export const PHOTO_WALL_SCROLL_SPEED_PX_PER_SEC = 36;
 export const PHOTO_WALL_INSERT_INTERVAL_MS = 5_000;
 export const PHOTO_WALL_INSERT_RETRY_MS = 800;
 export const PHOTO_WALL_INSERT_DURATION_MS = 2_800;
@@ -172,7 +174,50 @@ export function photoWallWaterfallScrollDurationSec(
 ): number {
   const base = 240;
   const spread = 36;
-  return base + (columnIndex % columnCount) * spread;
+  const cols = Math.max(columnCount, 1);
+  return base + (columnIndex % cols) * spread;
+}
+
+/** Скорость колонки в px/s с лёгким разбросом между колонками. */
+export function photoWallWaterfallScrollSpeedPxPerSec(
+  columnIndex: number,
+  columnCount: number,
+): number {
+  const cols = Math.max(columnCount, 1);
+  const spread = 5;
+  return PHOTO_WALL_SCROLL_SPEED_PX_PER_SEC + (columnIndex % cols) * spread;
+}
+
+/**
+ * Индекс тайла для удаления при insert, чтобы длина колонки не росла.
+ * Предпочитаем вне центра экрана и дальше от точки вставки.
+ */
+export function photoWallPickRemovalTileIndex(params: {
+  tilesLength: number;
+  insertAt: number;
+  centerLogicalIndices: readonly number[];
+}): number | null {
+  const { tilesLength, insertAt, centerLogicalIndices } = params;
+  if (tilesLength < 2) return null;
+
+  const center = new Set(centerLogicalIndices);
+  const anchor = Math.max(0, Math.min(tilesLength - 1, insertAt - 1));
+  const protectedIdx = new Set<number>([anchor, insertAt % tilesLength]);
+
+  let best: number | null = null;
+  let bestScore = Number.NEGATIVE_INFINITY;
+  for (let i = 0; i < tilesLength; i += 1) {
+    if (protectedIdx.has(i)) continue;
+    const linear = Math.abs(i - anchor);
+    const dist = Math.min(linear, tilesLength - linear);
+    const outsideBonus = center.has(i) ? 0 : tilesLength * 2;
+    const score = outsideBonus + dist;
+    if (score > bestScore) {
+      bestScore = score;
+      best = i;
+    }
+  }
+  return best;
 }
 
 export function photoWallTileAspectRatio(
@@ -192,16 +237,14 @@ export function photoWallSlotPhotoIndex(
 ): number {
   if (photosLength < 1 || columnCount < 1) return 0;
 
-  const indices: number[] = [];
-  for (let i = columnIndex; i < photosLength; i += columnCount) {
-    indices.push(i);
-  }
+  const indices = photoWallColumnPhotoIndices(photosLength, columnIndex, columnCount);
   if (indices.length === 0) {
     return (columnIndex + slotIndex + rotationOffset) % photosLength;
   }
   return indices[(slotIndex + rotationOffset) % indices.length]!;
 }
 
+/** Индексы колонки: сначала более новые фото (больший номер файла). */
 export function photoWallColumnPhotoIndices(
   photosLength: number,
   columnIndex: number,
@@ -218,6 +261,7 @@ export function photoWallColumnPhotoIndices(
       indices.push(i);
     }
   }
+  indices.reverse();
   return indices;
 }
 
@@ -240,18 +284,17 @@ export function photoWallPickInsertPhotoIndex(
   return null;
 }
 
-/** Индексы фото (0-based в альбоме) для коллажа на плитке участника. */
+/** Индексы фото (0-based в альбоме) для коллажа на плитке: последние `count` кадров. */
 export function photoWallCollagePhotoIndices(
   photosLength: number,
   count = PHOTO_WALL_COLLAGE_PHOTO_COUNT,
 ): number[] {
   if (photosLength < 1 || count < 1) return [];
   const take = Math.min(count, photosLength);
-  if (take === 1) return [0];
-
+  const start = photosLength - take;
   const result: number[] = [];
   for (let i = 0; i < take; i += 1) {
-    result.push(Math.round((i * (photosLength - 1)) / (take - 1)));
+    result.push(start + i);
   }
   return result;
 }

@@ -219,10 +219,8 @@ function formatSecondsFromMs(valueMs: number): string {
 
 function SubQuizReportParticipantTable({
   table,
-  isPdfMode,
 }: {
   table: PublicReportPayload["subQuizParticipantTables"][number];
-  isPdfMode: boolean;
 }) {
   const placeMap = (() => {
     if (!table.rows.length) return new Map<string, number>();
@@ -240,11 +238,12 @@ function SubQuizReportParticipantTable({
     <TableContainer
       sx={{
         mt: 1.5,
-        maxHeight: isPdfMode ? "none" : "min(70vh, 640px)",
-        overflow: "auto",
+        // Полная высота таблицы в отчёте; горизонтальный скролл — если много вопросов.
+        overflowX: "auto",
+        overflowY: "visible",
       }}
     >
-      <Table size="small" stickyHeader>
+      <Table size="small">
         <TableHead>
           <TableRow>
             <TableCell
@@ -962,10 +961,7 @@ export function PublicReportPage() {
                         <Typography variant="subtitle2" fontWeight={700} sx={{ mb: 0.5 }}>
                           Таблица результатов
                         </Typography>
-                        <SubQuizReportParticipantTable
-                          table={group.participantTable}
-                          isPdfMode={isPdfMode}
-                        />
+                        <SubQuizReportParticipantTable table={group.participantTable} />
                       </Box>
                     ) : group.participantTable && group.participantTable.rows.length === 0 ? (
                       <Typography variant="body2" color="text.secondary" sx={{ mt: 1.5 }}>
