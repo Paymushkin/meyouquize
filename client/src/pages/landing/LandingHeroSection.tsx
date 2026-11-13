@@ -160,11 +160,15 @@ export function LandingHeroSection() {
               },
               "& > *:nth-of-type(2)": {
                 animation: `${heroStaggerIn} 800ms cubic-bezier(0.22, 1, 0.36, 1) both`,
-                animationDelay: "200ms",
+                animationDelay: "180ms",
               },
               "& > *:nth-of-type(3)": {
                 animation: `${heroStaggerIn} 800ms cubic-bezier(0.22, 1, 0.36, 1) both`,
-                animationDelay: "320ms",
+                animationDelay: "280ms",
+              },
+              "& > *:nth-of-type(4)": {
+                animation: `${heroStaggerIn} 800ms cubic-bezier(0.22, 1, 0.36, 1) both`,
+                animationDelay: "380ms",
               },
             },
           }}
@@ -174,15 +178,36 @@ export function LandingHeroSection() {
             sx={{
               fontFamily: BRAND_DISPLAY_FONT,
               fontWeight: 800,
-              letterSpacing: { xs: "0.04em", sm: "0.08em" },
-              lineHeight: 1.05,
+              letterSpacing: { xs: "0.08em", sm: "0.12em" },
+              lineHeight: 0.95,
               fontSize: {
-                xs: "clamp(1.35rem, 7vw, 2rem)",
-                sm: "clamp(2.2rem, 5.5vw, 3rem)",
-                md: "clamp(2.8rem, 4.6vw, 4.25rem)",
+                xs: "clamp(3.2rem, 18vw, 5.5rem)",
+                sm: "clamp(5rem, 14vw, 7.5rem)",
+                md: "clamp(6.5rem, 12vw, 9rem)",
               },
               textTransform: "uppercase",
               width: "100%",
+              mb: { xs: 1, md: 1.25 },
+            }}
+          >
+            МИЮ
+          </Typography>
+          <Typography
+            component="p"
+            aria-label="Делаем мероприятие живым"
+            sx={{
+              fontFamily: BRAND_DISPLAY_FONT,
+              fontWeight: 800,
+              letterSpacing: { xs: "0.04em", sm: "0.08em" },
+              lineHeight: 1.05,
+              fontSize: {
+                xs: "clamp(1.2rem, 5.5vw, 1.65rem)",
+                sm: "clamp(1.6rem, 3.8vw, 2.15rem)",
+                md: "clamp(1.85rem, 3.2vw, 2.6rem)",
+              },
+              textTransform: "uppercase",
+              width: "100%",
+              m: 0,
             }}
           >
             <Box
@@ -209,11 +234,9 @@ export function LandingHeroSection() {
               живым
             </Box>
           </Typography>
-          {/* Обёртка принимает stagger-анимацию (она перетирает transform),
-                подъём на уровень «ЖИВЫМ» — на внутреннем Typography */}
           <Box
             sx={{
-              mt: { xs: 1.5, md: 1.5 },
+              mt: { xs: 1.5, md: 1.75 },
               mb: { xs: 2.5, md: 3 },
             }}
           >
@@ -223,12 +246,6 @@ export function LandingHeroSection() {
                 fontSize: { xs: "1.02rem", md: "1.125rem" },
                 lineHeight: 1.4,
                 maxWidth: { xs: "92vw", sm: "36rem", md: "38rem" },
-                // На sm+ чуть ниже уровня «ЖИВЫМ»; на xs без подъёма
-                transform: {
-                  xs: "none",
-                  sm: "translateY(calc(-1 * (clamp(2.2rem, 5.5vw, 3rem) * 1.05 + 12px) + 18px))",
-                  md: "translateY(calc(-1 * (clamp(2.8rem, 4.6vw, 4.25rem) * 1.05 + 12px) + 22px))",
-                },
               }}
             >
               {lt("Интерактивы для всего зала и контент с гостями -")}

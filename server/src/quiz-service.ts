@@ -2524,31 +2524,57 @@ export async function getPublicReportBySlug(slug: string): Promise<PublicEventRe
   const view = publicViewJsonToState(quiz.publicView);
   if (!view.reportPublished) return null;
 
-  const [dash, participantsCount, answersCount, speakerStats, speakerItemsRaw, feedbackFormsRaw] =
-    await Promise.all([
-      getDashboardResults(quiz.id),
-      prisma.participant.count({ where: { quizId: quiz.id } }),
-      prisma.answer.count({ where: { quizId: quiz.id } }),
-      prisma.speakerQuestion.groupBy({
-        by: ["isOnScreen"],
-        where: { quizId: quiz.id },
-        _count: { _all: true },
-      }),
+  const speakerSessionsNorm = normalizeSpeakerQuestionSessions({
+    sessions: view.speakerQuestionSessions,
+    activeSpeakerSessionId: view.activeSpeakerSessionId,
+    speakers: view.speakerQuestionsSpeakers,
+  });
+  const speakerQuestionSelect = {
+    id: true,
+    sessionId: true,
+    speakerName: true,
+    text: true,
+    participant: { select: { nickname: true } },
+    reactions: { select: { reaction: true } },
+  } as const;
+  /** По каждой сессии отдельно — иначе newest-first take выкидывает ранние сессии. */
+  const SPEAKER_REPORT_PER_SESSION = 100;
+
+  const [
+    dash,
+    participantsCount,
+    answersCount,
+    speakerStats,
+    speakerItemsRawNested,
+    feedbackFormsRaw,
+  ] = await Promise.all([
+    getDashboardResults(quiz.id),
+    prisma.participant.count({ where: { quizId: quiz.id } }),
+    prisma.answer.count({ where: { quizId: quiz.id } }),
+    prisma.speakerQuestion.groupBy({
+      by: ["isOnScreen"],
+      where: { quizId: quiz.id },
+      _count: { _all: true },
+    }),
+    Promise.all([
+      ...speakerSessionsNorm.sessions.map((session) =>
+        prisma.speakerQuestion.findMany({
+          where: { quizId: quiz.id, sessionId: session.id },
+          orderBy: { createdAt: "desc" },
+          take: SPEAKER_REPORT_PER_SESSION,
+          select: speakerQuestionSelect,
+        }),
+      ),
       prisma.speakerQuestion.findMany({
-        where: { quizId: quiz.id },
+        where: { quizId: quiz.id, sessionId: null },
         orderBy: { createdAt: "desc" },
-        take: 100,
-        select: {
-          id: true,
-          sessionId: true,
-          speakerName: true,
-          text: true,
-          participant: { select: { nickname: true } },
-          reactions: { select: { reaction: true } },
-        },
+        take: SPEAKER_REPORT_PER_SESSION,
+        select: speakerQuestionSelect,
       }),
-      getFeedbackResultsForReport(quiz.id, view.reportFeedbackFormIds),
-    ]);
+    ]),
+    getFeedbackResultsForReport(quiz.id, view.reportFeedbackFormIds),
+  ]);
+  const speakerItemsRaw = speakerItemsRawNested.flat();
 
   const onScreen = speakerStats.find((row) => row.isOnScreen)?._count._all ?? 0;
   const total = speakerStats.reduce((sum, row) => sum + row._count._all, 0);
@@ -2574,11 +2600,6 @@ export async function getPublicReportBySlug(slug: string): Promise<PublicEventRe
     if (row.subQuizId != null) return false;
     if (voteQuestionIdSet.size === 0) return true;
     return voteQuestionIdSet.has(row.questionId);
-  });
-  const speakerSessionsNorm = normalizeSpeakerQuestionSessions({
-    sessions: view.speakerQuestionSessions,
-    activeSpeakerSessionId: view.activeSpeakerSessionId,
-    speakers: view.speakerQuestionsSpeakers,
   });
   const speakerItems = speakerItemsRaw.map((item) => {
     const reactionCountByValue = new Map<string, number>();
@@ -2721,7 +2742,7 @@ export async function getPublicReportBySlug(slug: string): Promise<PublicEventRe
       const items = qSet === null ? speakerItems : speakerItems.filter((item) => qSet.has(item.id));
       return {
         enabled: view.speakerQuestionsEnabled,
-        total: items.length,
+        total: qSet === null ? total : items.length,
         onScreen,
         sessions: speakerSessionsNorm.sessions.map((s) => ({ id: s.id, name: s.name })),
         items,

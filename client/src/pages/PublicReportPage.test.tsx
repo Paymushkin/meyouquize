@@ -352,4 +352,93 @@ describe("PublicReportPage", () => {
     expect(await screen.findByText("Вопрос пленарки")).toBeTruthy();
     expect(await screen.findByText("Вопрос про ИИ")).toBeTruthy();
   });
+
+  it("keeps early speaker sessions when later sessions have many questions", async () => {
+    const laterSessionItems = Array.from({ length: 35 }, (_, index) => ({
+      id: `late-${index}`,
+      sessionId: "s2",
+      sessionName: "Сессия 2",
+      speakerName: "Петров",
+      text: `Новый вопрос ${index}`,
+      author: "Борис",
+      reactions: [] as Array<{ reaction: string; count: number }>,
+    }));
+
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => ({
+        ok: true,
+        json: async () => ({
+          title: "Демо событие",
+          slug: "demo",
+          generatedAt: new Date().toISOString(),
+          branding: {
+            brandPrimaryColor: "#7c5acb",
+            brandAccentColor: "#1976d2",
+            brandSurfaceColor: "#ffffff",
+            brandTextColor: "#1f1f1f",
+            brandFontFamily: "Jost, Arial, sans-serif",
+            brandLogoUrl: "",
+            brandProjectorBackgroundImageUrl: "",
+            brandBodyBackgroundColor: "#000000",
+          },
+          config: {
+            reportTitle: "Отчет демо",
+            reportModules: ["speaker_questions_summary"],
+            reportVoteQuestionIds: [],
+            reportQuizQuestionIds: [],
+            reportQuizSubQuizIds: [],
+            reportPublished: true,
+          },
+          summary: {
+            participantsCount: 10,
+            questionsCount: 0,
+            subQuizzesCount: 0,
+            answersCount: 0,
+          },
+          leaderboard: [],
+          quizQuestions: [],
+          voteQuestions: [],
+          randomizer: { currentWinners: [], history: [] },
+          reactions: { overlayText: "", widgets: [] },
+          speakerQuestions: {
+            enabled: true,
+            total: 36,
+            onScreen: 0,
+            sessions: [
+              { id: "s1", name: "Сессия 1" },
+              { id: "s2", name: "Сессия 2" },
+            ],
+            items: [
+              ...laterSessionItems,
+              {
+                id: "early-1",
+                sessionId: "s1",
+                sessionName: "Сессия 1",
+                speakerName: "Иванов",
+                text: "Вопрос из сессии 1",
+                author: "Алиса",
+                reactions: [],
+              },
+            ],
+          },
+          feedback: [],
+          subQuizParticipantTables: [],
+          banners: [],
+        }),
+      })),
+    );
+
+    render(
+      <MemoryRouter initialEntries={["/report/demo"]}>
+        <Routes>
+          <Route path="/report/:slug" element={<PublicReportPage />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    expect(await screen.findByText("Сессия 1")).toBeTruthy();
+    expect(await screen.findByText("Вопрос из сессии 1")).toBeTruthy();
+    expect(await screen.findByText("Сессия 2")).toBeTruthy();
+  });
 });

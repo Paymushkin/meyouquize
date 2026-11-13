@@ -1,4 +1,4 @@
-import { lazy, Suspense } from "react";
+import { lazy, Suspense, useEffect } from "react";
 import { Box } from "@mui/material";
 import { BrandPageLayout } from "./brand/BrandPageLayout";
 import { BrandHeader } from "./brand/BrandHeader";
@@ -12,6 +12,14 @@ import {
   buildWebsiteJsonLd,
   LANDING_SEO,
 } from "./landing/landingSeo";
+
+/** Убирает статичный #seo-fallback из index.html после гидрации (иначе два H1). */
+function useDismissSeoFallback() {
+  useEffect(() => {
+    document.documentElement.classList.add("js-ready");
+    document.getElementById("seo-fallback")?.remove();
+  }, []);
+}
 
 const LandingPillarsSection = lazy(() =>
   import("./landing/LandingPillarsSection").then((m) => ({ default: m.LandingPillarsSection })),
@@ -58,6 +66,8 @@ const LandingCookieBanner = lazy(() =>
 );
 
 export function LandingPage() {
+  useDismissSeoFallback();
+
   return (
     <BrandPageLayout>
       <DocumentSeo

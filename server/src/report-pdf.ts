@@ -122,7 +122,7 @@ async function renderSimplePdf(report: PublicEventReport): Promise<Buffer> {
       doc.fontSize(11).text(`Всего вопросов: ${report.speakerQuestions.total}`);
       doc.text(`На экране: ${report.speakerQuestions.onScreen}`);
       const speakerGroups = groupSpeakerQuestionsBySession(
-        report.speakerQuestions.items.slice(0, 20),
+        report.speakerQuestions.items,
         (report.speakerQuestions.sessions ?? []).map((s) => ({
           id: s.id,
           name: s.name,

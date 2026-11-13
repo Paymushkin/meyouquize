@@ -1277,8 +1277,10 @@ export function PublicReportPage() {
           </Card>
         );
       case "speaker_questions_summary": {
+        // Не режем глобально newest-first до группировки: иначе старые сессии
+        // (например «Сессия 1») полностью выпадают, когда новых вопросов много.
         const speakerGroups = groupSpeakerQuestionsBySession(
-          payload!.speakerQuestions.items.slice(0, 30),
+          payload!.speakerQuestions.items,
           (payload!.speakerQuestions.sessions ?? []).map((s) => ({
             id: s.id,
             name: s.name,
