@@ -182,6 +182,7 @@ export function LandingHeroSection() {
         >
           <Box
             sx={{
+              position: "relative",
               display: "flex",
               flexDirection: { xs: "column", md: "row" },
               alignItems: { xs: "stretch", md: "flex-end" },
@@ -240,6 +241,24 @@ export function LandingHeroSection() {
               >
                 Делаем мероприятие
               </Typography>
+            </Box>
+            {/* Явный пробел в DOM: иначе краулер склеивает «мероприятие»+«живым» в сниппете */}
+            <Box
+              component="span"
+              aria-hidden
+              sx={{
+                position: "absolute",
+                width: 1,
+                height: 1,
+                p: 0,
+                m: -1,
+                overflow: "hidden",
+                clip: "rect(0, 0, 0, 0)",
+                whiteSpace: "nowrap",
+                border: 0,
+              }}
+            >
+              {" "}
             </Box>
             <Typography
               component="p"
