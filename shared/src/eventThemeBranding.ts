@@ -34,6 +34,10 @@ export type EventThemeBranding = {
   playerVoteOptionTextColor: string;
   playerVoteProgressTrackColor: string;
   playerVoteProgressBarColor: string;
+  networkingProfileBackgroundColor: string;
+  networkingProfileTextColor: string;
+  networkingProjectorIconColor: string;
+  networkingNavIconColor: string;
   brandPrimaryColor: string;
   brandAccentColor: string;
   brandSurfaceColor: string;
@@ -100,6 +104,10 @@ export function pickEventThemeBrandingFromPublicView(view: unknown): EventThemeB
     playerVoteOptionTextColor: String(value.playerVoteOptionTextColor ?? ""),
     playerVoteProgressTrackColor: String(value.playerVoteProgressTrackColor ?? ""),
     playerVoteProgressBarColor: String(value.playerVoteProgressBarColor ?? ""),
+    networkingProfileBackgroundColor: String(value.networkingProfileBackgroundColor ?? ""),
+    networkingProfileTextColor: String(value.networkingProfileTextColor ?? ""),
+    networkingProjectorIconColor: String(value.networkingProjectorIconColor ?? ""),
+    networkingNavIconColor: String(value.networkingNavIconColor ?? ""),
     brandPrimaryColor: String(value.brandPrimaryColor ?? ""),
     brandAccentColor: String(value.brandAccentColor ?? ""),
     brandSurfaceColor: String(value.brandSurfaceColor ?? ""),

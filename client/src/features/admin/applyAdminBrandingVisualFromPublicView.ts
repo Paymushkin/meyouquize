@@ -35,6 +35,10 @@ export type AdminBrandingVisualSetters = {
   setPlayerVoteOptionTextColor: (value: string) => void;
   setPlayerVoteProgressTrackColor: (value: string) => void;
   setPlayerVoteProgressBarColor: (value: string) => void;
+  setNetworkingProfileBackgroundColor: (value: string) => void;
+  setNetworkingProfileTextColor: (value: string) => void;
+  setNetworkingProjectorIconColor: (value: string) => void;
+  setNetworkingNavIconColor: (value: string) => void;
   setBrandPrimaryColor: (value: string) => void;
   setBrandAccentColor: (value: string) => void;
   setBrandSurfaceColor: (value: string) => void;
@@ -103,6 +107,11 @@ export function applyAdminBrandingVisualFromPublicView(
   setters.setPlayerVoteOptionTextColor(b.playerVoteOptionTextColor);
   setters.setPlayerVoteProgressTrackColor(b.playerVoteProgressTrackColor);
   setters.setPlayerVoteProgressBarColor(b.playerVoteProgressBarColor);
+  // toBrandingState уже нормализует: иконки → brand primary/accent, если не заданы.
+  setters.setNetworkingProfileBackgroundColor(b.networkingProfileBackgroundColor);
+  setters.setNetworkingProfileTextColor(b.networkingProfileTextColor);
+  setters.setNetworkingProjectorIconColor(b.networkingProjectorIconColor);
+  setters.setNetworkingNavIconColor(b.networkingNavIconColor);
   setters.setBrandPrimaryColor(b.brandPrimaryColor);
   setters.setBrandAccentColor(b.brandAccentColor);
   setters.setBrandSurfaceColor(b.brandSurfaceColor);

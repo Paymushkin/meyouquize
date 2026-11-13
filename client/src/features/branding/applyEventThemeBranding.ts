@@ -56,6 +56,10 @@ export function brandingEditorStateToEventThemeBranding(state: {
   playerVoteOptionTextColor: string;
   playerVoteProgressTrackColor: string;
   playerVoteProgressBarColor: string;
+  networkingProfileBackgroundColor: string;
+  networkingProfileTextColor: string;
+  networkingProjectorIconColor: string;
+  networkingNavIconColor: string;
   brandPrimaryColor: string;
   brandAccentColor: string;
   brandSurfaceColor: string;

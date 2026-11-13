@@ -18,6 +18,7 @@ export function buildBrandBackground(input: BrandVisualInput): {
   backgroundImage: string;
   backgroundSize?: string;
   backgroundPosition?: string;
+  backgroundRepeat?: string;
   backgroundAttachment?: string;
 } {
   const hasImage = !!input.backgroundImageUrl?.trim();
@@ -38,8 +39,9 @@ export function buildBrandBackground(input: BrandVisualInput): {
   }
   return {
     backgroundImage: layers.join(", "),
-    backgroundSize: "auto, cover",
+    backgroundSize: "cover, cover",
     backgroundPosition: `center, ${imagePosition}`,
+    backgroundRepeat: "no-repeat, no-repeat",
     ...(attachment ? { backgroundAttachment: attachment } : {}),
   };
 }

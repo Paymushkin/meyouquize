@@ -1,5 +1,3 @@
-import SlideshowIcon from "@mui/icons-material/Slideshow";
-import SlideshowOutlinedIcon from "@mui/icons-material/SlideshowOutlined";
 import {
   Box,
   Button,
@@ -27,7 +25,6 @@ type Props = {
   animate: boolean;
   kenBurns: boolean;
   tileVisible: boolean;
-  projectorMode: boolean;
   onBaseUrlChange: (value: string) => void;
   onBaseUrlCommit: () => void;
   onImageCountChange: (value: number) => void;
@@ -38,7 +35,6 @@ type Props = {
   onAnimateChange: (value: boolean) => void;
   onKenBurnsChange: (value: boolean) => void;
   onTileVisibleChange: (value: boolean) => void;
-  onToggleProjector: () => void;
 };
 
 export function AdminPhotoWallSection(props: Props) {
@@ -50,7 +46,6 @@ export function AdminPhotoWallSection(props: Props) {
     animate,
     kenBurns,
     tileVisible,
-    projectorMode,
     onBaseUrlChange,
     onBaseUrlCommit,
     onImageCountChange,
@@ -61,7 +56,6 @@ export function AdminPhotoWallSection(props: Props) {
     onAnimateChange,
     onKenBurnsChange,
     onTileVisibleChange,
-    onToggleProjector,
   } = props;
 
   const [verifyState, setVerifyState] = useState<"idle" | "ok" | "fail">("idle");
@@ -167,15 +161,6 @@ export function AdminPhotoWallSection(props: Props) {
             <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
               <Button size="small" variant="outlined" onClick={() => void verifyFirstImage()}>
                 Проверить 1.{imageExt}
-              </Button>
-              <Button
-                size="small"
-                variant={projectorMode ? "contained" : "outlined"}
-                color={projectorMode ? "primary" : "inherit"}
-                startIcon={projectorMode ? <SlideshowIcon /> : <SlideshowOutlinedIcon />}
-                onClick={onToggleProjector}
-              >
-                {projectorMode ? "Скрыть с экрана" : "Показать на проекторе"}
               </Button>
             </Stack>
             {verifyState === "ok" && previewUrl ? (

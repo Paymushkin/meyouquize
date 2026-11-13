@@ -471,7 +471,7 @@ describe("setPublicViewSchema networkingJoinForm", () => {
 
   it("rejects unknown join form mode", () => {
     expect(
-      setPublicViewSchema.safeParse({ quizId: "q1", networkingJoinFormMode: "simple" }).success,
+      setPublicViewSchema.safeParse({ quizId: "q1", networkingJoinFormMode: "bogus" }).success,
     ).toBe(false);
   });
 });

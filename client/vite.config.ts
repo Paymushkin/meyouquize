@@ -1,68 +1,93 @@
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { defineConfig } from "vite";
+import { defineConfig, loadEnv } from "vite";
 import react from "@vitejs/plugin-react";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const monorepoRoot = path.resolve(__dirname, "..");
 
-export default defineConfig({
-  plugins: [react()],
-  resolve: {
-    alias: {
-      "@meyouquize/shared": path.resolve(__dirname, "../shared/src/index.ts"),
+export default defineConfig(({ mode }) => {
+  // LAN_HOST из корневого `.env` — чтобы HMR/WebSocket на телефоне не ходили на localhost.
+  const env = loadEnv(mode, monorepoRoot, "");
+  const lanHost = (env.LAN_HOST || process.env.LAN_HOST || "").trim();
+
+  return {
+    plugins: [react()],
+    envDir: monorepoRoot,
+    // LAN_HOST из корневого `.env` → import.meta.env.LAN_HOST (QR на телефоне при админке на localhost).
+    envPrefix: ["VITE_", "LAN_"],
+    resolve: {
+      alias: {
+        "@meyouquize/shared": path.resolve(__dirname, "../shared/src/index.ts"),
+      },
     },
-  },
-  optimizeDeps: {
-    // Monorepo alias: не держим битый prebundle после `npm run build -w shared`.
-    exclude: ["@meyouquize/shared"],
-  },
-  build: {
-    rollupOptions: {
-      // russia-map-calibrate.html — только локальный dev, в production-сборку не входит.
-      output: {
-        manualChunks(id) {
-          if (id.includes("russia-svg-paths.json") || id.includes("russia-boundary.json")) {
-            return "russia-map";
-          }
+    optimizeDeps: {
+      // Monorepo alias: не держим битый prebundle после `npm run build -w shared`.
+      exclude: ["@meyouquize/shared"],
+    },
+    build: {
+      rollupOptions: {
+        // russia-map-calibrate.html — только локальный dev, в production-сборку не входит.
+        output: {
+          manualChunks(id) {
+            if (id.includes("russia-svg-paths.json") || id.includes("russia-boundary.json")) {
+              return "russia-map";
+            }
+          },
         },
       },
     },
-  },
-  server: {
-    watch: {
-      ignored: ["!**/shared/src/**"],
-    },
-    host: true,
-    proxy: {
-      "/api": {
-        target: "http://127.0.0.1:4000",
-        changeOrigin: true,
+    server: {
+      watch: {
+        ignored: ["!**/shared/src/**"],
       },
-      "/socket.io": {
-        target: "http://127.0.0.1:4000",
-        changeOrigin: true,
-        ws: true,
+      host: true,
+      strictPort: true,
+      /**
+       * Safari/iOS в LAN: без явного host HMR часто цепляется к localhost телефона →
+       * пустая страница / бесконечные перезагрузки «через раз».
+       * Задайте LAN_HOST в корневом `.env` (сейчас Wi‑Fi IP Mac).
+       */
+      ...(lanHost
+        ? {
+            hmr: {
+              host: lanHost,
+              protocol: "ws" as const,
+              clientPort: 5173,
+            },
+          }
+        : null),
+      proxy: {
+        "/api": {
+          target: "http://127.0.0.1:4000",
+          changeOrigin: true,
+        },
+        "/socket.io": {
+          target: "http://127.0.0.1:4000",
+          changeOrigin: true,
+          ws: true,
+        },
+        "/media": {
+          target: "http://127.0.0.1:4000",
+          changeOrigin: true,
+        },
       },
-      "/media": {
-        target: "http://127.0.0.1:4000",
-        changeOrigin: true,
+      /**
+       * Иначе с http://192.168.x.x:5173 Vite отвечает 403 на /@fs/... (проверка Host).
+       * В production-сборке не используется. Узко: allowedHosts: ["192.168.1.8"].
+       */
+      allowedHosts: true,
+      /** Зависимости из корня monorepo (hoist) — файлы вне client/. */
+      fs: {
+        allow: [__dirname, monorepoRoot],
       },
     },
-    /**
-     * Иначе с http://192.168.x.x:5173 Vite отвечает 403 на /@fs/... (проверка Host).
-     * В production-сборке не используется. Узко: allowedHosts: ["192.168.1.8"].
-     */
-    allowedHosts: true,
-    /** Зависимости из корня monorepo (hoist) — файлы вне client/. */
-    fs: {
-      allow: [__dirname, path.resolve(__dirname, "..")],
+    preview: {
+      host: true,
+      allowedHosts: true,
+      fs: {
+        allow: [__dirname, monorepoRoot],
+      },
     },
-  },
-  preview: {
-    host: true,
-    allowedHosts: true,
-    fs: {
-      allow: [__dirname, path.resolve(__dirname, "..")],
-    },
-  },
+  };
 });

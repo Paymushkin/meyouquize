@@ -6,7 +6,10 @@ import {
   Dialog,
   DialogContent,
   DialogTitle,
+  FormControl,
   IconButton,
+  MenuItem,
+  Select,
   Stack,
   Switch,
   TextField,
@@ -36,7 +39,16 @@ import type {
   NetworkingJoinFormCopy,
   NetworkingJoinFormFields,
   NetworkingJoinFormMode,
+  NetworkingPlayerTab,
 } from "@meyouquize/shared";
+import { normalizeNetworkingPlayerTab } from "@meyouquize/shared";
+
+const NETWORKING_PLAYER_TABS: NetworkingPlayerTab[] = ["feed", "guests", "chats"];
+const NETWORKING_TAB_LABELS: Record<NetworkingPlayerTab, string> = {
+  feed: "Лента",
+  guests: "Гости",
+  chats: "Чаты",
+};
 
 type Props = {
   editableTitle: string;
@@ -47,12 +59,16 @@ type Props = {
   onToggleShowEventTitleOnPlayer: (next: boolean) => void;
   playerAutoJoinRandomNickname: boolean;
   onTogglePlayerAutoJoinRandomNickname: (next: boolean) => void;
+  networkingEnabled: boolean;
+  onNetworkingEnabledChange: (enabled: boolean) => void;
   networkingJoinFormMode: NetworkingJoinFormMode;
   onNetworkingJoinFormModeChange: (mode: NetworkingJoinFormMode) => void;
   networkingJoinFormFields: NetworkingJoinFormFields;
   onNetworkingJoinFormFieldsChange: (fields: NetworkingJoinFormFields) => void;
   networkingJoinFormCopy: NetworkingJoinFormCopy;
   onNetworkingJoinFormCopyChange: (copy: NetworkingJoinFormCopy) => void;
+  networkingDefaultTab: NetworkingPlayerTab;
+  onNetworkingDefaultTabChange: (tab: NetworkingPlayerTab) => void;
   projectorJoinQrVisible: boolean;
   setProjectorJoinQrVisible: (value: boolean) => void;
   projectorBrowserZoom: number;
@@ -76,12 +92,16 @@ export function AdminGeneralSection(props: Props) {
     onToggleShowEventTitleOnPlayer,
     playerAutoJoinRandomNickname,
     onTogglePlayerAutoJoinRandomNickname,
+    networkingEnabled,
+    onNetworkingEnabledChange,
     networkingJoinFormMode,
     onNetworkingJoinFormModeChange,
     networkingJoinFormFields,
     onNetworkingJoinFormFieldsChange,
     networkingJoinFormCopy,
     onNetworkingJoinFormCopyChange,
+    networkingDefaultTab,
+    onNetworkingDefaultTabChange,
     projectorJoinQrVisible,
     setProjectorJoinQrVisible,
     projectorBrowserZoom,
@@ -349,6 +369,32 @@ export function AdminGeneralSection(props: Props) {
                     }}
                   />
                 </Box>
+                <Box sx={switchRowSx}>
+                  <Typography variant="body2">Нетворкинг</Typography>
+                  <Switch
+                    checked={networkingEnabled}
+                    onChange={(_, next) => onNetworkingEnabledChange(next)}
+                  />
+                </Box>
+                {networkingEnabled ? (
+                  <FormControl size="small" fullWidth sx={{ pt: 0.5 }}>
+                    <Typography variant="body2" sx={{ mb: 0.75 }}>
+                      Вкладка по умолчанию
+                    </Typography>
+                    <Select
+                      value={networkingDefaultTab}
+                      onChange={(e) =>
+                        onNetworkingDefaultTabChange(normalizeNetworkingPlayerTab(e.target.value))
+                      }
+                    >
+                      {NETWORKING_PLAYER_TABS.map((tab) => (
+                        <MenuItem key={tab} value={tab}>
+                          {NETWORKING_TAB_LABELS[tab]}
+                        </MenuItem>
+                      ))}
+                    </Select>
+                  </FormControl>
+                ) : null}
               </Stack>
             </Stack>
           </CardContent>

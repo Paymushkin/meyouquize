@@ -27,6 +27,11 @@ import {
   shouldSkipAdminViewSetDedupe,
   type AdminViewSetDedupeState,
 } from "../admin-view-set-dedupe.js";
+import {
+  resumeTimelineAfterOverride,
+  suspendTimelineForOverride,
+} from "../../projector-timeline-sequencer.js";
+import { normalizeProjectorTimelineState } from "@meyouquize/shared";
 
 export function registerResultsDashboardHandlers(socket: EnrichedSocket, io: Server) {
   socket.on("results:subscribe", async (raw: unknown) => {
@@ -147,8 +152,45 @@ export function registerResultsDashboardHandlers(socket: EnrichedSocket, io: Ser
           data: { isOnScreen: false },
         });
       }
-      await saveStoredPublicView(payload.quizId, nextView);
-      const removedMediaUrls = findRemovedLocalMediaUrls(prevView, nextView);
+      const timeline = normalizeProjectorTimelineState(prevView.projectorTimeline);
+      const stepMode = timeline.steps[timeline.cursor]?.mode;
+      const manualModeChange = typeof payload.mode === "string" && payload.mode !== prevView.mode;
+      let nextViewFinal = nextView;
+      // resume/suspend уже шлют results:public:view — не дублировать ниже.
+      let timelineAlreadyBroadcast = false;
+      if (manualModeChange) {
+        const newMode = payload.mode as string;
+        // Снятие интерактива (legacy title) или возврат к режиму текущего шага → resume.
+        const shouldResume =
+          newMode === "title" || (typeof stepMode === "string" && newMode === stepMode);
+        if (shouldResume) {
+          // Сохраняем прочие поля патча, затем resume перезапишет mode шагом таймлайна.
+          await saveStoredPublicView(payload.quizId, {
+            ...nextView,
+            projectorTimeline: {
+              ...normalizeProjectorTimelineState(nextView.projectorTimeline),
+              suppressed: true,
+            },
+          });
+          nextViewFinal = await resumeTimelineAfterOverride(io, payload.quizId);
+          timelineAlreadyBroadcast = true;
+        } else {
+          nextViewFinal = {
+            ...nextView,
+            projectorTimeline: {
+              ...normalizeProjectorTimelineState(nextView.projectorTimeline),
+              suppressed: true,
+              playing: false,
+            },
+          };
+          await saveStoredPublicView(payload.quizId, nextViewFinal);
+          await suspendTimelineForOverride(io, payload.quizId, nextViewFinal);
+          timelineAlreadyBroadcast = true;
+        }
+      } else {
+        await saveStoredPublicView(payload.quizId, nextViewFinal);
+      }
+      const removedMediaUrls = findRemovedLocalMediaUrls(prevView, nextViewFinal);
       if (removedMediaUrls.length > 0) {
         void cleanupUnusedQuestionMedia(removedMediaUrls).catch((error) => {
           console.warn("[media-cleanup] failed after public view update", {
@@ -159,19 +201,20 @@ export function registerResultsDashboardHandlers(socket: EnrichedSocket, io: Ser
       }
       console.info("[mq-winners] admin:results:view:set merged", {
         quizId: payload.quizId,
-        mode: nextView.mode,
-        questionId: nextView.questionId,
-        showFirstCorrectAnswerer: nextView.showFirstCorrectAnswerer,
+        mode: nextViewFinal.mode,
+        questionId: nextViewFinal.questionId,
+        showFirstCorrectAnswerer: nextViewFinal.showFirstCorrectAnswerer,
       });
       if (
+        !timelineAlreadyBroadcast &&
         !isPlayerOnlyPublicViewPatch(payload as Record<string, unknown>) &&
-        projectorPublicViewChanged(prevView, nextView)
+        projectorPublicViewChanged(prevView, nextViewFinal)
       ) {
         emitToQuizDashboard(
           io,
           payload.quizId,
           "results:public:view",
-          toPublicViewPayload(nextView, quiz.title),
+          toPublicViewPayload(nextViewFinal, quiz.title),
         );
       }
       const updatedQuizState = await getQuizPublicState(payload.quizId);

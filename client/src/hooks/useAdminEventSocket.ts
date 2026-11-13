@@ -91,6 +91,10 @@ type Params = {
   setPlayerVoteOptionTextColor: (value: string) => void;
   setPlayerVoteProgressTrackColor: (value: string) => void;
   setPlayerVoteProgressBarColor: (value: string) => void;
+  setNetworkingProfileBackgroundColor: (value: string) => void;
+  setNetworkingProfileTextColor: (value: string) => void;
+  setNetworkingProjectorIconColor: (value: string) => void;
+  setNetworkingNavIconColor: (value: string) => void;
   setProjectorJoinQrVisible: (value: boolean) => void;
   setProjectorBrowserZoom: (value: number) => void;
   setProjectorContentMaxWidthPx: (value: number) => void;
@@ -174,6 +178,10 @@ export function useAdminEventSocket<TQuestion extends QuestionFormPatchable>(
     setPlayerVoteOptionTextColor,
     setPlayerVoteProgressTrackColor,
     setPlayerVoteProgressBarColor,
+    setNetworkingProfileBackgroundColor,
+    setNetworkingProfileTextColor,
+    setNetworkingProjectorIconColor,
+    setNetworkingNavIconColor,
     setProjectorJoinQrVisible,
     setProjectorBrowserZoom,
     setProjectorContentMaxWidthPx,
@@ -263,6 +271,10 @@ export function useAdminEventSocket<TQuestion extends QuestionFormPatchable>(
       setPlayerVoteOptionTextColor(nextBranding.playerVoteOptionTextColor);
       setPlayerVoteProgressTrackColor(nextBranding.playerVoteProgressTrackColor);
       setPlayerVoteProgressBarColor(nextBranding.playerVoteProgressBarColor);
+      setNetworkingProfileBackgroundColor(nextBranding.networkingProfileBackgroundColor);
+      setNetworkingProfileTextColor(nextBranding.networkingProfileTextColor);
+      setNetworkingProjectorIconColor(nextBranding.networkingProjectorIconColor);
+      setNetworkingNavIconColor(nextBranding.networkingNavIconColor);
       setProjectorJoinQrVisible(nextBranding.projectorJoinQrVisible);
       setProjectorBrowserZoom(nextBranding.projectorBrowserZoom);
       setProjectorContentMaxWidthPx(nextBranding.projectorContentMaxWidthPx);
@@ -319,6 +331,10 @@ export function useAdminEventSocket<TQuestion extends QuestionFormPatchable>(
       setPlayerVoteOptionTextColor,
       setPlayerVoteProgressTrackColor,
       setPlayerVoteProgressBarColor,
+      setNetworkingProfileBackgroundColor,
+      setNetworkingProfileTextColor,
+      setNetworkingProjectorIconColor,
+      setNetworkingNavIconColor,
       setProjectorJoinQrVisible,
       setProjectorBrowserZoom,
       setProjectorContentMaxWidthPx,

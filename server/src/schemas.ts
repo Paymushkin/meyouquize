@@ -425,6 +425,10 @@ export const setPublicViewSchema = z.object({
       "report",
       "debate_compare",
       "debate_series",
+      "networking_profiles",
+      "networking_stats",
+      "networking_incomplete",
+      "join_qr",
     ])
     .optional(),
   questionId: z.string().min(1).optional(),
@@ -569,6 +573,89 @@ export const setPublicViewSchema = z.object({
       message: "Must be transparent or #RRGGBB",
     })
     .optional(),
+  networkingEnabled: z.boolean().optional(),
+  networkingJoinFormMode: z
+    .enum(["interactive", "networking", "pharma", "simple", "full"])
+    .optional(),
+  networkingJoinFormFields: z
+    .object({
+      company: z.boolean().optional(),
+      offers: z.boolean().optional(),
+      seeking: z.boolean().optional(),
+      phone: z.boolean().optional(),
+      email: z.boolean().optional(),
+      companyRequired: z.boolean().optional(),
+      offersRequired: z.boolean().optional(),
+      seekingRequired: z.boolean().optional(),
+      phoneRequired: z.boolean().optional(),
+      emailRequired: z.boolean().optional(),
+      jobTitleRequired: z.boolean().optional(),
+    })
+    .optional(),
+  networkingJoinFormCopy: z
+    .object({
+      offersLabel: z.string().trim().max(60).optional(),
+      seekingLabel: z.string().trim().max(60).optional(),
+      offersPlaceholder: z.string().trim().max(160).optional(),
+      seekingPlaceholder: z.string().trim().max(160).optional(),
+      privacyPolicyUrl: z.string().trim().max(500).optional(),
+    })
+    .optional(),
+  networkingDefaultTab: z.enum(["feed", "guests", "chats"]).optional(),
+  networkingProfileBackgroundColor: z
+    .string()
+    .regex(/^#([0-9a-fA-F]{6})$/)
+    .optional(),
+  networkingProfileTextColor: z
+    .string()
+    .regex(/^#([0-9a-fA-F]{6})$/)
+    .optional(),
+  networkingProjectorIconColor: z
+    .string()
+    .regex(/^#([0-9a-fA-F]{6})$/)
+    .optional(),
+  networkingNavIconColor: z
+    .string()
+    .regex(/^#([0-9a-fA-F]{6})$/)
+    .optional(),
+  projectorTimeline: z
+    .object({
+      enabled: z.boolean(),
+      playing: z.boolean(),
+      frozen: z.boolean().optional(),
+      suppressed: z.boolean().optional(),
+      cursor: z.number().int().min(0),
+      stepStartedAt: z.number().nullable(),
+      steps: z
+        .array(
+          z.object({
+            id: z.string().trim().min(1).max(80),
+            mode: z.enum([
+              "title",
+              "question",
+              "leaderboard",
+              "speaker_questions",
+              "reactions",
+              "randomizer",
+              "photo_wall",
+              "video_wall",
+              "debate_compare",
+              "debate_series",
+              "networking_profiles",
+              "networking_stats",
+              "networking_incomplete",
+              "join_qr",
+            ]),
+            questionId: z.string().trim().min(1).max(80).optional(),
+            debateCompareQuestionId: z.string().trim().min(1).max(80).optional(),
+            debateSeriesId: z.string().trim().min(1).max(80).optional(),
+            leaderboardSubQuizId: z.string().trim().min(1).max(80).optional(),
+            durationSec: z.number().int().min(3).max(600),
+          }),
+        )
+        .max(100),
+    })
+    .optional(),
   showFirstCorrectAnswerer: z.boolean().optional(),
   firstCorrectWinnersCount: z.number().int().min(1).max(20).optional(),
   speakerQuestionsEnabled: z.boolean().optional(),
@@ -592,31 +679,6 @@ export const setPublicViewSchema = z.object({
   speakerQuestionsModeratorShowAll: z.boolean().optional(),
   showEventTitleOnPlayer: z.boolean().optional(),
   playerAutoJoinRandomNickname: z.boolean().optional(),
-  networkingJoinFormMode: z.enum(["interactive", "networking", "pharma"]).optional(),
-  networkingJoinFormFields: z
-    .object({
-      company: z.boolean(),
-      offers: z.boolean(),
-      seeking: z.boolean(),
-      phone: z.boolean(),
-      email: z.boolean(),
-      jobTitleRequired: z.boolean().optional(),
-      companyRequired: z.boolean(),
-      offersRequired: z.boolean(),
-      seekingRequired: z.boolean(),
-      phoneRequired: z.boolean(),
-      emailRequired: z.boolean(),
-    })
-    .optional(),
-  networkingJoinFormCopy: z
-    .object({
-      offersLabel: z.string().trim().max(60),
-      seekingLabel: z.string().trim().max(60),
-      offersPlaceholder: z.string().trim().max(160),
-      seekingPlaceholder: z.string().trim().max(160),
-      privacyPolicyUrl: z.string().trim().max(500),
-    })
-    .optional(),
   playerBanners: z
     .array(
       z.object({

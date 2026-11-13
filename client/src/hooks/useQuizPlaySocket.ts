@@ -9,6 +9,7 @@ import {
   socketConnectErrorMessage,
 } from "../utils/socketConnectErrorMessage";
 import { parseSocketErrorCode, parseSocketErrorMessage } from "../utils/socketError";
+import { clearQuizJoinedBuffer, subscribeQuizJoined } from "../features/quizPlay/quizJoinedRelay";
 
 type SubmitPayload = {
   quizId: string;
@@ -176,7 +177,11 @@ export function useQuizPlaySocket({
       if (pendingQuestionId) {
         clearSubmitInFlight?.(pendingQuestionId);
       }
-      if (message === "Participant not found" || code === "NOT_JOINED") {
+      if (
+        message === "Participant not found" ||
+        message.includes("rejoin the event") ||
+        code === "NOT_JOINED"
+      ) {
         onParticipantMissing?.();
         setError("");
         return;
@@ -184,6 +189,10 @@ export function useQuizPlaySocket({
       if (message === "Not joined") {
         onParticipantMissing?.();
         setError("");
+        return;
+      }
+      if (message === "Guest not found") {
+        setError("Гость не найден. Обновите список гостей.");
         return;
       }
       if (message === "Question is not open") {
@@ -235,6 +244,7 @@ export function useQuizPlaySocket({
       phone?: string;
       email?: string;
     }) => {
+      clearQuizJoinedBuffer();
       const resolvedNickname = payload?.nickname?.trim();
       if (resolvedNickname) {
         onJoinedNickname?.(resolvedNickname);
@@ -325,7 +335,7 @@ export function useQuizPlaySocket({
     socket.on("connect_error", onConnectError);
     socket.on("connect", onConnect);
     socket.on("disconnect", onDisconnect);
-    socket.on("quiz:joined", onJoined);
+    const unsubscribeJoined = subscribeQuizJoined(onJoined);
     socket.on("player:answers", onPlayerAnswers);
     socket.on("answer:submitted", onSubmitted);
     socket.on("answers:reset:done", onAnswersReset);
@@ -338,7 +348,7 @@ export function useQuizPlaySocket({
       socket.off("connect_error", onConnectError);
       socket.off("connect", onConnect);
       socket.off("disconnect", onDisconnect);
-      socket.off("quiz:joined", onJoined);
+      unsubscribeJoined();
       socket.off("player:answers", onPlayerAnswers);
       socket.off("answer:submitted", onSubmitted);
       socket.off("answers:reset:done", onAnswersReset);

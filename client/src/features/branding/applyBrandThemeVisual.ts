@@ -13,6 +13,8 @@ export type BrandThemeVisualSetters = {
   setPlayerVoteOptionTextColor: (value: string) => void;
   setPlayerVoteProgressTrackColor: (value: string) => void;
   setPlayerVoteProgressBarColor: (value: string) => void;
+  setNetworkingProjectorIconColor?: (value: string) => void;
+  setNetworkingNavIconColor?: (value: string) => void;
   setBrandPrimaryColor: (value: string) => void;
   setBrandAccentColor: (value: string) => void;
   setBrandSurfaceColor: (value: string) => void;
@@ -48,6 +50,8 @@ export function applyBrandThemeVisualSetters(
   setters.setPlayerVoteProgressBarColor(visual.playerVoteProgressBarColor);
   setters.setBrandPrimaryColor(visual.brandPrimaryColor);
   setters.setBrandAccentColor(visual.brandAccentColor);
+  setters.setNetworkingProjectorIconColor?.(visual.brandPrimaryColor);
+  setters.setNetworkingNavIconColor?.(visual.brandAccentColor);
   setters.setBrandSurfaceColor(visual.brandSurfaceColor);
   setters.setBrandTextColor(visual.brandTextColor);
   setters.setBrandInputTextColor(visual.brandInputTextColor);

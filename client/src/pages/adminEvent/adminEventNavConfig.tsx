@@ -1,10 +1,10 @@
 import type { ReactNode } from "react";
 import BrandingWatermarkIcon from "@mui/icons-material/BrandingWatermark";
 import DescriptionIcon from "@mui/icons-material/Description";
-import InsightsIcon from "@mui/icons-material/Insights";
+import MoreHorizIcon from "@mui/icons-material/MoreHoriz";
+import PresentToAllIcon from "@mui/icons-material/PresentToAll";
 import QuizIcon from "@mui/icons-material/Quiz";
 import RecordVoiceOverIcon from "@mui/icons-material/RecordVoiceOver";
-import ReportProblemIcon from "@mui/icons-material/ReportProblem";
 import SettingsSuggestIcon from "@mui/icons-material/SettingsSuggest";
 import PhotoLibraryIcon from "@mui/icons-material/PhotoLibrary";
 import VideoLibraryIcon from "@mui/icons-material/VideoLibrary";
@@ -19,13 +19,13 @@ export type AdminEventNavItem = {
 
 export const ADMIN_EVENT_NAV: AdminEventNavItem[] = [
   { id: "general", label: "Общее", icon: <SettingsSuggestIcon fontSize="small" /> },
+  { id: "projector", label: "Проектор", icon: <PresentToAllIcon fontSize="small" /> },
   { id: "questions", label: "Интерактивы", icon: <QuizIcon fontSize="small" /> },
   { id: "speakers", label: "Q&A", icon: <RecordVoiceOverIcon fontSize="small" /> },
   { id: "banners", label: "Баннеры", icon: <ViewCarouselIcon fontSize="small" /> },
   { id: "photo_wall", label: "Фотостена", icon: <PhotoLibraryIcon fontSize="small" /> },
   { id: "video_wall", label: "Видеостена", icon: <VideoLibraryIcon fontSize="small" /> },
-  { id: "results", label: "Результаты", icon: <InsightsIcon fontSize="small" /> },
   { id: "report", label: "Отчет", icon: <DescriptionIcon fontSize="small" /> },
   { id: "branding", label: "Брендирование", icon: <BrandingWatermarkIcon fontSize="small" /> },
-  { id: "danger", label: "Опасные", icon: <ReportProblemIcon fontSize="small" /> },
+  { id: "more", label: "Ещё", icon: <MoreHorizIcon fontSize="small" /> },
 ];

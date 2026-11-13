@@ -143,6 +143,35 @@ describe("projectorPublicViewChanged", () => {
         reactionsWidgets: [],
       }),
     ).toBe(true);
+    expect(
+      isPlayerOnlyPublicViewPatch({
+        quizId: "q1",
+        networkingJoinFormMode: "pharma",
+      }),
+    ).toBe(true);
+    expect(
+      isPlayerOnlyPublicViewPatch({
+        quizId: "q1",
+        networkingJoinFormFields: { company: false, offers: true, seeking: true },
+      }),
+    ).toBe(true);
+    expect(
+      isPlayerOnlyPublicViewPatch({
+        quizId: "q1",
+        networkingJoinFormCopy: {
+          offersLabel: "Даю",
+          seekingLabel: "Беру",
+          offersPlaceholder: "",
+          seekingPlaceholder: "",
+        },
+      }),
+    ).toBe(true);
+    expect(
+      isPlayerOnlyPublicViewPatch({
+        quizId: "q1",
+        networkingDefaultTab: "guests",
+      }),
+    ).toBe(true);
   });
 
   it("returns false when only reactions overlay changes in question mode", () => {

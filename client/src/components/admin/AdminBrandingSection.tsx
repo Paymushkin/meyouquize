@@ -3,6 +3,7 @@ import { Card, CardContent, Stack, Typography } from "@mui/material";
 import type { PublicViewSetPatch, ProjectorJoinQrOverlayCorner } from "../../publicViewContract";
 import { BrandFontsSection } from "./branding/BrandFontsSection";
 import { BrandImagesSection } from "./branding/BrandImagesSection";
+import { BrandNetworkingColorsSection } from "./branding/BrandNetworkingColorsSection";
 import { BrandPlayerUiResultsSection } from "./branding/BrandPlayerUiResultsSection";
 import { BrandProjectorJoinQrSection } from "./branding/BrandProjectorJoinQrSection";
 import { BrandScreenColorsSection } from "./branding/BrandScreenColorsSection";
@@ -52,6 +53,14 @@ type Props = {
   setPlayerVoteOptionTextColor: (value: string) => void;
   playerVoteProgressBarColor: string;
   setPlayerVoteProgressBarColor: (value: string) => void;
+  networkingProfileBackgroundColor: string;
+  setNetworkingProfileBackgroundColor: (value: string) => void;
+  networkingProfileTextColor: string;
+  setNetworkingProfileTextColor: (value: string) => void;
+  networkingProjectorIconColor: string;
+  setNetworkingProjectorIconColor: (value: string) => void;
+  networkingNavIconColor: string;
+  setNetworkingNavIconColor: (value: string) => void;
   qrSettingsProps: {
     projectorJoinQrOverlayVisible: boolean;
     setProjectorJoinQrOverlayVisible: (value: boolean) => void;
@@ -162,6 +171,14 @@ export function AdminBrandingSection(props: Props) {
     setPlayerVoteOptionTextColor,
     playerVoteProgressBarColor,
     setPlayerVoteProgressBarColor,
+    networkingProfileBackgroundColor,
+    setNetworkingProfileBackgroundColor,
+    networkingProfileTextColor,
+    setNetworkingProfileTextColor,
+    networkingProjectorIconColor,
+    setNetworkingProjectorIconColor,
+    networkingNavIconColor,
+    setNetworkingNavIconColor,
     qrSettingsProps,
     cloudQuestionColor,
     setCloudQuestionColor,
@@ -210,7 +227,7 @@ export function AdminBrandingSection(props: Props) {
 
   const colorGridSx = {
     display: "grid",
-    gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))",
+    gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))",
     gap: 1,
     alignItems: "center",
   } as const;
@@ -289,6 +306,18 @@ export function AdminBrandingSection(props: Props) {
             setPlayerVoteOptionTextColor={setPlayerVoteOptionTextColor}
             playerVoteProgressBarColor={playerVoteProgressBarColor}
             setPlayerVoteProgressBarColor={setPlayerVoteProgressBarColor}
+            emitPatch={emitBrandingPatch}
+          />
+          <BrandNetworkingColorsSection
+            colorGridSx={colorGridSx}
+            networkingProfileBackgroundColor={networkingProfileBackgroundColor}
+            setNetworkingProfileBackgroundColor={setNetworkingProfileBackgroundColor}
+            networkingProfileTextColor={networkingProfileTextColor}
+            setNetworkingProfileTextColor={setNetworkingProfileTextColor}
+            networkingProjectorIconColor={networkingProjectorIconColor}
+            setNetworkingProjectorIconColor={setNetworkingProjectorIconColor}
+            networkingNavIconColor={networkingNavIconColor}
+            setNetworkingNavIconColor={setNetworkingNavIconColor}
             emitPatch={emitBrandingPatch}
           />
           <BrandProjectorJoinQrSection {...qrSettingsProps} emitPatch={emitBrandingPatch} />

@@ -29,6 +29,12 @@ const AdminThemeEditorPage = lazy(() =>
 const AdminFontsPage = lazy(() =>
   import("./pages/AdminFontsPage").then((m) => ({ default: m.AdminFontsPage })),
 );
+const AdminGuestsPage = lazy(() =>
+  import("./pages/AdminGuestsPage").then((m) => ({ default: m.AdminGuestsPage })),
+);
+const AdminResultsPage = lazy(() =>
+  import("./pages/AdminResultsPage").then((m) => ({ default: m.AdminResultsPage })),
+);
 const AdminEventRoute = lazy(() =>
   import("./pages/AdminEventRoute").then((m) => ({ default: m.AdminEventRoute })),
 );
@@ -264,6 +270,8 @@ function App() {
               path=":eventName/sub-quizzes/:subQuizId/results"
               element={<AdminSubQuizResultsPage />}
             />
+            <Route path=":eventName/guests" element={<AdminGuestsPage />} />
+            <Route path=":eventName/results" element={<AdminResultsPage />} />
             <Route path=":eventName" element={<AdminEventRoute />} />
           </Route>
           <Route path="/403" element={<ForbiddenPage />} />

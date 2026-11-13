@@ -10,6 +10,9 @@ import { ProjectorDebateCompareSection } from "../components/projector/Projector
 import { ProjectorRandomizerSection } from "../components/projector/ProjectorRandomizerSection";
 import { ProjectorPhotoWallSection } from "../components/projector/ProjectorPhotoWallSection";
 import { ProjectorVideoWallSection } from "../components/projector/ProjectorVideoWallSection";
+import { ProjectorNetworkingProfileSection } from "../components/projector/ProjectorNetworkingProfileSection";
+import { ProjectorNetworkingStatsSection } from "../components/projector/ProjectorNetworkingStatsSection";
+import { ProjectorJoinQrTimelineSection } from "../components/projector/ProjectorJoinQrTimelineSection";
 import { useResultsProjectorSession } from "../hooks/useResultsProjectorSession";
 import { useProjectorJoinQr } from "../hooks/useProjectorJoinQr";
 import { ProjectorViewportBackground } from "../components/projector/ProjectorViewportBackground";
@@ -258,7 +261,11 @@ export function ResultsPage() {
     view.mode === "reactions" ||
     view.mode === "randomizer" ||
     view.mode === "photo_wall" ||
-    view.mode === "video_wall";
+    view.mode === "video_wall" ||
+    view.mode === "networking_profiles" ||
+    view.mode === "networking_stats" ||
+    view.mode === "networking_incomplete" ||
+    view.mode === "join_qr";
   const brandProjectorBackgroundImageUrl = view.brandProjectorBackgroundImageUrl?.trim()
     ? resolveClientAssetUrl(view.brandProjectorBackgroundImageUrl)
     : undefined;
@@ -291,7 +298,9 @@ export function ResultsPage() {
       slug,
       showEventTitleScreen,
       projectorJoinQrBlockVisible: view.projectorJoinQrVisible,
-      projectorJoinQrOverlayVisible: view.projectorJoinQrOverlayVisible,
+      // Отдельный шаг join_qr — свой fullscreen-блок, overlay не дублируем.
+      projectorJoinQrOverlayVisible:
+        view.mode === "join_qr" ? false : view.projectorJoinQrOverlayVisible,
       overlaySizePx: view.projectorJoinQrOverlaySizePx,
     });
 
@@ -340,6 +349,7 @@ export function ResultsPage() {
           overflow: "hidden",
           boxSizing: "border-box",
           backgroundColor: "transparent",
+          backgroundImage: "none",
           fontFamily: view.brandFontFamily,
           "& .MuiTypography-root, & .MuiButton-root, & .MuiChip-root, & .MuiInputBase-root, & .MuiFormLabel-root":
             {
@@ -816,6 +826,11 @@ export function ResultsPage() {
         {view.mode === "randomizer" && <ProjectorRandomizerSection view={view} />}
         {view.mode === "photo_wall" && <ProjectorPhotoWallSection view={view} />}
         {view.mode === "video_wall" && <ProjectorVideoWallSection view={view} />}
+        {(view.mode === "networking_profiles" || view.mode === "networking_incomplete") && (
+          <ProjectorNetworkingProfileSection view={view} />
+        )}
+        {view.mode === "networking_stats" && <ProjectorNetworkingStatsSection view={view} />}
+        {view.mode === "join_qr" && <ProjectorJoinQrTimelineSection view={view} slug={slug} />}
       </Container>
     </>
   );

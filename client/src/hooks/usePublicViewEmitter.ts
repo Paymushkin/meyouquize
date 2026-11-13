@@ -140,6 +140,10 @@ type UsePublicViewEmitterParams = {
   playerVoteOptionTextColor: string;
   playerVoteProgressTrackColor: string;
   playerVoteProgressBarColor: string;
+  networkingProfileBackgroundColor: string;
+  networkingProfileTextColor: string;
+  networkingProjectorIconColor: string;
+  networkingNavIconColor: string;
   randomizerMode: RandomizerMode;
   randomizerListMode: RandomizerListMode;
   randomizerTitle: string;
@@ -264,6 +268,10 @@ export function usePublicViewEmitter(params: UsePublicViewEmitterParams) {
     playerVoteOptionTextColor,
     playerVoteProgressTrackColor,
     playerVoteProgressBarColor,
+    networkingProfileBackgroundColor,
+    networkingProfileTextColor,
+    networkingProjectorIconColor,
+    networkingNavIconColor,
     randomizerMode,
     randomizerListMode,
     randomizerTitle,
@@ -490,6 +498,12 @@ export function usePublicViewEmitter(params: UsePublicViewEmitterParams) {
         playerVoteProgressTrackColor:
           patch.playerVoteProgressTrackColor ?? playerVoteProgressTrackColor,
         playerVoteProgressBarColor: patch.playerVoteProgressBarColor ?? playerVoteProgressBarColor,
+        networkingProfileBackgroundColor:
+          patch.networkingProfileBackgroundColor ?? networkingProfileBackgroundColor,
+        networkingProfileTextColor: patch.networkingProfileTextColor ?? networkingProfileTextColor,
+        networkingProjectorIconColor:
+          patch.networkingProjectorIconColor ?? networkingProjectorIconColor,
+        networkingNavIconColor: patch.networkingNavIconColor ?? networkingNavIconColor,
         randomizerMode: patch.randomizerMode ?? randomizerMode,
         randomizerListMode: patch.randomizerListMode ?? randomizerListMode,
         randomizerTitle: patch.randomizerTitle ?? randomizerTitle,
@@ -640,6 +654,10 @@ export function usePublicViewEmitter(params: UsePublicViewEmitterParams) {
       playerVoteOptionTextColor,
       playerVoteProgressTrackColor,
       playerVoteProgressBarColor,
+      networkingProfileBackgroundColor,
+      networkingProfileTextColor,
+      networkingProjectorIconColor,
+      networkingNavIconColor,
       randomizerMode,
       randomizerListMode,
       randomizerTitle,
