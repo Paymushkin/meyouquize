@@ -17,6 +17,7 @@ import {
   LANDING_REQUEST_MAILTO,
   lt,
 } from "./landingConstants";
+import { reachYandexMetrikaGoal, YM_GOAL } from "./yandexMetrika";
 
 type LandingContactContextValue = {
   openContact: () => void;
@@ -29,6 +30,7 @@ export function useLandingContact(): LandingContactContextValue {
   if (!ctx) {
     return {
       openContact: () => {
+        reachYandexMetrikaGoal(YM_GOAL.contactOpen);
         window.location.href = LANDING_REQUEST_MAILTO;
       },
     };
@@ -38,7 +40,10 @@ export function useLandingContact(): LandingContactContextValue {
 
 export function LandingContactProvider({ children }: { children: ReactNode }) {
   const [open, setOpen] = useState(false);
-  const openContact = useCallback(() => setOpen(true), []);
+  const openContact = useCallback(() => {
+    reachYandexMetrikaGoal(YM_GOAL.contactOpen);
+    setOpen(true);
+  }, []);
   const value = useMemo(() => ({ openContact }), [openContact]);
 
   return (

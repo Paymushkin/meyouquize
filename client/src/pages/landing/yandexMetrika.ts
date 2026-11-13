@@ -1,3 +1,5 @@
+import { useEffect, useRef } from "react";
+import { useLocation } from "react-router-dom";
 import { LANDING_COOKIE_CONSENT_KEY, LANDING_YANDEX_METRIKA_ID } from "./landingConstants";
 
 type YmFn = ((...args: unknown[]) => void) & {
@@ -11,6 +13,12 @@ declare global {
   }
 }
 
+/** JS-события целей (создать в Метрике как «JavaScript-событие» → совпадает). */
+export const YM_GOAL = {
+  contactOpen: "contact_open",
+  demoClick: "demo_click",
+} as const;
+
 let metrikaStarted = false;
 
 export function hasLandingCookieConsent(): boolean {
@@ -19,6 +27,11 @@ export function hasLandingCookieConsent(): boolean {
   } catch {
     return false;
   }
+}
+
+function ymCall(...args: unknown[]): void {
+  if (typeof window === "undefined" || !window.ym) return;
+  window.ym(...args);
 }
 
 /** Яндекс.Метрика только после согласия на cookies. */
@@ -58,4 +71,38 @@ export function startYandexMetrika(): void {
 
 export function startYandexMetrikaIfConsented(): void {
   if (hasLandingCookieConsent()) startYandexMetrika();
+}
+
+/** Просмотр страницы SPA (React Router). */
+export function trackYandexMetrikaHit(url?: string, title?: string): void {
+  if (!hasLandingCookieConsent() || !metrikaStarted) return;
+  const href = url ?? `${location.pathname}${location.search}${location.hash}`;
+  ymCall(LANDING_YANDEX_METRIKA_ID, "hit", href, {
+    title: title ?? document.title,
+    referer: document.referrer,
+  });
+}
+
+/** Достижение JS-цели. */
+export function reachYandexMetrikaGoal(goalId: string): void {
+  if (!hasLandingCookieConsent()) return;
+  if (!metrikaStarted) startYandexMetrika();
+  ymCall(LANDING_YANDEX_METRIKA_ID, "reachGoal", goalId);
+}
+
+/** Хиты при смене маршрута на brand/landing страницах. */
+export function useYandexMetrikaSpaHits(): void {
+  const location = useLocation();
+  const first = useRef(true);
+
+  useEffect(() => {
+    startYandexMetrikaIfConsented();
+    if (!hasLandingCookieConsent()) return;
+    // Первый просмотр уже уходит в init; дальше — hit на навигацию
+    if (first.current) {
+      first.current = false;
+      return;
+    }
+    trackYandexMetrikaHit(`${location.pathname}${location.search}${location.hash}`);
+  }, [location.pathname, location.search, location.hash]);
 }

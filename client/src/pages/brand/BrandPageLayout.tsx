@@ -3,6 +3,7 @@ import { Box, CssBaseline, ThemeProvider } from "@mui/material";
 import { brandTheme } from "../../theme/brandTheme";
 import { useBodyBrandBackground } from "../../hooks/useBodyBrandBackground";
 import { LandingContactProvider } from "../landing/LandingContactDialog";
+import { useYandexMetrikaSpaHits } from "../landing/yandexMetrika";
 
 interface BrandPageLayoutProps {
   children: React.ReactNode;
@@ -11,6 +12,7 @@ interface BrandPageLayoutProps {
 
 export function BrandPageLayout({ children, documentTitle }: BrandPageLayoutProps) {
   useBodyBrandBackground({ backgroundColor: "#000000" });
+  useYandexMetrikaSpaHits();
   useEffect(() => {
     if (!documentTitle) return;
     const previous = document.title;

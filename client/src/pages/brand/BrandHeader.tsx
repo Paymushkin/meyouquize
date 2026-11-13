@@ -7,6 +7,7 @@ import { alpha } from "@mui/material/styles";
 import { BRAND_ACCENT, BRAND_BORDER } from "../../theme/brandTheme";
 import { useLandingContact } from "../landing/LandingContactDialog";
 import { LANDING_CONTAINER_SX, lt } from "../landing/landingConstants";
+import { reachYandexMetrikaGoal, YM_GOAL } from "../landing/yandexMetrika";
 
 interface BrandHeaderProps {
   showDemoButton?: boolean;
@@ -144,6 +145,7 @@ export function BrandHeader({
                 to="/q/demo"
                 variant="outlined"
                 color="inherit"
+                onClick={() => reachYandexMetrikaGoal(YM_GOAL.demoClick)}
                 sx={{
                   display: { xs: "none", sm: "inline-flex" },
                   flexShrink: 0,
@@ -244,7 +246,10 @@ export function BrandHeader({
                 to="/q/demo"
                 variant="outlined"
                 color="inherit"
-                onClick={closeMenu}
+                onClick={() => {
+                  reachYandexMetrikaGoal(YM_GOAL.demoClick);
+                  closeMenu();
+                }}
                 sx={{
                   borderRadius: 0,
                   borderColor: BRAND_ACCENT,
