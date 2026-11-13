@@ -16,7 +16,10 @@ test.describe("projector display", () => {
     await toggleQuizQuestion(page, true, 0);
     await showQuestionOnProjector(page, 0);
 
-    await page.goto(`/p/${slug}`);
-    await expect(page.getByText("E2E: выберите один")).toBeVisible({ timeout: 20_000 });
+    // Отдельная вкладка: уход с админки рвёт сокет и может сбросить view.
+    const projector = await page.context().newPage();
+    await projector.goto(`/p/${slug}`);
+    await expect(projector.getByText("E2E: выберите один")).toBeVisible({ timeout: 20_000 });
+    await projector.close();
   });
 });

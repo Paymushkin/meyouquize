@@ -47,7 +47,7 @@ test.beforeEach(async ({ page }) => {
 test("админка: секция спикеров и колонки таблиц доступны", async ({ page }) => {
   await page.goto("/admin/demo");
 
-  await page.getByRole("button", { name: "Спикеры" }).click();
+  await page.getByRole("button", { name: "Q&A" }).click();
 
   await expect(page.getByText("Вопросы спикерам")).toBeVisible();
   await expect(page.getByRole("columnheader", { name: "UI" }).first()).toBeVisible();
@@ -59,7 +59,7 @@ test("админка: секция спикеров и колонки табли
 
 test("админка: таблица скрытых вопросов содержит колонку UI", async ({ page }) => {
   await page.goto("/admin/demo");
-  await page.getByRole("button", { name: "Спикеры" }).click();
+  await page.getByRole("button", { name: "Q&A" }).click();
 
   const hiddenSection = page.locator("section, div").filter({ hasText: "Скрытые вопросы" }).first();
   await expect(hiddenSection.getByRole("columnheader", { name: "UI" }).first()).toBeVisible();
@@ -68,11 +68,12 @@ test("админка: таблица скрытых вопросов содер�
 
 test("админка: панель настроек спикеров содержит все элементы", async ({ page }) => {
   await page.goto("/admin/demo");
-  await page.getByRole("button", { name: "Спикеры" }).click();
+  await page.getByRole("button", { name: "Q&A" }).click();
+  await page.getByRole("button", { name: "Настройки" }).click();
 
-  await expect(page.getByLabel("Кнопка у пользователей")).toBeVisible();
-  await expect(page.getByLabel("Автор на экране")).toBeVisible();
-  await expect(page.getByLabel("Реакции (по одной в строке, например 👍)")).toBeVisible();
-  await expect(page.getByLabel("Список спикеров (по одному в строке)")).toBeVisible();
-  await expect(page.getByRole("button", { name: "Сохранить настройки" })).toBeVisible();
+  const dialog = page.getByRole("dialog");
+  await expect(dialog.getByText("Кнопка у пользователей")).toBeVisible();
+  await expect(dialog.getByText("Автор на экране")).toBeVisible();
+  await expect(dialog.getByLabel("Реакции (по одной в строке, например 👍)")).toBeVisible();
+  await expect(dialog.getByRole("button", { name: "Готово" })).toBeVisible();
 });

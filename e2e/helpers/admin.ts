@@ -12,11 +12,11 @@ export async function loginAdmin(page: Page, slug = getE2eFixture().slug): Promi
   expect(auth.ok(), `admin auth failed: ${auth.status()} ${await auth.text()}`).toBeTruthy();
 
   await page.goto(`/admin/${slug}`);
-  await expect(page.getByRole("button", { name: "Вопросы" })).toBeVisible({ timeout: 20_000 });
+  await expect(page.getByRole("button", { name: "Интерактивы" })).toBeVisible({ timeout: 20_000 });
 }
 
 export async function openQuestionsTab(page: Page): Promise<void> {
-  await page.getByRole("button", { name: "Вопросы" }).click();
+  await page.getByRole("button", { name: "Интерактивы" }).click();
   await page.getByRole("tab", { name: "Квизы" }).click();
   const subQuizHeader = page.locator(".MuiAccordionSummary-root").filter({ hasText: "E2E Квиз" });
   if (await subQuizHeader.isVisible().catch(() => false)) {
@@ -36,7 +36,7 @@ function quizQuestionsScope(page: Page) {
 }
 
 export async function deactivateAllVoteQuestions(page: Page): Promise<void> {
-  await page.getByRole("button", { name: "Вопросы" }).click();
+  await page.getByRole("button", { name: "Интерактивы" }).click();
   await page.getByRole("tab", { name: "Голосования" }).click();
   for (let i = 0; i < 4; i += 1) {
     const offButtons = page.getByRole("button", { name: "Отключить вопрос" });
@@ -46,8 +46,8 @@ export async function deactivateAllVoteQuestions(page: Page): Promise<void> {
 }
 
 export async function deactivateFeedbackForm(page: Page): Promise<void> {
-  await page.getByRole("button", { name: "Вопросы" }).click();
-  await page.getByRole("tab", { name: "Обратная связь" }).click();
+  await page.getByRole("button", { name: "Интерактивы" }).click();
+  await page.getByRole("tab", { name: "ОС", exact: true }).click();
   const offButtons = page.getByRole("button", { name: "Отключить форму на телефонах" });
   if ((await offButtons.count()) > 0) {
     await offButtons.first().click();
@@ -83,7 +83,7 @@ export async function toggleQuizQuestion(page: Page, enabled: boolean, index = 0
 }
 
 export async function toggleVoteQuestion(page: Page, enabled: boolean): Promise<void> {
-  await page.getByRole("button", { name: "Вопросы" }).click();
+  await page.getByRole("button", { name: "Интерактивы" }).click();
   const label = enabled ? "Включить вопрос" : "Отключить вопрос";
   await page.getByRole("tab", { name: "Голосования" }).click();
   await page.getByRole("button", { name: label }).first().click();
@@ -102,8 +102,8 @@ export async function showQuestionOnProjector(page: Page, index = 0): Promise<vo
 }
 
 export async function openFeedbackTab(page: Page): Promise<void> {
-  await page.getByRole("button", { name: "Вопросы" }).click();
-  await page.getByRole("tab", { name: "Обратная связь" }).click();
+  await page.getByRole("button", { name: "Интерактивы" }).click();
+  await page.getByRole("tab", { name: "ОС", exact: true }).click();
 }
 
 export async function activateFeedbackForm(page: Page): Promise<void> {
