@@ -44,7 +44,8 @@ www.{$DOMAIN} {
 
   handle {
     root * /opt/meyouquize/current/client/dist
-    try_files {path} /index.html
+    # / → prerendered index.html; /privacy|/cookies → */index.html; else SPA shell
+    try_files {path} {path}/index.html /spa.html
     file_server
   }
 

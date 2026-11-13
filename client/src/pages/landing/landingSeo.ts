@@ -12,14 +12,19 @@ import {
 export const LANDING_SITE_ORIGIN = "https://ameyou.ru";
 /** Зеркало: в выдаче не конкурирует - canonical всегда на основной домен */
 export const LANDING_MIRROR_ORIGIN = "https://meyou.site";
+/** Предыдущая версия продукта (тот же бренд) */
+export const LANDING_LEGACY_ORIGIN = "https://meyou.ru";
+
+export const LANDING_BRAND_NAME = "МИЮ";
+export const LANDING_BRAND_ALT_NAMES = ["MeYou", "meyou", "МИЮ MeYou"] as const;
 
 export const LANDING_SEO = {
-  title: lt("МИЮ - интерактивы и флеш-интервью для живых мероприятий"),
+  title: lt("МИЮ (MeYou) - интерактивы и флеш-интервью для живых мероприятий"),
   description: lt(
-    "Интерактивы для всего зала и флеш-интервью с гостями под вашим брендом. QR без приложений, живой экран, команда на площадке. От 40 000 ₽/день, до 1500 участников онлайн.",
+    "МИЮ (ранее MeYou, meyou.ru) - интерактивы для зала и флеш-интервью с гостями: QR-квиз, голосования, вопросы спикерам, облако тегов. Без приложений, команда на площадке. От 40 000 ₽/день.",
   ),
   keywords: lt(
-    "интерактивы для мероприятий, интерактив на конференции, интерактив на корпоративе, QR-квиз, голосование с телефона, голосование в зале, вопросы спикерам, облако тегов, розыгрыш на большом экране, флеш-интервью, брендированное интервью с гостями, МИЮ",
+    "МИЮ, MeYou, meyou, meyou.ru, ameyou.ru, интерактивы для мероприятий, квиз на мероприятие, интерактивы на корпоратив, интерактив на конференции, QR-квиз, голосование с телефона, голосование в зале, вопросы спикерам, облако тегов, флеш-интервью, mentimeter аналог, аналог mentimeter для россии",
   ),
   ogImagePath: "/og-cover.jpg",
   locale: "ru_RU",
@@ -43,7 +48,8 @@ export function buildOrganizationJsonLd() {
   return {
     "@context": "https://schema.org",
     "@type": "Organization",
-    name: "МИЮ",
+    name: LANDING_BRAND_NAME,
+    alternateName: [...LANDING_BRAND_ALT_NAMES],
     legalName: LANDING_OPERATOR_NAME,
     url: LANDING_SITE_ORIGIN,
     logo: absoluteUrl("/logo.svg"),
@@ -63,7 +69,7 @@ export function buildOrganizationJsonLd() {
       telephone: LANDING_CONTACT_PHONE_DISPLAY,
       availableLanguage: ["Russian"],
     },
-    sameAs: [LANDING_MIRROR_ORIGIN],
+    sameAs: [LANDING_LEGACY_ORIGIN, LANDING_MIRROR_ORIGIN],
   };
 }
 
@@ -71,10 +77,15 @@ export function buildWebsiteJsonLd() {
   return {
     "@context": "https://schema.org",
     "@type": "WebSite",
-    name: "МИЮ",
+    name: LANDING_BRAND_NAME,
+    alternateName: [...LANDING_BRAND_ALT_NAMES],
     url: LANDING_SITE_ORIGIN,
     inLanguage: "ru-RU",
-    publisher: { "@type": "Organization", name: "МИЮ", url: LANDING_SITE_ORIGIN },
+    publisher: {
+      "@type": "Organization",
+      name: LANDING_BRAND_NAME,
+      url: LANDING_SITE_ORIGIN,
+    },
   };
 }
 
@@ -83,8 +94,18 @@ export function buildServiceJsonLd() {
     "@context": "https://schema.org",
     "@type": "Service",
     name: lt("Интерактивы и флеш-интервью для мероприятий"),
+    alternateName: [
+      lt("MeYou интерактивы"),
+      lt("МИЮ интерактивы"),
+      lt("Аналог Mentimeter для живого зала"),
+    ],
     serviceType: lt("Организация интерактивов на мероприятиях"),
-    provider: { "@type": "Organization", name: "МИЮ", url: LANDING_SITE_ORIGIN },
+    provider: {
+      "@type": "Organization",
+      name: LANDING_BRAND_NAME,
+      alternateName: [...LANDING_BRAND_ALT_NAMES],
+      url: LANDING_SITE_ORIGIN,
+    },
     areaServed: { "@type": "Country", name: "RU" },
     description: LANDING_SEO.description,
     offers: {

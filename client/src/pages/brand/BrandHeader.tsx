@@ -16,13 +16,13 @@ interface BrandHeaderProps {
 }
 
 const LANDING_NAV = [
-  { label: lt("Возможности"), href: "#proof" },
-  { label: lt("Как это работает"), href: "#how" },
-  { label: lt("На площадке"), href: "#onsite" },
-  { label: lt("Интервью"), href: "#flash" },
-  { label: lt("Для кого"), href: "#scenarios" },
-  { label: lt("Отзывы"), href: "#cases" },
-  { label: "FAQ", href: "#faq" },
+  { label: lt("Возможности"), href: "/#proof" },
+  { label: lt("Интерактивы"), href: "/interactives" },
+  { label: lt("Интервью"), href: "/flash-interview" },
+  { label: lt("Конференция"), href: "/conference" },
+  { label: lt("Корпоратив"), href: "/corporate" },
+  { label: lt("Для кого"), href: "/#scenarios" },
+  { label: "FAQ", href: "/#faq" },
 ] as const;
 
 const BRAND_LOGO_SIZE_PX = 52;
@@ -122,8 +122,8 @@ export function BrandHeader({
               {LANDING_NAV.map((item) => (
                 <Typography
                   key={item.label}
-                  component="a"
-                  href={item.href}
+                  component={RouterLink}
+                  to={item.href}
                   sx={{
                     color: "rgba(255,255,255,0.82)",
                     fontSize: { lg: 13, xl: 14 },
@@ -142,9 +142,19 @@ export function BrandHeader({
               <Button
                 component={RouterLink}
                 to="/q/demo"
-                variant="text"
+                variant="outlined"
                 color="inherit"
-                sx={{ display: { xs: "none", sm: "inline-flex" }, flexShrink: 0 }}
+                sx={{
+                  display: { xs: "none", sm: "inline-flex" },
+                  flexShrink: 0,
+                  borderRadius: 0,
+                  borderColor: BRAND_ACCENT,
+                  color: "#fff",
+                  "&:hover": {
+                    borderColor: BRAND_ACCENT,
+                    bgcolor: alpha(BRAND_ACCENT, 0.08),
+                  },
+                }}
               >
                 {lt("Демо")}
               </Button>
@@ -210,8 +220,8 @@ export function BrandHeader({
           {LANDING_NAV.map((item) => (
             <Box
               key={item.label}
-              component="a"
-              href={item.href}
+              component={RouterLink}
+              to={item.href}
               onClick={closeMenu}
               sx={{
                 px: 1.5,
@@ -233,12 +243,16 @@ export function BrandHeader({
                 component={RouterLink}
                 to="/q/demo"
                 variant="outlined"
-                color="secondary"
+                color="inherit"
                 onClick={closeMenu}
                 sx={{
-                  borderColor: "rgba(255,255,255,0.35)",
+                  borderRadius: 0,
+                  borderColor: BRAND_ACCENT,
                   color: "#fff",
-                  "&:hover": { borderColor: "#fff", bgcolor: alpha("#fff", 0.06) },
+                  "&:hover": {
+                    borderColor: BRAND_ACCENT,
+                    bgcolor: alpha(BRAND_ACCENT, 0.08),
+                  },
                 }}
               >
                 {lt("Демо")}

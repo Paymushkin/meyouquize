@@ -44,6 +44,13 @@ const HERO_FRAME_FADE_MS = 800;
 const HERO_FRAME_EASE = "cubic-bezier(0.33, 0, 0.2, 1)";
 const HERO_SCREEN_ON_DELAY_MS = HERO_SEQ[HERO_SEQ.length - 1].delayMs;
 
+/** Размер бренда МИЮ и «ЖИВЫМ» */
+const HERO_BRAND_FONT_SIZE = {
+  xs: "clamp(2.6rem, 12vw, 3.5rem)",
+  sm: "clamp(3rem, 7vw, 4rem)",
+  md: "clamp(4.25rem, 7vw, 6rem)",
+} as const;
+
 const heroBgLayerSx = {
   position: "absolute",
   inset: 0,
@@ -173,56 +180,85 @@ export function LandingHeroSection() {
             },
           }}
         >
-          <Typography
-            component="h1"
+          <Box
             sx={{
-              fontFamily: BRAND_DISPLAY_FONT,
-              fontWeight: 800,
-              letterSpacing: { xs: "0.08em", sm: "0.12em" },
-              lineHeight: 0.95,
-              fontSize: {
-                xs: "clamp(3.2rem, 18vw, 5.5rem)",
-                sm: "clamp(5rem, 14vw, 7.5rem)",
-                md: "clamp(6.5rem, 12vw, 9rem)",
-              },
-              textTransform: "uppercase",
+              display: "flex",
+              flexDirection: { xs: "column", md: "row" },
+              alignItems: { xs: "stretch", md: "flex-end" },
+              justifyContent: "space-between",
+              gap: { xs: 0.5, md: 3 },
               width: "100%",
-              mb: { xs: 1, md: 1.25 },
             }}
           >
-            МИЮ
-          </Typography>
-          <Typography
-            component="p"
-            aria-label="Делаем мероприятие живым"
-            sx={{
-              fontFamily: BRAND_DISPLAY_FONT,
-              fontWeight: 800,
-              letterSpacing: { xs: "0.04em", sm: "0.08em" },
-              lineHeight: 1.05,
-              fontSize: {
-                xs: "clamp(1.2rem, 5.5vw, 1.65rem)",
-                sm: "clamp(1.6rem, 3.8vw, 2.15rem)",
-                md: "clamp(1.85rem, 3.2vw, 2.6rem)",
-              },
-              textTransform: "uppercase",
-              width: "100%",
-              m: 0,
-            }}
-          >
-            <Box
-              component="span"
-              sx={{ display: "block", whiteSpace: { xs: "normal", sm: "nowrap" } }}
-            >
-              Делаем мероприятие
+            <Box sx={{ minWidth: 0, flex: { md: "1 1 auto" }, pr: { md: 2 } }}>
+              <Typography
+                component="h1"
+                sx={{
+                  fontFamily: BRAND_DISPLAY_FONT,
+                  fontWeight: 800,
+                  letterSpacing: { xs: "0.06em", sm: "0.1em" },
+                  lineHeight: 0.95,
+                  fontSize: HERO_BRAND_FONT_SIZE,
+                  textTransform: "uppercase",
+                  m: 0,
+                  mb: { xs: 0.5, md: 1 },
+                  width: "fit-content",
+                }}
+              >
+                МИ
+                <Box
+                  component="span"
+                  sx={{
+                    color: "#fff",
+                    "@media (prefers-reduced-motion: no-preference)": {
+                      animation: `${heroZhivymAccent} ${HERO_FRAME_FADE_MS}ms ${HERO_FRAME_EASE} ${HERO_SCREEN_ON_DELAY_MS}ms both`,
+                    },
+                    "@media (prefers-reduced-motion: reduce)": {
+                      color: BRAND_ACCENT,
+                    },
+                  }}
+                >
+                  Ю
+                </Box>
+              </Typography>
+              <Typography
+                component="p"
+                sx={{
+                  fontFamily: BRAND_DISPLAY_FONT,
+                  fontWeight: 800,
+                  letterSpacing: { xs: "0.04em", sm: "0.06em" },
+                  lineHeight: 1.1,
+                  fontSize: {
+                    xs: "clamp(0.95rem, 3.8vw, 1.25rem)",
+                    sm: "clamp(1.2rem, 2.8vw, 1.65rem)",
+                    md: "clamp(1.5rem, 2.4vw, 2.1rem)",
+                  },
+                  textTransform: "uppercase",
+                  m: 0,
+                  whiteSpace: { xs: "normal", sm: "nowrap" },
+                }}
+              >
+                Делаем мероприятие
+              </Typography>
             </Box>
-            <Box
-              component="span"
+            <Typography
+              component="p"
+              aria-label="живым"
               sx={{
-                display: "block",
+                fontFamily: BRAND_DISPLAY_FONT,
+                fontWeight: 800,
+                fontSize: HERO_BRAND_FONT_SIZE,
+                letterSpacing: { xs: "0.06em", sm: "0.1em" },
+                lineHeight: 0.95,
+                textTransform: "uppercase",
+                m: 0,
                 color: "#fff",
-                textAlign: { xs: "left", sm: "right" },
-                whiteSpace: { xs: "normal", sm: "nowrap" },
+                whiteSpace: "nowrap",
+                width: "max-content",
+                flexShrink: 0,
+                textAlign: "right",
+                alignSelf: { xs: "flex-end", md: "flex-end" },
+                ml: { md: "auto" },
                 "@media (prefers-reduced-motion: no-preference)": {
                   animation: `${heroZhivymAccent} ${HERO_FRAME_FADE_MS}ms ${HERO_FRAME_EASE} ${HERO_SCREEN_ON_DELAY_MS}ms both`,
                 },
@@ -232,8 +268,8 @@ export function LandingHeroSection() {
               }}
             >
               живым
-            </Box>
-          </Typography>
+            </Typography>
+          </Box>
           <Box
             sx={{
               mt: { xs: 1.5, md: 1.75 },

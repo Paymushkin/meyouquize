@@ -39,9 +39,19 @@ export function BrandFooter() {
                   sx={{ width: 28, height: 28, display: "block" }}
                 />
                 <Box component="span" sx={{ color: "text.secondary", fontSize: 14 }}>
-                  © {year} МИЮ
+                  © {year} МИЮ (MeYou)
                 </Box>
               </Stack>
+              <Typography
+                sx={{
+                  color: "text.secondary",
+                  fontSize: 12,
+                  lineHeight: 1.45,
+                  opacity: 0.85,
+                }}
+              >
+                {lt("Ранее - MeYou, meyou.ru. Актуальный сайт - ameyou.ru.")}
+              </Typography>
               <Typography
                 sx={{
                   color: "text.secondary",
@@ -99,21 +109,70 @@ export function BrandFooter() {
             <Stack spacing={1.25} alignItems={{ xs: "flex-start", md: "flex-end" }}>
               <MuiLink
                 component={RouterLink}
-                to="/privacy"
+                to="/interactives"
                 underline="hover"
                 sx={{ color: "text.secondary", fontSize: 14 }}
               >
-                {lt("Политика конфиденциальности")}
+                {lt("Интерактивы")}
               </MuiLink>
               <MuiLink
                 component={RouterLink}
-                to="/cookies"
+                to="/flash-interview"
                 underline="hover"
                 sx={{ color: "text.secondary", fontSize: 14 }}
               >
-                {lt("Политика cookies")}
+                {lt("Флеш-интервью")}
+              </MuiLink>
+              <MuiLink
+                component={RouterLink}
+                to="/conference"
+                underline="hover"
+                sx={{ color: "text.secondary", fontSize: 14 }}
+              >
+                {lt("Конференция")}
+              </MuiLink>
+              <MuiLink
+                component={RouterLink}
+                to="/corporate"
+                underline="hover"
+                sx={{ color: "text.secondary", fontSize: 14 }}
+              >
+                {lt("Корпоратив")}
+              </MuiLink>
+              <MuiLink
+                component={RouterLink}
+                to="/pharma"
+                underline="hover"
+                sx={{ color: "text.secondary", fontSize: 14 }}
+              >
+                {lt("Фарм / экспертный")}
               </MuiLink>
             </Stack>
+          </Stack>
+
+          <Stack
+            direction="row"
+            flexWrap="wrap"
+            spacing={2}
+            useFlexGap
+            justifyContent={{ xs: "flex-start", md: "flex-end" }}
+          >
+            <MuiLink
+              component={RouterLink}
+              to="/privacy"
+              underline="hover"
+              sx={{ color: "text.secondary", fontSize: 13 }}
+            >
+              {lt("Политика конфиденциальности")}
+            </MuiLink>
+            <MuiLink
+              component={RouterLink}
+              to="/cookies"
+              underline="hover"
+              sx={{ color: "text.secondary", fontSize: 13 }}
+            >
+              {lt("Политика cookies")}
+            </MuiLink>
           </Stack>
         </Stack>
       </Container>

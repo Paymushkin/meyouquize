@@ -1,4 +1,5 @@
-import { Box, Container, Stack, Typography } from "@mui/material";
+import { Box, Container, Link as MuiLink, Stack, Typography } from "@mui/material";
+import { Link as RouterLink } from "react-router-dom";
 import {
   BRAND_ACCENT,
   BRAND_BORDER,
@@ -11,6 +12,7 @@ import { landingRevealSx, useLandingReveal } from "./useLandingReveal";
 const SCENARIOS = [
   {
     title: lt("Конференция"),
+    to: "/conference",
     pain: lt("Доклады идут, а диалога с залом нет"),
     gain: lt(
       "Голосования, облако тегов и вопросы спикерам с телефона - всё сразу на большом экране",
@@ -18,16 +20,19 @@ const SCENARIOS = [
   },
   {
     title: lt("Корпоратив"),
+    to: "/corporate",
     pain: lt("Сложно удержать внимание всего зала"),
     gain: lt("Один QR - квиз, реакции и розыгрыш без приложений и регистрации"),
   },
   {
     title: lt("Экспертный / фарм-ивент"),
+    to: "/pharma",
     pain: lt("Нужны модерация и измеримый отклик аудитории"),
     gain: lt("Вопросы с модерацией, точечные опросы и обратная связь по итогам сессии"),
   },
   {
     title: lt("Бренд-ивент"),
+    to: "/flash-interview",
     pain: lt("После площадки почти не остаётся живого контента"),
     gain: lt("Флеш-интервью и фотостена - кадры гостей сразу в вашем визуале"),
   },
@@ -81,16 +86,22 @@ export function LandingScenariosSection() {
                     : {}),
                 }}
               >
-                <Typography
+                <MuiLink
+                  component={RouterLink}
+                  to={item.to}
+                  underline="hover"
                   sx={{
                     fontFamily: BRAND_DISPLAY_FONT,
                     fontWeight: 700,
                     fontSize: { xs: "1.15rem", md: "1.25rem" },
                     color: BRAND_ACCENT,
+                    textDecoration: "none",
+                    width: "fit-content",
+                    "&:hover": { color: BRAND_ACCENT, opacity: 0.85 },
                   }}
                 >
                   {item.title}
-                </Typography>
+                </MuiLink>
                 <Typography sx={{ color: BRAND_TEXT_MUTED, lineHeight: 1.5 }}>
                   {item.pain}
                 </Typography>

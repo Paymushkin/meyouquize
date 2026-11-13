@@ -48,7 +48,7 @@ export function LandingContactProvider({ children }: { children: ReactNode }) {
         open={open}
         onClose={() => setOpen(false)}
         fullWidth
-        maxWidth="xs"
+        maxWidth={false}
         PaperProps={{
           sx: {
             bgcolor: "#0a0a0a",
@@ -56,9 +56,9 @@ export function LandingContactProvider({ children }: { children: ReactNode }) {
             border: `1px solid ${BRAND_BORDER}`,
             borderRadius: 0,
             backgroundImage: "none",
-            m: { xs: 1.5, sm: 2 },
-            width: { xs: "calc(100% - 24px)", sm: undefined },
-            maxWidth: { xs: "calc(100% - 24px)", sm: undefined },
+            m: 2,
+            width: "100%",
+            maxWidth: 420,
           },
         }}
         slotProps={{

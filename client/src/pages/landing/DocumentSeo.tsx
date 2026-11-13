@@ -60,7 +60,7 @@ export function DocumentSeo({
 
     upsertMeta("property", "og:type", path === "/" ? "website" : "article");
     upsertMeta("property", "og:locale", LANDING_SEO.locale);
-    upsertMeta("property", "og:site_name", "МИЮ");
+    upsertMeta("property", "og:site_name", "МИЮ (MeYou)");
     upsertMeta("property", "og:title", title);
     upsertMeta("property", "og:description", description);
     upsertMeta("property", "og:url", canonical);

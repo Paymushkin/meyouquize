@@ -1,6 +1,6 @@
 /* eslint-disable react-refresh/only-export-components */
 import React, { lazy, Suspense, useEffect } from "react";
-import { createRoot } from "react-dom/client";
+import { createRoot, hydrateRoot } from "react-dom/client";
 import { BrowserRouter, Outlet, Route, Routes } from "react-router-dom";
 import { CssBaseline, ThemeProvider, createTheme } from "@mui/material";
 import "@fontsource/manrope/400.css";
@@ -49,6 +49,29 @@ const LandingPrivacyPage = lazy(() =>
 );
 const LandingCookiesPage = lazy(() =>
   import("./pages/landing/LandingLegalPage").then((m) => ({ default: m.LandingCookiesPage })),
+);
+const LandingInteractivesPage = lazy(() =>
+  import("./pages/landing/LandingMarketingPage").then((m) => ({
+    default: m.LandingInteractivesPage,
+  })),
+);
+const LandingFlashInterviewPage = lazy(() =>
+  import("./pages/landing/LandingMarketingPage").then((m) => ({
+    default: m.LandingFlashInterviewPage,
+  })),
+);
+const LandingConferencePage = lazy(() =>
+  import("./pages/landing/LandingMarketingPage").then((m) => ({
+    default: m.LandingConferencePage,
+  })),
+);
+const LandingCorporatePage = lazy(() =>
+  import("./pages/landing/LandingMarketingPage").then((m) => ({
+    default: m.LandingCorporatePage,
+  })),
+);
+const LandingPharmaPage = lazy(() =>
+  import("./pages/landing/LandingMarketingPage").then((m) => ({ default: m.LandingPharmaPage })),
 );
 const SpeakerModeratorPage = lazy(() =>
   import("./pages/SpeakerModeratorPage").then((m) => ({ default: m.SpeakerModeratorPage })),
@@ -169,6 +192,46 @@ function App() {
       <Routes>
         <Route path="/" element={<LandingPage />} />
         <Route
+          path="/interactives"
+          element={
+            <Suspense fallback={null}>
+              <LandingInteractivesPage />
+            </Suspense>
+          }
+        />
+        <Route
+          path="/flash-interview"
+          element={
+            <Suspense fallback={null}>
+              <LandingFlashInterviewPage />
+            </Suspense>
+          }
+        />
+        <Route
+          path="/conference"
+          element={
+            <Suspense fallback={null}>
+              <LandingConferencePage />
+            </Suspense>
+          }
+        />
+        <Route
+          path="/corporate"
+          element={
+            <Suspense fallback={null}>
+              <LandingCorporatePage />
+            </Suspense>
+          }
+        />
+        <Route
+          path="/pharma"
+          element={
+            <Suspense fallback={null}>
+              <LandingPharmaPage />
+            </Suspense>
+          }
+        />
+        <Route
           path="/privacy"
           element={
             <Suspense fallback={null}>
@@ -217,8 +280,15 @@ window.addEventListener("vite:preloadError", (event) => {
   window.location.reload();
 });
 
-createRoot(document.getElementById("root")!).render(
+const rootEl = document.getElementById("root")!;
+const appTree = (
   <AppErrorBoundary>
     <App />
-  </AppErrorBoundary>,
+  </AppErrorBoundary>
 );
+// Prerendered landing ships markup in #root → hydrate; empty shell (dev / spa.html) → createRoot.
+if (rootEl.hasChildNodes()) {
+  hydrateRoot(rootEl, appTree);
+} else {
+  createRoot(rootEl).render(appTree);
+}
