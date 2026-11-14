@@ -42,17 +42,53 @@ www.{$DOMAIN} {
     file_server
   }
 
-  handle {
+  # SPA-приложение (админка / игрок / проектор) — shell, не marketing soft-404.
+  @spaApp {
+    path /admin /admin/* /q/* /p/* /s/* /report/* /403 /404
+  }
+  handle @spaApp {
     root * /opt/meyouquize/current/client/dist
-    # / → prerendered index.html; /privacy|/cookies → */index.html; else SPA shell
-    try_files {path} {path}/index.html /spa.html
+    rewrite * /spa.html
     file_server
   }
 
-  # Кастомные страницы для серверных ошибок: 500 — реальная ошибка backend,
-  # 502/503/504 — backend недоступен (например, во время деплоя/рестарта).
+  # Markdown для агентов (Accept: text/markdown) — до HTML try_files.
+  @wantMarkdown {
+    header Accept *text/markdown*
+  }
+  handle @wantMarkdown {
+    root * /opt/meyouquize/current/client/dist
+    try_files {path}.md {path}/index.md
+    header Content-Type "text/markdown; charset=utf-8"
+    header Vary Accept
+    file_server
+  }
+
+  handle {
+    root * /opt/meyouquize/current/client/dist
+    # / → index.html; /about → about/index.html; неизвестное → HTTP 404 (не spa.html)
+    try_files {path} {path}/index.html
+    header Vary Accept
+    file_server
+  }
+
+  # Кастомные страницы для серверных ошибок: 404 — агент-friendly; 500/502 — backend.
   handle_errors {
     root * /opt/meyouquize/current/client/dist
+    @err404 expression `{err.status_code} == 404`
+    handle @err404 {
+      @md404 {
+        header Accept *text/markdown*
+      }
+      handle @md404 {
+        rewrite * /404.md
+        header Content-Type "text/markdown; charset=utf-8"
+        header Vary Accept
+        file_server
+      }
+      rewrite * /404.html
+      file_server
+    }
     @err500 expression `{err.status_code} == 500`
     rewrite @err500 /errors/500.html
     @err502 expression `{err.status_code} in [502, 503, 504]`

@@ -56,6 +56,12 @@ const LandingPrivacyPage = lazy(() =>
 const LandingCookiesPage = lazy(() =>
   import("./pages/landing/LandingLegalPage").then((m) => ({ default: m.LandingCookiesPage })),
 );
+const LandingAboutPage = lazy(() =>
+  import("./pages/landing/LandingTrustPage").then((m) => ({ default: m.LandingAboutPage })),
+);
+const LandingContactPage = lazy(() =>
+  import("./pages/landing/LandingTrustPage").then((m) => ({ default: m.LandingContactPage })),
+);
 const LandingInteractivesPage = lazy(() =>
   import("./pages/landing/LandingMarketingPage").then((m) => ({
     default: m.LandingInteractivesPage,
@@ -250,6 +256,22 @@ function App() {
           element={
             <Suspense fallback={null}>
               <LandingCookiesPage />
+            </Suspense>
+          }
+        />
+        <Route
+          path="/about"
+          element={
+            <Suspense fallback={null}>
+              <LandingAboutPage />
+            </Suspense>
+          }
+        />
+        <Route
+          path="/contact"
+          element={
+            <Suspense fallback={null}>
+              <LandingContactPage />
             </Suspense>
           }
         />

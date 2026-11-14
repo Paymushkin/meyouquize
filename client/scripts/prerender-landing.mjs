@@ -63,6 +63,19 @@ const ROUTES = [
     readySelector: "h1",
     readyText: "Политика cookies",
   },
+  {
+    path: "/about",
+    outFile: "about/index.html",
+    // lt() ставит NBSP после «О» — ищем устойчивый фрагмент
+    readySelector: "#trust-page h1",
+    readyText: "компании МИЮ",
+  },
+  {
+    path: "/contact",
+    outFile: "contact/index.html",
+    readySelector: "#trust-page h1",
+    readyText: "Контакты",
+  },
 ];
 
 function getFreePort() {

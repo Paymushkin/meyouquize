@@ -36,15 +36,49 @@
     file_server
   }
 
+  @spaApp {
+    path /admin /admin/* /q/* /p/* /s/* /report/* /403 /404
+  }
+  handle @spaApp {
+    root * {$MQ_ROOT}/client/dist
+    rewrite * /spa.html
+    file_server
+  }
+
+  @wantMarkdown {
+    header Accept *text/markdown*
+  }
+  handle @wantMarkdown {
+    root * {$MQ_ROOT}/client/dist
+    try_files {path}.md {path}/index.md
+    header Content-Type "text/markdown; charset=utf-8"
+    header Vary Accept
+    file_server
+  }
+
   handle {
     root * {$MQ_ROOT}/client/dist
-    # / → prerendered index.html; /privacy|/cookies → */index.html; else SPA shell
-    try_files {path} {path}/index.html /spa.html
+    try_files {path} {path}/index.html
+    header Vary Accept
     file_server
   }
 
   handle_errors {
     root * {$MQ_ROOT}/client/dist
+    @err404 expression `{err.status_code} == 404`
+    handle @err404 {
+      @md404 {
+        header Accept *text/markdown*
+      }
+      handle @md404 {
+        rewrite * /404.md
+        header Content-Type "text/markdown; charset=utf-8"
+        header Vary Accept
+        file_server
+      }
+      rewrite * /404.html
+      file_server
+    }
     @err500 expression `{err.status_code} == 500`
     rewrite @err500 /errors/500.html
     @err502 expression `{err.status_code} in [502, 503, 504]`

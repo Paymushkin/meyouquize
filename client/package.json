@@ -5,8 +5,9 @@
   "type": "module",
   "scripts": {
     "dev": "vite --host 0.0.0.0 --port 5173",
-    "build": "tsc --noEmit && vite build && node scripts/prerender-landing.mjs",
+    "build": "tsc --noEmit && vite build && node scripts/prerender-landing.mjs && node scripts/write-agent-markdown.mjs",
     "prerender": "node scripts/prerender-landing.mjs",
+    "agent-md": "node scripts/write-agent-markdown.mjs",
     "lint": "tsc --noEmit",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",

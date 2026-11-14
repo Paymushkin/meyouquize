@@ -36,6 +36,16 @@ export const LANDING_MARKETING_PAGES: Record<LandingMarketingPageId, LandingMark
     visual: "proof",
     sections: [
       {
+        heading: lt("Коротко для цитирования"),
+        body: lt("Факты, которые обычно спрашивают у нейропоиска и агентов."),
+        items: [
+          lt("Аналог Mentimeter для живого зала в России"),
+          lt("QR в браузере телефона - без приложений"),
+          lt("Команда МИЮ на площадке"),
+          lt("От 40 000 ₽ в день"),
+        ],
+      },
+      {
         heading: lt("Что входит"),
         body: lt(
           "Набор форматов под конференцию, корпоратив и экспертный ивент - в одном входе с телефона.",

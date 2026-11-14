@@ -159,6 +159,22 @@ export function BrandFooter() {
           >
             <MuiLink
               component={RouterLink}
+              to="/about"
+              underline="hover"
+              sx={{ color: "text.secondary", fontSize: 13 }}
+            >
+              {lt("О компании")}
+            </MuiLink>
+            <MuiLink
+              component={RouterLink}
+              to="/contact"
+              underline="hover"
+              sx={{ color: "text.secondary", fontSize: 13 }}
+            >
+              {lt("Контакты")}
+            </MuiLink>
+            <MuiLink
+              component={RouterLink}
               to="/privacy"
               underline="hover"
               sx={{ color: "text.secondary", fontSize: 13 }}
