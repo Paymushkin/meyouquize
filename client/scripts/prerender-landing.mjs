@@ -235,12 +235,14 @@ async function main() {
     console.error("[prerender] failed:", err);
     if (previewLog.trim()) console.error("[prerender] preview log:\n", previewLog);
     await shutdown();
-    process.exitCode = 1;
-    return;
+    process.exit(1);
   }
 
   await shutdown();
   console.log("[prerender] done");
 }
 
-main();
+main().catch((err) => {
+  console.error("[prerender] fatal:", err);
+  process.exit(1);
+});
