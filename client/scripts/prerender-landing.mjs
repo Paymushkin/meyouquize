@@ -49,7 +49,7 @@ const ROUTES = [
     path: "/pharma",
     outFile: "pharma/index.html",
     readySelector: "#marketing-page h1",
-    readyText: "экспертные",
+    readyText: "экспертных",
   },
   {
     path: "/privacy",
