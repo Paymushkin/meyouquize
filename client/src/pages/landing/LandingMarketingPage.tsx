@@ -15,7 +15,7 @@ import { LandingCookieBanner } from "./LandingCookieBanner";
 import { DocumentSeo } from "./DocumentSeo";
 import { LandingFlashInterviewSection } from "./LandingFlashInterviewSection";
 import { LandingProofSection } from "./LandingProofSection";
-import { buildOrganizationJsonLd, buildServiceJsonLd } from "./landingSeo";
+import { buildFaqJsonLd, buildOrganizationJsonLd, buildServiceJsonLd } from "./landingSeo";
 import { useLandingContact } from "./LandingContactDialog";
 import { LANDING_MARKETING_PAGES, type LandingMarketingPageId } from "./landingMarketingPages";
 
@@ -31,7 +31,7 @@ export function LandingMarketingPage({ pageId }: { pageId: LandingMarketingPageI
         title={page.documentTitle}
         description={page.description}
         path={page.path}
-        jsonLd={[buildOrganizationJsonLd(), buildServiceJsonLd()]}
+        jsonLd={[buildOrganizationJsonLd(), buildServiceJsonLd(), buildFaqJsonLd(page.faq)]}
       />
       <BrandHeader />
       <Box
@@ -177,6 +177,45 @@ export function LandingMarketingPage({ pageId }: { pageId: LandingMarketingPageI
                 ) : null}
               </Box>
             ))}
+
+            <Box
+              component="section"
+              sx={{ pt: { xs: 1, md: 1.5 }, borderTop: `1px solid ${BRAND_BORDER}` }}
+            >
+              <Typography
+                component="h2"
+                sx={{
+                  fontFamily: BRAND_DISPLAY_FONT,
+                  fontWeight: 800,
+                  letterSpacing: "0.04em",
+                  textTransform: "uppercase",
+                  fontSize: { xs: "1.15rem", md: "1.35rem" },
+                  mb: 1.5,
+                }}
+              >
+                {lt("Частые вопросы")}
+              </Typography>
+              <Stack spacing={2}>
+                {page.faq.map((item) => (
+                  <Box key={item.q}>
+                    <Typography
+                      component="h3"
+                      sx={{
+                        fontWeight: 700,
+                        fontSize: { xs: "0.98rem", md: "1.05rem" },
+                        mb: 0.5,
+                        lineHeight: 1.35,
+                      }}
+                    >
+                      {item.q}
+                    </Typography>
+                    <Typography sx={{ color: BRAND_TEXT_MUTED, lineHeight: 1.55 }}>
+                      {item.a}
+                    </Typography>
+                  </Box>
+                ))}
+              </Stack>
+            </Box>
 
             <Box sx={{ pt: 1, borderTop: `1px solid ${BRAND_BORDER}` }}>
               <Typography

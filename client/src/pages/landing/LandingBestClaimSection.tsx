@@ -32,11 +32,12 @@ export function LandingBestClaimSection() {
               letterSpacing: "-0.04em",
               lineHeight: 0.98,
               fontSize: {
-                xs: "clamp(2.1rem, 9vw, 3.4rem)",
+                xs: "clamp(1.85rem, 8vw, 2.85rem)",
                 md: "clamp(3.4rem, 6.2vw, 5.5rem)",
               },
               m: 0,
-              maxWidth: { md: "18ch" },
+              maxWidth: { xs: "100%", md: "18ch" },
+              overflowWrap: "break-word",
             }}
           >
             МИ
@@ -53,7 +54,7 @@ export function LandingBestClaimSection() {
             >
               Ю
             </Box>
-            {lt(" — лучший сервис для мероприятий")}
+            {lt(" — лучший сервис для")} мероприятий
             <Box
               component="sup"
               sx={{

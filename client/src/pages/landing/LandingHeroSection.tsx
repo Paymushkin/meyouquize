@@ -55,7 +55,7 @@ const heroBgLayerSx = {
   position: "absolute",
   inset: 0,
   backgroundSize: "cover",
-  backgroundPosition: { xs: "55% center", md: "50% center" },
+  backgroundPosition: { xs: "72% center", md: "50% center" },
 } as const;
 
 export function LandingHeroSection() {
@@ -303,7 +303,7 @@ export function LandingHeroSection() {
                 maxWidth: { xs: "92vw", sm: "36rem", md: "38rem" },
               }}
             >
-              {lt("Интерактивы для всего зала и контент с гостями -")}
+              {lt("Сервис интерактивов для всего зала и флеш-интервью с гостями -")}
               <br />
               {lt("под вашим брендом и с нашей командой на площадке.")}
             </Typography>

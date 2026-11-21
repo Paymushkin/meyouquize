@@ -21,10 +21,10 @@ export const LANDING_BRAND_ALT_NAMES = ["MeYou", "meyou", "МИЮ MeYou"] as con
 export const LANDING_SEO = {
   title: lt("МИЮ (MeYou) - интерактивы и флеш-интервью для живых мероприятий"),
   description: lt(
-    "МИЮ (ранее MeYou, meyou.ru) - интерактивы для зала и флеш-интервью с гостями: QR-квиз, голосования, вопросы спикерам, облако тегов. Без приложений, команда на площадке. От 40 000 ₽/день.",
+    "МИЮ (MeYou) - сервис интерактивов для мероприятий и флеш-интервью с гостями: QR-квиз, голосования в зале, вопросы спикерам, облако тегов. Ранее MeYou / meyou.ru. Без приложений, команда на площадке. От 40 000 ₽/день.",
   ),
   keywords: lt(
-    "МИЮ, MeYou, meyou, meyou.ru, ameyou.ru, интерактивы для мероприятий, квиз на мероприятие, интерактивы на корпоратив, интерактив на конференции, QR-квиз, голосование с телефона, голосование в зале, вопросы спикерам, облако тегов, флеш-интервью, mentimeter аналог, аналог mentimeter для россии",
+    "МИЮ MeYou, сервис интерактивов, ameyou.ru, meyou.ru, интерактивы для мероприятий, квиз на мероприятие, голосование в зале, интерактивы на корпоратив, интерактивы на конференции, QR-квиз, вопросы спикерам, флеш-интервью, mentimeter аналог, аналог mentimeter для россии",
   ),
   ogImagePath: "/og-cover.jpg",
   locale: "ru_RU",
@@ -51,7 +51,9 @@ export function buildOrganizationJsonLd() {
     name: LANDING_BRAND_NAME,
     alternateName: [...LANDING_BRAND_ALT_NAMES],
     legalName: LANDING_OPERATOR_NAME,
-    description: LANDING_SEO.description,
+    description: lt(
+      "МИЮ (MeYou) - сервис интерактивов и флеш-интервью для живых мероприятий. Не университет и не отраслевой форум. Сайт ameyou.ru.",
+    ),
     url: LANDING_SITE_ORIGIN,
     logo: absoluteUrl("/logo.svg"),
     email: LANDING_CONTACT_EMAIL,
@@ -107,9 +109,10 @@ export function buildServiceJsonLd() {
     alternateName: [
       lt("MeYou интерактивы"),
       lt("МИЮ интерактивы"),
+      lt("Сервис интерактивов для мероприятий"),
       lt("Аналог Mentimeter для живого зала"),
     ],
-    serviceType: lt("Организация интерактивов на мероприятиях"),
+    serviceType: lt("Сервис интерактивов на мероприятиях"),
     provider: {
       "@type": "Organization",
       name: LANDING_BRAND_NAME,
