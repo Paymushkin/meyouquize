@@ -155,6 +155,8 @@ async function main() {
       cwd: clientRoot,
       stdio: ["ignore", "pipe", "pipe"],
       shell: process.platform === "win32",
+      // Own process group so we can kill npx + vite children together.
+      detached: process.platform !== "win32",
       env: { ...process.env, BROWSER: "none" },
     },
   );
@@ -168,11 +170,22 @@ async function main() {
   });
 
   const shutdown = async () => {
-    if (!preview.killed) {
-      preview.kill("SIGTERM");
-      await new Promise((r) => setTimeout(r, 300));
-      if (!preview.killed) preview.kill("SIGKILL");
+    const pid = preview.pid;
+    if (!pid) return;
+    try {
+      if (process.platform !== "win32") {
+        process.kill(-pid, "SIGKILL");
+      } else {
+        preview.kill("SIGKILL");
+      }
+    } catch {
+      try {
+        preview.kill("SIGKILL");
+      } catch {
+        /* already gone */
+      }
     }
+    await new Promise((r) => setTimeout(r, 200));
   };
 
   try {
